@@ -185,7 +185,7 @@
     if(state.playing)return stopProgression();if(!allCards().length){$('status').textContent='Add at least one chord or note first.';return;}
     state.playing=true;setRiderBonesRiding(true);$('playAllBtn').textContent='■ Stop';await ensureAudio();let idx=0;
     const step=async()=>{if(!state.playing)return;const list=state.rows.flatMap((r,ri)=>r.map((c,ci)=>({c,ri,ci})));if(!list.length)return stopProgression();if(idx>=list.length){if($('loopToggle').checked)idx=0;else return stopProgression();}
-      const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4,ms=60000/bpm*beats,item=list[idx++];await playCard(item.c,Math.max(.4,ms/1000*.88));document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');document.querySelector(`.progression-line[data-row="${item.ri}"]`)?.querySelectorAll('.chord-card')[item.ci]?.style.setProperty('outline','2px solid var(--accent)');state.timer=setTimeout(step,ms);};step();
+      const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4,ms=60000/bpm*beats,item=list[idx++];await playCard(item.c,Math.max(.4,ms/1000*1.03));document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');document.querySelector(`.progression-line[data-row="${item.ri}"]`)?.querySelectorAll('.chord-card')[item.ci]?.style.setProperty('outline','2px solid var(--accent)');state.timer=setTimeout(step,ms);};step();
   }
   function stopProgression(){state.playing=false;clearTimeout(state.timer);state.timer=null;setRiderBonesRiding(false);$('playAllBtn').textContent='▶ Play';document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');}
 
