@@ -94,7 +94,12 @@
   async function playCard(card,seconds=1.5){
     const p=await ensureAudio(),val=displayedValue(card);let notes;
     if(card.type==='note'){const oct=(state.instrument==='piano'?4:3)+state.octave;notes=[val+oct];}
-    else notes=chordNotes(val,(state.instrument==='piano'?4:3)+state.octave);
+    else if(state.instrument==='guitar'){
+      // Play the actual selected guitar voicing so what you hear matches the diagram.
+      const frets=guitarShapeForCard(card),opens=[40,45,50,55,59,64];
+      notes=frets.map((f,i)=>f==null?null:noteAtMidi(opens[i]+f+state.capo+state.octave*12)).filter(Boolean);
+      if(!notes.length)notes=chordNotes(val,3+state.octave);
+    }else notes=chordNotes(val,4+state.octave);
     if(state.sound==='electric_bass_finger')notes=notes.slice(0,card.type==='note'?1:3).map(n=>noteAtMidi(midiOf(n)-12));
     const now=state.audioCtx.currentTime;notes.forEach((n,i)=>p.play(n,now+(state.instrument==='guitar'?i*.035:0),{duration:seconds,gain:.72}));
   }
@@ -111,18 +116,106 @@
     return `<svg viewBox="0 0 ${w} ${h}"><text x="4" y="12" fill="#9aa3ad" font-size="11">Octave ${state.octave>0?'+':''}${state.octave}</text>${ws}${bs}</svg>`;
   }
 
+  function chordCoreIntervals(c){
+    const q=c.quality;
+    if(q==='dim'||q==='dim7'||q==='m7b5')return[0,3,6];
+    if(q==='aug')return[0,4,8];
+    if(q==='sus2')return[0,2,7];
+    if(q==='sus4')return[0,5,7];
+    return q.startsWith('m')&&!q.startsWith('maj')?[0,3,7]:[0,4,7];
+  }
+  function seventhInterval(c){
+    if(['7','9','m7','m9','m7b5'].includes(c.quality))return 10;
+    if(['maj7','maj9'].includes(c.quality))return 11;
+    if(c.quality==='dim7')return 9;
+    return null;
+  }
+  function extensionInterval(c){
+    if(['9','maj9','m9','add9','madd9'].includes(c.quality))return 2;
+    if(['6','m6'].includes(c.quality))return 9;
+    return null;
+  }
+  function fretCandidates(stringMidi,pc,maxFret=15){
+    const out=[];for(let f=0;f<=maxFret;f++)if((stringMidi+f)%12===pc)out.push(f);return out;
+  }
+  function permutations(a){
+    if(a.length<=1)return[a.slice()];const out=[];
+    a.forEach((v,i)=>permutations(a.slice(0,i).concat(a.slice(i+1))).forEach(p=>out.push([v,...p])));return out;
+  }
+  function compactVoicing(pcs,strings,inversionPc=null){
+    const opens=[40,45,50,55,59,64],choices=[];
+    permutations(pcs).forEach(order=>{
+      const lists=order.map((pc,i)=>fretCandidates(opens[strings[i]],pc));
+      const walk=(i,frets)=>{if(i===lists.length){
+        const abs=frets.map((f,j)=>opens[strings[j]]+f),min=Math.min(...frets),max=Math.max(...frets),span=max-min;
+        const lowestPc=abs[abs.indexOf(Math.min(...abs))]%12;
+        let score=span*7+frets.reduce((a,b)=>a+b,0)/frets.length+(max>12?6:0)+(min===0?-.5:0);
+        if(inversionPc!=null&&lowestPc!==inversionPc)score+=35;
+        choices.push({frets,score});return;
+      };
+      lists[i].forEach(f=>walk(i+1,[...frets,f]));};walk(0,[]);
+    });
+    if(!choices.length)return null;choices.sort((a,b)=>a.score-b.score);const full=Array(6).fill(null);choices[0].frets.forEach((f,i)=>full[strings[i]]=f);return full;
+  }
+  function barreShape(name){
+    const c=parseChord(name);if(!c)return[null,null,null,null,null,null];
+    const f=(NOTE_INDEX[c.root]-NOTE_INDEX.E+12)%12,q=c.quality;
+    if(q==='m'||q==='m7'||q==='m9'||q==='m6'||q==='madd9')return q==='m7'?[f,f+2,f,f,f,f]:[f,f+2,f+2,f,f,f];
+    if(q==='7'||q==='9')return[f,f+2,f,f+1,f,f];
+    if(q==='maj7'||q==='maj9')return[f,f+2,f+1,f+1,f,f];
+    if(q==='sus4')return[f,f+2,f+2,f+2,f,f];
+    return[f,f+2,f+2,f+1,f,f];
+  }
+  function powerShape(name){
+    const c=parseChord(name);if(!c)return[null,null,null,null,null,null];
+    const e=(NOTE_INDEX[c.root]-NOTE_INDEX.E+12)%12;
+    if(e<=8)return[e,e+2,e+2,null,null,null];
+    const a=(NOTE_INDEX[c.root]-NOTE_INDEX.A+12)%12;
+    return[null,a,a+2,a+2,null,null];
+  }
+  function triadShape(name,inversion=false){
+    const c=parseChord(name);if(!c)return[null,null,null,null,null,null];
+    const pcs=chordCoreIntervals(c).map(i=>(NOTE_INDEX[c.root]+i)%12),inv=inversion?pcs[1]:pcs[0];
+    return compactVoicing(pcs,[3,4,5],inv)||compactVoicing(pcs,[2,3,4],inv)||barreShape(name);
+  }
+  function shellShape(name){
+    const c=parseChord(name);if(!c)return[null,null,null,null,null,null];const root=NOTE_INDEX[c.root],core=chordCoreIntervals(c),sev=seventhInterval(c);
+    const ints=sev==null?[0,core[1],core[2]]:[0,core[1],sev],pcs=ints.map(i=>(root+i)%12);
+    return compactVoicing(pcs,[2,3,4],pcs[0])||compactVoicing(pcs,[1,2,3],pcs[0])||triadShape(name,false);
+  }
+  function colorShape(name){
+    const c=parseChord(name);if(!c)return[null,null,null,null,null,null];const root=NOTE_INDEX[c.root],core=chordCoreIntervals(c),sev=seventhInterval(c),ext=extensionInterval(c);
+    let ints;
+    if(ext!=null)ints=[0,core[1],sev==null?core[2]:sev,ext];
+    else if(sev!=null)ints=[0,core[1],core[2],sev];
+    else if(c.quality==='sus2'||c.quality==='sus4')ints=[0,core[1],core[2],12+core[1]];
+    else ints=[0,core[1],core[2],14];
+    const pcs=ints.map(i=>(root+i)%12);return compactVoicing(pcs,[2,3,4,5],pcs[0])||barreShape(name);
+  }
   function genericGuitarShape(name){
     if(GUITAR_SHAPES[name])return GUITAR_SHAPES[name].slice();
-    const c=parseChord(name),root=NOTE_INDEX[c.root],fret=((root-NOTE_INDEX.E+12)%12)||12,minor=c.quality.startsWith('m')&&!c.quality.startsWith('maj');
-    return minor?[fret,fret+2,fret+2,fret,fret,fret]:[fret,fret+2,fret+2,fret+1,fret,fret];
+    return barreShape(name);
+  }
+  function guitarShapeForName(name){
+    switch(state.neck){
+      case'triad':return triadShape(name,false);
+      case'barre':return barreShape(name);
+      case'power':return powerShape(name);
+      case'shell':return shellShape(name);
+      case'inversion':return triadShape(name,true);
+      case'color':return colorShape(name);
+      default:return genericGuitarShape(name);
+    }
+  }
+  function guitarShapeForCard(card){
+    if(card.type==='note'){const p=guitarNotePosition(shapeValue(card)),a=Array(6).fill(null);if(p)a[p.s]=p.f;return a;}
+    return guitarShapeForName(shapeValue(card));
   }
   function guitarNotePosition(note){const target=NOTE_INDEX[note],opens=[40,45,50,55,59,64];let best=null;for(let s=0;s<6;s++)for(let f=0;f<=12;f++)if((opens[s]+f)%12===target){const score=f+(s<2?0:2);if(!best||score<best.score)best={s,f,score};}return best;}
   function guitarSvg(card){
     const shape=shapeValue(card),shown=displayedValue(card),W=360,H=245,L=55,T=36,sg=48,fg=35,nf=5,tuning=['E','A','D','G','B','E'];let frets,start=1;
     if(card.type==='note'){const p=guitarNotePosition(shape);start=Math.max(1,p?.f>4?p.f-1:1);frets=Array(6).fill(null);if(p)frets[p.s]=p.f;}
-    else{frets=genericGuitarShape(shape);const pos=frets.filter(f=>f>0);start=pos.length?Math.max(1,Math.min(...pos)):1;}
-    if(state.neck==='higher'&&card.type==='chord'){frets=frets.map(f=>f==null||f===0?f:f+12);start+=12;}
-    if(state.neck==='lower'&&start>5&&card.type==='chord'){frets=frets.map(f=>f==null||f===0?f:Math.max(1,f-5));start=Math.max(1,start-5);}
+    else{frets=guitarShapeForName(shape);const pos=frets.filter(f=>f>0);start=frets.includes(0)?1:(pos.length?Math.max(1,Math.min(...pos)):1);}
     let svg=`<svg viewBox="0 0 ${W} ${H}"><text x="10" y="18" fill="#9aa3ad" font-size="12">${state.capo?`Capo ${state.capo}${state.transpose?' • transpose view':''}`:`Fret ${start}`}</text>`;
     for(let s=0;s<6;s++){const x=L+s*sg;svg+=`<line x1="${x}" y1="${T}" x2="${x}" y2="${T+nf*fg}" stroke="#d8dde4" stroke-width="${1+s*.12}"/><text x="${x}" y="${T+nf*fg+24}" text-anchor="middle" fill="#8f99a5" font-size="12">${tuning[s]}</text>`;}
     for(let f=0;f<=nf;f++){const y=T+f*fg;svg+=`<line x1="${L}" y1="${y}" x2="${L+5*sg}" y2="${y}" stroke="${f===0?'#f3f4f6':'#737d89'}" stroke-width="${f===0?4:1.4}"/>`;}
@@ -131,9 +224,12 @@
   }
 
   function subtitle(card){
-    if(state.instrument!=='guitar'||!state.capo)return'';
-    const shape=shapeValue(card),sound=displayedValue(card);
-    return state.transpose?`${card.value} shape → sounds ${sound}`:(shape===card.value?`Capo ${state.capo}`:`Play ${shape} shape → sounds ${card.value}`);
+    if(state.instrument!=='guitar')return'';
+    const labels={open:'Open / Easy',triad:'Triad',barre:'Barre Chord',power:'Power Chord',shell:'Shell Voicing',inversion:'1st Inversion',color:'Color / Extended'};
+    const shape=shapeValue(card),sound=displayedValue(card),kind=card.type==='chord'?labels[state.neck]||labels.open:'';
+    if(!state.capo)return kind;
+    const capoText=state.transpose?`${card.value} shape → sounds ${sound}`:(shape===card.value?`Capo ${state.capo}`:`Play ${shape} shape → sounds ${card.value}`);
+    return [kind,capoText].filter(Boolean).join(' • ');
   }
 
   function moveDragged(toRow,toIndex){
@@ -176,7 +272,7 @@
   function renderSound(){const s=$('soundSelect');s.innerHTML='';SOUNDS[state.instrument].forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;s.appendChild(o);});if(!SOUNDS[state.instrument].some(x=>x[0]===state.sound))state.sound=SOUNDS[state.instrument][0][0];s.value=state.sound;}
   function renderAll(){
     renderSound();document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.classList.toggle('active',b.dataset.instrument===state.instrument));document.querySelectorAll('#modeTabs .seg').forEach(b=>b.classList.toggle('active',b.dataset.mode===state.mode));
-    $('octaveValue').textContent=state.octave>0?'+'+state.octave:state.octave;$('capoWrap').style.display=$('neckWrap').style.display=$('transposeWrap').style.display=state.instrument==='guitar'?'':'none';
+    $('octaveValue').textContent=state.octave>0?'+'+state.octave:state.octave;$('capoWrap').style.display=$('transposeWrap').style.display=state.instrument==='guitar'?'':'none';$('neckWrap').style.display=state.instrument==='guitar'&&state.mode==='chord'?'':'none';$('neckSelect').value=state.neck;
     $('transposeBtn').textContent=state.transpose?'Transpose ON':'Transpose OFF';$('transposeBtn').classList.toggle('on',state.transpose);$('transposeBtn').setAttribute('aria-pressed',String(state.transpose));
     $('chordInput').placeholder=state.mode==='chord'?'Enter chords, e.g. Em A7 Cmaj7 B7':'Enter notes, e.g. E F# A B';renderFits();renderRows();
   }
@@ -225,7 +321,7 @@
   async function refreshCloudProjects(){if(!accountUser){cloudProjects=null;cloudSyncState='idle';renderProjects();return;}cloudSyncState='syncing';updateAccountSummary();try{const d=await api('/api/projects');cloudProjects=d.projects||[];cloudProjects.forEach(upsertLocal);cloudSyncState='ready';updateAccountSummary();renderProjects();}catch(e){cloudSyncState='error';updateAccountSummary();$('status').textContent='Cloud sync unavailable — using local backup.';renderProjects();}}
   async function saveProject(){const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);state.currentProjectId=p.id;$('projectName').value=name;upsertLocal(p);if(accountUser){try{const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});upsertLocal(d.project);await refreshCloudProjects();$('status').textContent=`Saved “${name}” to cloud.`;}catch(e){$('status').textContent=`Saved locally; cloud sync failed: ${e.message}`;}}else{$('status').textContent=`Saved “${name}” on this device.`;renderProjects();}}
   function projectSource(){return (accountUser&&cloudProjects)?cloudProjects:localProjects();}
-  function loadProject(id){const p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;state.currentProjectId=id;state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=p.neck||'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;renderAll();}
+  function loadProject(id){const p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;state.currentProjectId=id;state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;renderAll();}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
   function renderProjects(){const w=$('projectList'),ps=[...projectSource()].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));$('projectStorageLabel').textContent=accountUser?'Synced to your cloud account':'Saved on this device';w.innerHTML=ps.length?'':'<div class="subtle">No saved projects yet.</div>';ps.forEach(p=>{const e=document.createElement('div');e.className='project-item';const count=p.rows?p.rows.flat().length:(p.chords||[]).length;e.innerHTML=`<div class="name">${esc(p.name)}</div><div class="meta">${count} cards</div><button class="open">Open</button><button class="rename">Rename</button><button class="delete">Delete</button>`;e.querySelector('.open').onclick=()=>loadProject(p.id);e.querySelector('.rename').onclick=async()=>{const n=prompt('New project name:',p.name);if(!n?.trim())return;const name=n.trim();const locals=localProjects(),i=locals.findIndex(x=>x.id===p.id);if(i>=0){locals[i].name=name;locals[i].updatedAt=Date.now();saveLocalProjects(locals);}if(accountUser){try{await api('/api/projects/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({name})});await refreshCloudProjects();}catch(err){$('status').textContent='Rename saved locally; cloud sync failed.';renderProjects();}}else renderProjects();};e.querySelector('.delete').onclick=async()=>{if(!confirm(`Delete “${p.name}”?`))return;saveLocalProjects(localProjects().filter(x=>x.id!==p.id));if(accountUser){try{await api('/api/projects/'+encodeURIComponent(p.id),{method:'DELETE'});await refreshCloudProjects();}catch(err){$('status').textContent='Deleted locally; cloud delete failed.';renderProjects();}}else renderProjects();};w.appendChild(e);});}
   function showAccount(){const logged=!!accountUser;const panel=$('accountPanel');panel?.classList.toggle('is-logged-in',logged);$('accountSummaryBtn').hidden=!logged;$('authForms').hidden=logged;$('accountTools').hidden=!logged;$('logoutBtn').hidden=!logged;$('accountStatus').textContent=logged?`Signed in as ${accountDisplayName()}`:'Not signed in — local projects still work.';$('projectStorageLabel').textContent=logged?'Synced to your cloud account':'Saved on this device';if(logged){updateAccountSummary();setAccountCollapsed(true);}else{setAccountCollapsed(false);cloudSyncState='idle';}renderProjects();}
