@@ -461,6 +461,7 @@
     }
     state.playing = true;
     state.playIndex = 0;
+    setRiderBonesRiding(true);
     $('playAllBtn').textContent = '■ Stop';
     await ensureAudio();
     runProgressionStep();
