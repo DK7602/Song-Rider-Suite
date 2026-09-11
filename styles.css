@@ -174,3 +174,25 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
 .account-panel.is-logged-in:not(.is-collapsed) .account-summary-btn {
   margin-bottom:10px;
 }
+
+
+/* v1.5 — mobile chord suggestions: single-row horizontal scroller */
+@media (max-width:700px) {
+  #compatibleChords {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+    gap: 8px;
+    padding: 2px 2px 9px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  #compatibleChords::-webkit-scrollbar { display:none; }
+  #compatibleChords .chip {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
