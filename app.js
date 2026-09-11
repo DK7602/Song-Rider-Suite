@@ -219,8 +219,8 @@
   }
 
   function createPianoSvg(chord) {
-    // Show ONE intentional chord voicing, not every duplicate pitch class
-    // visible across the keyboard.
+    // Compact, dynamic keyboard: show only the range needed for the selected
+    // voicing, plus a little musical context on each side.
     const baseOctave = 4 + state.octave;
     const noteNames = chordNotes(chord, baseOctave);
 
@@ -230,57 +230,66 @@
       return (Number(m[3]) + 1) * 12 + NOTE_INDEX[m[1] + m[2]];
     }
 
-    const targetMidis = new Set(noteNames.map(noteToMidi).filter(n => n != null));
+    const chordMidis = noteNames.map(noteToMidi).filter(n => n != null);
+    const targetMidis = new Set(chordMidis);
 
-    // Display two octaves beginning on C of the selected octave.
-    // This is wide enough to show root-position triads/sevenths for every root
-    // without repeating any chord tone.
-    const startMidi = (baseOctave + 1) * 12; // C of baseOctave
-    const endMidi = startMidi + 24;          // through B of next octave
-    const whiteW = 40;
-    const whiteCount = 14;
-    const width = whiteCount * whiteW;
+    // Pad the voicing by a few semitones, then snap the visible edges to
+    // natural (white) keys so the keyboard looks intentional.
+    let startMidi = Math.min(...chordMidis) - 4;
+    let endMidi = Math.max(...chordMidis) + 5; // exclusive-ish upper padding
+
+    const isBlack = midi => NOTE_NAMES[((midi % 12) + 12) % 12].includes('#');
+    while (isBlack(startMidi)) startMidi--;
+    while (isBlack(endMidi - 1)) endMidi++;
+
+    // Guarantee enough context for a simple triad, while allowing 7ths,
+    // 9ths, add chords, etc. to expand naturally when their voicing spans farther.
+    while (endMidi - startMidi < 13) {
+      startMidi--;
+      if (isBlack(startMidi)) startMidi--;
+      if (endMidi - startMidi >= 13) break;
+      endMidi++;
+      if (isBlack(endMidi - 1)) endMidi++;
+    }
+
+    const visibleWhites = [];
+    for (let midi = startMidi; midi < endMidi; midi++) {
+      if (!isBlack(midi)) visibleWhites.push(midi);
+    }
+
+    const whiteW = 46;
+    const width = visibleWhites.length * whiteW;
     const height = 164;
-
     let whites = '';
     let blacks = '';
-    let whiteIndex = 0;
     const whiteXByMidi = new Map();
 
-    // Draw white keys first.
-    for (let midi = startMidi; midi < endMidi; midi++) {
-      const pc = NOTE_NAMES[midi % 12];
-      if (pc.includes('#')) continue;
-
-      const x = whiteIndex * whiteW;
+    visibleWhites.forEach((midi, i) => {
+      const pc = NOTE_NAMES[((midi % 12) + 12) % 12];
+      const x = i * whiteW;
       whiteXByMidi.set(midi, x);
       const hit = targetMidis.has(midi);
 
       whites += `<rect x="${x}" y="18" width="${whiteW}" height="132" rx="2" fill="${hit ? '#e9c46a' : '#f6f2e7'}" stroke="#171717" stroke-width="2"/>`;
-
       if (hit) {
-        whites += `<text x="${x + whiteW / 2}" y="136" text-anchor="middle" font-size="15" font-weight="800" fill="#161616">${pc}</text>`;
+        whites += `<text x="${x + whiteW / 2}" y="136" text-anchor="middle" font-size="16" font-weight="800" fill="#161616">${pc}</text>`;
       }
-      whiteIndex++;
-    }
+    });
 
-    // Draw black keys in their exact octave positions.
+    // Draw only black keys whose surrounding white-key position is visible.
     for (let midi = startMidi; midi < endMidi; midi++) {
-      const pc = NOTE_NAMES[midi % 12];
-      if (!pc.includes('#')) continue;
-
-      // A black key sits after the preceding natural key.
+      if (!isBlack(midi)) continue;
       const prevWhiteMidi = midi - 1;
       const prevX = whiteXByMidi.get(prevWhiteMidi);
       if (prevX == null) continue;
 
+      const pc = NOTE_NAMES[((midi % 12) + 12) % 12];
       const hit = targetMidis.has(midi);
-      const bx = prevX + whiteW - 13;
+      const bx = prevX + whiteW - 14;
 
-      blacks += `<rect x="${bx}" y="18" width="26" height="82" rx="2" fill="${hit ? '#f4a261' : '#1a1a1a'}" stroke="#080808" stroke-width="1.5"/>`;
-
+      blacks += `<rect x="${bx}" y="18" width="28" height="82" rx="2" fill="${hit ? '#f4a261' : '#1a1a1a'}" stroke="#080808" stroke-width="1.5"/>`;
       if (hit) {
-        blacks += `<text x="${bx + 13}" y="78" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">${pc}</text>`;
+        blacks += `<text x="${bx + 14}" y="78" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">${pc}</text>`;
       }
     }
 
