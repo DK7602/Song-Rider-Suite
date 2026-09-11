@@ -130,3 +130,13 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
   .chord-card { flex-basis:100%; width:100%; }
   .progression-line { padding:10px; }
 }
+
+/* v1.4 private accounts + cloud sync */
+.account-panel { padding-top:12px; padding-bottom:12px; }
+.account-heading { margin-top:0; align-items:center; }
+.account-heading > div { display:grid; gap:3px; }
+.auth-wrap { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+.auth-box { display:grid; gap:8px; background:#11151a; border:1px solid #343c46; border-radius:12px; padding:12px; }
+.auth-box h3 { margin:0 0 2px; font-size:.92rem; color:var(--accent); }
+.account-tools { margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+@media(max-width:700px){.auth-wrap{grid-template-columns:1fr}.account-panel{padding:12px}}

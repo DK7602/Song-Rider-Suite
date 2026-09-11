@@ -1,35 +1,63 @@
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
+const enc = new TextEncoder();
+const COOKIE = 'crp_session';
+const ITERATIONS = 210000;
+const SESSION_DAYS = 30;
 
-    if (url.pathname === "/api/health") {
-      try {
-        const row = await env.DB.prepare("SELECT 1 AS ok").first();
-        return Response.json({
-          ok: row?.ok === 1,
-          app: "Chord Rider Pro",
-          database: "connected"
-        });
-      } catch (error) {
-        return Response.json(
-          {
-            ok: false,
-            app: "Chord Rider Pro",
-            database: "error",
-            error: String(error?.message || error)
-          },
-          { status: 500 }
-        );
-      }
-    }
+const json = (data, status=200, headers={}) => Response.json(data,{status,headers:{'Cache-Control':'no-store',...headers}});
+const b64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+const unb64 = s => Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+const randomToken = (n=32) => { const a=new Uint8Array(n); crypto.getRandomValues(a); return b64(a).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); };
+async function sha256(s){return b64(await crypto.subtle.digest('SHA-256',enc.encode(s)));}
+async function hashPassword(password,saltB64,iterations=ITERATIONS){
+  const key=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:unb64(saltB64),iterations},key,256);
+  return b64(bits);
+}
+function safeEqual(a,b){if(typeof a!=='string'||typeof b!=='string'||a.length!==b.length)return false;let x=0;for(let i=0;i<a.length;i++)x|=a.charCodeAt(i)^b.charCodeAt(i);return x===0;}
+function cookie(request,name){const raw=request.headers.get('Cookie')||'';for(const part of raw.split(';')){const [k,...v]=part.trim().split('=');if(k===name)return decodeURIComponent(v.join('='));}return null;}
+function sessionCookie(token,maxAge=SESSION_DAYS*86400){return `${COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;}
+async function body(request){try{return await request.json();}catch{return {};}}
+async function userFor(request,env){
+  const token=cookie(request,COOKIE); if(!token)return null; const tokenHash=await sha256(token); const now=Date.now();
+  const row=await env.DB.prepare(`SELECT users.id, users.email, users.display_name FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.token_hash=? AND sessions.expires_at>?`).bind(tokenHash,now).first();
+  return row||null;
+}
+async function createSession(userId,env){const token=randomToken(),id=crypto.randomUUID(),now=Date.now();await env.DB.prepare('INSERT INTO sessions (id,user_id,token_hash,expires_at,created_at) VALUES (?,?,?,?,?)').bind(id,userId,await sha256(token),now+SESSION_DAYS*86400000,now).run();return token;}
+function validPassword(p){return typeof p==='string'&&p.length>=8&&p.length<=200;}
+function validEmail(e){return typeof e==='string'&&e.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);}
 
-    if (url.pathname.startsWith("/api/")) {
-      return Response.json(
-        { ok: false, error: "API route not found" },
-        { status: 404 }
-      );
-    }
-
-    return env.ASSETS.fetch(request);
+async function api(request,env,url){
+  const path=url.pathname, method=request.method;
+  if(path==='/api/health') {try{const r=await env.DB.prepare('SELECT 1 ok').first();return json({ok:r?.ok===1,app:'Chord Rider Pro',database:'connected'});}catch(e){return json({ok:false,error:String(e?.message||e)},500);}}
+  if(path==='/api/auth/me'&&method==='GET'){const u=await userFor(request,env);return json({ok:true,user:u});}
+  if(path==='/api/auth/register'&&method==='POST'){
+    const b=await body(request), email=String(b.email||'').trim().toLowerCase(), displayName=String(b.displayName||'').trim().slice(0,80), password=String(b.password||''), invite=String(b.inviteCode||'');
+    if(!env.INVITE_CODE||!safeEqual(invite,String(env.INVITE_CODE)))return json({ok:false,error:'Invalid invite code.'},403);
+    if(!validEmail(email))return json({ok:false,error:'Enter a valid email address.'},400); if(!validPassword(password))return json({ok:false,error:'Password must be at least 8 characters.'},400);
+    if(await env.DB.prepare('SELECT id FROM users WHERE email=? COLLATE NOCASE').bind(email).first())return json({ok:false,error:'An account already exists for that email.'},409);
+    const salt=b64(crypto.getRandomValues(new Uint8Array(16))), hash=await hashPassword(password,salt), id=crypto.randomUUID(), now=Date.now();
+    await env.DB.prepare('INSERT INTO users (id,email,display_name,password_hash,password_salt,password_iterations,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)').bind(id,email,displayName||null,hash,salt,ITERATIONS,now,now).run();
+    const token=await createSession(id,env);return json({ok:true,user:{id,email,display_name:displayName||null}},201,{'Set-Cookie':sessionCookie(token)});
   }
-};
+  if(path==='/api/auth/login'&&method==='POST'){
+    const b=await body(request),email=String(b.email||'').trim().toLowerCase(),password=String(b.password||'');
+    const u=await env.DB.prepare('SELECT * FROM users WHERE email=? COLLATE NOCASE').bind(email).first(); if(!u)return json({ok:false,error:'Email or password is incorrect.'},401);
+    const hash=await hashPassword(password,u.password_salt,u.password_iterations||ITERATIONS);if(!safeEqual(hash,u.password_hash))return json({ok:false,error:'Email or password is incorrect.'},401);
+    const token=await createSession(u.id,env);return json({ok:true,user:{id:u.id,email:u.email,display_name:u.display_name}},200,{'Set-Cookie':sessionCookie(token)});
+  }
+  if(path==='/api/auth/logout'&&method==='POST'){
+    const token=cookie(request,COOKIE);if(token)await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await sha256(token)).run();return json({ok:true},200,{'Set-Cookie':sessionCookie('',0)});
+  }
+  if(path==='/api/auth/password'&&method==='POST'){
+    const u=await userFor(request,env);if(!u)return json({ok:false,error:'Please log in.'},401);const b=await body(request),oldP=String(b.currentPassword||''),newP=String(b.newPassword||'');if(!validPassword(newP))return json({ok:false,error:'New password must be at least 8 characters.'},400);
+    const full=await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(u.id).first(), oldHash=await hashPassword(oldP,full.password_salt,full.password_iterations||ITERATIONS);if(!safeEqual(oldHash,full.password_hash))return json({ok:false,error:'Current password is incorrect.'},403);
+    const salt=b64(crypto.getRandomValues(new Uint8Array(16))),hash=await hashPassword(newP,salt),now=Date.now();await env.DB.batch([env.DB.prepare('UPDATE users SET password_hash=?,password_salt=?,password_iterations=?,updated_at=? WHERE id=?').bind(hash,salt,ITERATIONS,now,u.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(u.id)]);const token=await createSession(u.id,env);return json({ok:true},200,{'Set-Cookie':sessionCookie(token)});
+  }
+  const u=await userFor(request,env);if(!u)return json({ok:false,error:'Please log in.'},401);
+  if(path==='/api/projects'&&method==='GET'){const rs=await env.DB.prepare('SELECT id,name,data,created_at,updated_at FROM projects WHERE user_id=? ORDER BY updated_at DESC').bind(u.id).all();return json({ok:true,projects:(rs.results||[]).map(r=>{let data={};try{data=JSON.parse(r.data)}catch{}return {...data,id:r.id,name:r.name,createdAt:r.created_at,updatedAt:r.updated_at};})});}
+  if(path==='/api/projects'&&method==='POST'){const b=await body(request),p=b.project||{},id=String(p.id||crypto.randomUUID()),name=String(p.name||'Untitled Project').trim().slice(0,160)||'Untitled Project',now=Date.now();const existing=await env.DB.prepare('SELECT created_at FROM projects WHERE id=? AND user_id=?').bind(id,u.id).first();const clean={...p,id,name};await env.DB.prepare(`INSERT INTO projects(id,user_id,name,data,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,data=excluded.data,updated_at=excluded.updated_at WHERE user_id=?`).bind(id,u.id,name,JSON.stringify(clean),existing?.created_at||now,now,u.id).run();return json({ok:true,project:{...clean,updatedAt:now}});}
+  const m=path.match(/^\/api\/projects\/([^/]+)$/);if(m){const id=decodeURIComponent(m[1]);if(method==='DELETE'){await env.DB.prepare('DELETE FROM projects WHERE id=? AND user_id=?').bind(id,u.id).run();return json({ok:true});}if(method==='PATCH'){const b=await body(request),name=String(b.name||'').trim().slice(0,160);if(!name)return json({ok:false,error:'Project name is required.'},400);const r=await env.DB.prepare('SELECT data FROM projects WHERE id=? AND user_id=?').bind(id,u.id).first();if(!r)return json({ok:false,error:'Project not found.'},404);let d={};try{d=JSON.parse(r.data)}catch{}d.name=name;d.updatedAt=Date.now();await env.DB.prepare('UPDATE projects SET name=?,data=?,updated_at=? WHERE id=? AND user_id=?').bind(name,JSON.stringify(d),d.updatedAt,id,u.id).run();return json({ok:true});}}
+  return json({ok:false,error:'API route not found.'},404);
+}
+
+export default {async fetch(request,env){const url=new URL(request.url);if(url.pathname.startsWith('/api/'))return api(request,env,url);return env.ASSETS.fetch(request);}};
