@@ -21,7 +21,10 @@
   </header>
 
   <main class="app-shell">
-    <section class="panel account-panel">
+    <section id="accountPanel" class="panel account-panel">
+      <button id="accountSummaryBtn" class="account-summary-btn" type="button" hidden aria-expanded="false">
+        ☁ Cloud Account
+      </button>
       <div class="section-heading-row account-heading">
         <div><h2>Cloud Account</h2><span id="accountStatus" class="subtle">Checking account…</span></div>
         <button id="logoutBtn" type="button" hidden>Log out</button>

@@ -140,3 +140,37 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
 .auth-box h3 { margin:0 0 2px; font-size:.92rem; color:var(--accent); }
 .account-tools { margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 @media(max-width:700px){.auth-wrap{grid-template-columns:1fr}.account-panel{padding:12px}}
+
+
+/* v1.4.2 — compact cloud account bar after sign-in */
+.account-summary-btn {
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  min-height:44px;
+  padding:10px 14px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:var(--panel-2);
+  color:var(--text);
+  font-weight:800;
+  text-align:left;
+}
+.account-summary-btn .cloud-state {
+  color:var(--accent);
+  font-weight:800;
+}
+.account-panel.is-logged-in.is-collapsed {
+  padding:8px;
+}
+.account-panel.is-logged-in.is-collapsed .account-heading,
+.account-panel.is-logged-in.is-collapsed #authForms,
+.account-panel.is-logged-in.is-collapsed #accountTools,
+.account-panel.is-logged-in.is-collapsed #authMessage {
+  display:none !important;
+}
+.account-panel.is-logged-in:not(.is-collapsed) .account-summary-btn {
+  margin-bottom:10px;
+}
