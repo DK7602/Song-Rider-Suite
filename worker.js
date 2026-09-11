@@ -1,6 +1,6 @@
 const enc = new TextEncoder();
 const COOKIE = 'crp_session';
-const ITERATIONS = 210000;
+const ITERATIONS = 100000;
 const SESSION_DAYS = 30;
 
 const json = (data, status=200, headers={}) => Response.json(data,{status,headers:{'Cache-Control':'no-store',...headers}});
