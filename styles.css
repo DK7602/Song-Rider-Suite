@@ -230,3 +230,29 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
     white-space: nowrap;
   }
 }
+
+
+/* v2.2 — hard-contained mobile Chords-that-fit scroller */
+@media (max-width:700px) {
+  #compatibleChords {
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    width:calc(100vw - 44px) !important;
+    max-width:calc(100vw - 44px) !important;
+    min-width:0 !important;
+    overflow-x:scroll !important;
+    overflow-y:hidden !important;
+    gap:8px !important;
+    padding:2px 0 10px !important;
+    margin-top:9px;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-x;
+  }
+  #compatibleChords::-webkit-scrollbar { display:none; }
+  #compatibleChords > .chip {
+    flex:0 0 auto !important;
+    width:auto !important;
+    white-space:nowrap !important;
+  }
+}

@@ -105,3 +105,67 @@
     min-width:30px;
   }
 }
+
+
+/* v2.2 — contain Beat + Drums + Volume inside mobile viewport */
+@media(max-width:700px){
+  .crp-beat-controls{
+    display:grid !important;
+    grid-template-columns:minmax(118px,1.25fr) auto minmax(92px,.9fr) !important;
+    align-items:center !important;
+    column-gap:6px !important;
+    row-gap:0 !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    overflow:hidden !important;
+  }
+
+  .crp-beat-controls .crp-beat-btn{
+    min-width:0 !important;
+    width:100% !important;
+    padding:9px 7px !important;
+    font-size:.78rem !important;
+    white-space:nowrap !important;
+  }
+
+  .crp-beat-controls .check-label{
+    min-width:0 !important;
+    margin:0 !important;
+    gap:4px !important;
+    font-size:.72rem !important;
+    white-space:nowrap !important;
+  }
+
+  .crp-beat-controls .check-label input{
+    margin:0 !important;
+  }
+
+  .crp-beat-controls .crp-volume-main{
+    display:grid !important;
+    grid-template-columns:auto minmax(38px,1fr) auto !important;
+    align-items:center !important;
+    gap:3px !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+    font-size:.68rem !important;
+    white-space:nowrap !important;
+  }
+
+  .crp-beat-controls .crp-volume-main input[type="range"]{
+    display:block !important;
+    width:100% !important;
+    min-width:38px !important;
+    max-width:72px !important;
+    margin:0 !important;
+    padding:0 !important;
+  }
+
+  .crp-beat-controls .crp-volume-main span{
+    min-width:25px !important;
+    width:auto !important;
+    font-size:.68rem !important;
+    text-align:right !important;
+  }
+}
