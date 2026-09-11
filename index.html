@@ -21,36 +21,7 @@
   </header>
 
   <main class="app-shell">
-    <section id="accountPanel" class="panel account-panel">
-      <button id="accountSummaryBtn" class="account-summary-btn" type="button" hidden aria-expanded="false">
-        ☁ Cloud Account
-      </button>
-      <div class="section-heading-row account-heading">
-        <div><h2>Cloud Account</h2><span id="accountStatus" class="subtle">Checking account…</span></div>
-        <button id="logoutBtn" type="button" hidden>Log out</button>
-      </div>
-      <div id="authForms" class="auth-wrap" hidden>
-        <div class="auth-box">
-          <h3>Log in</h3>
-          <input id="loginEmail" type="email" autocomplete="email" placeholder="Email" />
-          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password" />
-          <button id="loginBtn" class="accent" type="button">Log in</button>
-        </div>
-        <div class="auth-box">
-          <h3>Create account</h3>
-          <input id="registerName" type="text" autocomplete="name" placeholder="Name (optional)" />
-          <input id="registerEmail" type="email" autocomplete="email" placeholder="Email" />
-          <input id="registerPassword" type="password" autocomplete="new-password" placeholder="Password (8+ characters)" />
-          <input id="inviteCode" type="password" autocomplete="off" placeholder="Private invite code" />
-          <button id="registerBtn" class="accent" type="button">Create account</button>
-        </div>
-      </div>
-      <div id="accountTools" class="account-tools" hidden>
-        <button id="changePasswordBtn" type="button">Change password</button>
-        <span class="subtle">Projects sync to your private cloud account. This device also keeps a local backup.</span>
-      </div>
-      <div id="authMessage" class="status" aria-live="polite"></div>
-    </section>
+    
     <section class="panel composer-panel">
       <div class="toolbar primary-toolbar">
         <div class="segmented" id="instrumentTabs" aria-label="Instrument">
@@ -175,6 +146,38 @@
       </div>
       <div id="notesEditor" class="notes-editor" contenteditable="true"
         data-placeholder="Song ideas, voicing notes, lyric notes, production reminders…"></div>
+    </section>
+  
+
+    <section id="accountPanel" class="panel account-panel">
+      <button id="accountSummaryBtn" class="account-summary-btn" type="button" hidden aria-expanded="false">
+        ☁ Cloud Account
+      </button>
+      <div class="section-heading-row account-heading">
+        <div><h2>Cloud Account</h2><span id="accountStatus" class="subtle">Checking account…</span></div>
+        <button id="logoutBtn" type="button" hidden>Log out</button>
+      </div>
+      <div id="authForms" class="auth-wrap" hidden>
+        <div class="auth-box">
+          <h3>Log in</h3>
+          <input id="loginEmail" type="email" autocomplete="email" placeholder="Email" />
+          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password" />
+          <button id="loginBtn" class="accent" type="button">Log in</button>
+        </div>
+        <div class="auth-box">
+          <h3>Create account</h3>
+          <input id="registerName" type="text" autocomplete="name" placeholder="Name (optional)" />
+          <input id="registerEmail" type="email" autocomplete="email" placeholder="Email" />
+          <input id="registerPassword" type="password" autocomplete="new-password" placeholder="Password (8+ characters)" />
+          <input id="inviteCode" type="password" autocomplete="off" placeholder="Private invite code" />
+          <button id="registerBtn" class="accent" type="button">Create account</button>
+        </div>
+      </div>
+      <div id="accountTools" class="account-tools" hidden>
+        <button id="changePasswordBtn" type="button">Change password</button>
+        <span class="subtle">Projects sync to your private cloud account. This device also keeps a local backup.</span>
+      </div>
+      <div id="authMessage" class="status" aria-live="polite"></div>
     </section>
   </main>
 
