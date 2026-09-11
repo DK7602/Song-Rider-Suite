@@ -24,8 +24,13 @@
     <section class="panel composer-panel">
       <div class="toolbar primary-toolbar">
         <div class="segmented" id="instrumentTabs" aria-label="Instrument">
-          <button class="seg active" data-instrument="guitar">Guitar</button>
-          <button class="seg" data-instrument="piano">Piano</button>
+          <button class="seg active" data-instrument="piano">Piano</button>
+          <button class="seg" data-instrument="guitar">Guitar</button>
+        </div>
+
+        <div class="segmented" id="modeTabs" aria-label="Chord or note mode">
+          <button class="seg active" data-mode="chord">Chord</button>
+          <button class="seg" data-mode="note">Note</button>
         </div>
 
         <label>
@@ -55,6 +60,11 @@
             <option value="lower">Lower voicing</option>
           </select>
         </label>
+
+        <label id="transposeWrap">
+          Capo mode
+          <button id="transposeBtn" class="toggle-btn" type="button" aria-pressed="false">Transpose OFF</button>
+        </label>
       </div>
 
       <div class="entry-row">
@@ -67,7 +77,7 @@
 
       <div>
         <div class="section-heading-row">
-          <h2>Chords that fit</h2>
+          <h2 id="fitHeading">Chords that fit</h2>
           <span id="keyHint" class="subtle"></span>
         </div>
         <div id="compatibleChords" class="chip-row"></div>
@@ -94,10 +104,14 @@
         </label>
       </div>
 
-      <p class="drag-tip">Tap a diagram to hear it. Long-press, then drag to reorder it. Drag onto the “new line” target to start a new row.</p>
+      <div class="line-actions">
+        <button id="addLineBtn" type="button">＋ Add blank line</button>
+        <span class="subtle">Tap a line to select it. New chords/notes go to the selected line.</span>
+      </div>
 
-      <div id="progression" class="progression" aria-label="Chord progression"></div>
-      <button id="newLineDrop" class="new-line-drop" type="button">↳ Drop / tap here to start a new line</button>
+      <p class="drag-tip">Tap a card to hear it. Long-press/drag any card within a line or between lines. Empty lines are allowed.</p>
+
+      <div id="progression" class="progression" aria-label="Chord and note progression"></div>
     </section>
 
     <section class="panel save-panel">

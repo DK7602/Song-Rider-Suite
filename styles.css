@@ -22,9 +22,7 @@ button { cursor: pointer; }
   background: rgba(13,15,18,.92); backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
 }
-.brand-mark { width: 86px; height: 64px; object-fit: contain; flex:0 0 auto; }
-.brand-copy { flex:1; min-width:0; }
-.brand-right { margin-left:auto; }
+.brand-mark { width: 76px; height: 58px; object-fit: contain; }
 h1 { margin:0; font-size: clamp(1.4rem, 4vw, 2.1rem); letter-spacing:.02em; }
 .tagline { margin:2px 0 0; color:var(--muted); font-size:.9rem; }
 .app-shell { width:min(1180px, 100%); margin:0 auto; padding:16px; display:grid; gap:16px; }
@@ -89,9 +87,7 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
 
 @media (max-width: 700px) {
   .app-header { position:static; }
-  .brand-mark { width:62px; height:56px; }
-  .brand-right { display:none; }
-  .app-header { gap:10px; }
+  .brand-mark { width:64px; }
   .app-shell { padding:10px; }
   .panel { border-radius:14px; padding:12px; }
   .toolbar > label { flex:1 1 44%; }
@@ -100,4 +96,37 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
   .chord-card { width:100%; min-width:0; }
   .project-item { flex-wrap:wrap; }
   .project-item .name { flex-basis:60%; }
+}
+
+
+/* v1.3 multi-line card workflow */
+.toggle-btn { min-width:132px; }
+.toggle-btn.on { background:var(--accent); color:#17130a; border-color:#d7b654; font-weight:800; }
+.line-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:14px 0 8px; }
+.progression { display:grid; gap:12px; min-height:0; }
+.progression-line {
+  position:relative; display:flex; flex-wrap:wrap; gap:12px;
+  min-height:92px; padding:12px; border:1px dashed #3d4652;
+  border-radius:16px; background:#0e1115;
+  transition:border-color .15s, box-shadow .15s, background .15s;
+}
+.progression-line.selected {
+  border-color:var(--accent); box-shadow:0 0 0 3px rgba(233,196,106,.10); background:#12161b;
+}
+.progression-line.drop-target { border-color:var(--accent2); }
+.line-badge {
+  position:absolute; top:-10px; left:14px; background:var(--panel); color:var(--muted);
+  font-size:.68rem; padding:1px 7px; border-radius:999px;
+}
+.progression-line.selected .line-badge { color:var(--accent); }
+.empty-line {
+  width:100%; min-height:64px; display:flex; align-items:center; justify-content:center;
+  color:#65707c; font-size:.8rem; pointer-events:none;
+}
+.chord-card { flex:0 0 min(240px, calc(50% - 6px)); }
+.chord-card.note-card .chord-name::before { content:"♪ "; }
+.card-subtitle { color:var(--muted); font-size:.72rem; margin:-4px 0 7px; }
+@media (max-width:700px) {
+  .chord-card { flex-basis:100%; width:100%; }
+  .progression-line { padding:10px; }
 }
