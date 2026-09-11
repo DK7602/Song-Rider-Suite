@@ -176,24 +176,44 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
 }
 
 
-/* v1.6 — ONLY "Chords that fit" scrolls horizontally on mobile */
+/* v1.7 — contained mobile "Chords that fit" scroller */
 @media (max-width:700px) {
+  /* Keep the app centered and prevent any child from widening the page. */
   html, body {
+    width: 100%;
     max-width: 100%;
     overflow-x: hidden;
   }
 
+  .container,
+  .app,
+  main,
+  section,
+  .card,
+  .panel,
+  .controls,
+  .control-row {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Only this row scrolls horizontally. */
   #compatibleChords {
     display: flex;
-    flex-wrap: nowrap;
+    flex-flow: row nowrap;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
     max-width: 100%;
     min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
     gap: 8px;
-    padding: 2px 2px 9px;
+    padding: 2px 0 10px;
+    box-sizing: border-box;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    touch-action: pan-x;
     overscroll-behavior-x: contain;
   }
 
