@@ -447,3 +447,32 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
     opacity:1 !important;
   }
 }
+
+
+/* v2.5 — widen Beats/chord selector so selected number is always visible */
+@media (max-width:700px) {
+  .play-row {
+    grid-template-columns: 86px 72px minmax(72px,1fr) 112px !important;
+  }
+
+  .play-row .beats-control {
+    display:grid !important;
+    grid-template-columns: 40px 64px !important;
+    gap:5px !important;
+    justify-content:end !important;
+    align-items:center !important;
+    min-width:109px !important;
+  }
+
+  .play-row #beatsSelect {
+    width:64px !important;
+    min-width:64px !important;
+    max-width:64px !important;
+    padding:7px 22px 7px 10px !important;
+    text-align:left !important;
+    text-align-last:left !important;
+    color:var(--text) !important;
+    -webkit-text-fill-color:var(--text) !important;
+    opacity:1 !important;
+  }
+}
