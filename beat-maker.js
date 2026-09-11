@@ -48,7 +48,7 @@
   function freshBeat(){
     const tracks = {};
     DRUMS.forEach(([id]) => tracks[id] = Array.from({length:16}, () => []));
-    return {version:VERSION, enabled:true, bars:1, resolution:16, gain:.78, tracks};
+    return {version:VERSION, enabled:true, bars:1, resolution:16, gain:.65, tracks};
   }
   function normalizeBeat(src){
     const b = freshBeat();
@@ -56,7 +56,7 @@
     b.enabled = src.enabled !== false;
     b.bars = clamp(+src.bars || 1, 1, 16);
     b.resolution = [8,16,32,64].includes(+src.resolution) ? +src.resolution : 16;
-    b.gain = Math.max(.1, Math.min(1.2, +src.gain || .78));
+    b.gain = Math.max(0, Math.min(1, Number.isFinite(+src.gain) ? +src.gain : .65));
     DRUMS.forEach(([id]) => {
       const bars = src.tracks && Array.isArray(src.tracks[id]) ? src.tracks[id] : [];
       b.tracks[id] = Array.from({length:16}, (_,bar) => {
@@ -114,7 +114,8 @@
     wrap.className='crp-beat-controls';
     wrap.innerHTML = `
       <button id="crpBeatBtn" class="crp-beat-btn" type="button">🥁 Beat</button>
-      <label class="check-label"><input id="crpDrumsToggle" type="checkbox" checked> Drums</label>`;
+      <label class="check-label"><input id="crpDrumsToggle" type="checkbox" checked> Drums</label>
+      <label class="crp-volume-main">Vol <input id="crpDrumVolume" type="range" min="0" max="100" step="1" value="65"><span id="crpDrumVolumeValue">65%</span></label>`;
     playRow.insertAdjacentElement('afterend', wrap);
 
     const modal = document.createElement('div');
@@ -125,6 +126,7 @@
           <h2>🥁 Beat Maker</h2>
           <label class="crp-beat-tool">Bars <select id="crpBarsSelect">${Array.from({length:16},(_,i)=>`<option>${i+1}</option>`).join('')}</select></label>
           <label class="crp-beat-tool">Grid <select id="crpResolution"><option value="8">1/8</option><option value="16">1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
+          <label class="crp-beat-tool crp-volume-tool">Volume <input id="crpBeatVolume" type="range" min="0" max="100" step="1" value="65"><span id="crpBeatVolumeValue">65%</span></label>
           <button id="crpBeatClose" type="button">✕</button>
         </div>
         <div class="crp-beat-body">
@@ -149,6 +151,13 @@
     modal.addEventListener('click', e => { if(e.target===modal) closeEditor(); });
     $('crpBeatSave').addEventListener('click', ()=>{ persistBeatIntoProject(); closeEditor(); updateMainControls(); });
     $('crpDrumsToggle').addEventListener('change', e=>{ beat.enabled=e.target.checked; persistBeatIntoProject(); updateMainControls(); });
+    const setVolume = value => {
+      beat.gain = clamp(+value / 100, 0, 1);
+      updateVolumeControls();
+      persistBeatIntoProject();
+    };
+    $('crpDrumVolume').addEventListener('input', e=>setVolume(e.target.value));
+    $('crpBeatVolume').addEventListener('input', e=>setVolume(e.target.value));
     $('crpBarsSelect').addEventListener('change', e=>{ beat.bars=clamp(+e.target.value,1,16); currentBar=clamp(currentBar,0,beat.bars-1); renderEditor(); });
     $('crpResolution').addEventListener('change', e=>{ beat.resolution=+e.target.value; renderGrid(); });
     $('crpPreview').addEventListener('click', ()=> previewing ? stopPreview() : startPreview());
@@ -190,8 +199,16 @@
     });
   }
 
+  function updateVolumeControls(){
+    const pct=Math.round(beat.gain*100);
+    if($('crpDrumVolume')) $('crpDrumVolume').value=String(pct);
+    if($('crpDrumVolumeValue')) $('crpDrumVolumeValue').textContent=`${pct}%`;
+    if($('crpBeatVolume')) $('crpBeatVolume').value=String(pct);
+    if($('crpBeatVolumeValue')) $('crpBeatVolumeValue').textContent=`${pct}%`;
+  }
   function updateMainControls(){
     if($('crpDrumsToggle')) $('crpDrumsToggle').checked=beat.enabled;
+    updateVolumeControls();
     if($('crpBeatBtn')){
       const hits=countHits();
       $('crpBeatBtn').classList.toggle('has-beat', hits>0);
@@ -206,7 +223,7 @@
   }
   function closeEditor(){ stopPreview(); $('crpBeatModal')?.classList.remove('open'); }
   function renderEditor(){
-    $('crpBarsSelect').value=String(beat.bars); $('crpResolution').value=String(beat.resolution);
+    $('crpBarsSelect').value=String(beat.bars); $('crpResolution').value=String(beat.resolution); updateVolumeControls();
     renderBarTabs(); renderGrid();
     $('crpBeatStatus').textContent=`${countHits()} hits • BPM ${getBpm()}`;
   }
