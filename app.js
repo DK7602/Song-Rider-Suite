@@ -14,7 +14,9 @@
     player: null,
     playerName: '',
     currentProjectId: null,
-    dragIndex: null
+    dragIndex: null,
+    playIndex: 0,
+    currentChordStartedAt: 0
   };
 
   const SOUNDSETS = {
@@ -407,6 +409,40 @@
     renderProgression();
   }
 
+  function getChordDurationMs() {
+    const bpm = Math.max(40, Math.min(240, Number($('bpmInput').value) || 92));
+    const beats = Number($('beatsSelect').value) || 4;
+    return 60000 / bpm * beats;
+  }
+
+  function rescheduleForTempoChange() {
+    if (!state.playing) return;
+    if (state.loopTimer) clearTimeout(state.loopTimer);
+    const chordMs = getChordDurationMs();
+    state.loopTimer = setTimeout(runProgressionStep, chordMs);
+    $('status').textContent = `Tempo: ${Math.round(60000 * Number($('beatsSelect').value || 4) / chordMs)} BPM`;
+    setTimeout(() => { if ($('status').textContent.startsWith('Tempo:')) $('status').textContent = ''; }, 900);
+  }
+
+  async function runProgressionStep() {
+    if (!state.playing || !state.chords.length) return;
+    const chordMs = getChordDurationMs();
+    const i = state.playIndex;
+    state.currentChordStartedAt = performance.now();
+    await playChord(state.chords[i], Math.max(.5, chordMs/1000*.88));
+    if (!state.playing) return;
+
+    const cards = [...document.querySelectorAll('.chord-card')];
+    cards.forEach((c,idx) => c.style.outline = idx === i ? '2px solid var(--accent)' : '');
+
+    state.playIndex += 1;
+    if (state.playIndex >= state.chords.length) {
+      if ($('loopToggle').checked) state.playIndex = 0;
+      else return stopProgression();
+    }
+    state.loopTimer = setTimeout(runProgressionStep, chordMs);
+  }
+
   async function playProgression() {
     if (state.playing) return stopProgression();
     if (!state.chords.length) {
@@ -414,32 +450,17 @@
       return;
     }
     state.playing = true;
+    state.playIndex = 0;
     $('playAllBtn').textContent = '■ Stop';
     await ensureAudio();
-    const bpm = Math.max(40, Math.min(240, Number($('bpmInput').value) || 92));
-    const beats = Number($('beatsSelect').value) || 4;
-    const chordMs = 60000 / bpm * beats;
-
-    let i = 0;
-    const step = async () => {
-      if (!state.playing) return;
-      await playChord(state.chords[i], Math.max(.5, chordMs/1000*.88));
-      const cards = [...document.querySelectorAll('.chord-card')];
-      cards.forEach((c,idx) => c.style.outline = idx === i ? '2px solid var(--accent)' : '');
-      i++;
-      if (i >= state.chords.length) {
-        if ($('loopToggle').checked) i = 0;
-        else return stopProgression();
-      }
-      state.loopTimer = setTimeout(step, chordMs);
-    };
-    step();
+    runProgressionStep();
   }
 
   function stopProgression() {
     state.playing = false;
     if (state.loopTimer) clearTimeout(state.loopTimer);
     state.loopTimer = null;
+    state.playIndex = 0;
     $('playAllBtn').textContent = '▶ Play';
     document.querySelectorAll('.chord-card').forEach(c => c.style.outline = '');
   }
@@ -589,6 +610,9 @@
     $('capoSelect').onchange = e => { state.capo = Number(e.target.value); renderAll(); };
     $('neckSelect').onchange = e => { state.neck = e.target.value; renderAll(); };
     $('playAllBtn').onclick = playProgression;
+    $('bpmInput').addEventListener('input', rescheduleForTempoChange);
+    $('bpmInput').addEventListener('change', rescheduleForTempoChange);
+    $('beatsSelect').addEventListener('change', rescheduleForTempoChange);
 
     $('newLineDrop').onclick = () => {
       if (state.dragIndex != null) {

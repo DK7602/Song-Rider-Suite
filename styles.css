@@ -22,7 +22,9 @@ button { cursor: pointer; }
   background: rgba(13,15,18,.92); backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
 }
-.brand-mark { width: 76px; height: 58px; object-fit: contain; }
+.brand-mark { width: 86px; height: 64px; object-fit: contain; flex:0 0 auto; }
+.brand-copy { flex:1; min-width:0; }
+.brand-right { margin-left:auto; }
 h1 { margin:0; font-size: clamp(1.4rem, 4vw, 2.1rem); letter-spacing:.02em; }
 .tagline { margin:2px 0 0; color:var(--muted); font-size:.9rem; }
 .app-shell { width:min(1180px, 100%); margin:0 auto; padding:16px; display:grid; gap:16px; }
@@ -87,7 +89,9 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
 
 @media (max-width: 700px) {
   .app-header { position:static; }
-  .brand-mark { width:64px; }
+  .brand-mark { width:62px; height:56px; }
+  .brand-right { display:none; }
+  .app-header { gap:10px; }
   .app-shell { padding:10px; }
   .panel { border-radius:14px; padding:12px; }
   .toolbar > label { flex:1 1 44%; }
