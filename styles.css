@@ -256,3 +256,88 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
     white-space:nowrap !important;
   }
 }
+
+
+/* v2.3 — compact mobile build + transport controls */
+@media (max-width:700px) {
+
+  /* Pull the chord suggestions closer to the Build row. */
+  .build-row,
+  .builder-row,
+  .input-row {
+    margin-bottom: 6px !important;
+  }
+
+  #compatibleChords {
+    margin-top: 0 !important;
+  }
+
+  /* Keep Play + Repeat + BPM + Beats/chord on one mobile row. */
+  .transport,
+  .transport-row,
+  .playback-row,
+  .play-row {
+    display:grid !important;
+    grid-template-columns: auto auto minmax(78px,1fr) minmax(86px,1fr) !important;
+    align-items:center !important;
+    gap:6px !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    overflow:visible !important;
+  }
+
+  #playBtn {
+    width:auto !important;
+    min-width:0 !important;
+    padding:11px 12px !important;
+    white-space:nowrap !important;
+  }
+
+  label[for="repeatToggle"],
+  .repeat-label,
+  .repeat-control,
+  .repeat-wrap {
+    width:auto !important;
+    min-width:0 !important;
+    margin:0 !important;
+    padding:0 !important;
+    display:flex !important;
+    align-items:center !important;
+    gap:4px !important;
+    white-space:nowrap !important;
+    font-size:.7rem !important;
+  }
+
+  #repeatToggle {
+    margin:0 !important;
+  }
+
+  .bpm-control,
+  .beats-control,
+  .beats-per-chord-control {
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  #bpmInput,
+  #beatsSelect,
+  #beatsPerChord {
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  /* Shorter mobile label so the final control fits cleanly. */
+  .beats-label,
+  label[for="beatsSelect"],
+  label[for="beatsPerChord"] {
+    font-size:0 !important;
+  }
+
+  .beats-label::after,
+  label[for="beatsSelect"]::after,
+  label[for="beatsPerChord"]::after {
+    content:"Beats";
+    font-size:.7rem;
+  }
+}
