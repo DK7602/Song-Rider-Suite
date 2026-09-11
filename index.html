@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <meta name="description" content="Chord Rider Pro - interactive chord diagrams for guitar and piano." />
+  <title>Chord Rider Pro</title>
+  <link rel="icon" href="assets/rider-and-bones.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <img src="assets/rider-and-bones.svg" class="brand-mark" alt="Rider and Bones skeleton rider logo" />
+    <div>
+      <h1>Chord Rider Pro</h1>
+      <p class="tagline">Ride the progression. See it. Hear it. Build it.</p>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <section class="panel composer-panel">
+      <div class="toolbar primary-toolbar">
+        <div class="segmented" id="instrumentTabs" aria-label="Instrument">
+          <button class="seg active" data-instrument="guitar">Guitar</button>
+          <button class="seg" data-instrument="piano">Piano</button>
+        </div>
+
+        <label>
+          Sound
+          <select id="soundSelect"></select>
+        </label>
+
+        <label>
+          Octave
+          <div class="stepper">
+            <button id="octaveDown" aria-label="Decrease octave">−</button>
+            <span id="octaveValue">0</span>
+            <button id="octaveUp" aria-label="Increase octave">+</button>
+          </div>
+        </label>
+
+        <label id="capoWrap">
+          Capo
+          <select id="capoSelect"></select>
+        </label>
+
+        <label id="neckWrap">
+          Neck
+          <select id="neckSelect">
+            <option value="open">Open / easiest</option>
+            <option value="higher">Higher voicing</option>
+            <option value="lower">Lower voicing</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="entry-row">
+        <input id="chordInput" type="text" autocomplete="off" autocapitalize="characters"
+          placeholder="Enter chords, e.g. Em A7 Cmaj7 B7" />
+        <button id="buildBtn" class="accent">Build</button>
+      </div>
+
+      <div id="status" class="status" aria-live="polite"></div>
+
+      <div>
+        <div class="section-heading-row">
+          <h2>Chords that fit</h2>
+          <span id="keyHint" class="subtle"></span>
+        </div>
+        <div id="compatibleChords" class="chip-row"></div>
+      </div>
+
+      <div class="play-row">
+        <button id="playAllBtn" class="accent big">▶ Play</button>
+        <label>
+          BPM
+          <input id="bpmInput" type="number" min="40" max="240" value="92" />
+        </label>
+        <label>
+          Beats / chord
+          <select id="beatsSelect">
+            <option>1</option>
+            <option>2</option>
+            <option selected>4</option>
+            <option>8</option>
+          </select>
+        </label>
+        <label class="check-label">
+          <input id="loopToggle" type="checkbox" checked />
+          Repeat
+        </label>
+      </div>
+
+      <p class="drag-tip">Tap a diagram to hear it. Long-press, then drag to reorder it. Drag onto the “new line” target to start a new row.</p>
+
+      <div id="progression" class="progression" aria-label="Chord progression"></div>
+      <button id="newLineDrop" class="new-line-drop" type="button">↳ Drop / tap here to start a new line</button>
+    </section>
+
+    <section class="panel save-panel">
+      <div class="section-heading-row">
+        <h2>Projects</h2>
+        <span class="subtle">Saved on this device</span>
+      </div>
+      <div class="save-row">
+        <input id="projectName" type="text" placeholder="Project name" />
+        <button id="saveProjectBtn" class="accent">Save</button>
+      </div>
+      <div id="projectList" class="project-list"></div>
+    </section>
+
+    <section class="panel notes-panel">
+      <div class="section-heading-row">
+        <h2>Notes</h2>
+        <span class="subtle">Per project</span>
+      </div>
+      <div class="notes-toolbar">
+        <button data-cmd="bold"><b>B</b></button>
+        <button data-cmd="italic"><i>I</i></button>
+        <button data-cmd="underline"><u>U</u></button>
+        <button data-cmd="insertUnorderedList">• List</button>
+        <button data-cmd="insertOrderedList">1. List</button>
+        <button id="clearNotesBtn">Clear</button>
+      </div>
+      <div id="notesEditor" class="notes-editor" contenteditable="true"
+        data-placeholder="Song ideas, voicing notes, lyric notes, production reminders…"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Chord Rider Pro</span>
+    <span>Rider &amp; Bones</span>
+  </footer>
+
+  <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

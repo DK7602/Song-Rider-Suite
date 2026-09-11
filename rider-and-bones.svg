@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 170">
+  <rect width="260" height="170" rx="24" fill="#11151a"/>
+  <g fill="none" stroke="#e9c46a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <!-- horse -->
+    <path d="M33 122 C50 102 73 101 96 112 C116 122 135 121 156 107 C178 93 200 98 215 115" />
+    <path d="M44 120 L33 151 M78 118 L70 153 M174 112 L177 153 M207 116 L219 150" />
+    <path d="M199 104 C208 85 220 74 237 77 L229 96 L215 107" />
+    <circle cx="230" cy="80" r="3" fill="#e9c46a"/>
+    <!-- rider torso / head -->
+    <circle cx="126" cy="42" r="18"/>
+    <path d="M116 60 L107 94 L137 95 L132 61" />
+    <path d="M111 72 L82 90 M134 72 L164 92" />
+    <path d="M113 94 L95 119 M136 94 L158 116" />
+    <!-- ribs -->
+    <path d="M113 68 L134 68 M111 76 L136 76 M109 84 L138 84" />
+    <!-- reins -->
+    <path d="M162 90 C190 76 211 80 225 90" />
+  </g>
+  <g fill="#f4a261">
+    <circle cx="120" cy="40" r="3.3"/><circle cx="132" cy="40" r="3.3"/>
+  </g>
+</svg>

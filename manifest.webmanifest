@@ -1,0 +1,16 @@
+{
+  "name": "Chord Rider Pro",
+  "short_name": "Chord Rider",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0d0f12",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "assets/rider-and-bones.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
