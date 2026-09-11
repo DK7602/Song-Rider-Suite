@@ -1,0 +1,42 @@
+CHORD RIDER PRO — BEAT MAKER ADD-ON
+===================================
+
+This package is designed to ADD the beat maker to the current Chord Rider Pro build without replacing app.js.
+That is intentional: it preserves the cloud/login changes already made in your live GitHub build.
+
+1) Upload these items into the ROOT of the Chord Rider Pro GitHub repo:
+   - beat-maker.js
+   - beat-maker.css
+   - assets/drums/   (the whole drums folder)
+
+2) Open index.html in GitHub. Near the bottom, add this ONE line immediately AFTER the existing app.js script line:
+
+   <script src="beat-maker.js"></script>
+
+   beat-maker.js automatically loads beat-maker.css.
+
+3) Commit changes and let GitHub Pages redeploy.
+
+WHAT IT DOES
+------------
+- Adds a "Beat" button and "Drums" checkbox beneath Play/BPM controls.
+- 1–16 bars.
+- 1/8, 1/16, 1/32 and 1/64 step grids.
+- 3 kicks, 5 snares, closed/open hats, 3 toms, clap, rim, shaker, tambourine, cowbell and conga.
+- One-bar-at-a-time mobile editor with bar tabs.
+- Preview, Copy Bar, Paste Bar, Duplicate Bar, Clear Bar.
+- Audio-clock scheduling for tight playback.
+- Uses project BPM.
+- Drum beat is injected into the saved project object under `beatMaker` when the normal Save button is used.
+- Pattern starts/stops with the normal Play button.
+
+IMPORTANT CLOUD NOTE
+--------------------
+The current September 11 file copy available to ChatGPT stores projects in localStorage (`crp-projects`).
+This add-on stores the beat INSIDE those same project objects, so any cloud-sync layer that syncs the complete project object will carry `beatMaker` with it automatically.
+If your live GitHub cloud code strips unknown project fields instead of syncing whole project objects, that cloud serializer will need one additional field added later.
+
+SERVICE WORKER (recommended)
+----------------------------
+Your service-worker.js can continue working unchanged because fetched drum assets will be cached dynamically.
+If a phone seems to show an old build after deployment, refresh once or close/reopen the installed web app.

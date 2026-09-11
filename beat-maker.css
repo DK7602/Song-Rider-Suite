@@ -1,0 +1,36 @@
+/* Chord Rider Pro — Beat Maker add-on */
+.crp-beat-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.crp-beat-controls .check-label{display:flex;grid-template-columns:none;align-items:center;gap:7px;color:var(--muted,#9aa3ad);font-size:.82rem}
+.crp-beat-btn{font-weight:800}
+.crp-beat-btn.has-beat{border-color:var(--accent,#e9c46a);box-shadow:0 0 0 2px rgba(233,196,106,.12)}
+.crp-beat-modal{position:fixed;inset:0;z-index:10000;background:rgba(5,7,10,.88);backdrop-filter:blur(7px);display:none;align-items:stretch;justify-content:center;padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom))}
+.crp-beat-modal.open{display:flex}
+.crp-beat-panel{width:min(1180px,100%);height:100%;background:#13171c;border:1px solid #3b434e;border-radius:18px;box-shadow:0 22px 60px rgba(0,0,0,.55);display:flex;flex-direction:column;overflow:hidden;color:#f3f4f6}
+.crp-beat-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid #343a43;background:#191e24}
+.crp-beat-head h2{font-size:1.05rem;margin:0 auto 0 0;color:#e9c46a}
+.crp-beat-tool{display:flex;align-items:center;gap:7px;color:#a8b0bb;font-size:.78rem}
+.crp-beat-tool select{padding:7px 9px}
+.crp-beat-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:10px}
+.crp-bar-tabs{display:flex;gap:5px;overflow-x:auto;padding:2px 0 9px;scrollbar-width:thin}
+.crp-bar-tab{min-width:42px;padding:7px 9px;border-radius:8px;background:#20262d;color:#aeb6c1;border:1px solid #39424d}
+.crp-bar-tab.active{background:#e9c46a;color:#17130a;border-color:#d7b654;font-weight:900}
+.crp-grid-wrap{flex:1;min-height:0;overflow:auto;border:1px solid #343c46;border-radius:12px;background:#0d1014}
+.crp-grid{display:grid;align-content:start;min-width:max-content}
+.crp-drum-row{display:grid;grid-template-columns:126px auto;min-height:39px;border-bottom:1px solid #252c34}
+.crp-drum-row:last-child{border-bottom:0}
+.crp-drum-name{position:sticky;left:0;z-index:5;display:flex;align-items:center;gap:7px;padding:0 9px;background:#171c22;border-right:1px solid #343c46;font-size:.77rem;font-weight:800;white-space:nowrap}
+.crp-audition{width:27px;height:27px;padding:0;border-radius:50%;display:grid;place-items:center;font-size:.68rem}
+.crp-steps{display:grid;align-items:stretch}
+.crp-step{width:33px;min-width:33px;height:38px;padding:0;border-radius:0;border-width:0 1px 0 0;border-color:#29313a;background:#12171c;position:relative}
+.crp-step:hover{filter:none;background:#1b222a}
+.crp-step.beat-edge{border-left:2px solid #56606d}
+.crp-step.active{background:#e9c46a;box-shadow:inset 0 0 0 2px #f4d98f}
+.crp-step.active::after{content:"";position:absolute;inset:9px;border-radius:50%;background:#261f0d}
+.crp-step.playing{box-shadow:inset 0 -4px 0 #f4a261}
+.crp-beat-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;border-top:1px solid #343a43;background:#191e24}
+.crp-beat-foot .spacer{flex:1}
+.crp-beat-status{color:#9aa3ad;font-size:.76rem;margin-right:auto}
+.crp-danger{color:#f2a08d!important}
+@media(max-width:700px){
+ .crp-beat-modal{padding:0}.crp-beat-panel{border-radius:0;border-left:0;border-right:0}.crp-beat-head{padding:9px}.crp-beat-head h2{width:100%;margin:0}.crp-beat-body{padding:7px}.crp-drum-row{grid-template-columns:108px auto}.crp-drum-name{font-size:.7rem;padding:0 6px}.crp-step{width:30px;min-width:30px}.crp-beat-foot{padding:8px}.crp-beat-foot button{padding:8px 9px}
+}
