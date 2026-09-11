@@ -16,12 +16,12 @@
 .crp-bar-tab.active{background:#e9c46a;color:#17130a;border-color:#d7b654;font-weight:900}
 .crp-grid-wrap{flex:1;min-height:0;overflow:auto;border:1px solid #343c46;border-radius:12px;background:#0d1014}
 .crp-grid{display:grid;align-content:start;min-width:max-content}
-.crp-drum-row{display:grid;grid-template-columns:126px auto;min-height:39px;border-bottom:1px solid #252c34}
+.crp-drum-row{display:grid;grid-template-columns:126px auto;min-height:40px;border-bottom:1px solid #252c34}
 .crp-drum-row:last-child{border-bottom:0}
 .crp-drum-name{position:sticky;left:0;z-index:5;display:flex;align-items:center;gap:7px;padding:0 9px;background:#171c22;border-right:1px solid #343c46;font-size:.77rem;font-weight:800;white-space:nowrap}
 .crp-audition{width:27px;height:27px;padding:0;border-radius:50%;display:grid;place-items:center;font-size:.68rem}
 .crp-steps{display:grid;align-items:stretch}
-.crp-step{width:33px;min-width:33px;height:38px;padding:0;border-radius:0;border-width:0 1px 0 0;border-color:#29313a;background:#12171c;position:relative}
+.crp-step{width:40px;min-width:40px;height:40px;padding:0;border-radius:0;border-width:0 1px 0 0;border-color:#29313a;background:#12171c;position:relative}
 .crp-step:hover{filter:none;background:#1b222a}
 .crp-step.beat-edge{border-left:2px solid #56606d}
 .crp-step.active{background:#e9c46a;box-shadow:inset 0 0 0 2px #f4d98f}
@@ -32,5 +32,5 @@
 .crp-beat-status{color:#9aa3ad;font-size:.76rem;margin-right:auto}
 .crp-danger{color:#f2a08d!important}
 @media(max-width:700px){
- .crp-beat-modal{padding:0}.crp-beat-panel{border-radius:0;border-left:0;border-right:0}.crp-beat-head{padding:9px}.crp-beat-head h2{width:100%;margin:0}.crp-beat-body{padding:7px}.crp-drum-row{grid-template-columns:108px auto}.crp-drum-name{font-size:.7rem;padding:0 6px}.crp-step{width:30px;min-width:30px}.crp-beat-foot{padding:8px}.crp-beat-foot button{padding:8px 9px}
+ .crp-beat-modal{padding:0}.crp-beat-panel{border-radius:0;border-left:0;border-right:0}.crp-beat-head{padding:9px}.crp-beat-head h2{width:100%;margin:0}.crp-beat-body{padding:7px}.crp-drum-row{grid-template-columns:108px auto}.crp-drum-name{font-size:.7rem;padding:0 6px}.crp-step{width:36px;min-width:36px;height:36px}.crp-beat-foot{padding:8px}.crp-beat-foot button{padding:8px 9px}
 }

@@ -4,6 +4,7 @@
   const STORAGE_KEY = 'crp-projects';
   const DRAFT_KEY = 'crp-beat-draft-v1';
   const VERSION = 1;
+  const SCRIPT_URL = document.currentScript?.src || new URL('beat-maker.js', window.location.href).href;
   const $ = id => document.getElementById(id);
 
   const DRUMS = [
@@ -224,7 +225,7 @@
       const name=document.createElement('div'); name.className='crp-drum-name';
       name.innerHTML=`<button class="crp-audition" type="button" title="Hear ${label}">▶</button><span>${label}</span>`;
       name.querySelector('button').onclick=()=>audition(id);
-      const steps=document.createElement('div'); steps.className='crp-steps'; steps.style.gridTemplateColumns=`repeat(${cells},33px)`;
+      const steps=document.createElement('div'); steps.className='crp-steps'; steps.style.gridTemplateColumns=`repeat(${cells},40px)`;
       const active=new Set(beat.tracks[id][currentBar]);
       for(let c=0;c<cells;c++){
         const canonical=c*stride; const s=document.createElement('button'); s.type='button'; s.className='crp-step';
@@ -257,17 +258,38 @@
     if(audioCtx.state==='suspended') await audioCtx.resume();
     if(buffers.size===DRUMS.length) return;
     if(loading) return loading;
-    loading=Promise.all(DRUMS.map(async([id,,url])=>{
-      const r=await fetch(url); if(!r.ok) throw new Error(`Missing drum sample: ${url}`);
-      const a=await r.arrayBuffer(); const buf=await audioCtx.decodeAudioData(a); buffers.set(id,buf);
-    })).finally(()=>loading=null);
+
+    // Resolve samples relative to beat-maker.js. This is safer on GitHub Pages
+    // where the app may live inside a repository sub-folder.
+    loading=Promise.allSettled(DRUMS.map(async([id,,url])=>{
+      const resolved = new URL(url, SCRIPT_URL).href;
+      const r=await fetch(resolved, {cache:'no-store'});
+      if(!r.ok) throw new Error(`${url} (${r.status})`);
+      const a=await r.arrayBuffer();
+      const buf=await audioCtx.decodeAudioData(a);
+      buffers.set(id,buf);
+      return id;
+    })).then(results=>{
+      const failed=[];
+      results.forEach((result,i)=>{
+        if(result.status==='rejected') failed.push(DRUMS[i][2]);
+      });
+      if(failed.length){
+        console.error('Beat Maker missing/invalid samples:', failed);
+        const first=failed[0].split('/').pop();
+        status(`Missing sample: ${first}${failed.length>1 ? ` (+${failed.length-1})` : ''}`);
+      }else{
+        status(`${countHits()} hits • BPM ${getBpm()}`);
+      }
+      return failed;
+    }).finally(()=>loading=null);
     return loading;
   }
   function hit(id,time,gain=1){
     const buf=buffers.get(id); if(!buf||!audioCtx) return;
     const src=audioCtx.createBufferSource(), g=audioCtx.createGain(); src.buffer=buf; g.gain.value=beat.gain*gain; src.connect(g).connect(audioCtx.destination); src.start(time);
   }
-  async function audition(id,gain=.78){ try{await ensureDrums();hit(id,audioCtx.currentTime+.01,gain)}catch(e){console.error(e);status('Could not load drum samples');} }
+  async function audition(id,gain=.78){ try{await ensureDrums();hit(id,audioCtx.currentTime+.01,gain)}catch(e){console.error(e);status(`Drum error: ${e.message||e}`);} }
   function scheduleCanonicalStep(absStep,time,barIndex){
     const step=absStep%64; DRUMS.forEach(([id])=>{ if(beat.tracks[id][barIndex]?.includes(step)) hit(id,time,1); });
   }
@@ -290,7 +312,7 @@
   }
   async function startPreview(){
     try{await ensureDrums(); stopMainDrums(); previewing=true; previewStep=currentBar*64; previewNextTime=audioCtx.currentTime+.04; $('crpPreview').textContent='■ Stop Preview'; startScheduler('preview');}
-    catch(e){console.error(e);status('Could not load drum samples');}
+    catch(e){console.error(e);status(`Drum error: ${e.message||e}`);}
   }
   function stopPreview(){ previewing=false; if(scheduler){clearInterval(scheduler);scheduler=null;} if($('crpPreview')) $('crpPreview').textContent='▶ Preview'; document.querySelectorAll('.crp-step.playing').forEach(x=>x.classList.remove('playing')); }
   function markPlayingStep(bar,step){
