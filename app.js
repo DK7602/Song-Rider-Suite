@@ -443,6 +443,16 @@
     state.loopTimer = setTimeout(runProgressionStep, chordMs);
   }
 
+
+  function setRiderBonesRiding(isRiding) {
+    ['riderBonesLeft', 'riderBonesRight'].forEach(id => {
+      const img = $(id);
+      if (!img) return;
+      const nextSrc = isRiding ? img.dataset.animated : img.dataset.still;
+      if (nextSrc && !img.src.endsWith(nextSrc)) img.src = nextSrc;
+    });
+  }
+
   async function playProgression() {
     if (state.playing) return stopProgression();
     if (!state.chords.length) {
@@ -458,6 +468,7 @@
 
   function stopProgression() {
     state.playing = false;
+    setRiderBonesRiding(false);
     if (state.loopTimer) clearTimeout(state.loopTimer);
     state.loopTimer = null;
     state.playIndex = 0;
@@ -644,6 +655,7 @@
 
     renderProjects();
     renderAll();
+    setRiderBonesRiding(false);
 
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(()=>{});
   }
