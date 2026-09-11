@@ -133,6 +133,24 @@
           <div id="crpBarTabs" class="crp-bar-tabs"></div>
           <div class="crp-grid-wrap"><div id="crpBeatGrid" class="crp-grid"></div></div>
         </div>
+        <div class="crp-randomizer">
+          <strong>🎲 Beat Generator</strong>
+          <label>Style <select id="crpBeatStyle">
+            <option value="rock">Rock</option>
+            <option value="pop">Pop</option>
+            <option value="rap" selected>Rap</option>
+            <option value="trap">Trap</option>
+            <option value="boombap">Boom Bap</option>
+            <option value="gfunk">G-Funk</option>
+          </select></label>
+          <label>Complexity <select id="crpBeatComplexity">
+            <option value="simple">Simple</option>
+            <option value="medium" selected>Medium</option>
+            <option value="busy">Busy</option>
+          </select></label>
+          <button id="crpRandomizeBeat" class="accent" type="button">🎲 Randomize Beat</button>
+          <button id="crpFillLastBar" type="button">🥁 Fill Last Bar</button>
+        </div>
         <div class="crp-beat-foot">
           <button id="crpPreview" type="button">▶ Preview</button>
           <button id="crpCopyBar" type="button">Copy Bar</button>
@@ -165,6 +183,8 @@
     $('crpPasteBar').addEventListener('click', pasteBar);
     $('crpDuplicateBar').addEventListener('click', duplicateBar);
     $('crpClearBar').addEventListener('click', clearBar);
+    $('crpRandomizeBeat').addEventListener('click', randomizeBeat);
+    $('crpFillLastBar').addEventListener('click', fillLastBar);
     document.addEventListener('keydown', e=>{ if(e.key==='Escape' && modal.classList.contains('open')) closeEditor(); });
 
     hookProjectUi();
@@ -268,6 +288,154 @@
   }
   function clearBar(){ DRUMS.forEach(([id])=>beat.tracks[id][currentBar]=[]); renderGrid(); status(`Cleared Bar ${currentBar+1}`); }
   function status(s){ if($('crpBeatStatus')) $('crpBeatStatus').textContent=s; }
+
+
+  // --- Style-aware beat generator -----------------------------------------
+  // Patterns are written on the canonical 64-step grid:
+  // 0,16,32,48 = quarter notes; 8-step spacing = eighth notes;
+  // 4-step spacing = sixteenth notes; 2 = 32nds; 1 = 64ths.
+  function addHit(id, bar, step){
+    if(!beat.tracks[id] || bar < 0 || bar >= 16) return;
+    step=((Math.round(step)%64)+64)%64;
+    if(!beat.tracks[id][bar].includes(step)) beat.tracks[id][bar].push(step);
+  }
+  function chance(p){ return Math.random() < p; }
+  function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+  function addMany(id,bar,steps){ steps.forEach(s=>addHit(id,bar,s)); }
+  function clearAllBeat(){
+    DRUMS.forEach(([id])=>{ for(let b=0;b<16;b++) beat.tracks[id][b]=[]; });
+  }
+  function humanVariation(bar, complexity){
+    // Tasteful ghost/percussion variation; timing remains exactly on-grid.
+    const amount = complexity==='simple' ? .10 : complexity==='busy' ? .34 : .20;
+    if(chance(amount)) addHit('rim',bar,pick([12,28,44,60]));
+    if(chance(amount*.75)) addHit('shaker',bar,pick([8,24,40,56]));
+  }
+  function hatLine(bar, style, complexity){
+    const busy=complexity==='busy', simple=complexity==='simple';
+    if(style==='rock'){
+      addMany('chh',bar, simple?[0,8,16,24,32,40,48,56]:
+        Array.from({length:16},(_,i)=>i*4));
+      if(!simple && chance(.35)) addHit('ohh',bar,56);
+    }else if(style==='pop'){
+      addMany('chh',bar, simple?[0,8,16,24,32,40,48,56]:
+        Array.from({length:16},(_,i)=>i*4));
+      if(chance(.45)) addHit('ohh',bar,56);
+      if(!simple && chance(.45)) addMany('shaker',bar,[8,24,40,56]);
+    }else if(style==='rap' || style==='boombap' || style==='gfunk'){
+      addMany('chh',bar, simple?[0,8,16,24,32,40,48,56]:
+        Array.from({length:16},(_,i)=>i*4).filter(()=>chance(busy?.92:.78)));
+      if(chance(style==='gfunk'?.55:.28)) addHit('ohh',bar,pick([24,56]));
+      if(busy && chance(.45)) addMany('chh',bar,[54,58,60,62]);
+    }else if(style==='trap'){
+      addMany('chh',bar,Array.from({length:16},(_,i)=>i*4));
+      const rolls=simple?0:(busy?2:1);
+      for(let r=0;r<rolls;r++){
+        const start=pick([12,28,44,52]);
+        [0,2,4,6].forEach(x=>addHit('chh',bar,start+x));
+        if(busy && chance(.45)) [0,1,2,3].forEach(x=>addHit('chh',bar,start+4+x));
+      }
+      if(chance(.38)) addHit('ohh',bar,pick([24,56]));
+    }
+  }
+  function grooveBar(bar, style, complexity){
+    const busy=complexity==='busy', simple=complexity==='simple';
+    hatLine(bar,style,complexity);
+
+    if(style==='rock'){
+      addMany('snare1',bar,[16,48]);
+      addMany('kick1',bar,simple?[0,32]:[0,24,32]);
+      if(!simple && chance(.55)) addHit('kick1',bar,pick([8,40,56]));
+      if(busy && chance(.5)) addHit('kick2',bar,pick([12,28,44,60]));
+    }else if(style==='pop'){
+      addMany('snare2',bar,[16,48]); addMany('clap',bar,[16,48]);
+      addMany('kick1',bar,simple?[0,32]:[0,24,32,40]);
+      if(busy && chance(.55)) addHit('kick2',bar,pick([8,28,56]));
+    }else if(style==='rap'){
+      addMany('snare3',bar,[16,48]);
+      if(chance(.45)) addMany('clap',bar,[16,48]);
+      addHit('kick2',bar,0);
+      const pool=simple?[32]:[12,24,32,40,52,56];
+      const n=simple?1:(busy?4:2);
+      for(let i=0;i<n;i++) if(chance(.82)) addHit('kick2',bar,pick(pool));
+      if(!simple && chance(.32)) addHit('rim',bar,44);
+    }else if(style==='trap'){
+      addMany('snare4',bar,[32]); // classic half-time backbeat
+      if(chance(.35)) addHit('clap',bar,32);
+      addHit('kick3',bar,0);
+      const pool=[10,20,26,38,44,52,58];
+      const n=simple?1:(busy?5:3);
+      for(let i=0;i<n;i++) if(chance(.82)) addHit('kick3',bar,pick(pool));
+    }else if(style==='boombap'){
+      addMany('snare5',bar,[16,48]);
+      if(chance(.55)) addHit('rim',bar,44);
+      addHit('kick1',bar,0);
+      const pool=[8,24,28,36,40,56];
+      const n=simple?1:(busy?4:2);
+      for(let i=0;i<n;i++) if(chance(.85)) addHit('kick1',bar,pick(pool));
+    }else if(style==='gfunk'){
+      addMany('snare2',bar,[16,48]);
+      if(chance(.65)) addMany('clap',bar,[16,48]);
+      addHit('kick1',bar,0);
+      const pool=[12,24,36,40,52,56];
+      const n=simple?1:(busy?4:2);
+      for(let i=0;i<n;i++) if(chance(.8)) addHit('kick1',bar,pick(pool));
+      if(!simple && chance(.5)) addHit('cowbell',bar,pick([8,24,40,56]));
+      if(busy && chance(.4)) addHit('conga',bar,pick([12,28,44,60]));
+    }
+    humanVariation(bar,complexity);
+  }
+  function addFillToBar(bar, style, complexity){
+    // Keep the groove, then create a fill in beat 4 (steps 48-63).
+    ['tomHi','tomMid','tomLow','snare1','snare2','snare3','snare4','snare5'].forEach(id=>{
+      beat.tracks[id][bar]=beat.tracks[id][bar].filter(s=>s<48);
+    });
+    const snare = style==='trap'?'snare4':style==='boombap'?'snare5':style==='rap'?'snare3':style==='pop'?'snare2':'snare1';
+    if(complexity==='simple'){
+      addMany(snare,bar,[48,56]);
+      addMany('tomLow',bar,[52,60]);
+    }else if(complexity==='busy'){
+      addMany(snare,bar,[48,52]);
+      addMany('tomHi',bar,[54,56]);
+      addMany('tomMid',bar,[58,60]);
+      addMany('tomLow',bar,[62]);
+      if(style==='trap') addMany(snare,bar,[61,63]);
+    }else{
+      addMany(snare,bar,[48,52]);
+      addMany('tomHi',bar,[56]);
+      addMany('tomMid',bar,[60]);
+      addMany('tomLow',bar,[62]);
+    }
+    addHit('kick1',bar,0);
+  }
+  function randomizeBeat(){
+    const style=$('crpBeatStyle')?.value||'rap';
+    const complexity=$('crpBeatComplexity')?.value||'medium';
+    clearAllBeat();
+    // 32nd display for trap rolls; 16th is clearer for the other genres.
+    beat.resolution = style==='trap' && complexity!=='simple' ? 32 : 16;
+    for(let b=0;b<beat.bars;b++) grooveBar(b,style,complexity);
+    // Give multi-bar patterns a musical turnaround without making every bar busy.
+    if(beat.bars>1 && complexity!=='simple') addFillToBar(beat.bars-1,style,complexity);
+    currentBar=0;
+    renderEditor();
+    status(`${styleLabel(style)} • ${complexity} • ${beat.bars} bar${beat.bars===1?'':'s'} generated`);
+  }
+  function fillLastBar(){
+    const style=$('crpBeatStyle')?.value||'rap';
+    const complexity=$('crpBeatComplexity')?.value||'medium';
+    const bar=Math.max(0,beat.bars-1);
+    // If the last bar is empty, make a groove first, then add the fill.
+    const hasHits=DRUMS.some(([id])=>beat.tracks[id][bar].length);
+    if(!hasHits) grooveBar(bar,style,complexity);
+    addFillToBar(bar,style,complexity);
+    currentBar=bar;
+    renderEditor();
+    status(`Fill added to Bar ${bar+1}`);
+  }
+  function styleLabel(style){
+    return ({rock:'Rock',pop:'Pop',rap:'Rap',trap:'Trap',boombap:'Boom Bap',gfunk:'G-Funk'})[style]||style;
+  }
 
   function getBpm(){ return clamp(+($('bpmInput')?.value||92),40,240); }
   async function ensureDrums(){
