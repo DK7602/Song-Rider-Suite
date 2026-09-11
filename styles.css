@@ -192,3 +192,41 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
     display:none;
   }
 }
+
+
+/* v2.1 — restore ONLY "Chords that fit" as a horizontal mobile scroller */
+@media (max-width:700px) {
+  html, body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  #compatibleChords {
+    display: flex !important;
+    flex-flow: row nowrap !important;
+    justify-content: flex-start !important;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    gap: 8px;
+    padding: 2px 0 10px;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+  }
+
+  #compatibleChords::-webkit-scrollbar {
+    display: none;
+  }
+
+  #compatibleChords .chip {
+    flex: 0 0 auto !important;
+    white-space: nowrap;
+  }
+}
