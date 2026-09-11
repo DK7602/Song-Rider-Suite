@@ -219,44 +219,77 @@
   }
 
   function createPianoSvg(chord) {
-    const notes = chordNotes(chord, 4);
-    const pitchClasses = new Set(notes.map(n => n.replace(/-?\d+$/,'')));
-    const width = 420, height = 155, whiteW = 40, whiteCount = 10;
-    const startMidi = 60; // C4
-    const whiteNames = ['C','D','E','F','G','A','B'];
-    let whites = '';
-    let x = 0;
-    const positions = {};
-    let midi = startMidi;
-    let whiteIndex = 0;
-    while (whiteIndex < whiteCount) {
-      const pc = NOTE_NAMES[midi%12];
-      if (!pc.includes('#')) {
-        const hit = pitchClasses.has(pc) || (pc === 'D#' && pitchClasses.has('Eb')) || (pc === 'A#' && pitchClasses.has('Bb'));
-        whites += `<rect x="${x}" y="8" width="${whiteW}" height="132" rx="2" fill="${hit ? '#e9c46a' : '#f6f2e7'}" stroke="#171717" stroke-width="2"/>`;
-        if (hit) whites += `<text x="${x+whiteW/2}" y="126" text-anchor="middle" font-size="15" font-weight="800" fill="#161616">${pc}</text>`;
-        positions[pc] = x;
-        x += whiteW;
-        whiteIndex++;
-      }
-      midi++;
+    // Show ONE intentional chord voicing, not every duplicate pitch class
+    // visible across the keyboard.
+    const baseOctave = 4 + state.octave;
+    const noteNames = chordNotes(chord, baseOctave);
+
+    function noteToMidi(note) {
+      const m = note.match(/^([A-G])(#?)(-?\d+)$/);
+      if (!m) return null;
+      return (Number(m[3]) + 1) * 12 + NOTE_INDEX[m[1] + m[2]];
     }
-    // black key placement over white keyboard
-    const blackAfter = {C:0,D:1,F:3,G:4,A:5};
+
+    const targetMidis = new Set(noteNames.map(noteToMidi).filter(n => n != null));
+
+    // Display two octaves beginning on C of the selected octave.
+    // This is wide enough to show root-position triads/sevenths for every root
+    // without repeating any chord tone.
+    const startMidi = (baseOctave + 1) * 12; // C of baseOctave
+    const endMidi = startMidi + 24;          // through B of next octave
+    const whiteW = 40;
+    const whiteCount = 14;
+    const width = whiteCount * whiteW;
+    const height = 164;
+
+    let whites = '';
     let blacks = '';
-    const octaves = [0,1];
-    octaves.forEach(oct => {
-      Object.entries(blackAfter).forEach(([name, wi]) => {
-        const absoluteWhite = oct*7 + wi;
-        if (absoluteWhite >= whiteCount-1) return;
-        const pc = NOTE_NAMES[(NOTE_INDEX[name]+1)%12];
-        const hit = pitchClasses.has(pc);
-        const bx = absoluteWhite*whiteW + whiteW - 13;
-        blacks += `<rect x="${bx}" y="8" width="26" height="82" rx="2" fill="${hit ? '#f4a261' : '#1a1a1a'}" stroke="#080808" stroke-width="1.5"/>`;
-        if (hit) blacks += `<text x="${bx+13}" y="70" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">${pc}</text>`;
-      });
-    });
-    return `<svg viewBox="0 0 ${whiteCount*whiteW} ${height}" aria-label="${chord} piano diagram">${whites}${blacks}</svg>`;
+    let whiteIndex = 0;
+    const whiteXByMidi = new Map();
+
+    // Draw white keys first.
+    for (let midi = startMidi; midi < endMidi; midi++) {
+      const pc = NOTE_NAMES[midi % 12];
+      if (pc.includes('#')) continue;
+
+      const x = whiteIndex * whiteW;
+      whiteXByMidi.set(midi, x);
+      const hit = targetMidis.has(midi);
+
+      whites += `<rect x="${x}" y="18" width="${whiteW}" height="132" rx="2" fill="${hit ? '#e9c46a' : '#f6f2e7'}" stroke="#171717" stroke-width="2"/>`;
+
+      if (hit) {
+        whites += `<text x="${x + whiteW / 2}" y="136" text-anchor="middle" font-size="15" font-weight="800" fill="#161616">${pc}</text>`;
+      }
+      whiteIndex++;
+    }
+
+    // Draw black keys in their exact octave positions.
+    for (let midi = startMidi; midi < endMidi; midi++) {
+      const pc = NOTE_NAMES[midi % 12];
+      if (!pc.includes('#')) continue;
+
+      // A black key sits after the preceding natural key.
+      const prevWhiteMidi = midi - 1;
+      const prevX = whiteXByMidi.get(prevWhiteMidi);
+      if (prevX == null) continue;
+
+      const hit = targetMidis.has(midi);
+      const bx = prevX + whiteW - 13;
+
+      blacks += `<rect x="${bx}" y="18" width="26" height="82" rx="2" fill="${hit ? '#f4a261' : '#1a1a1a'}" stroke="#080808" stroke-width="1.5"/>`;
+
+      if (hit) {
+        blacks += `<text x="${bx + 13}" y="78" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">${pc}</text>`;
+      }
+    }
+
+    const octaveText = state.octave === 0 ? 'Octave 0' : `Octave ${state.octave > 0 ? '+' : ''}${state.octave}`;
+
+    return `<svg viewBox="0 0 ${width} ${height}" aria-label="${chord} piano diagram">
+      <text x="4" y="12" fill="#9aa3ad" font-size="11">${octaveText}</text>
+      ${whites}${blacks}
+    </svg>`;
   }
 
   function baseGuitarShape(chord) {
