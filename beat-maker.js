@@ -3,7 +3,7 @@
 
   const STORAGE_KEY = 'crp-projects';
   const DRAFT_KEY = 'crp-beat-draft-v1';
-  const VERSION = 1;
+  const VERSION = 2;
   const SCRIPT_URL = document.currentScript?.src || new URL('beat-maker.js', window.location.href).href;
   const $ = id => document.getElementById(id);
 
@@ -48,7 +48,7 @@
   function freshBeat(){
     const tracks = {};
     DRUMS.forEach(([id]) => tracks[id] = Array.from({length:16}, () => []));
-    return {version:VERSION, enabled:true, bars:1, resolution:16, gain:.65, tracks};
+    return {version:VERSION, enabled:true, bars:1, resolution:16, gain:.4225, tracks};
   }
   function normalizeBeat(src){
     const b = freshBeat();
@@ -56,7 +56,9 @@
     b.enabled = src.enabled !== false;
     b.bars = clamp(+src.bars || 1, 1, 16);
     b.resolution = [8,16,32,64].includes(+src.resolution) ? +src.resolution : 16;
-    b.gain = Math.max(0, Math.min(1, Number.isFinite(+src.gain) ? +src.gain : .65));
+    const sourceGain = Number.isFinite(+src.gain) ? +src.gain : .65;
+    // v2 mix rebalance: drums are 35% quieter than v1. Migrate old saved beats once.
+    b.gain = Math.max(0, Math.min(1, (+src.version || 1) < 2 ? sourceGain * .65 : sourceGain));
     DRUMS.forEach(([id]) => {
       const bars = src.tracks && Array.isArray(src.tracks[id]) ? src.tracks[id] : [];
       b.tracks[id] = Array.from({length:16}, (_,bar) => {
@@ -115,7 +117,7 @@
     wrap.innerHTML = `
       <button id="crpBeatBtn" class="crp-beat-btn" type="button">🥁 Beat</button>
       <label class="check-label"><input id="crpDrumsToggle" type="checkbox" checked> Drums</label>
-      <label class="crp-volume-main">Vol <input id="crpDrumVolume" type="range" min="0" max="100" step="1" value="65"><span id="crpDrumVolumeValue">65%</span></label>`;
+      <label class="crp-volume-main">Vol <input id="crpDrumVolume" type="range" min="0" max="100" step="1" value="42"><span id="crpDrumVolumeValue">42%</span></label>`;
     playRow.insertAdjacentElement('afterend', wrap);
 
     const modal = document.createElement('div');
@@ -126,7 +128,7 @@
           <h2>🥁 Beat Maker</h2>
           <label class="crp-beat-tool">Bars <select id="crpBarsSelect">${Array.from({length:16},(_,i)=>`<option>${i+1}</option>`).join('')}</select></label>
           <label class="crp-beat-tool">Grid <select id="crpResolution"><option value="8">1/8</option><option value="16">1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
-          <label class="crp-beat-tool crp-volume-tool">Volume <input id="crpBeatVolume" type="range" min="0" max="100" step="1" value="65"><span id="crpBeatVolumeValue">65%</span></label>
+          <label class="crp-beat-tool crp-volume-tool">Volume <input id="crpBeatVolume" type="range" min="0" max="100" step="1" value="42"><span id="crpBeatVolumeValue">42%</span></label>
           <button id="crpBeatClose" type="button">✕</button>
         </div>
         <div class="crp-beat-body">
