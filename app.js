@@ -235,8 +235,8 @@
 
     // Pad the voicing by a few semitones, then snap the visible edges to
     // natural (white) keys so the keyboard looks intentional.
-    let startMidi = Math.min(...chordMidis) - 4;
-    let endMidi = Math.max(...chordMidis) + 5; // exclusive-ish upper padding
+    let startMidi = Math.min(...chordMidis) - 2;
+    let endMidi = Math.max(...chordMidis) + 3; // compact padding around the voicing
 
     const isBlack = midi => NOTE_NAMES[((midi % 12) + 12) % 12].includes('#');
     while (isBlack(startMidi)) startMidi--;
@@ -244,7 +244,7 @@
 
     // Guarantee enough context for a simple triad, while allowing 7ths,
     // 9ths, add chords, etc. to expand naturally when their voicing spans farther.
-    while (endMidi - startMidi < 13) {
+    while (endMidi - startMidi < 10) {
       startMidi--;
       if (isBlack(startMidi)) startMidi--;
       if (endMidi - startMidi >= 13) break;
