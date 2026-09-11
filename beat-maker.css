@@ -54,3 +54,31 @@
  .crp-randomizer select{flex:1;min-width:0}
  .crp-randomizer button{padding:8px 9px}
 }
+
+
+/* v1.8 — keep main-page Beat, Drums and Volume on the same row */
+.crp-beat-mainbar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.crp-beat-mainbar .crp-drum-vol{
+  margin:0;
+  flex:1 1 190px;
+  min-width:150px;
+}
+@media(max-width:700px){
+  .crp-beat-mainbar{
+    flex-wrap:nowrap;
+    gap:8px;
+  }
+  .crp-beat-mainbar .crp-drum-vol{
+    flex:1 1 auto;
+    min-width:0;
+  }
+  .crp-beat-mainbar .crp-drum-vol input[type="range"]{
+    min-width:70px;
+    width:100%;
+  }
+}
