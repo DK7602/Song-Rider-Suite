@@ -90,22 +90,25 @@
 
       <div class="play-row">
         <button id="playAllBtn" class="accent big">▶ Play</button>
-        <label>
-          BPM
+
+        <label class="check-label repeat-control">
+          <input id="loopToggle" type="checkbox" checked />
+          <span>Repeat</span>
+        </label>
+
+        <label class="bpm-control">
+          <span class="transport-label">BPM</span>
           <input id="bpmInput" type="number" min="40" max="240" value="92" />
         </label>
-        <label>
-          Beats / chord
+
+        <label class="beats-control">
+          <span class="beats-label"><span>Beats</span><span>chord</span></span>
           <select id="beatsSelect">
             <option>1</option>
             <option>2</option>
             <option selected>4</option>
             <option>8</option>
           </select>
-        </label>
-        <label class="check-label">
-          <input id="loopToggle" type="checkbox" checked />
-          Repeat
         </label>
       </div>
 

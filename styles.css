@@ -341,3 +341,109 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
     font-size:.7rem;
   }
 }
+
+
+/* v2.4 — corrected mobile transport order and sizing */
+@media (max-width:700px) {
+  .play-row {
+    display:grid !important;
+    grid-template-columns: 86px 72px minmax(72px,1fr) minmax(70px,.9fr) !important;
+    align-items:center !important;
+    gap:5px !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    margin-top:12px !important;
+    overflow:visible !important;
+  }
+
+  #playAllBtn {
+    width:86px !important;
+    min-width:86px !important;
+    padding:11px 8px !important;
+    font-size:.83rem !important;
+    white-space:nowrap !important;
+  }
+
+  .play-row .repeat-control {
+    order:2;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-start !important;
+    gap:4px !important;
+    width:72px !important;
+    min-width:0 !important;
+    margin:0 !important;
+    padding:0 !important;
+    font-size:.69rem !important;
+    white-space:nowrap !important;
+  }
+
+  .play-row .repeat-control input {
+    margin:0 !important;
+    width:18px !important;
+    height:18px !important;
+    flex:0 0 18px !important;
+  }
+
+  .play-row .bpm-control {
+    order:3;
+    display:flex !important;
+    align-items:center !important;
+    gap:4px !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+    font-size:.68rem !important;
+    white-space:nowrap !important;
+  }
+
+  .play-row .bpm-control #bpmInput {
+    width:48px !important;
+    min-width:48px !important;
+    max-width:48px !important;
+    padding:8px 5px !important;
+    text-align:center !important;
+  }
+
+  .play-row .beats-control {
+    order:4;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+    gap:3px !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+    font-size:.66rem !important;
+  }
+
+  .play-row .beats-label {
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:flex-start !important;
+    justify-content:center !important;
+    gap:0 !important;
+    line-height:.92 !important;
+    font-size:.66rem !important;
+    width:auto !important;
+    min-width:29px !important;
+  }
+
+  .play-row .beats-label::after {
+    content:none !important;
+  }
+
+  .play-row #beatsSelect {
+    display:block !important;
+    width:46px !important;
+    min-width:46px !important;
+    max-width:46px !important;
+    height:40px !important;
+    padding:7px 18px 7px 7px !important;
+    font-size:.8rem !important;
+    text-align:center !important;
+    color:var(--text) !important;
+    opacity:1 !important;
+  }
+}
