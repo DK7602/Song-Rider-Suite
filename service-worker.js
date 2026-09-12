@@ -1,4 +1,4 @@
-const CACHE = 'chord-rider-pro-v1.5.9';
+const CACHE = 'chord-rider-pro-v1.6.0';
 const ASSETS = [
   './',
   './index.html',

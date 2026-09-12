@@ -1466,3 +1466,23 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
   }
   .progression.mobile-carousel .line-badge{touch-action:none;}
 }
+
+
+/* v1.6.0 — keep mobile carousel line controls fully inside the scroll viewport */
+@media(max-width:700px){
+  .progression.mobile-carousel > .progression-line{
+    padding-top:34px !important;
+  }
+
+  .progression.mobile-carousel .line-badge{
+    top:7px !important;
+    left:10px !important;
+    z-index:6;
+  }
+
+  .progression.mobile-carousel .delete-line{
+    top:6px !important;
+    right:8px !important;
+    z-index:6;
+  }
+}
