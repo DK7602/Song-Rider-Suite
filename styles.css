@@ -845,3 +845,43 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
     font-size:clamp(.66rem, 3vw, .84rem);
   }
 }
+
+
+/* v1.5.4 — cleaner tagline + larger Rider/Bones without taller header */
+
+/* Reduce the "echo" while keeping a raised white 3D look. */
+.brand-copy .tagline{
+  text-shadow:
+    0 1px 0 rgba(218,223,230,.95),
+    0 2px 1px rgba(105,113,124,.72),
+    0 3px 4px rgba(0,0,0,.62);
+}
+
+/* Enlarge both still PNGs and animated GIFs visually, but retain their
+   existing layout box so the header itself does not become taller. */
+.brand-mark{
+  position:relative;
+  align-self:flex-end;
+  transform:scale(1.27);
+  transform-origin:center bottom;
+  bottom:-10px;
+  z-index:2;
+}
+
+/* The art has a little transparent padding under the hooves. Moving the
+   image box to the border makes the visible hooves appear to stand on it. */
+@media(max-width:700px){
+  .brand-mark{
+    transform:scale(1.38);
+    transform-origin:center bottom;
+    bottom:-9px;
+  }
+}
+
+@media(max-width:390px){
+  .brand-mark{
+    transform:scale(1.42);
+    transform-origin:center bottom;
+    bottom:-9px;
+  }
+}
