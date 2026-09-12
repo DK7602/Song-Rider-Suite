@@ -1336,3 +1336,61 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
     font-size:.72rem;
   }
 }
+
+
+/* v1.5.8 — Project title | New | Save | Export */
+.project-save-row{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) auto auto auto !important;
+  align-items:center;
+  gap:6px !important;
+  width:100%;
+  min-width:0;
+}
+
+.project-save-row #projectName{
+  width:100%;
+  min-width:0 !important;
+}
+
+.project-save-row #newProjectBtn,
+.project-save-row #saveProjectBtn,
+.project-save-row .export-btn{
+  white-space:nowrap;
+  min-width:0;
+}
+
+@media(max-width:700px){
+  .project-save-row{
+    grid-template-columns:minmax(0,1fr) auto auto auto !important;
+    gap:4px !important;
+  }
+
+  .project-save-row #projectName{
+    padding-inline:9px;
+  }
+
+  .project-save-row #newProjectBtn,
+  .project-save-row #saveProjectBtn,
+  .project-save-row .export-btn{
+    padding-inline:clamp(6px,1.9vw,9px) !important;
+    font-size:clamp(.65rem,2.45vw,.76rem) !important;
+  }
+}
+
+@media(max-width:380px){
+  .project-save-row{
+    grid-template-columns:minmax(0,1fr) auto auto auto !important;
+    gap:3px !important;
+  }
+  .project-save-row #projectName{
+    padding-inline:7px;
+    font-size:.76rem;
+  }
+  .project-save-row #newProjectBtn,
+  .project-save-row #saveProjectBtn,
+  .project-save-row .export-btn{
+    padding-inline:5px !important;
+    font-size:.64rem !important;
+  }
+}

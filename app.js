@@ -517,6 +517,14 @@
     b.textContent='↕';
   }
 
+  function disableAutoScrollForManualScroll(){
+    if(!state.autoScroll)return;
+    state.autoScroll=false;
+    localStorage.setItem('crp-auto-scroll','0');
+    updateAutoScrollButton();
+    $('status').textContent='Auto scroll off — manual scrolling detected.';
+  }
+
   function updateSustainButton(){
     const b=$('sustainBtn'); if(!b)return;
     b.classList.toggle('on',state.sustain);
@@ -572,6 +580,39 @@
   function localProjects(){try{return JSON.parse(localStorage.getItem('crp-projects')||'[]')}catch{return[]}}
   function saveLocalProjects(p){localStorage.setItem('crp-projects',JSON.stringify(p))}
   async function api(path,options={}){const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.error||`Request failed (${r.status})`);return d;}
+  function newProject(){
+    if(state.playing)stopProgression();
+    closeExportMenu?.();
+
+    // Start a fresh project instead of adding another line to the current one.
+    state.currentProjectId=null;
+    state.rows=[[]];
+    state.selectedRow=0;
+    state.capo=0;
+    state.neck='open';
+    state.transpose=false;
+
+    $('projectName').value='';
+    $('chordInput').value='';
+    $('keyInput').value='';
+    $('keyInput').dataset.autoKey='1';
+    $('bpmInput').value=92;
+    $('beatsSelect').value=4;
+    $('loopToggle').checked=true;
+    $('notesEditor').innerHTML='';
+    $('capoSelect').value='0';
+    $('neckSelect').value='open';
+
+    // A new project always starts with a blank beat.
+    window.CRPBeatMaker?.loadProject?.(null);
+
+    renderAll();
+    syncBuildInput();
+    renderFits();
+    $('status').textContent='New blank project.';
+    $('projectName').focus();
+  }
+
   function capture(id,name){
     const existing=id?localProjects().find(x=>x.id===id):null;
     const liveBeat=window.CRPBeatMaker?.getBeat?.();
@@ -729,9 +770,30 @@
     $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();};
     $('autoScrollBtn').onclick=()=>{state.autoScroll=!state.autoScroll;localStorage.setItem('crp-auto-scroll',state.autoScroll?'1':'0');updateAutoScrollButton();};
     updateAutoScrollButton();
-    $('playAllBtn').onclick=playProgression;$('saveProjectBtn').onclick=saveProject;
+    $('playAllBtn').onclick=playProgression;
+    $('newProjectBtn').onclick=newProject;
+    $('saveProjectBtn').onclick=saveProject;
     $('exportBtn').onclick=e=>{e.stopPropagation();toggleExportMenu();};$('exportPdfBtn').onclick=exportPdf;$('exportPngBtn').onclick=exportPng;
     document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))closeExportMenu();});
+
+    // Programmatic scrollIntoView does not generate touchmove/wheel events,
+    // so these only shut Auto Scroll off when the user actually intervenes.
+    let autoScrollTouchStartY=null;
+    window.addEventListener('touchstart',e=>{
+      if(!state.playing||!state.autoScroll||!e.touches?.length)return;
+      autoScrollTouchStartY=e.touches[0].clientY;
+    },{passive:true});
+    window.addEventListener('touchmove',e=>{
+      if(!state.playing||!state.autoScroll||autoScrollTouchStartY==null||!e.touches?.length)return;
+      if(Math.abs(e.touches[0].clientY-autoScrollTouchStartY)>10){
+        autoScrollTouchStartY=null;
+        disableAutoScrollForManualScroll();
+      }
+    },{passive:true});
+    window.addEventListener('touchend',()=>{autoScrollTouchStartY=null;},{passive:true});
+    window.addEventListener('wheel',()=>{
+      if(state.playing&&state.autoScroll)disableAutoScrollForManualScroll();
+    },{passive:true});
     $('loginBtn').onclick=login;$('registerBtn').onclick=register;$('logoutBtn').onclick=logout;$('changePasswordBtn').onclick=changePassword;
     $('accountSummaryBtn').onclick=()=>{const panel=$('accountPanel');setAccountCollapsed(!panel.classList.contains('is-collapsed'));};
     document.querySelectorAll('.notes-toolbar [data-cmd]').forEach(b=>b.onclick=()=>document.execCommand(b.dataset.cmd,false,null));$('clearNotesBtn').onclick=()=>{if(confirm('Clear notes?'))$('notesEditor').innerHTML='';};
