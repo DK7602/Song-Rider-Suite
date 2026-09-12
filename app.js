@@ -455,7 +455,7 @@
   function moveDragged(toRow,toIndex){
     if(state.autoScroll){state.drag=null;$('status').textContent='Turn Auto Scroll off to reorder cards.';return;}
     if(!state.drag)return;const {row:fr,index:fi}=state.drag,card=state.rows[fr][fi];if(!card)return;
-    state.rows[fr].splice(fi,1);if(fr===toRow&&fi<toIndex)toIndex--;state.rows[toRow].splice(Math.max(0,toIndex),0,card);state.selectedRow=toRow;state.drag=null;$('status').textContent='';renderRows();syncBuildInput();
+    state.rows[fr].splice(fi,1);if(fr===toRow&&fi<toIndex)toIndex--;state.rows[toRow].splice(Math.max(0,toIndex),0,card);state.selectedRow=toRow;state.drag=null;$('status').textContent='';renderRows();syncBuildInput();scheduleAutoSave();
   }
   function clearLineDropMarkers(){
     document.querySelectorAll('.progression-line').forEach(el=>el.classList.remove('line-moving','line-drop-before','line-drop-after'));
@@ -472,7 +472,7 @@
     state.lineDrag=null;
     clearLineDropMarkers();
     $('status').textContent='Line moved.';
-    renderRows();syncBuildInput();renderFits();
+    renderRows();syncBuildInput();renderFits();scheduleAutoSave();
   }
   function renderRows(){
     const wrap=$('progression');wrap.innerHTML='';
@@ -540,7 +540,7 @@
       });
       badge.addEventListener('pointerleave',()=>{if(!lineMoveActive){/* document listeners keep tracking until release */}});
       badge.addEventListener('click',e=>{if(suppressBadgeClick){e.preventDefault();e.stopPropagation();suppressBadgeClick=false;}});
-      line.querySelector('.delete-line').onclick=e=>{e.stopPropagation();if(state.rows.length===1){state.rows[0]=[];state.selectedRow=0;}else{state.rows.splice(ri,1);if(state.selectedRow>ri)state.selectedRow--;else if(state.selectedRow===ri)state.selectedRow=Math.min(ri,state.rows.length-1);}renderRows();syncBuildInput();renderFits();};
+      line.querySelector('.delete-line').onclick=e=>{e.stopPropagation();if(state.rows.length===1){state.rows[0]=[];state.selectedRow=0;}else{state.rows.splice(ri,1);if(state.selectedRow>ri)state.selectedRow--;else if(state.selectedRow===ri)state.selectedRow=Math.min(ri,state.rows.length-1);}renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
       line.onclick=e=>{if(!e.target.closest('.chord-card')){state.selectedRow=ri;realCarouselLines().forEach(x=>x.classList.toggle('selected',+x.dataset.row===ri));syncBuildInput();updateMobileLineIndicator(ri);}};
       line.addEventListener('dragover',e=>{if(state.autoScroll)return;e.preventDefault();line.classList.add('drop-target');});
       line.addEventListener('dragleave',()=>line.classList.remove('drop-target'));
@@ -550,7 +550,7 @@
         const el=document.createElement('div');el.className='chord-card'+(card.type==='note'?' note-card':'');el.draggable=!state.autoScroll;
         const shown=displayedValue(card),sub=subtitle(card),hint=state.autoScroll?'Tap to play • Auto Scroll locks reordering':'Tap to play • hold & drag to move';
         el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}<div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div><div class="hint">${hint}</div>`;
-        el.querySelector('.remove').onclick=e=>{e.stopPropagation();row.splice(ci,1);renderRows();syncBuildInput();renderFits();};
+        el.querySelector('.remove').onclick=e=>{e.stopPropagation();row.splice(ci,1);renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
         el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove')){const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4,stepSeconds=60/bpm*beats;playCard(card,state.sustain?Math.max(.4,stepSeconds*1.03):Math.max(.35,stepSeconds*.62));}};
         el.addEventListener('dragstart',e=>{if(state.autoScroll){e.preventDefault();$('status').textContent='Turn Auto Scroll off to reorder cards.';return;}state.drag={row:ri,index:ci};e.dataTransfer.effectAllowed='move';el.classList.add('dragging');});
         el.addEventListener('dragend',()=>{el.classList.remove('dragging');state.drag=null;});
@@ -577,7 +577,7 @@
       const bad=commitBuildInput();
       selectedRow().push({type:state.mode,value:v});
       $('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';
-      syncBuildInput();autoPopulateKeyFromEntry();renderAll();
+      syncBuildInput();autoPopulateKeyFromEntry();renderAll();scheduleAutoSave();
     };w.appendChild(b);});
   }
   function renderSound(){const s=$('soundSelect');s.innerHTML='';SOUNDS[state.instrument].forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;s.appendChild(o);});if(!SOUNDS[state.instrument].some(x=>x[0]===state.sound))state.sound=SOUNDS[state.instrument][0][0];s.value=state.sound;}
@@ -673,6 +673,9 @@
     if(state.playing)stopProgression();
     closeExportMenu?.();
 
+    // Flush any pending edits on the current saved project before leaving it.
+    flushAutoSaveNow();
+
     // Start a fresh project instead of adding another line to the current one.
     state.currentProjectId=null;
     state.rows=[[]];
@@ -709,11 +712,75 @@
   }
   function upsertLocal(p){const ps=localProjects(),i=ps.findIndex(x=>x.id===p.id);if(i>=0)ps[i]=p;else ps.unshift(p);saveLocalProjects(ps);}
   async function refreshCloudProjects(){if(!accountUser){cloudProjects=null;cloudSyncState='idle';renderProjects();return;}cloudSyncState='syncing';updateAccountSummary();try{const d=await api('/api/projects');cloudProjects=d.projects||[];cloudProjects.forEach(upsertLocal);cloudSyncState='ready';updateAccountSummary();renderProjects();}catch(e){cloudSyncState='error';updateAccountSummary();$('status').textContent='Cloud sync unavailable — using local backup.';renderProjects();}}
-  async function saveProject(){const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);state.currentProjectId=p.id;$('projectName').value=name;upsertLocal(p);if(accountUser){try{const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});upsertLocal(d.project);await refreshCloudProjects();$('status').textContent=`Saved “${name}” to cloud.`;}catch(e){$('status').textContent=`Saved locally; cloud sync failed: ${e.message}`;}}else{$('status').textContent=`Saved “${name}” on this device.`;renderProjects();}}
+  let autoSaveTimer=null, autoSaveRunning=false, autoSaveQueued=false;
+
+  function updateCloudSnapshot(p){
+    if(!cloudProjects)return;
+    const i=cloudProjects.findIndex(x=>x.id===p.id);
+    if(i>=0)cloudProjects[i]=p;
+    else cloudProjects.unshift(p);
+  }
+
+  function scheduleAutoSave(){
+    // Brand-new/unnamed projects wait for the first manual Save.
+    if(!state.currentProjectId)return;
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer=setTimeout(()=>runAutoSave(),850);
+  }
+
+  function flushAutoSaveNow(){
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer=null;
+    if(state.currentProjectId)runAutoSave();
+  }
+
+  async function runAutoSave(){
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer=null;
+    if(!state.currentProjectId)return;
+
+    if(autoSaveRunning){
+      autoSaveQueued=true;
+      return;
+    }
+
+    autoSaveRunning=true;
+    const projectId=state.currentProjectId;
+    const existing=localProjects().find(x=>x.id===projectId);
+    const name=$('projectName').value.trim()||existing?.name||`Chord Project ${new Date().toLocaleDateString()}`;
+    const p=capture(projectId,name);
+
+    // Local save happens synchronously first, so edits are protected even if cloud is unavailable.
+    upsertLocal(p);
+    updateCloudSnapshot(p);
+    renderProjects();
+
+    if(accountUser){
+      try{
+        await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
+        cloudSyncState='ready';
+        updateAccountSummary();
+      }catch(e){
+        cloudSyncState='error';
+        updateAccountSummary();
+        $('status').textContent=`Autosaved locally; cloud sync failed: ${e.message}`;
+      }
+    }
+
+    autoSaveRunning=false;
+    if(autoSaveQueued){
+      autoSaveQueued=false;
+      // If the same saved project changed while the cloud request was in flight,
+      // immediately write the newest snapshot.
+      if(state.currentProjectId===projectId)runAutoSave();
+    }
+  }
+
+  async function saveProject(){clearTimeout(autoSaveTimer);autoSaveTimer=null;const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);state.currentProjectId=p.id;$('projectName').value=name;upsertLocal(p);if(accountUser){try{const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});upsertLocal(d.project);await refreshCloudProjects();$('status').textContent=`Saved “${name}” to cloud.`;}catch(e){$('status').textContent=`Saved locally; cloud sync failed: ${e.message}`;}}else{$('status').textContent=`Saved “${name}” on this device.`;renderProjects();}}
   function projectSource(){return (accountUser&&cloudProjects)?cloudProjects:localProjects();}
-  function loadProject(id){const p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;state.currentProjectId=id;state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);}
+  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();const p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;state.currentProjectId=id;state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
-  function renderProjects(){const w=$('projectList'),ps=[...projectSource()].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));$('projectStorageLabel').textContent=accountUser?'Synced to your cloud account':'Saved on this device';w.innerHTML=ps.length?'':'<div class="subtle">No saved projects yet.</div>';ps.forEach(p=>{const e=document.createElement('div');e.className='project-item';const count=p.rows?p.rows.flat().length:(p.chords||[]).length;e.innerHTML=`<div class="name">${esc(p.name)}</div><div class="meta">${count} cards</div><button class="open">Open</button><button class="rename">Rename</button><button class="delete">Delete</button>`;e.querySelector('.open').onclick=()=>loadProject(p.id);e.querySelector('.rename').onclick=async()=>{const n=prompt('New project name:',p.name);if(!n?.trim())return;const name=n.trim();const locals=localProjects(),i=locals.findIndex(x=>x.id===p.id);if(i>=0){locals[i].name=name;locals[i].updatedAt=Date.now();saveLocalProjects(locals);}if(accountUser){try{await api('/api/projects/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({name})});await refreshCloudProjects();}catch(err){$('status').textContent='Rename saved locally; cloud sync failed.';renderProjects();}}else renderProjects();};e.querySelector('.delete').onclick=async()=>{if(!confirm(`Delete “${p.name}”?`))return;saveLocalProjects(localProjects().filter(x=>x.id!==p.id));if(accountUser){try{await api('/api/projects/'+encodeURIComponent(p.id),{method:'DELETE'});await refreshCloudProjects();}catch(err){$('status').textContent='Deleted locally; cloud delete failed.';renderProjects();}}else renderProjects();};w.appendChild(e);});}
+  function renderProjects(){const w=$('projectList'),ps=[...projectSource()].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));$('projectStorageLabel').textContent=accountUser?'Synced to your cloud account':'Saved on this device';w.innerHTML=ps.length?'':'<div class="subtle">No saved projects yet.</div>';ps.forEach(p=>{const e=document.createElement('div');e.className='project-item';const count=p.rows?p.rows.flat().length:(p.chords||[]).length;e.innerHTML=`<div class="name">${esc(p.name)}</div><div class="meta">${count} cards</div><button class="open">Open</button><button class="rename">Rename</button><button class="delete">Delete</button>`;e.querySelector('.open').onclick=()=>loadProject(p.id);e.querySelector('.rename').onclick=async()=>{const n=prompt('New project name:',p.name);if(!n?.trim())return;const name=n.trim();const locals=localProjects(),i=locals.findIndex(x=>x.id===p.id);if(i>=0){locals[i].name=name;locals[i].updatedAt=Date.now();saveLocalProjects(locals);}if(accountUser){try{await api('/api/projects/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({name})});await refreshCloudProjects();}catch(err){$('status').textContent='Rename saved locally; cloud sync failed.';renderProjects();}}else renderProjects();};e.querySelector('.delete').onclick=async()=>{if(!confirm(`Delete “${p.name}”?`))return;if(state.currentProjectId===p.id){clearTimeout(autoSaveTimer);autoSaveTimer=null;state.currentProjectId=null;}saveLocalProjects(localProjects().filter(x=>x.id!==p.id));if(accountUser){try{await api('/api/projects/'+encodeURIComponent(p.id),{method:'DELETE'});await refreshCloudProjects();}catch(err){$('status').textContent='Deleted locally; cloud delete failed.';renderProjects();}}else renderProjects();};w.appendChild(e);});}
   function showAccount(){const logged=!!accountUser;const panel=$('accountPanel');panel?.classList.toggle('is-logged-in',logged);$('accountSummaryBtn').hidden=!logged;$('authForms').hidden=logged;$('accountTools').hidden=!logged;$('logoutBtn').hidden=!logged;$('accountStatus').textContent=logged?`Signed in as ${accountDisplayName()}`:'Not signed in — local projects still work.';$('projectStorageLabel').textContent=logged?'Synced to your cloud account':'Saved on this device';if(logged){updateAccountSummary();setAccountCollapsed(true);}else{setAccountCollapsed(false);cloudSyncState='idle';}renderProjects();}
   async function checkAccount(){try{const d=await api('/api/auth/me');accountUser=d.user||null;}catch{accountUser=null;}showAccount();if(accountUser)await refreshCloudProjects();}
   async function login(){try{const d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:$('loginEmail').value,password:$('loginPassword').value})});accountUser=d.user;$('loginPassword').value='';$('authMessage').textContent='Logged in. Syncing projects…';showAccount();await refreshCloudProjects();$('authMessage').textContent='Cloud sync ready.';}catch(e){$('authMessage').textContent=e.message;}}
@@ -845,18 +912,18 @@
 
   function init(){
     for(let i=0;i<=12;i++){const o=document.createElement('option');o.value=i;o.textContent=i?'Capo '+i:'None';$('capoSelect').appendChild(o);}
-    $('buildBtn').onclick=()=>{const bad=commitBuildInput();$('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';syncBuildInput();autoPopulateKeyFromEntry();renderAll();};
+    $('buildBtn').onclick=()=>{const bad=commitBuildInput();$('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';syncBuildInput();autoPopulateKeyFromEntry();renderAll();scheduleAutoSave();};
     $('chordInput').oninput=()=>autoPopulateKeyFromEntry();
     $('chordInput').onkeydown=e=>{if(e.key==='Enter')$('buildBtn').click();};
-    $('keyInput').oninput=()=>{const key=$('keyInput');key.dataset.autoKey='0';const raw=key.value.trim();if(!raw){key.dataset.autoKey='1';autoPopulateKeyFromEntry();return;}if(!enteredKey()){$('keyHint').textContent='Enter a key like F, F#m, Bb, or C minor';return;}renderFits();};
+    $('keyInput').oninput=()=>{const key=$('keyInput');key.dataset.autoKey='0';const raw=key.value.trim();scheduleAutoSave();if(!raw){key.dataset.autoKey='1';autoPopulateKeyFromEntry();return;}if(!enteredKey()){$('keyHint').textContent='Enter a key like F, F#m, Bb, or C minor';return;}renderFits();};
     $('keyInput').onkeydown=e=>{if(e.key==='Enter'){$('buildBtn').click();}};
-    document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.onclick=()=>{state.instrument=b.dataset.instrument;localStorage.setItem('crp-last-instrument',state.instrument);state.sound=SOUNDS[state.instrument][0][0];state.player=null;renderAll();});
-    document.querySelectorAll('#modeTabs .seg').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;localStorage.setItem('crp-last-mode',state.mode);renderAll();syncBuildInput();});
-    $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);renderAll();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);renderAll();};
+    document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.onclick=()=>{state.instrument=b.dataset.instrument;localStorage.setItem('crp-last-instrument',state.instrument);state.sound=SOUNDS[state.instrument][0][0];state.player=null;renderAll();scheduleAutoSave();});
+    document.querySelectorAll('#modeTabs .seg').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;localStorage.setItem('crp-last-mode',state.mode);renderAll();syncBuildInput();scheduleAutoSave();});
+    $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;scheduleAutoSave();};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);renderAll();scheduleAutoSave();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);renderAll();scheduleAutoSave();};
     $('sustainBtn').onclick=()=>{state.sustain=!state.sustain;localStorage.setItem('crp-sustain',state.sustain?'1':'0');updateSustainButton();};
     updateSustainButton();
-    $('capoSelect').onchange=e=>{state.capo=+e.target.value;renderAll();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;renderAll();};
-    $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();};
+    $('capoSelect').onchange=e=>{state.capo=+e.target.value;renderAll();scheduleAutoSave();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();scheduleAutoSave();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;renderAll();scheduleAutoSave();};
+    $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();scheduleAutoSave();};
     $('autoScrollBtn').onclick=()=>{state.autoScroll=!state.autoScroll;localStorage.setItem('crp-auto-scroll',state.autoScroll?'1':'0');updateAutoScrollButton();};
     updateAutoScrollButton();
     let lastMobileCarousel=isMobileCarousel(),resizeTimer=null;
@@ -885,9 +952,14 @@
     window.addEventListener('wheel',()=>{
       if(state.playing&&state.autoScroll)disableAutoScrollForManualScroll();
     },{passive:true});
+    // Full-project autosave: only active after the project has been manually saved once.
+    ['projectName','keyInput','bpmInput'].forEach(id=>$(id)?.addEventListener('input',scheduleAutoSave));
+    ['bpmInput','beatsSelect','loopToggle'].forEach(id=>$(id)?.addEventListener('change',scheduleAutoSave));
+    $('notesEditor')?.addEventListener('input',scheduleAutoSave);
+
     $('loginBtn').onclick=login;$('registerBtn').onclick=register;$('logoutBtn').onclick=logout;$('changePasswordBtn').onclick=changePassword;
     $('accountSummaryBtn').onclick=()=>{const panel=$('accountPanel');setAccountCollapsed(!panel.classList.contains('is-collapsed'));};
-    document.querySelectorAll('.notes-toolbar [data-cmd]').forEach(b=>b.onclick=()=>document.execCommand(b.dataset.cmd,false,null));$('clearNotesBtn').onclick=()=>{if(confirm('Clear notes?'))$('notesEditor').innerHTML='';};
+    document.querySelectorAll('.notes-toolbar [data-cmd]').forEach(b=>b.onclick=()=>{document.execCommand(b.dataset.cmd,false,null);scheduleAutoSave();});$('clearNotesBtn').onclick=()=>{if(confirm('Clear notes?')){$('notesEditor').innerHTML='';scheduleAutoSave();}};
     $('keyInput').dataset.autoKey=$('keyInput').value.trim()?'0':'1';
     renderProjects();renderAll();syncBuildInput();autoPopulateKeyFromEntry();setRiderBonesRiding(false);checkAccount();if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
   }
