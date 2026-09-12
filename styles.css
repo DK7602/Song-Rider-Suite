@@ -1603,11 +1603,18 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
     min-width:0;
   }
   .project-browser-window{
-    max-height:358px; /* about two phone-sized project cards */
+    max-height:272px; /* two compact phone project cards */
     padding-right:3px;
   }
   .project-item{
-    min-height:168px;
+    min-height:0;
+    padding:10px;
+    row-gap:10px;
+    column-gap:8px;
+    align-content:flex-start;
+  }
+  .project-item button{
+    padding:8px 10px;
   }
   .project-item .archive-toggle{
     min-width:84px;
