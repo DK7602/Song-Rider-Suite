@@ -1486,3 +1486,38 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
     z-index:6;
   }
 }
+
+
+/* v1.6.3 — duplicate whole progression line */
+.duplicate-line{
+  position:absolute;
+  top:-11px;
+  right:40px;
+  width:22px;
+  height:22px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  border:1px solid #4b5561;
+  background:var(--panel);
+  color:#aab2bc;
+  font-size:14px;
+  font-weight:900;
+  line-height:1;
+  z-index:2;
+}
+.duplicate-line:hover,
+.duplicate-line:focus-visible{
+  color:#fff;
+  border-color:var(--accent);
+  background:#34301f;
+}
+
+@media(max-width:700px){
+  .progression.mobile-carousel .duplicate-line{
+    top:6px !important;
+    right:42px !important;
+    z-index:6;
+  }
+}

@@ -479,7 +479,7 @@
     state.rows.forEach((row,ri)=>{
       const locked=state.autoScroll;
       const line=document.createElement('div');line.className='progression-line'+(ri===state.selectedRow?' selected':'');line.dataset.row=ri;
-      line.innerHTML=`<span class="line-badge" title="${locked?'Turn Auto Scroll off to reorder lines':'Long press and drag to move this line'}">Line ${ri+1}</span><button class="delete-line" type="button" aria-label="Delete line ${ri+1}" title="Delete line">×</button>`;
+      line.innerHTML=`<span class="line-badge" title="${locked?'Turn Auto Scroll off to reorder lines':'Long press and drag to move this line'}">Line ${ri+1}</span><button class="duplicate-line" type="button" aria-label="Duplicate line ${ri+1}" title="Duplicate line">⧉</button><button class="delete-line" type="button" aria-label="Delete line ${ri+1}" title="Delete line">×</button>`;
       const badge=line.querySelector('.line-badge');
       let lineHold=null,lineMoveActive=false,suppressBadgeClick=false;
       const stopLineMove=cancel=>{
@@ -540,6 +540,18 @@
       });
       badge.addEventListener('pointerleave',()=>{if(!lineMoveActive){/* document listeners keep tracking until release */}});
       badge.addEventListener('click',e=>{if(suppressBadgeClick){e.preventDefault();e.stopPropagation();suppressBadgeClick=false;}});
+      line.querySelector('.duplicate-line').onclick=e=>{
+        e.stopPropagation();
+        const copy=row.map(card=>({...card}));
+        state.rows.splice(ri+1,0,copy);
+        state.selectedRow=ri+1;
+        renderRows();
+        syncBuildInput();
+        renderFits();
+        scheduleAutoSave();
+        $('status').textContent=`Line ${ri+1} duplicated.`;
+        if(isMobileCarousel())requestAnimationFrame(()=>scrollMobileLineTo(ri+1,true));
+      };
       line.querySelector('.delete-line').onclick=e=>{e.stopPropagation();if(state.rows.length===1){state.rows[0]=[];state.selectedRow=0;}else{state.rows.splice(ri,1);if(state.selectedRow>ri)state.selectedRow--;else if(state.selectedRow===ri)state.selectedRow=Math.min(ri,state.rows.length-1);}renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
       line.onclick=e=>{if(!e.target.closest('.chord-card')){state.selectedRow=ri;realCarouselLines().forEach(x=>x.classList.toggle('selected',+x.dataset.row===ri));syncBuildInput();updateMobileLineIndicator(ri);}};
       line.addEventListener('dragover',e=>{if(state.autoScroll)return;e.preventDefault();line.classList.add('drop-target');});
