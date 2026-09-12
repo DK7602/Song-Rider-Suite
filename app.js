@@ -352,7 +352,88 @@
     return [kind,capoText].filter(Boolean).join(' • ');
   }
 
+  function isMobileCarousel(){return window.matchMedia('(max-width:700px)').matches;}
+  function realCarouselLines(){return [...document.querySelectorAll('#progression .progression-line:not(.carousel-clone)')];}
+  function lineScrollLeft(wrap,line){
+    const wr=wrap.getBoundingClientRect(),lr=line.getBoundingClientRect();
+    return wrap.scrollLeft+(lr.left-wr.left);
+  }
+  function updateMobileLineIndicator(ri=state.selectedRow){
+    const el=$('mobileLineIndicator');if(!el)return;
+    if(!isMobileCarousel()){el.hidden=true;return;}
+    el.hidden=false;
+    const total=Math.max(1,state.rows.length),n=Math.max(0,Math.min(total-1,ri));
+    el.textContent=`Line ${n+1} / ${total}`;
+  }
+  function setCarouselSelectedRow(ri){
+    ri=Math.max(0,Math.min(state.rows.length-1,+ri||0));
+    if(state.selectedRow!==ri){state.selectedRow=ri;syncBuildInput();renderFits();}
+    realCarouselLines().forEach(el=>el.classList.toggle('selected',+el.dataset.row===ri));
+    updateMobileLineIndicator(ri);
+  }
+  function scrollMobileLineTo(ri,smooth=true){
+    if(!isMobileCarousel())return;
+    const wrap=$('progression');if(!wrap)return;
+    const line=wrap.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"]`);if(!line)return;
+    wrap.scrollTo({left:lineScrollLeft(wrap,line),behavior:smooth?'smooth':'auto'});
+    updateMobileLineIndicator(ri);
+  }
+  function applyProgressionEditLock(){
+    const wrap=$('progression');if(!wrap)return;
+    wrap.classList.toggle('edit-locked',state.autoScroll);
+    wrap.querySelectorAll('.progression-line:not(.carousel-clone) .chord-card').forEach(el=>el.draggable=!state.autoScroll);
+  }
+  function setupMobileCarousel(wrap){
+    const indicator=$('mobileLineIndicator');
+    if(!isMobileCarousel()){
+      if(indicator)indicator.hidden=true;
+      wrap.classList.remove('mobile-carousel');
+      return;
+    }
+    wrap.classList.add('mobile-carousel');
+    const real=[...wrap.querySelectorAll(':scope > .progression-line')];
+    if(!real.length){updateMobileLineIndicator(0);return;}
+
+    // DOM-only edge clones create the infinite feel without duplicating project data.
+    if(real.length>1){
+      const lead=real[real.length-1].cloneNode(true),tail=real[0].cloneNode(true);
+      lead.classList.add('carousel-clone');tail.classList.add('carousel-clone');
+      lead.dataset.cloneTarget=String(real.length-1);tail.dataset.cloneTarget='0';
+      lead.setAttribute('aria-hidden','true');tail.setAttribute('aria-hidden','true');
+      wrap.prepend(lead);wrap.append(tail);
+    }
+
+    let settleTimer=null;
+    const settle=()=>{
+      const items=[...wrap.querySelectorAll(':scope > .progression-line')];if(!items.length)return;
+      const wr=wrap.getBoundingClientRect(),cx=wr.left+wr.width/2;
+      let nearest=items[0],dist=Infinity;
+      items.forEach(el=>{const r=el.getBoundingClientRect(),d=Math.abs((r.left+r.width/2)-cx);if(d<dist){dist=d;nearest=el;}});
+      if(nearest.classList.contains('carousel-clone')){
+        const ri=+nearest.dataset.cloneTarget||0;
+        const target=wrap.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"]`);
+        if(target)wrap.scrollTo({left:lineScrollLeft(wrap,target),behavior:'auto'});
+        setCarouselSelectedRow(ri);
+      }else setCarouselSelectedRow(+nearest.dataset.row||0);
+    };
+    wrap.addEventListener('scroll',()=>{clearTimeout(settleTimer);settleTimer=setTimeout(settle,90);},{passive:true});
+
+    // A deliberate horizontal swipe takes control away from playback-follow mode.
+    let tx=null,ty=null;
+    wrap.addEventListener('touchstart',e=>{if(!e.touches?.length)return;tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+    wrap.addEventListener('touchmove',e=>{
+      if(tx==null||!e.touches?.length)return;
+      const dx=e.touches[0].clientX-tx,dy=e.touches[0].clientY-ty;
+      if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)){tx=ty=null;if(state.autoScroll)disableAutoScrollForManualScroll();}
+    },{passive:true});
+    wrap.addEventListener('touchend',()=>{tx=ty=null;},{passive:true});
+
+    requestAnimationFrame(()=>scrollMobileLineTo(state.selectedRow,false));
+    updateMobileLineIndicator(state.selectedRow);
+  }
+
   function moveDragged(toRow,toIndex){
+    if(state.autoScroll){state.drag=null;$('status').textContent='Turn Auto Scroll off to reorder cards.';return;}
     if(!state.drag)return;const {row:fr,index:fi}=state.drag,card=state.rows[fr][fi];if(!card)return;
     state.rows[fr].splice(fi,1);if(fr===toRow&&fi<toIndex)toIndex--;state.rows[toRow].splice(Math.max(0,toIndex),0,card);state.selectedRow=toRow;state.drag=null;$('status').textContent='';renderRows();syncBuildInput();
   }
@@ -376,7 +457,9 @@
   function renderRows(){
     const wrap=$('progression');wrap.innerHTML='';
     state.rows.forEach((row,ri)=>{
-      const line=document.createElement('div');line.className='progression-line'+(ri===state.selectedRow?' selected':'');line.dataset.row=ri;line.innerHTML=`<span class="line-badge" title="Long press and drag to move this line">Line ${ri+1}</span><button class="delete-line" type="button" aria-label="Delete line ${ri+1}" title="Delete line">×</button>`;
+      const locked=state.autoScroll;
+      const line=document.createElement('div');line.className='progression-line'+(ri===state.selectedRow?' selected':'');line.dataset.row=ri;
+      line.innerHTML=`<span class="line-badge" title="${locked?'Turn Auto Scroll off to reorder lines':'Long press and drag to move this line'}">Line ${ri+1}</span><button class="delete-line" type="button" aria-label="Delete line ${ri+1}" title="Delete line">×</button>`;
       const badge=line.querySelector('.line-badge');
       let lineHold=null,lineMoveActive=false,suppressBadgeClick=false;
       const stopLineMove=cancel=>{
@@ -388,103 +471,80 @@
         else if(drag)moveWholeLine(drag.from,drag.insert);
       };
       badge.addEventListener('pointerdown',e=>{
+        if(state.autoScroll){$('status').textContent='Turn Auto Scroll off to reorder lines.';return;}
         if(e.button!=null&&e.button!==0)return;
         clearTimeout(lineHold);
-        const pointerId=e.pointerId;
-        const startX=e.clientX,startY=e.clientY;
+        const pointerId=e.pointerId,startX=e.clientX,startY=e.clientY;
         let lastX=startX,lastY=startY;
 
         const updateLineDestination=(clientX,clientY)=>{
           if(!lineMoveActive||!state.lineDrag)return;
-
-          // Keep vertical line dragging usable even when the destination is initially off-screen.
-          if(clientY<80)window.scrollBy(0,-18);
-          else if(clientY>window.innerHeight-80)window.scrollBy(0,18);
-
-          const lines=[...document.querySelectorAll('.progression-line')];
+          const mobile=isMobileCarousel(),lines=realCarouselLines();
           let insert=lines.length;
-          for(let i=0;i<lines.length;i++){
-            const rect=lines[i].getBoundingClientRect();
-            if(clientY<rect.top+rect.height/2){insert=i;break;}
+          if(mobile){
+            const carousel=$('progression'),cr=carousel.getBoundingClientRect();
+            if(clientX<cr.left+62)carousel.scrollBy({left:-20,behavior:'auto'});
+            else if(clientX>cr.right-62)carousel.scrollBy({left:20,behavior:'auto'});
+            for(let i=0;i<lines.length;i++){const r=lines[i].getBoundingClientRect();if(clientX<r.left+r.width/2){insert=i;break;}}
+          }else{
+            if(clientY<80)window.scrollBy(0,-18);else if(clientY>window.innerHeight-80)window.scrollBy(0,18);
+            for(let i=0;i<lines.length;i++){const r=lines[i].getBoundingClientRect();if(clientY<r.top+r.height/2){insert=i;break;}}
           }
           state.lineDrag.insert=insert;
-
-          clearLineDropMarkers();
-          line.classList.add('line-moving');
-          if(lines.length){
-            if(insert>=lines.length)lines[lines.length-1].classList.add('line-drop-after');
-            else lines[insert].classList.add('line-drop-before');
-          }
+          clearLineDropMarkers();line.classList.add('line-moving');
+          if(lines.length){if(insert>=lines.length)lines[lines.length-1].classList.add('line-drop-after');else lines[insert].classList.add('line-drop-before');}
         };
 
         const onDocMove=ev=>{
           if(ev.pointerId!==pointerId)return;
           lastX=ev.clientX;lastY=ev.clientY;
-          // Before the hold fires, moving very far means the user intended to scroll/tap instead.
-          if(!lineMoveActive){
-            if(Math.hypot(lastX-startX,lastY-startY)>18){clearTimeout(lineHold);lineHold=null;}
-            return;
-          }
-          ev.preventDefault();
-          updateLineDestination(lastX,lastY);
+          if(!lineMoveActive){if(Math.hypot(lastX-startX,lastY-startY)>18){clearTimeout(lineHold);lineHold=null;}return;}
+          ev.preventDefault();updateLineDestination(lastX,lastY);
         };
         const finishDocMove=(ev,cancel=false)=>{
           if(ev.pointerId!==pointerId)return;
-          document.removeEventListener('pointermove',onDocMove,true);
-          document.removeEventListener('pointerup',onDocUp,true);
-          document.removeEventListener('pointercancel',onDocCancel,true);
-          if(lineMoveActive){ev.preventDefault();stopLineMove(cancel);}
-          else {clearTimeout(lineHold);lineHold=null;}
+          document.removeEventListener('pointermove',onDocMove,true);document.removeEventListener('pointerup',onDocUp,true);document.removeEventListener('pointercancel',onDocCancel,true);
+          if(lineMoveActive){ev.preventDefault();stopLineMove(cancel);}else{clearTimeout(lineHold);lineHold=null;}
         };
-        const onDocUp=ev=>finishDocMove(ev,false);
-        const onDocCancel=ev=>finishDocMove(ev,true);
-
-        document.addEventListener('pointermove',onDocMove,{capture:true,passive:false});
-        document.addEventListener('pointerup',onDocUp,{capture:true,passive:false});
-        document.addEventListener('pointercancel',onDocCancel,{capture:true,passive:false});
+        const onDocUp=ev=>finishDocMove(ev,false),onDocCancel=ev=>finishDocMove(ev,true);
+        document.addEventListener('pointermove',onDocMove,{capture:true,passive:false});document.addEventListener('pointerup',onDocUp,{capture:true,passive:false});document.addEventListener('pointercancel',onDocCancel,{capture:true,passive:false});
 
         lineHold=setTimeout(()=>{
-          lineMoveActive=true;
-          state.lineDrag={from:ri,insert:ri};
+          if(state.autoScroll)return;
+          lineMoveActive=true;state.lineDrag={from:ri,insert:ri};
           try{badge.setPointerCapture?.(pointerId);}catch(_){}
-          line.classList.add('line-moving');
-          document.body.classList.add('moving-line');
-          $('status').textContent='Move the whole line, then release.';
-          navigator.vibrate?.(20);
-          updateLineDestination(lastX,lastY);
+          line.classList.add('line-moving');document.body.classList.add('moving-line');
+          $('status').textContent=isMobileCarousel()?'Move the line left or right, then release.':'Move the whole line, then release.';
+          navigator.vibrate?.(20);updateLineDestination(lastX,lastY);
         },450);
       });
       badge.addEventListener('pointerleave',()=>{if(!lineMoveActive){/* document listeners keep tracking until release */}});
       badge.addEventListener('click',e=>{if(suppressBadgeClick){e.preventDefault();e.stopPropagation();suppressBadgeClick=false;}});
       line.querySelector('.delete-line').onclick=e=>{e.stopPropagation();if(state.rows.length===1){state.rows[0]=[];state.selectedRow=0;}else{state.rows.splice(ri,1);if(state.selectedRow>ri)state.selectedRow--;else if(state.selectedRow===ri)state.selectedRow=Math.min(ri,state.rows.length-1);}renderRows();syncBuildInput();renderFits();};
-      line.onclick=e=>{if(!e.target.closest('.chord-card')){state.selectedRow=ri;renderRows();syncBuildInput();}};
-      line.addEventListener('dragover',e=>{e.preventDefault();line.classList.add('drop-target');});
+      line.onclick=e=>{if(!e.target.closest('.chord-card')){state.selectedRow=ri;realCarouselLines().forEach(x=>x.classList.toggle('selected',+x.dataset.row===ri));syncBuildInput();updateMobileLineIndicator(ri);}};
+      line.addEventListener('dragover',e=>{if(state.autoScroll)return;e.preventDefault();line.classList.add('drop-target');});
       line.addEventListener('dragleave',()=>line.classList.remove('drop-target'));
-      line.addEventListener('drop',e=>{e.preventDefault();line.classList.remove('drop-target');moveDragged(ri,row.length);});
+      line.addEventListener('drop',e=>{if(state.autoScroll)return;e.preventDefault();line.classList.remove('drop-target');moveDragged(ri,row.length);});
       if(!row.length){const empty=document.createElement('div');empty.className='empty-line';empty.textContent='Empty line — tap to select or drop a card here';line.appendChild(empty);}
       row.forEach((card,ci)=>{
-        const el=document.createElement('div');el.className='chord-card'+(card.type==='note'?' note-card':'');el.draggable=true;
-        const shown=displayedValue(card),sub=subtitle(card);
-        el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}<div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div><div class="hint">Tap to play • hold & drag to move</div>`;
+        const el=document.createElement('div');el.className='chord-card'+(card.type==='note'?' note-card':'');el.draggable=!state.autoScroll;
+        const shown=displayedValue(card),sub=subtitle(card),hint=state.autoScroll?'Tap to play • Auto Scroll locks reordering':'Tap to play • hold & drag to move';
+        el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}<div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div><div class="hint">${hint}</div>`;
         el.querySelector('.remove').onclick=e=>{e.stopPropagation();row.splice(ci,1);renderRows();syncBuildInput();renderFits();};
-        el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove')){
-          const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92));
-          const beats=+$('beatsSelect').value||4;
-          const stepSeconds=60/bpm*beats;
-          playCard(card,state.sustain?Math.max(.4,stepSeconds*1.03):Math.max(.35,stepSeconds*.62));
-        }};
-        el.addEventListener('dragstart',e=>{state.drag={row:ri,index:ci};e.dataTransfer.effectAllowed='move';el.classList.add('dragging');});
+        el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove')){const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4,stepSeconds=60/bpm*beats;playCard(card,state.sustain?Math.max(.4,stepSeconds*1.03):Math.max(.35,stepSeconds*.62));}};
+        el.addEventListener('dragstart',e=>{if(state.autoScroll){e.preventDefault();$('status').textContent='Turn Auto Scroll off to reorder cards.';return;}state.drag={row:ri,index:ci};e.dataTransfer.effectAllowed='move';el.classList.add('dragging');});
         el.addEventListener('dragend',()=>{el.classList.remove('dragging');state.drag=null;});
-        el.addEventListener('dragover',e=>e.preventDefault());
-        el.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();moveDragged(ri,ci);});
-        let t=null;el.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;t=setTimeout(()=>{state.drag={row:ri,index:ci};el.classList.add('dragging');$('status').textContent='Card selected to move. Tap another card or line.';navigator.vibrate?.(20);},450);});
+        el.addEventListener('dragover',e=>{if(!state.autoScroll)e.preventDefault();});
+        el.addEventListener('drop',e=>{if(state.autoScroll)return;e.preventDefault();e.stopPropagation();moveDragged(ri,ci);});
+        let t=null;el.addEventListener('pointerdown',e=>{if(e.target.closest('button')||state.autoScroll)return;t=setTimeout(()=>{if(state.autoScroll)return;state.drag={row:ri,index:ci};el.classList.add('dragging');$('status').textContent='Card selected to move. Tap another card or line.';navigator.vibrate?.(20);},450);});
         ['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,()=>clearTimeout(t)));
-        el.addEventListener('pointerup',e=>{if(state.drag&&(state.drag.row!==ri||state.drag.index!==ci)&&!e.target.closest('button'))moveDragged(ri,ci);});
+        el.addEventListener('pointerup',e=>{if(!state.autoScroll&&state.drag&&(state.drag.row!==ri||state.drag.index!==ci)&&!e.target.closest('button'))moveDragged(ri,ci);});
         line.appendChild(el);
       });
-      line.addEventListener('pointerup',e=>{if(state.drag&&!e.target.closest('.chord-card'))moveDragged(ri,row.length);});
+      line.addEventListener('pointerup',e=>{if(!state.autoScroll&&state.drag&&!e.target.closest('.chord-card'))moveDragged(ri,row.length);});
       wrap.appendChild(line);
     });
+    setupMobileCarousel(wrap);applyProgressionEditLock();
   }
 
   function renderFits(){
@@ -515,6 +575,7 @@
     b.setAttribute('title',state.autoScroll?'Auto scroll on':'Auto scroll off');
     b.setAttribute('aria-label',state.autoScroll?'Auto scroll on':'Auto scroll off');
     b.textContent='↕';
+    applyProgressionEditLock();
   }
 
   function disableAutoScrollForManualScroll(){
@@ -553,7 +614,11 @@
       const playingCard=document.querySelector(`.progression-line[data-row="${item.ri}"]`)?.querySelectorAll('.chord-card')[item.ci];
       playingCard?.style.setProperty('outline','2px solid var(--accent)');
       if(state.autoScroll&&playingCard){
-        playingCard.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
+        if(isMobileCarousel()){
+          scrollMobileLineTo(item.ri,true);
+          updateMobileLineIndicator(item.ri);
+          setTimeout(()=>{if(state.autoScroll)playingCard.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});},180);
+        }else playingCard.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
       }
       nextStepAt += ms;
       state.timer=setTimeout(step,Math.max(0,nextStepAt-performance.now()));
@@ -770,6 +835,8 @@
     $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();};
     $('autoScrollBtn').onclick=()=>{state.autoScroll=!state.autoScroll;localStorage.setItem('crp-auto-scroll',state.autoScroll?'1':'0');updateAutoScrollButton();};
     updateAutoScrollButton();
+    let lastMobileCarousel=isMobileCarousel(),resizeTimer=null;
+    window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{const mobile=isMobileCarousel();if(mobile!==lastMobileCarousel){lastMobileCarousel=mobile;renderRows();}},120);},{passive:true});
     $('playAllBtn').onclick=playProgression;
     $('newProjectBtn').onclick=newProject;
     $('saveProjectBtn').onclick=saveProject;

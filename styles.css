@@ -1394,3 +1394,75 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
     font-size:.64rem !important;
   }
 }
+
+
+/* v1.5.9 — mobile horizontal looping line carousel */
+.mobile-line-indicator{display:none;}
+.progression.edit-locked .line-badge{cursor:default;opacity:.72;}
+.progression.edit-locked .chord-card{cursor:default;}
+
+@media(max-width:700px){
+  .progression.mobile-carousel{
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    align-items:flex-start;
+    gap:10px !important;
+    width:100%;
+    min-width:0;
+    overflow-x:auto;
+    overflow-y:visible;
+    scroll-snap-type:x mandatory;
+    scroll-behavior:smooth;
+    overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    padding:4px 0 5px;
+  }
+  .progression.mobile-carousel::-webkit-scrollbar{display:none;}
+  .progression.mobile-carousel > .progression-line{
+    flex:0 0 100% !important;
+    width:100% !important;
+    min-width:100% !important;
+    max-width:100% !important;
+    scroll-snap-align:start;
+    scroll-snap-stop:always;
+    box-sizing:border-box;
+  }
+  .progression.mobile-carousel > .carousel-clone{
+    pointer-events:none;
+  }
+  .mobile-line-indicator{
+    display:block;
+    width:max-content;
+    max-width:100%;
+    margin:2px auto 7px;
+    padding:2px 9px;
+    border:1px solid #39414b;
+    border-radius:999px;
+    background:#0e1115;
+    color:var(--muted);
+    font-size:.68rem;
+    font-weight:700;
+    line-height:1.35;
+  }
+  .mobile-line-indicator[hidden]{display:none !important;}
+
+  /* Whole-line reorder changes from vertical insertion to horizontal insertion. */
+  .progression.mobile-carousel .progression-line.line-drop-before::before,
+  .progression.mobile-carousel .progression-line.line-drop-after::after{
+    top:8px !important;
+    bottom:8px !important;
+    width:4px !important;
+    height:auto !important;
+    border-radius:999px;
+  }
+  .progression.mobile-carousel .progression-line.line-drop-before::before{
+    left:-7px !important;
+    right:auto !important;
+  }
+  .progression.mobile-carousel .progression-line.line-drop-after::after{
+    right:-7px !important;
+    left:auto !important;
+  }
+  .progression.mobile-carousel .line-badge{touch-action:none;}
+}
