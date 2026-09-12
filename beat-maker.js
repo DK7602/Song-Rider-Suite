@@ -189,8 +189,8 @@
     };
     $('crpDrumVolume').addEventListener('input', e=>setVolume(e.target.value));
     $('crpBeatVolume').addEventListener('input', e=>setVolume(e.target.value));
-    $('crpBarsSelect').addEventListener('change', e=>{ beat.bars=clamp(+e.target.value,1,16); currentBar=clamp(currentBar,0,beat.bars-1); renderEditor(); });
-    $('crpResolution').addEventListener('change', e=>{ beat.resolution=+e.target.value; renderGrid(); });
+    $('crpBarsSelect').addEventListener('change', e=>{ beat.bars=clamp(+e.target.value,1,16); currentBar=clamp(currentBar,0,beat.bars-1); renderEditor(); persistBeatIntoProject(); });
+    $('crpResolution').addEventListener('change', e=>{ beat.resolution=+e.target.value; renderGrid(); persistBeatIntoProject(); });
     $('crpPreview').addEventListener('click', ()=> previewing ? stopPreview() : startPreview());
     $('crpCopyBar').addEventListener('click', copyBar);
     $('crpPasteBar').addEventListener('click', pasteBar);
@@ -298,15 +298,16 @@
     const arr=beat.tracks[id][currentBar]; const i=arr.indexOf(step);
     if(i>=0) arr.splice(i,1); else {arr.push(step);arr.sort((a,b)=>a-b); audition(id,.58);}
     btn.classList.toggle('active',i<0); $('crpBeatStatus').textContent=`${countHits()} hits • BPM ${getBpm()}`;
+    persistBeatIntoProject();
   }
   function copyBar(){ copiedBar={}; DRUMS.forEach(([id])=>copiedBar[id]=[...beat.tracks[id][currentBar]]); status(`Copied Bar ${currentBar+1}`); }
-  function pasteBar(){ if(!copiedBar){status('Copy a bar first');return;} DRUMS.forEach(([id])=>beat.tracks[id][currentBar]=[...(copiedBar[id]||[])]); renderGrid(); status(`Pasted into Bar ${currentBar+1}`); }
+  function pasteBar(){ if(!copiedBar){status('Copy a bar first');return;} DRUMS.forEach(([id])=>beat.tracks[id][currentBar]=[...(copiedBar[id]||[])]); renderGrid(); persistBeatIntoProject(); status(`Pasted into Bar ${currentBar+1}`); }
   function duplicateBar(){
     if(beat.bars>=16 && currentBar>=15){status('16-bar maximum');return;}
     const target=Math.min(currentBar+1,15); if(target>=beat.bars) beat.bars=target+1;
-    DRUMS.forEach(([id])=>beat.tracks[id][target]=[...beat.tracks[id][currentBar]]); currentBar=target; renderEditor(); status(`Duplicated to Bar ${target+1}`);
+    DRUMS.forEach(([id])=>beat.tracks[id][target]=[...beat.tracks[id][currentBar]]); currentBar=target; renderEditor(); persistBeatIntoProject(); status(`Duplicated to Bar ${target+1}`);
   }
-  function clearBar(){ DRUMS.forEach(([id])=>beat.tracks[id][currentBar]=[]); renderGrid(); status(`Cleared Bar ${currentBar+1}`); }
+  function clearBar(){ DRUMS.forEach(([id])=>beat.tracks[id][currentBar]=[]); renderGrid(); persistBeatIntoProject(); status(`Cleared Bar ${currentBar+1}`); }
   function status(s){ if($('crpBeatStatus')) $('crpBeatStatus').textContent=s; }
 
 
@@ -439,6 +440,7 @@
     if(beat.bars>1 && complexity!=='simple') addFillToBar(beat.bars-1,style,complexity);
     currentBar=0;
     renderEditor();
+    persistBeatIntoProject();
     status(`${styleLabel(style)} • ${complexity} • ${beat.bars} bar${beat.bars===1?'':'s'} generated`);
   }
   function fillLastBar(){
@@ -451,6 +453,7 @@
     addFillToBar(bar,style,complexity);
     currentBar=bar;
     renderEditor();
+    persistBeatIntoProject();
     status(`Fill added to Bar ${bar+1}`);
   }
   function styleLabel(style){
@@ -546,6 +549,20 @@
 
   // If the chord progression stops itself (Repeat off), stop drums too.
   setInterval(()=>{ if(mainPlaying && $('playAllBtn') && !/Stop/i.test($('playAllBtn').textContent||'')) stopMainDrums(); },120);
+
+  // Public bridge used by the core project save/load code. The beat is now
+  // stored in the same project payload as chords, BPM, notes, etc.
+  window.CRPBeatMaker = {
+    getBeat(){
+      return JSON.parse(JSON.stringify(normalizeBeat(beat)));
+    },
+    loadProject(project){
+      loadBeatFromProject(project || null);
+    },
+    persist(){
+      return persistBeatIntoProject();
+    }
+  };
 
   // Initial beat belongs to the most recently saved project, if any.
   function init(){
