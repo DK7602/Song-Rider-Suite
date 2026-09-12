@@ -224,3 +224,68 @@
   border:2px solid #171b20;
   background:var(--accent,#e9c46a);
 }
+
+
+/* v1.5.6 — main Beat/Drums/Volume row adapts to narrow phones */
+@media(max-width:700px){
+  .crp-beat-controls{
+    grid-template-columns:minmax(72px,1fr) auto minmax(96px,1.15fr) !important;
+    gap:clamp(3px,1.4vw,6px) !important;
+    overflow:visible !important;
+  }
+
+  .crp-beat-controls .crp-beat-btn{
+    min-width:0 !important;
+    width:100% !important;
+    padding-inline:6px !important;
+    font-size:clamp(.66rem,2.7vw,.78rem) !important;
+  }
+
+  .crp-beat-controls .check-label{
+    font-size:clamp(.61rem,2.5vw,.72rem) !important;
+    gap:3px !important;
+  }
+
+  .crp-beat-controls .crp-volume-main{
+    grid-template-columns:auto minmax(30px,1fr) auto !important;
+    min-width:0 !important;
+    gap:2px !important;
+    font-size:clamp(.58rem,2.35vw,.68rem) !important;
+  }
+
+  .crp-beat-controls .crp-volume-main input[type="range"]{
+    min-width:30px !important;
+    max-width:none !important;
+  }
+
+  .crp-beat-controls .crp-volume-main span{
+    min-width:23px !important;
+    font-size:clamp(.58rem,2.35vw,.68rem) !important;
+  }
+}
+
+@media(max-width:380px){
+  .crp-beat-controls{
+    grid-template-columns:minmax(62px,.82fr) auto minmax(88px,1.18fr) !important;
+    gap:3px !important;
+  }
+
+  .crp-beat-controls .check-label{
+    font-size:0 !important;
+  }
+  .crp-beat-controls .check-label::after{
+    content:"Drums";
+    font-size:.61rem;
+  }
+
+  .crp-beat-controls .crp-volume-main{
+    font-size:0 !important;
+  }
+  .crp-beat-controls .crp-volume-main::before{
+    content:"Vol";
+    font-size:.58rem;
+  }
+  .crp-beat-controls .crp-volume-main span{
+    font-size:.58rem !important;
+  }
+}

@@ -949,3 +949,276 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
     font-size:.64rem;
   }
 }
+
+
+/* v1.5.6 — adaptive mobile layout for narrow and wide phones
+   The app now responds to the actual available content width instead of
+   assuming every phone is roughly the same size. */
+@media(max-width:700px){
+  html,body,.app-shell,.panel{
+    min-width:0;
+    max-width:100%;
+  }
+
+  .app-shell{
+    width:100%;
+    padding-inline:clamp(6px,2.5vw,10px);
+  }
+
+  .panel{
+    width:100%;
+    min-width:0;
+    padding-inline:clamp(8px,3vw,12px);
+    overflow:hidden;
+  }
+
+  /* Build row must never force the panel wider than the viewport. */
+  .entry-row{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:7px;
+    width:100%;
+    min-width:0;
+  }
+  .entry-row input{
+    min-width:0 !important;
+    width:100%;
+  }
+  #buildBtn{
+    min-width:0;
+    padding-inline:clamp(9px,3vw,14px);
+  }
+
+  /* Key/family line shrinks naturally. Family copy may use two short lines
+     instead of disappearing off the right edge. */
+  .section-heading-row{
+    width:100%;
+    min-width:0;
+  }
+  #fitHeading{
+    flex:0 1 auto;
+    min-width:0;
+  }
+  .fit-key-row{
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr);
+    flex:1 1 auto;
+    min-width:0;
+  }
+  .key-input{
+    width:clamp(54px,18vw,70px) !important;
+    min-width:54px !important;
+    max-width:70px !important;
+  }
+  #keyHint{
+    min-width:0;
+    white-space:normal !important;
+    overflow-wrap:anywhere;
+    line-height:1.05 !important;
+    text-align:right;
+  }
+
+  /* Transport controls use flexible columns rather than old fixed widths. */
+  .play-row{
+    display:grid !important;
+    grid-template-columns:
+      minmax(68px,.9fr)
+      minmax(52px,.72fr)
+      minmax(72px,.95fr)
+      minmax(72px,1fr) !important;
+    gap:clamp(3px,1.3vw,5px) !important;
+    min-width:0 !important;
+  }
+
+  #playAllBtn{
+    width:100% !important;
+    min-width:0 !important;
+    padding:10px 5px !important;
+    font-size:clamp(.70rem,2.8vw,.83rem) !important;
+  }
+
+  .play-row .repeat-control{
+    width:100% !important;
+    min-width:0 !important;
+    gap:3px !important;
+    font-size:clamp(.60rem,2.45vw,.69rem) !important;
+  }
+  .play-row .repeat-control input{
+    width:clamp(16px,4.5vw,18px) !important;
+    height:clamp(16px,4.5vw,18px) !important;
+    flex-basis:clamp(16px,4.5vw,18px) !important;
+  }
+
+  .play-row .bpm-control{
+    display:grid !important;
+    grid-template-columns:auto minmax(0,1fr);
+    width:100% !important;
+    min-width:0 !important;
+    gap:3px !important;
+    font-size:clamp(.59rem,2.4vw,.68rem) !important;
+  }
+  .play-row .bpm-control #bpmInput{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    padding:8px 3px !important;
+  }
+
+  .play-row .beats-control{
+    display:grid !important;
+    grid-template-columns:auto minmax(40px,1fr) !important;
+    width:100% !important;
+    min-width:0 !important;
+    gap:3px !important;
+  }
+  .play-row .beats-label{
+    min-width:0 !important;
+    width:auto !important;
+    font-size:clamp(.56rem,2.25vw,.66rem) !important;
+  }
+  .play-row #beatsSelect{
+    width:100% !important;
+    min-width:40px !important;
+    max-width:none !important;
+    height:40px !important;
+    padding:7px 18px 7px 6px !important;
+  }
+
+  /* Inline line controls may wrap only their helper copy, never the buttons. */
+  .line-actions{
+    display:grid !important;
+    grid-template-columns:auto 28px minmax(0,1fr);
+    align-items:center;
+    gap:5px;
+    width:100%;
+    min-width:0;
+  }
+  #addLineBtn{
+    min-width:0;
+    padding-inline:clamp(8px,2.4vw,12px);
+    font-size:clamp(.72rem,2.8vw,.88rem);
+    white-space:nowrap;
+  }
+  .line-help-inline{
+    min-width:0;
+    overflow:hidden;
+  }
+  .line-help-inline .line-help{
+    white-space:normal !important;
+    overflow-wrap:anywhere;
+  }
+  .line-help-select::after{
+    white-space:normal !important;
+    font-size:clamp(9px,2.55vw,12px) !important;
+    line-height:1.08 !important;
+  }
+
+  /* Project save row is allowed to shrink instead of being clipped. */
+  .project-save-row{
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto auto;
+    gap:6px !important;
+    width:100%;
+    min-width:0;
+  }
+  .project-save-row #projectName{
+    width:100%;
+    min-width:0 !important;
+  }
+  .project-save-row button{
+    min-width:0;
+    padding-inline:clamp(7px,2.1vw,10px);
+  }
+}
+
+/* Extra-small phones: preserve one-row transport, but shorten text and
+   squeeze secondary controls before ever allowing horizontal clipping. */
+@media(max-width:380px){
+  .app-shell{
+    padding-inline:5px;
+  }
+  .panel{
+    padding-inline:8px;
+  }
+
+  .brand-copy h1{
+    font-size:clamp(1.15rem,6vw,1.45rem) !important;
+  }
+  .brand-copy .tagline{
+    font-size:clamp(.61rem,2.9vw,.79rem) !important;
+  }
+
+  #fitHeading{
+    font-size:.86rem !important;
+  }
+  #keyHint{
+    font-size:.58rem !important;
+  }
+
+  .play-row{
+    grid-template-columns:minmax(62px,.86fr) minmax(48px,.66fr) minmax(66px,.9fr) minmax(66px,.95fr) !important;
+    gap:3px !important;
+  }
+  #playAllBtn{
+    font-size:.68rem !important;
+    padding-inline:3px !important;
+  }
+  .play-row .repeat-control span{
+    font-size:0;
+  }
+  .play-row .repeat-control span::after{
+    content:"Rpt";
+    font-size:.61rem;
+  }
+  .play-row .transport-label{
+    font-size:0;
+  }
+  .play-row .transport-label::after{
+    content:"BPM";
+    font-size:.58rem;
+  }
+  .play-row .beats-label span:first-child{
+    font-size:0;
+  }
+  .play-row .beats-label span:first-child::after{
+    content:"Beat";
+    font-size:.55rem;
+  }
+  .play-row .beats-label span:last-child{
+    font-size:.55rem;
+  }
+
+  #addLineBtn{
+    font-size:0;
+    padding-inline:8px;
+  }
+  #addLineBtn::after{
+    content:"+ Blank line";
+    font-size:.72rem;
+  }
+
+  .line-actions{
+    grid-template-columns:auto 27px minmax(0,1fr);
+    gap:4px;
+  }
+  .auto-scroll-btn{
+    width:27px !important;
+    min-width:27px !important;
+    height:27px !important;
+    min-height:27px !important;
+  }
+  .line-help-select::after{
+    content:"Tap line • Hold & drag cards";
+    font-size:9px !important;
+  }
+
+  .project-save-row{
+    grid-template-columns:minmax(0,1fr) auto auto;
+    gap:4px !important;
+  }
+  .export-btn,
+  #saveProjectBtn{
+    font-size:.68rem !important;
+    padding-inline:7px !important;
+  }
+}
