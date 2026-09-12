@@ -356,23 +356,71 @@
       badge.addEventListener('pointerdown',e=>{
         if(e.button!=null&&e.button!==0)return;
         clearTimeout(lineHold);
+        const pointerId=e.pointerId;
+        const startX=e.clientX,startY=e.clientY;
+        let lastX=startX,lastY=startY;
+
+        const updateLineDestination=(clientX,clientY)=>{
+          if(!lineMoveActive||!state.lineDrag)return;
+
+          // Keep vertical line dragging usable even when the destination is initially off-screen.
+          if(clientY<80)window.scrollBy(0,-18);
+          else if(clientY>window.innerHeight-80)window.scrollBy(0,18);
+
+          const lines=[...document.querySelectorAll('.progression-line')];
+          let insert=lines.length;
+          for(let i=0;i<lines.length;i++){
+            const rect=lines[i].getBoundingClientRect();
+            if(clientY<rect.top+rect.height/2){insert=i;break;}
+          }
+          state.lineDrag.insert=insert;
+
+          clearLineDropMarkers();
+          line.classList.add('line-moving');
+          if(lines.length){
+            if(insert>=lines.length)lines[lines.length-1].classList.add('line-drop-after');
+            else lines[insert].classList.add('line-drop-before');
+          }
+        };
+
+        const onDocMove=ev=>{
+          if(ev.pointerId!==pointerId)return;
+          lastX=ev.clientX;lastY=ev.clientY;
+          // Before the hold fires, moving very far means the user intended to scroll/tap instead.
+          if(!lineMoveActive){
+            if(Math.hypot(lastX-startX,lastY-startY)>18){clearTimeout(lineHold);lineHold=null;}
+            return;
+          }
+          ev.preventDefault();
+          updateLineDestination(lastX,lastY);
+        };
+        const finishDocMove=(ev,cancel=false)=>{
+          if(ev.pointerId!==pointerId)return;
+          document.removeEventListener('pointermove',onDocMove,true);
+          document.removeEventListener('pointerup',onDocUp,true);
+          document.removeEventListener('pointercancel',onDocCancel,true);
+          if(lineMoveActive){ev.preventDefault();stopLineMove(cancel);}
+          else {clearTimeout(lineHold);lineHold=null;}
+        };
+        const onDocUp=ev=>finishDocMove(ev,false);
+        const onDocCancel=ev=>finishDocMove(ev,true);
+
+        document.addEventListener('pointermove',onDocMove,{capture:true,passive:false});
+        document.addEventListener('pointerup',onDocUp,{capture:true,passive:false});
+        document.addEventListener('pointercancel',onDocCancel,{capture:true,passive:false});
+
         lineHold=setTimeout(()=>{
-          lineMoveActive=true;state.lineDrag={from:ri,insert:ri};
-          badge.setPointerCapture?.(e.pointerId);line.classList.add('line-moving');document.body.classList.add('moving-line');
-          $('status').textContent='Move the whole line, then release.';navigator.vibrate?.(20);
+          lineMoveActive=true;
+          state.lineDrag={from:ri,insert:ri};
+          try{badge.setPointerCapture?.(pointerId);}catch(_){}
+          line.classList.add('line-moving');
+          document.body.classList.add('moving-line');
+          $('status').textContent='Move the whole line, then release.';
+          navigator.vibrate?.(20);
+          updateLineDestination(lastX,lastY);
         },450);
       });
-      badge.addEventListener('pointermove',e=>{
-        if(!lineMoveActive||!state.lineDrag)return;
-        const under=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('.progression-line');
-        if(!under)return;
-        const target=Number(under.dataset.row),rect=under.getBoundingClientRect(),after=e.clientY>rect.top+rect.height/2;
-        state.lineDrag.insert=target+(after?1:0);
-        clearLineDropMarkers();line.classList.add('line-moving');under.classList.add(after?'line-drop-after':'line-drop-before');
-      });
-      badge.addEventListener('pointerup',()=>stopLineMove(false));
-      badge.addEventListener('pointercancel',()=>stopLineMove(true));
-      badge.addEventListener('pointerleave',()=>{if(!lineMoveActive){clearTimeout(lineHold);lineHold=null;}});
+      badge.addEventListener('pointerleave',()=>{if(!lineMoveActive){/* document listeners keep tracking until release */}});
       badge.addEventListener('click',e=>{if(suppressBadgeClick){e.preventDefault();e.stopPropagation();suppressBadgeClick=false;}});
       line.querySelector('.delete-line').onclick=e=>{e.stopPropagation();if(state.rows.length===1){state.rows[0]=[];state.selectedRow=0;}else{state.rows.splice(ri,1);if(state.selectedRow>ri)state.selectedRow--;else if(state.selectedRow===ri)state.selectedRow=Math.min(ri,state.rows.length-1);}renderRows();syncBuildInput();renderFits();};
       line.onclick=e=>{if(!e.target.closest('.chord-card')){state.selectedRow=ri;renderRows();syncBuildInput();}};
