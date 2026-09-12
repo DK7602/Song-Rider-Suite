@@ -39,13 +39,18 @@
           <select id="soundSelect"></select>
         </label>
 
-        <label>
+        <label class="octave-control">
           Octave
           <div class="stepper">
             <button id="octaveDown" aria-label="Decrease octave">−</button>
             <span id="octaveValue">0</span>
             <button id="octaveUp" aria-label="Increase octave">+</button>
           </div>
+        </label>
+
+        <label class="sustain-control">
+          Sustain
+          <button id="sustainBtn" class="toggle-btn sustain-btn" type="button" aria-pressed="false">OFF</button>
         </label>
 
         <label id="capoWrap">

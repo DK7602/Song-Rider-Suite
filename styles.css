@@ -1222,3 +1222,117 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
     padding-inline:7px !important;
   }
 }
+
+
+/* v1.5.7 — compact Octave + Sustain controls */
+.octave-control{
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:0 !important;
+}
+
+.octave-control .stepper{
+  width:104px;
+  min-width:104px;
+  max-width:104px;
+}
+
+.octave-control .stepper button{
+  flex:0 0 34px;
+  width:34px;
+  min-width:34px;
+  height:40px;
+  padding:0;
+}
+
+.octave-control .stepper #octaveValue{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 36px;
+  width:36px;
+  min-width:36px;
+  color:#fff;
+  font-size:1rem;
+  font-weight:900;
+  line-height:1;
+  text-align:center;
+  visibility:visible;
+  opacity:1;
+}
+
+.sustain-control{
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:0 !important;
+}
+
+.sustain-btn{
+  min-width:72px;
+  width:72px;
+  height:40px;
+  padding:0 8px;
+  font-size:.78rem;
+  font-weight:800;
+}
+
+.sustain-btn.on{
+  background:var(--accent);
+  color:#17130a;
+  border-color:#d7b654;
+}
+
+@media(max-width:700px){
+  /* Override the old rule that makes every toolbar label take ~half a row. */
+  .toolbar > .octave-control,
+  .toolbar > .sustain-control{
+    flex:0 0 auto !important;
+  }
+
+  .octave-control .stepper{
+    width:96px;
+    min-width:96px;
+    max-width:96px;
+  }
+
+  .octave-control .stepper button{
+    flex-basis:31px;
+    width:31px;
+    min-width:31px;
+  }
+
+  .octave-control .stepper #octaveValue{
+    flex-basis:34px;
+    width:34px;
+    min-width:34px;
+    font-size:1rem;
+  }
+
+  .sustain-btn{
+    width:68px;
+    min-width:68px;
+  }
+}
+
+@media(max-width:380px){
+  .octave-control .stepper{
+    width:92px;
+    min-width:92px;
+    max-width:92px;
+  }
+  .octave-control .stepper button{
+    flex-basis:29px;
+    width:29px;
+    min-width:29px;
+  }
+  .octave-control .stepper #octaveValue{
+    flex-basis:34px;
+    width:34px;
+    min-width:34px;
+  }
+  .sustain-btn{
+    width:62px;
+    min-width:62px;
+    font-size:.72rem;
+  }
+}

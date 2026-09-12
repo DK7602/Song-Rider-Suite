@@ -34,7 +34,8 @@
     instrumentBus:null, instrumentLimiter:null,
     rows:[[]], selectedRow:0, playing:false, timer:null,
     audioCtx:null, player:null, playerName:'', currentProjectId:null, drag:null, lineDrag:null,
-    autoScroll:localStorage.getItem('crp-auto-scroll')==='1'
+    autoScroll:localStorage.getItem('crp-auto-scroll')==='1',
+    sustain:localStorage.getItem('crp-sustain')==='1'
   };
   state.sound = SOUNDS[state.instrument][0][0];
 
@@ -466,7 +467,12 @@
         const shown=displayedValue(card),sub=subtitle(card);
         el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}<div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div><div class="hint">Tap to play • hold & drag to move</div>`;
         el.querySelector('.remove').onclick=e=>{e.stopPropagation();row.splice(ci,1);renderRows();syncBuildInput();renderFits();};
-        el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove'))playCard(card);};
+        el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove')){
+          const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92));
+          const beats=+$('beatsSelect').value||4;
+          const stepSeconds=60/bpm*beats;
+          playCard(card,state.sustain?Math.max(.4,stepSeconds*1.03):Math.max(.35,stepSeconds*.62));
+        }};
         el.addEventListener('dragstart',e=>{state.drag={row:ri,index:ci};e.dataTransfer.effectAllowed='move';el.classList.add('dragging');});
         el.addEventListener('dragend',()=>{el.classList.remove('dragging');state.drag=null;});
         el.addEventListener('dragover',e=>e.preventDefault());
@@ -511,6 +517,14 @@
     b.textContent='↕';
   }
 
+  function updateSustainButton(){
+    const b=$('sustainBtn'); if(!b)return;
+    b.classList.toggle('on',state.sustain);
+    b.setAttribute('aria-pressed',String(state.sustain));
+    b.textContent=state.sustain?'ON':'OFF';
+    b.title=state.sustain?'Sustain on — notes ring for the full beat':'Sustain off';
+  }
+
   async function playProgression(){
     if(state.playing)return stopProgression();if(!allCards().length){$('status').textContent='Add at least one chord or note first.';return;}
     state.playing=true;setRiderBonesRiding(true);$('playAllBtn').textContent='■ Stop';await ensureAudio();
@@ -522,7 +536,11 @@
       if(!list.length)return stopProgression();
       if(idx>=list.length){if($('loopToggle').checked)idx=0;else return stopProgression();}
       const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4,ms=60000/bpm*beats,item=list[idx++];
-      await playCard(item.c,Math.max(.4,ms/1000*1.03));
+      const stepSeconds=ms/1000;
+      const noteSeconds=state.sustain
+        ? Math.max(.4,stepSeconds*1.03)
+        : Math.max(.35,stepSeconds*.62);
+      await playCard(item.c,noteSeconds);
       document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');
       const playingCard=document.querySelector(`.progression-line[data-row="${item.ri}"]`)?.querySelectorAll('.chord-card')[item.ci];
       playingCard?.style.setProperty('outline','2px solid var(--accent)');
@@ -705,6 +723,8 @@
     document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.onclick=()=>{state.instrument=b.dataset.instrument;localStorage.setItem('crp-last-instrument',state.instrument);state.sound=SOUNDS[state.instrument][0][0];state.player=null;renderAll();});
     document.querySelectorAll('#modeTabs .seg').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;localStorage.setItem('crp-last-mode',state.mode);renderAll();syncBuildInput();});
     $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);renderAll();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);renderAll();};
+    $('sustainBtn').onclick=()=>{state.sustain=!state.sustain;localStorage.setItem('crp-sustain',state.sustain?'1':'0');updateSustainButton();};
+    updateSustainButton();
     $('capoSelect').onchange=e=>{state.capo=+e.target.value;renderAll();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;renderAll();};
     $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();};
     $('autoScrollBtn').onclick=()=>{state.autoScroll=!state.autoScroll;localStorage.setItem('crp-auto-scroll',state.autoScroll?'1':'0');updateAutoScrollButton();};
