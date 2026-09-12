@@ -32,7 +32,7 @@
     mode: localStorage.getItem('crp-last-mode') === 'note' ? 'note' : 'chord',
     sound:'', octave:0, capo:0, neck:'open', transpose:false,
     rows:[[]], selectedRow:0, playing:false, timer:null,
-    audioCtx:null, player:null, playerName:'', currentProjectId:null, drag:null
+    audioCtx:null, player:null, playerName:'', currentProjectId:null, drag:null, lineDrag:null
   };
   state.sound = SOUNDS[state.instrument][0][0];
 
@@ -322,10 +322,58 @@
     if(!state.drag)return;const {row:fr,index:fi}=state.drag,card=state.rows[fr][fi];if(!card)return;
     state.rows[fr].splice(fi,1);if(fr===toRow&&fi<toIndex)toIndex--;state.rows[toRow].splice(Math.max(0,toIndex),0,card);state.selectedRow=toRow;state.drag=null;$('status').textContent='';renderRows();syncBuildInput();
   }
+  function clearLineDropMarkers(){
+    document.querySelectorAll('.progression-line').forEach(el=>el.classList.remove('line-moving','line-drop-before','line-drop-after'));
+  }
+  function moveWholeLine(from,insertionIndex){
+    if(from<0||from>=state.rows.length)return;
+    insertionIndex=Math.max(0,Math.min(state.rows.length,insertionIndex));
+    const selected=state.rows[state.selectedRow];
+    const [moved]=state.rows.splice(from,1);
+    if(from<insertionIndex)insertionIndex--;
+    insertionIndex=Math.max(0,Math.min(state.rows.length,insertionIndex));
+    state.rows.splice(insertionIndex,0,moved);
+    state.selectedRow=Math.max(0,state.rows.indexOf(selected));
+    state.lineDrag=null;
+    clearLineDropMarkers();
+    $('status').textContent='Line moved.';
+    renderRows();syncBuildInput();renderFits();
+  }
   function renderRows(){
     const wrap=$('progression');wrap.innerHTML='';
     state.rows.forEach((row,ri)=>{
-      const line=document.createElement('div');line.className='progression-line'+(ri===state.selectedRow?' selected':'');line.dataset.row=ri;line.innerHTML=`<span class="line-badge">Line ${ri+1}</span><button class="delete-line" type="button" aria-label="Delete line ${ri+1}" title="Delete line">×</button>`;
+      const line=document.createElement('div');line.className='progression-line'+(ri===state.selectedRow?' selected':'');line.dataset.row=ri;line.innerHTML=`<span class="line-badge" title="Long press and drag to move this line">Line ${ri+1}</span><button class="delete-line" type="button" aria-label="Delete line ${ri+1}" title="Delete line">×</button>`;
+      const badge=line.querySelector('.line-badge');
+      let lineHold=null,lineMoveActive=false,suppressBadgeClick=false;
+      const stopLineMove=cancel=>{
+        clearTimeout(lineHold);lineHold=null;
+        if(!lineMoveActive)return;
+        const drag=state.lineDrag;lineMoveActive=false;suppressBadgeClick=true;
+        document.body.classList.remove('moving-line');
+        if(cancel){state.lineDrag=null;clearLineDropMarkers();$('status').textContent='';}
+        else if(drag)moveWholeLine(drag.from,drag.insert);
+      };
+      badge.addEventListener('pointerdown',e=>{
+        if(e.button!=null&&e.button!==0)return;
+        clearTimeout(lineHold);
+        lineHold=setTimeout(()=>{
+          lineMoveActive=true;state.lineDrag={from:ri,insert:ri};
+          badge.setPointerCapture?.(e.pointerId);line.classList.add('line-moving');document.body.classList.add('moving-line');
+          $('status').textContent='Move the whole line, then release.';navigator.vibrate?.(20);
+        },450);
+      });
+      badge.addEventListener('pointermove',e=>{
+        if(!lineMoveActive||!state.lineDrag)return;
+        const under=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('.progression-line');
+        if(!under)return;
+        const target=Number(under.dataset.row),rect=under.getBoundingClientRect(),after=e.clientY>rect.top+rect.height/2;
+        state.lineDrag.insert=target+(after?1:0);
+        clearLineDropMarkers();line.classList.add('line-moving');under.classList.add(after?'line-drop-after':'line-drop-before');
+      });
+      badge.addEventListener('pointerup',()=>stopLineMove(false));
+      badge.addEventListener('pointercancel',()=>stopLineMove(true));
+      badge.addEventListener('pointerleave',()=>{if(!lineMoveActive){clearTimeout(lineHold);lineHold=null;}});
+      badge.addEventListener('click',e=>{if(suppressBadgeClick){e.preventDefault();e.stopPropagation();suppressBadgeClick=false;}});
       line.querySelector('.delete-line').onclick=e=>{e.stopPropagation();if(state.rows.length===1){state.rows[0]=[];state.selectedRow=0;}else{state.rows.splice(ri,1);if(state.selectedRow>ri)state.selectedRow--;else if(state.selectedRow===ri)state.selectedRow=Math.min(ri,state.rows.length-1);}renderRows();syncBuildInput();renderFits();};
       line.onclick=e=>{if(!e.target.closest('.chord-card')){state.selectedRow=ri;renderRows();syncBuildInput();}};
       line.addEventListener('dragover',e=>{e.preventDefault();line.classList.add('drop-target');});
@@ -499,7 +547,7 @@
       const n=document.createElement('section');n.className='export-notes';n.innerHTML=`<h3>Project notes</h3><div class="export-notes-body">${notes}</div>`;sheet.appendChild(n);
     }
     const footer=document.createElement('footer');footer.className='export-sheet-footer';
-    footer.innerHTML=`<img src="assets/rider-and-bones-icon-white.png" alt="Rider and Bones"><span>Created with Chord Rider Pro • Rider &amp; Bones</span>`;
+    footer.innerHTML=`<img src="assets/rider-and-bones-left-still.png" alt="Rider and Bones"><span>Created with Chord Rider Pro</span>`;
     sheet.appendChild(footer);stage.appendChild(sheet);return sheet;
   }
   async function waitForExportImages(root){

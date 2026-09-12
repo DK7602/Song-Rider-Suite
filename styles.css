@@ -677,3 +677,17 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
 .export-sheet.pdf-print .export-notes,
 .export-sheet.pdf-print .export-meta-chip { background:#fff; }
 .export-sheet.pdf-print .export-sheet-key { background:#fff; color:#111; border:2px solid #111; }
+
+
+/* v2.8 — whole-line long-press reordering */
+.line-badge { cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
+.progression-line.line-moving { opacity:.72; box-shadow:0 0 0 2px rgba(233,196,106,.28); }
+.progression-line.line-drop-before::before,
+.progression-line.line-drop-after::after {
+  content:""; position:absolute; left:8px; right:8px; height:4px; border-radius:999px;
+  background:var(--accent); z-index:5; pointer-events:none;
+}
+.progression-line.line-drop-before::before { top:-8px; }
+.progression-line.line-drop-after::after { bottom:-8px; }
+body.moving-line { user-select:none; -webkit-user-select:none; }
+.export-sheet-footer img { width:62px; height:56px; object-fit:contain; }
