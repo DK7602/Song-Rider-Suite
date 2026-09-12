@@ -74,6 +74,67 @@
     input.value=selectedRow().filter(c=>c.type===state.mode).map(c=>c.value).join(' ');
   }
 
+  function inferKeyFromCards(cards){
+    if(!cards.length)return null;
+    const first=cards[0];
+    let best=null;
+    for(let rootIndex=0;rootIndex<12;rootIndex++){
+      for(const minor of [false,true]){
+        const ints=minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
+        const triQ=minor?['m','dim','','m','m','','']:['','m','m','','','m','dim'];
+        const sevQ=minor?['m7','m7b5','maj7','m7','m7','maj7','7']:['maj7','m7','m7','maj7','7','m7','m7b5'];
+        const scaleRoots=new Set(ints.map(i=>NOTES[(rootIndex+i)%12]));
+        const family=new Set();
+        ints.forEach((iv,j)=>{
+          const r=NOTES[(rootIndex+iv)%12];
+          family.add(r+triQ[j]);
+          family.add(r+sevQ[j]);
+        });
+        let score=0;
+        for(const card of cards){
+          if(card.type==='note'){
+            score+=scaleRoots.has(card.value)?3:-5;
+            continue;
+          }
+          const c=parseChord(card.value);if(!c)continue;
+          if(family.has(c.display))score+=6;
+          else if(scaleRoots.has(NOTES[NOTE_INDEX[c.root]]))score+=1;
+          else score-=6;
+        }
+        const tonic=NOTES[rootIndex];
+        if(first.type==='chord'){
+          const c=parseChord(first.value);
+          if(c&&NOTE_INDEX[c.root]===rootIndex){
+            const firstMinor=c.quality.startsWith('m')&&!c.quality.startsWith('maj');
+            score+=firstMinor===minor?4:1;
+          }
+        }else if(first.type==='note'&&NOTE_INDEX[first.value]===rootIndex)score+=2;
+        // When relative major/minor keys are otherwise tied, prefer major unless
+        // the progression begins on the minor tonic.
+        if(!minor)score+=0.15;
+        if(!best||score>best.score)best={root:tonic,minor,score};
+      }
+    }
+    return best?{root:best.root,minor:best.minor}:null;
+  }
+  function cardsFromEntry(){
+    return tokens($('chordInput')?.value||'').map(x=>{
+      if(state.mode==='chord'){
+        const c=parseChord(x);return c?{type:'chord',value:c.display}:null;
+      }
+      const n=parseNote(x);return n?{type:'note',value:n}:null;
+    }).filter(Boolean);
+  }
+  function autoPopulateKeyFromEntry(){
+    const key=$('keyInput');if(!key)return;
+    const canAuto=!key.value.trim()||key.dataset.autoKey==='1';
+    if(!canAuto)return;
+    const inferred=inferKeyFromCards(cardsFromEntry());if(!inferred)return;
+    key.value=inferred.root+(inferred.minor?'m':'');
+    key.dataset.autoKey='1';
+    renderFits();
+  }
+
   function fitItems(){
     const k=activeKey(),r=NOTE_INDEX[k.root],ints=k.minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
     if(state.mode==='note')return ints.map(i=>NOTES[(r+i)%12]);
@@ -280,7 +341,7 @@
   function renderFits(){
     $('fitHeading').textContent=state.mode==='chord'?'Chords that fit':'Notes that fit';const k=activeKey(),manual=enteredKey();
     $('keyHint').textContent=`Based on the ${k.root}${k.minor?' minor':' major'} family`;
-    const w=$('compatibleChords');w.innerHTML='';fitItems().forEach(v=>{const b=document.createElement('button');b.className='chip';b.textContent=v;b.onclick=()=>{selectedRow().push({type:state.mode,value:v});syncBuildInput();renderAll();};w.appendChild(b);});
+    const w=$('compatibleChords');w.innerHTML='';fitItems().forEach(v=>{const b=document.createElement('button');b.className='chip';b.textContent=v;b.onclick=()=>{selectedRow().push({type:state.mode,value:v});syncBuildInput();autoPopulateKeyFromEntry();renderAll();};w.appendChild(b);});
   }
   function renderSound(){const s=$('soundSelect');s.innerHTML='';SOUNDS[state.instrument].forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;s.appendChild(o);});if(!SOUNDS[state.instrument].some(x=>x[0]===state.sound))state.sound=SOUNDS[state.instrument][0][0];s.value=state.sound;}
   function renderAll(){
@@ -334,7 +395,7 @@
   async function refreshCloudProjects(){if(!accountUser){cloudProjects=null;cloudSyncState='idle';renderProjects();return;}cloudSyncState='syncing';updateAccountSummary();try{const d=await api('/api/projects');cloudProjects=d.projects||[];cloudProjects.forEach(upsertLocal);cloudSyncState='ready';updateAccountSummary();renderProjects();}catch(e){cloudSyncState='error';updateAccountSummary();$('status').textContent='Cloud sync unavailable — using local backup.';renderProjects();}}
   async function saveProject(){const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);state.currentProjectId=p.id;$('projectName').value=name;upsertLocal(p);if(accountUser){try{const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});upsertLocal(d.project);await refreshCloudProjects();$('status').textContent=`Saved “${name}” to cloud.`;}catch(e){$('status').textContent=`Saved locally; cloud sync failed: ${e.message}`;}}else{$('status').textContent=`Saved “${name}” on this device.`;renderProjects();}}
   function projectSource(){return (accountUser&&cloudProjects)?cloudProjects:localProjects();}
-  function loadProject(id){const p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;state.currentProjectId=id;state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';renderAll();syncBuildInput();}
+  function loadProject(id){const p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;state.currentProjectId=id;state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
   function renderProjects(){const w=$('projectList'),ps=[...projectSource()].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));$('projectStorageLabel').textContent=accountUser?'Synced to your cloud account':'Saved on this device';w.innerHTML=ps.length?'':'<div class="subtle">No saved projects yet.</div>';ps.forEach(p=>{const e=document.createElement('div');e.className='project-item';const count=p.rows?p.rows.flat().length:(p.chords||[]).length;e.innerHTML=`<div class="name">${esc(p.name)}</div><div class="meta">${count} cards</div><button class="open">Open</button><button class="rename">Rename</button><button class="delete">Delete</button>`;e.querySelector('.open').onclick=()=>loadProject(p.id);e.querySelector('.rename').onclick=async()=>{const n=prompt('New project name:',p.name);if(!n?.trim())return;const name=n.trim();const locals=localProjects(),i=locals.findIndex(x=>x.id===p.id);if(i>=0){locals[i].name=name;locals[i].updatedAt=Date.now();saveLocalProjects(locals);}if(accountUser){try{await api('/api/projects/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({name})});await refreshCloudProjects();}catch(err){$('status').textContent='Rename saved locally; cloud sync failed.';renderProjects();}}else renderProjects();};e.querySelector('.delete').onclick=async()=>{if(!confirm(`Delete “${p.name}”?`))return;saveLocalProjects(localProjects().filter(x=>x.id!==p.id));if(accountUser){try{await api('/api/projects/'+encodeURIComponent(p.id),{method:'DELETE'});await refreshCloudProjects();}catch(err){$('status').textContent='Deleted locally; cloud delete failed.';renderProjects();}}else renderProjects();};w.appendChild(e);});}
   function showAccount(){const logged=!!accountUser;const panel=$('accountPanel');panel?.classList.toggle('is-logged-in',logged);$('accountSummaryBtn').hidden=!logged;$('authForms').hidden=logged;$('accountTools').hidden=!logged;$('logoutBtn').hidden=!logged;$('accountStatus').textContent=logged?`Signed in as ${accountDisplayName()}`:'Not signed in — local projects still work.';$('projectStorageLabel').textContent=logged?'Synced to your cloud account':'Saved on this device';if(logged){updateAccountSummary();setAccountCollapsed(true);}else{setAccountCollapsed(false);cloudSyncState='idle';}renderProjects();}
@@ -347,9 +408,10 @@
 
   function init(){
     for(let i=0;i<=12;i++){const o=document.createElement('option');o.value=i;o.textContent=i?'Capo '+i:'None';$('capoSelect').appendChild(o);}
-    $('buildBtn').onclick=()=>{const raw=tokens($('chordInput').value),vals=[],bad=[];raw.forEach(x=>{const v=state.mode==='chord'?parseChord(x)?.display:parseNote(x);v?vals.push({type:state.mode,value:v}):bad.push(x);});state.rows[state.selectedRow]=vals;$('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';syncBuildInput();renderAll();};
+    $('buildBtn').onclick=()=>{const raw=tokens($('chordInput').value),vals=[],bad=[];raw.forEach(x=>{const v=state.mode==='chord'?parseChord(x)?.display:parseNote(x);v?vals.push({type:state.mode,value:v}):bad.push(x);});state.rows[state.selectedRow]=vals;$('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';syncBuildInput();autoPopulateKeyFromEntry();renderAll();};
+    $('chordInput').oninput=()=>autoPopulateKeyFromEntry();
     $('chordInput').onkeydown=e=>{if(e.key==='Enter')$('buildBtn').click();};
-    $('keyInput').oninput=()=>{const raw=$('keyInput').value.trim();if(raw&&!enteredKey()){$('keyHint').textContent='Enter a key like F, F#m, Bb, or C minor';return;}renderFits();};
+    $('keyInput').oninput=()=>{const key=$('keyInput');key.dataset.autoKey='0';const raw=key.value.trim();if(!raw){key.dataset.autoKey='1';autoPopulateKeyFromEntry();return;}if(!enteredKey()){$('keyHint').textContent='Enter a key like F, F#m, Bb, or C minor';return;}renderFits();};
     $('keyInput').onkeydown=e=>{if(e.key==='Enter'){$('buildBtn').click();}};
     document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.onclick=()=>{state.instrument=b.dataset.instrument;localStorage.setItem('crp-last-instrument',state.instrument);state.sound=SOUNDS[state.instrument][0][0];state.player=null;renderAll();});
     document.querySelectorAll('#modeTabs .seg').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;localStorage.setItem('crp-last-mode',state.mode);renderAll();syncBuildInput();});
@@ -359,7 +421,8 @@
     $('loginBtn').onclick=login;$('registerBtn').onclick=register;$('logoutBtn').onclick=logout;$('changePasswordBtn').onclick=changePassword;
     $('accountSummaryBtn').onclick=()=>{const panel=$('accountPanel');setAccountCollapsed(!panel.classList.contains('is-collapsed'));};
     document.querySelectorAll('.notes-toolbar [data-cmd]').forEach(b=>b.onclick=()=>document.execCommand(b.dataset.cmd,false,null));$('clearNotesBtn').onclick=()=>{if(confirm('Clear notes?'))$('notesEditor').innerHTML='';};
-    renderProjects();renderAll();syncBuildInput();setRiderBonesRiding(false);checkAccount();if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+    $('keyInput').dataset.autoKey=$('keyInput').value.trim()?'0':'1';
+    renderProjects();renderAll();syncBuildInput();autoPopulateKeyFromEntry();setRiderBonesRiding(false);checkAccount();if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
   }
   init();
 })();
