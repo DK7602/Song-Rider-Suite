@@ -73,6 +73,19 @@
     const input=$('chordInput');if(!input)return;
     input.value=selectedRow().filter(c=>c.type===state.mode).map(c=>c.value).join(' ');
   }
+  function parseBuildInput(){
+    const vals=[],bad=[];
+    tokens($('chordInput')?.value||'').forEach(x=>{
+      const v=state.mode==='chord'?parseChord(x)?.display:parseNote(x);
+      v?vals.push({type:state.mode,value:v}):bad.push(x);
+    });
+    return {vals,bad};
+  }
+  function commitBuildInput(){
+    const {vals,bad}=parseBuildInput();
+    state.rows[state.selectedRow]=vals;
+    return bad;
+  }
 
   function inferKeyFromCards(cards){
     if(!cards.length)return null;
@@ -341,7 +354,15 @@
   function renderFits(){
     $('fitHeading').textContent=state.mode==='chord'?'Chords that fit':'Notes that fit';const k=activeKey(),manual=enteredKey();
     $('keyHint').textContent=`Based on the ${k.root}${k.minor?' minor':' major'} family`;
-    const w=$('compatibleChords');w.innerHTML='';fitItems().forEach(v=>{const b=document.createElement('button');b.className='chip';b.textContent=v;b.onclick=()=>{selectedRow().push({type:state.mode,value:v});syncBuildInput();autoPopulateKeyFromEntry();renderAll();};w.appendChild(b);});
+    const w=$('compatibleChords');w.innerHTML='';fitItems().forEach(v=>{const b=document.createElement('button');b.className='chip';b.textContent=v;b.onclick=()=>{
+      // Treat whatever is currently typed in the Build field as the source of truth
+      // before appending a chip. This preserves manually typed chords/notes and
+      // prevents stale row state from wiping or duplicating the entry.
+      const bad=commitBuildInput();
+      selectedRow().push({type:state.mode,value:v});
+      $('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';
+      syncBuildInput();autoPopulateKeyFromEntry();renderAll();
+    };w.appendChild(b);});
   }
   function renderSound(){const s=$('soundSelect');s.innerHTML='';SOUNDS[state.instrument].forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;s.appendChild(o);});if(!SOUNDS[state.instrument].some(x=>x[0]===state.sound))state.sound=SOUNDS[state.instrument][0][0];s.value=state.sound;}
   function renderAll(){
@@ -408,7 +429,7 @@
 
   function init(){
     for(let i=0;i<=12;i++){const o=document.createElement('option');o.value=i;o.textContent=i?'Capo '+i:'None';$('capoSelect').appendChild(o);}
-    $('buildBtn').onclick=()=>{const raw=tokens($('chordInput').value),vals=[],bad=[];raw.forEach(x=>{const v=state.mode==='chord'?parseChord(x)?.display:parseNote(x);v?vals.push({type:state.mode,value:v}):bad.push(x);});state.rows[state.selectedRow]=vals;$('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';syncBuildInput();autoPopulateKeyFromEntry();renderAll();};
+    $('buildBtn').onclick=()=>{const bad=commitBuildInput();$('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';syncBuildInput();autoPopulateKeyFromEntry();renderAll();};
     $('chordInput').oninput=()=>autoPopulateKeyFromEntry();
     $('chordInput').onkeydown=e=>{if(e.key==='Enter')$('buildBtn').click();};
     $('keyInput').oninput=()=>{const key=$('keyInput');key.dataset.autoKey='0';const raw=key.value.trim();if(!raw){key.dataset.autoKey='1';autoPopulateKeyFromEntry();return;}if(!enteredKey()){$('keyHint').textContent='Enter a key like F, F#m, Bb, or C minor';return;}renderFits();};
