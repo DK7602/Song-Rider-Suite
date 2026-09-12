@@ -187,7 +187,9 @@
       if(!notes.length)notes=chordNotes(val,3+state.octave);
     }else notes=chordNotes(val,4+state.octave);
     if(state.sound==='electric_bass_finger')notes=notes.slice(0,card.type==='note'?1:3).map(n=>noteAtMidi(midiOf(n)-12));
-    const now=state.audioCtx.currentTime;notes.forEach((n,i)=>p.play(n,now+(state.instrument==='guitar'?i*.035:0),{duration:seconds,gain:.90}));
+    const boostedSounds=new Set(['acoustic_grand_piano','electric_piano_1','acoustic_guitar_steel','electric_guitar_clean']);
+    const instrumentGain=boostedSounds.has(state.sound)?.90*1.55:.90;
+    const now=state.audioCtx.currentTime;notes.forEach((n,i)=>p.play(n,now+(state.instrument==='guitar'?i*.035:0),{duration:seconds,gain:instrumentGain}));
   }
   function setRiderBonesRiding(on){['riderBonesLeft','riderBonesRight'].forEach(id=>{const img=$(id);if(img)img.src=on?img.dataset.animated:img.dataset.still;});}
 
