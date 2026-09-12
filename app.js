@@ -506,7 +506,9 @@
     const b=$('autoScrollBtn'); if(!b)return;
     b.classList.toggle('on',state.autoScroll);
     b.setAttribute('aria-pressed',String(state.autoScroll));
-    b.textContent=state.autoScroll?'Auto scroll ON':'Auto scroll';
+    b.setAttribute('title',state.autoScroll?'Auto scroll on':'Auto scroll off');
+    b.setAttribute('aria-label',state.autoScroll?'Auto scroll on':'Auto scroll off');
+    b.textContent='↕';
   }
 
   async function playProgression(){
