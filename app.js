@@ -626,10 +626,46 @@
     b.title=state.sustain?'Sustain on — notes ring for the full beat':'Sustain off';
   }
 
+  function playbackStartRow(){
+    if(!isMobileCarousel())return Math.max(0,Math.min(state.rows.length-1,state.selectedRow));
+
+    const wrap=$('progression');
+    if(!wrap)return Math.max(0,Math.min(state.rows.length-1,state.selectedRow));
+
+    const wr=wrap.getBoundingClientRect(),center=wr.left+wr.width/2;
+    const lines=[...wrap.querySelectorAll(':scope > .progression-line')];
+    let best=null,bestDistance=Infinity;
+
+    lines.forEach(line=>{
+      const r=line.getBoundingClientRect();
+      if(r.right<wr.left||r.left>wr.right)return;
+      const d=Math.abs((r.left+r.width/2)-center);
+      if(d<bestDistance){best=line;bestDistance=d;}
+    });
+
+    if(!best)return Math.max(0,Math.min(state.rows.length-1,state.selectedRow));
+    const raw=best.classList.contains('carousel-clone') ? best.dataset.cloneTarget : best.dataset.row;
+    const ri=Number(raw);
+    return Number.isFinite(ri) ? Math.max(0,Math.min(state.rows.length-1,ri)) : state.selectedRow;
+  }
+
   async function playProgression(){
     if(state.playing)return stopProgression();if(!allCards().length){$('status').textContent='Add at least one chord or note first.';return;}
+
+    const startRow=playbackStartRow();
+    state.selectedRow=startRow;
+    syncBuildInput();
+    updateMobileLineIndicator(startRow);
+    realCarouselLines().forEach(el=>el.classList.toggle('selected',+el.dataset.row===startRow));
+
+    const initialList=state.rows.flatMap((r,ri)=>r.map((c,ci)=>({c,ri,ci})));
+    let idx=initialList.findIndex(item=>item.ri>=startRow);
+    if(idx<0){
+      if($('loopToggle').checked)idx=0;
+      else {$('status').textContent='No chords or notes from this line to the end.';return;}
+    }
+
     state.playing=true;setRiderBonesRiding(true);$('playAllBtn').textContent='■ Stop';await ensureAudio();
-    let idx=0;
     let nextStepAt=performance.now();
     const step=async()=>{
       if(!state.playing)return;
