@@ -403,8 +403,25 @@
       wrap.prepend(lead);wrap.append(tail);
     }
 
-    let settleTimer=null;
+    let settleTimer=null,carouselTeleporting=false;
+    const instantCarouselJump=target=>{
+      if(!target)return;
+      carouselTeleporting=true;
+      const oldBehavior=wrap.style.scrollBehavior,oldSnap=wrap.style.scrollSnapType;
+      // The edge clone and its real line look identical. Temporarily disabling
+      // smooth scrolling + snapping makes the wrap-around jump invisible.
+      wrap.style.scrollBehavior='auto';
+      wrap.style.scrollSnapType='none';
+      wrap.scrollLeft=lineScrollLeft(wrap,target);
+      void wrap.offsetWidth;
+      requestAnimationFrame(()=>{
+        wrap.style.scrollBehavior=oldBehavior;
+        wrap.style.scrollSnapType=oldSnap;
+        requestAnimationFrame(()=>{carouselTeleporting=false;});
+      });
+    };
     const settle=()=>{
+      if(carouselTeleporting)return;
       const items=[...wrap.querySelectorAll(':scope > .progression-line')];if(!items.length)return;
       const wr=wrap.getBoundingClientRect(),cx=wr.left+wr.width/2;
       let nearest=items[0],dist=Infinity;
@@ -412,11 +429,14 @@
       if(nearest.classList.contains('carousel-clone')){
         const ri=+nearest.dataset.cloneTarget||0;
         const target=wrap.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"]`);
-        if(target)wrap.scrollTo({left:lineScrollLeft(wrap,target),behavior:'auto'});
+        instantCarouselJump(target);
         setCarouselSelectedRow(ri);
       }else setCarouselSelectedRow(+nearest.dataset.row||0);
     };
-    wrap.addEventListener('scroll',()=>{clearTimeout(settleTimer);settleTimer=setTimeout(settle,90);},{passive:true});
+    wrap.addEventListener('scroll',()=>{
+      if(carouselTeleporting)return;
+      clearTimeout(settleTimer);settleTimer=setTimeout(settle,90);
+    },{passive:true});
 
     // A deliberate horizontal swipe takes control away from playback-follow mode.
     let tx=null,ty=null;
