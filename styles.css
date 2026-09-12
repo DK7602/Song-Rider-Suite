@@ -660,3 +660,20 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
   .project-save-row .export-btn { padding:9px 8px; font-size:.72rem; }
   .project-save-row #saveProjectBtn { padding:9px 10px; }
 }
+
+
+/* v2.7 — line delete control + ink-saving PDF export */
+.delete-line {
+  position:absolute; top:-11px; right:12px; width:22px; height:22px; padding:0;
+  display:grid; place-items:center; border-radius:50%; border:1px solid #4b5561;
+  background:var(--panel); color:#aab2bc; font-size:15px; font-weight:900; line-height:1; z-index:2;
+}
+.delete-line:hover, .delete-line:focus-visible { color:#fff; border-color:#e76f51; background:#3a2020; }
+.export-sheet.pdf-print { background:#fff; }
+.export-sheet.pdf-print .export-card { background:#fff; color:#111; border:0; border-radius:0; }
+.export-sheet.pdf-print .export-card-name { color:#111; font-weight:900; }
+.export-sheet.pdf-print .export-card-subtitle { color:#555; }
+.export-sheet.pdf-print .export-summary,
+.export-sheet.pdf-print .export-notes,
+.export-sheet.pdf-print .export-meta-chip { background:#fff; }
+.export-sheet.pdf-print .export-sheet-key { background:#fff; color:#111; border:2px solid #111; }

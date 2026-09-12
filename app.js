@@ -325,7 +325,8 @@
   function renderRows(){
     const wrap=$('progression');wrap.innerHTML='';
     state.rows.forEach((row,ri)=>{
-      const line=document.createElement('div');line.className='progression-line'+(ri===state.selectedRow?' selected':'');line.dataset.row=ri;line.innerHTML=`<span class="line-badge">Line ${ri+1}</span>`;
+      const line=document.createElement('div');line.className='progression-line'+(ri===state.selectedRow?' selected':'');line.dataset.row=ri;line.innerHTML=`<span class="line-badge">Line ${ri+1}</span><button class="delete-line" type="button" aria-label="Delete line ${ri+1}" title="Delete line">×</button>`;
+      line.querySelector('.delete-line').onclick=e=>{e.stopPropagation();if(state.rows.length===1){state.rows[0]=[];state.selectedRow=0;}else{state.rows.splice(ri,1);if(state.selectedRow>ri)state.selectedRow--;else if(state.selectedRow===ri)state.selectedRow=Math.min(ri,state.rows.length-1);}renderRows();syncBuildInput();renderFits();};
       line.onclick=e=>{if(!e.target.closest('.chord-card')){state.selectedRow=ri;renderRows();syncBuildInput();}};
       line.addEventListener('dragover',e=>{e.preventDefault();line.classList.add('drop-target');});
       line.addEventListener('dragleave',()=>line.classList.remove('drop-target'));
@@ -498,21 +499,21 @@
       const n=document.createElement('section');n.className='export-notes';n.innerHTML=`<h3>Project notes</h3><div class="export-notes-body">${notes}</div>`;sheet.appendChild(n);
     }
     const footer=document.createElement('footer');footer.className='export-sheet-footer';
-    footer.innerHTML=`<img src="assets/rider-and-bones-icon.png" alt="Rider and Bones"><span>Created with Chord Rider Pro • Rider &amp; Bones</span>`;
+    footer.innerHTML=`<img src="assets/rider-and-bones-icon-white.png" alt="Rider and Bones"><span>Created with Chord Rider Pro • Rider &amp; Bones</span>`;
     sheet.appendChild(footer);stage.appendChild(sheet);return sheet;
   }
   async function waitForExportImages(root){
     const imgs=[...root.querySelectorAll('img')];
     await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=img.onerror=resolve;})));
   }
-  async function captureExportSheet(){
+  async function captureExportSheet(forPdf=false){
     if(typeof html2canvas!=='function')throw new Error('Export tools did not load. Check your connection and try again.');
-    const sheet=buildExportSheet();await waitForExportImages(sheet);
+    const sheet=buildExportSheet();sheet.classList.toggle('pdf-print',forPdf);await waitForExportImages(sheet);
     await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
     const bounds=sheet.getBoundingClientRect();
     const breaks=[...sheet.querySelectorAll('.export-sheet-header,.export-line,.export-notes,.export-sheet-footer')]
       .map(el=>Math.round(el.getBoundingClientRect().bottom-bounds.top));
-    const canvas=await html2canvas(sheet,{backgroundColor:'#f7f5ef',scale:2,useCORS:true,logging:false});
+    const canvas=await html2canvas(sheet,{backgroundColor:forPdf?'#ffffff':'#f7f5ef',scale:2,useCORS:true,logging:false});
     return{sheet,canvas,breaks};
   }
   function downloadDataUrl(dataUrl,name){const a=document.createElement('a');a.href=dataUrl;a.download=name;document.body.appendChild(a);a.click();a.remove();}
@@ -525,7 +526,7 @@
     closeExportMenu();$('status').textContent='Creating PDF chord sheet…';
     try{
       if(!window.jspdf?.jsPDF)throw new Error('PDF tools did not load. Check your connection and try again.');
-      const {canvas,breaks}=await captureExportSheet(),{jsPDF}=window.jspdf;
+      const {canvas,breaks}=await captureExportSheet(true),{jsPDF}=window.jspdf;
       const pdf=new jsPDF({orientation:'portrait',unit:'pt',format:'letter',compress:true});
       const pageW=pdf.internal.pageSize.getWidth(),pageH=pdf.internal.pageSize.getHeight(),margin=18,drawW=pageW-margin*2,drawH=pageH-margin*2;
       const scale=canvas.width/1120,idealSliceCss=(drawH/(drawW/canvas.width))/scale;
