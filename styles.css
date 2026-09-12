@@ -487,3 +487,61 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
   .key-input { width:112px; min-width:92px; padding:7px 8px; }
   #keyHint { min-width:0; font-size:.68rem; line-height:1.15; text-align:right; }
 }
+
+
+/* v2.5.1 — compact key-family row + remove empty status gap */
+.status:empty {
+  min-height: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.status:not(:empty) {
+  min-height: 0;
+  margin: 6px 0 0;
+}
+.section-heading-row {
+  margin-top: 6px;
+}
+.fit-key-row {
+  flex-wrap: nowrap;
+}
+.key-input {
+  width: 82px;
+  min-width: 72px;
+  max-width: 82px;
+}
+#fitHeading,
+#keyHint {
+  white-space: nowrap;
+}
+
+@media (max-width:700px) {
+  .section-heading-row {
+    gap: 6px;
+    margin-top: 4px;
+    flex-wrap: nowrap;
+  }
+  #fitHeading {
+    flex: 0 0 auto;
+    font-size: .98rem;
+  }
+  .fit-key-row {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .key-input {
+    flex: 0 0 70px;
+    width: 70px;
+    min-width: 70px;
+    max-width: 70px;
+    padding: 7px 8px;
+  }
+  #keyHint {
+    flex: 0 1 auto;
+    font-size: .66rem;
+    line-height: 1;
+    text-align: right;
+  }
+}

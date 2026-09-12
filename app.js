@@ -279,7 +279,7 @@
 
   function renderFits(){
     $('fitHeading').textContent=state.mode==='chord'?'Chords that fit':'Notes that fit';const k=activeKey(),manual=enteredKey();
-    $('keyHint').textContent=`Based on the ${k.root}${k.minor?' minor':' major'} family${manual?'':' (auto)'}`;
+    $('keyHint').textContent=`Based on the ${k.root}${k.minor?' minor':' major'} family`;
     const w=$('compatibleChords');w.innerHTML='';fitItems().forEach(v=>{const b=document.createElement('button');b.className='chip';b.textContent=v;b.onclick=()=>{selectedRow().push({type:state.mode,value:v});syncBuildInput();renderAll();};w.appendChild(b);});
   }
   function renderSound(){const s=$('soundSelect');s.innerHTML='';SOUNDS[state.instrument].forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;s.appendChild(o);});if(!SOUNDS[state.instrument].some(x=>x[0]===state.sound))state.sound=SOUNDS[state.instrument][0][0];s.value=state.sound;}
