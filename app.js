@@ -33,7 +33,8 @@
     sound:'', octave:0, capo:0, neck:'open', transpose:false,
     instrumentBus:null, instrumentLimiter:null,
     rows:[[]], selectedRow:0, playing:false, timer:null,
-    audioCtx:null, player:null, playerName:'', currentProjectId:null, drag:null, lineDrag:null
+    audioCtx:null, player:null, playerName:'', currentProjectId:null, drag:null, lineDrag:null,
+    autoScroll:localStorage.getItem('crp-auto-scroll')==='1'
   };
   state.sound = SOUNDS[state.instrument][0][0];
 
@@ -501,6 +502,13 @@
     $('chordInput').placeholder=state.mode==='chord'?'Enter chords, e.g. Em A7 Cmaj7 B7':'Enter notes, e.g. E F# A B';renderFits();renderRows();
   }
 
+  function updateAutoScrollButton(){
+    const b=$('autoScrollBtn'); if(!b)return;
+    b.classList.toggle('on',state.autoScroll);
+    b.setAttribute('aria-pressed',String(state.autoScroll));
+    b.textContent=state.autoScroll?'Auto scroll ON':'Auto scroll';
+  }
+
   async function playProgression(){
     if(state.playing)return stopProgression();if(!allCards().length){$('status').textContent='Add at least one chord or note first.';return;}
     state.playing=true;setRiderBonesRiding(true);$('playAllBtn').textContent='■ Stop';await ensureAudio();
@@ -514,7 +522,11 @@
       const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4,ms=60000/bpm*beats,item=list[idx++];
       await playCard(item.c,Math.max(.4,ms/1000*1.03));
       document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');
-      document.querySelector(`.progression-line[data-row="${item.ri}"]`)?.querySelectorAll('.chord-card')[item.ci]?.style.setProperty('outline','2px solid var(--accent)');
+      const playingCard=document.querySelector(`.progression-line[data-row="${item.ri}"]`)?.querySelectorAll('.chord-card')[item.ci];
+      playingCard?.style.setProperty('outline','2px solid var(--accent)');
+      if(state.autoScroll&&playingCard){
+        playingCard.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
+      }
       nextStepAt += ms;
       state.timer=setTimeout(step,Math.max(0,nextStepAt-performance.now()));
     };
@@ -692,7 +704,10 @@
     document.querySelectorAll('#modeTabs .seg').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;localStorage.setItem('crp-last-mode',state.mode);renderAll();syncBuildInput();});
     $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);renderAll();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);renderAll();};
     $('capoSelect').onchange=e=>{state.capo=+e.target.value;renderAll();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;renderAll();};
-    $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();};$('playAllBtn').onclick=playProgression;$('saveProjectBtn').onclick=saveProject;
+    $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();};
+    $('autoScrollBtn').onclick=()=>{state.autoScroll=!state.autoScroll;localStorage.setItem('crp-auto-scroll',state.autoScroll?'1':'0');updateAutoScrollButton();};
+    updateAutoScrollButton();
+    $('playAllBtn').onclick=playProgression;$('saveProjectBtn').onclick=saveProject;
     $('exportBtn').onclick=e=>{e.stopPropagation();toggleExportMenu();};$('exportPdfBtn').onclick=exportPdf;$('exportPngBtn').onclick=exportPng;
     document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))closeExportMenu();});
     $('loginBtn').onclick=login;$('registerBtn').onclick=register;$('logoutBtn').onclick=logout;$('changePasswordBtn').onclick=changePassword;

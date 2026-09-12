@@ -126,7 +126,7 @@
     const wrap = document.createElement('div');
     wrap.className='crp-beat-controls';
     wrap.innerHTML = `
-      <button id="crpBeatBtn" class="crp-beat-btn" type="button">🥁 Beat</button>
+      <button id="crpBeatBtn" class="crp-beat-btn" type="button">Beat</button>
       <label class="check-label"><input id="crpDrumsToggle" type="checkbox" checked> Drums</label>
       <label class="crp-volume-main">Vol <input id="crpDrumVolume" type="range" min="0" max="100" step="1" value="42"><span id="crpDrumVolumeValue">42%</span></label>`;
     playRow.insertAdjacentElement('afterend', wrap);
@@ -252,7 +252,7 @@
     if($('crpBeatBtn')){
       const hits=countHits();
       $('crpBeatBtn').classList.toggle('has-beat', hits>0);
-      $('crpBeatBtn').textContent = hits ? `🥁 Beat (${beat.bars} bar${beat.bars===1?'':'s'})` : '🥁 Beat';
+      $('crpBeatBtn').textContent = hits ? `Beat (${beat.bars} bar${beat.bars===1?'':'s'})` : 'Beat';
     }
   }
   function openEditor(){

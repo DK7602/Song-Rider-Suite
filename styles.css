@@ -691,3 +691,34 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
 .progression-line.line-drop-after::after { bottom:-8px; }
 body.moving-line { user-select:none; -webkit-user-select:none; }
 .export-sheet-footer img { width:62px; height:56px; object-fit:contain; }
+
+
+/* v1.5.2 — compact playback auto-scroll control beside Add blank line */
+.auto-scroll-btn{
+  flex:0 0 auto;
+  padding:7px 10px;
+  min-height:34px;
+  border-radius:9px;
+  font-size:.78rem;
+  line-height:1;
+  white-space:nowrap;
+}
+.auto-scroll-btn.on{
+  background:var(--accent);
+  color:#17130a;
+  border-color:#d7b654;
+  font-weight:800;
+}
+@media(max-width:700px){
+  .line-actions{
+    gap:7px;
+  }
+  #addLineBtn{
+    flex:0 1 auto;
+  }
+  .auto-scroll-btn{
+    padding:6px 8px;
+    min-height:32px;
+    font-size:.72rem;
+  }
+}
