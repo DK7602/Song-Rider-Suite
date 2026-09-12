@@ -722,3 +722,126 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
     font-size:.72rem;
   }
 }
+
+
+/* v1.5.3 — CRP gold title + riding-script tagline */
+.brand-copy{
+  min-width:0;
+  flex:1 1 auto;
+  text-align:center;
+  overflow:visible;
+}
+
+/* 24-karat-inspired polished gold block lettering */
+.brand-copy h1{
+  display:inline-block;
+  margin:0;
+  padding:0 2px 2px;
+  max-width:100%;
+  font-family:Impact, Haettenschweiler, "Arial Black", "Franklin Gothic Heavy", sans-serif;
+  font-size:clamp(1.55rem, 4.6vw, 2.5rem);
+  font-weight:900;
+  line-height:.96;
+  letter-spacing:.035em;
+  text-transform:none;
+  white-space:nowrap;
+
+  background:
+    linear-gradient(180deg,
+      #fff6ae 0%,
+      #ffe776 16%,
+      #f8c83d 34%,
+      #d99a12 54%,
+      #ffd95b 70%,
+      #fff0a0 84%,
+      #b97608 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+  color:#f4c542;
+
+  -webkit-text-stroke:.45px rgba(92,53,0,.75);
+  filter:
+    drop-shadow(0 1px 0 #8c5709)
+    drop-shadow(0 2px 0 #654006)
+    drop-shadow(0 3px 1px rgba(0,0,0,.72));
+  text-shadow:
+    0 0 8px rgba(255,207,65,.17);
+}
+
+/* Flowing raised white script — visually "rides" underneath the title */
+.brand-copy .tagline{
+  position:relative;
+  z-index:1;
+  display:block;
+  width:max-content;
+  max-width:100%;
+  margin:5px auto 0;
+  color:#fff;
+  font-family:"Brush Script MT","Segoe Script","Snell Roundhand","URW Chancery L",cursive;
+  font-size:clamp(.92rem, 2.65vw, 1.28rem);
+  font-weight:700;
+  font-style:italic;
+  line-height:1.05;
+  letter-spacing:.015em;
+  white-space:nowrap;
+  transform:rotate(-1deg);
+  text-shadow:
+    0 1px 0 #d8dde4,
+    0 2px 0 #aeb6c0,
+    0 3px 0 #7f8995,
+    0 4px 5px rgba(0,0,0,.72),
+    0 0 8px rgba(255,255,255,.18);
+}
+
+/* Add a very subtle swoop under the riding-script line */
+.brand-copy .tagline::after{
+  content:"";
+  position:absolute;
+  left:7%;
+  right:5%;
+  bottom:-5px;
+  height:6px;
+  border-bottom:2px solid rgba(255,255,255,.58);
+  border-radius:50%;
+  transform:rotate(.6deg);
+  opacity:.65;
+  pointer-events:none;
+}
+
+@media(max-width:700px){
+  .app-header{
+    gap:7px;
+    padding-top:8px;
+    padding-bottom:9px;
+  }
+  .brand-mark{
+    width:53px;
+    height:50px;
+    flex:0 0 53px;
+  }
+  .brand-copy h1{
+    font-size:clamp(1.35rem, 6.3vw, 1.85rem);
+    letter-spacing:.018em;
+  }
+  .brand-copy .tagline{
+    margin-top:4px;
+    font-size:clamp(.72rem, 3.15vw, .98rem);
+    letter-spacing:0;
+  }
+}
+
+@media(max-width:390px){
+  .app-header{ gap:4px; }
+  .brand-mark{
+    width:45px;
+    height:45px;
+    flex-basis:45px;
+  }
+  .brand-copy h1{
+    font-size:clamp(1.22rem, 6vw, 1.55rem);
+  }
+  .brand-copy .tagline{
+    font-size:clamp(.66rem, 3vw, .84rem);
+  }
+}
