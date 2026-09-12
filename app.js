@@ -427,6 +427,127 @@
   async function changePassword(){const currentPassword=prompt('Current password:');if(currentPassword===null)return;const newPassword=prompt('New password (8+ characters):');if(newPassword===null)return;try{await api('/api/auth/password',{method:'POST',body:JSON.stringify({currentPassword,newPassword})});$('authMessage').textContent='Password changed successfully.';}catch(e){$('authMessage').textContent=e.message;}}
 
 
+  // v2.6 — export the current project as a CRP-styled chord sheet.
+  function exportFileName(ext){
+    const raw=$('projectName').value.trim()||'Chord-Rider-Pro';
+    const safe=raw.replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim()||'Chord-Rider-Pro';
+    return `${safe} - Chord Sheet.${ext}`;
+  }
+  function exportKeyLabel(){
+    const raw=$('keyInput').value.trim();
+    if(raw&&enteredKey())return raw;
+    const k=activeKey();
+    return `${k.root}${k.minor?'m':''}`;
+  }
+  function uniqueUsedValues(){
+    const seen=new Set(),out=[];
+    state.rows.flat().forEach(card=>{const v=displayedValue(card);if(!seen.has(v)){seen.add(v);out.push(v);}});
+    return out;
+  }
+  function guitarVoicingLabel(){
+    const labels={open:'Open / Easy',triad:'Triad',barre:'Barre Chord',power:'Power Chord',shell:'Shell Voicing',inversion:'1st Inversion',color:'Color / Extended'};
+    return labels[state.neck]||labels.open;
+  }
+  function makeMetaChip(text){const e=document.createElement('span');e.className='export-meta-chip';e.textContent=text;return e;}
+  function buildExportSheet(){
+    // A user may type a chord and export without tapping Build first. Commit it so
+    // the exported sheet always matches the visible Build field.
+    const bad=commitBuildInput();
+    if(bad.length)$('status').textContent=`Skipped unrecognized: ${bad.join(', ')}`;
+    syncBuildInput();autoPopulateKeyFromEntry();renderAll();
+
+    if(!allCards().length)throw new Error('Add at least one chord or note before exporting.');
+    const stage=$('exportStage');stage.innerHTML='';
+    const sheet=document.createElement('section');sheet.className='export-sheet';
+    const projectName=$('projectName').value.trim()||'Untitled Chord Project';
+    const keyLabel=exportKeyLabel();
+    const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92));
+    const beats=+$('beatsSelect').value||4;
+    const used=uniqueUsedValues();
+    const kind=state.mode==='note'?'Notes':'Chords / notes';
+    const header=document.createElement('header');header.className='export-sheet-header';
+    header.innerHTML=`<div class="export-sheet-title-row"><div><h1>${esc(projectName)}</h1><div class="export-sheet-subtitle">Chord Rider Pro chord sheet</div></div><div class="export-sheet-key">Key ${esc(keyLabel)}</div></div>`;
+    const meta=document.createElement('div');meta.className='export-meta-grid';
+    meta.append(makeMetaChip(`${bpm} BPM`),makeMetaChip(`${beats} beat${beats===1?'':'s'} / chord`),makeMetaChip(state.instrument==='guitar'?'Guitar':'Piano'),makeMetaChip(state.mode==='note'?'Note mode':'Chord mode'));
+    if(state.instrument==='guitar'){
+      meta.append(makeMetaChip(`Voicing: ${guitarVoicingLabel()}`));
+      if(state.capo)meta.append(makeMetaChip(`Capo ${state.capo}${state.transpose?' • transpose view':''}`));
+    }else if(state.octave)meta.append(makeMetaChip(`Octave ${state.octave>0?'+':''}${state.octave}`));
+    header.appendChild(meta);
+    const summary=document.createElement('div');summary.className='export-summary';
+    const usedLine=document.createElement('div');usedLine.className='export-summary-line';usedLine.innerHTML=`<strong>${kind} used:</strong> ${esc(used.join(' • '))}`;
+    const progLine=document.createElement('div');progLine.className='export-summary-line';progLine.innerHTML=`<strong>Progression:</strong> ${state.rows.map((r,i)=>`L${i+1}: ${r.map(displayedValue).join(' – ')||'—'}`).map(esc).join(' &nbsp; | &nbsp; ')}`;
+    summary.append(usedLine,progLine);header.appendChild(summary);sheet.appendChild(header);
+
+    state.rows.forEach((row,ri)=>{
+      const line=document.createElement('section');line.className='export-line';
+      const text=row.map(displayedValue).join(' – ')||'Empty line';
+      line.innerHTML=`<div class="export-line-heading"><strong>Line ${ri+1}</strong><span>${esc(text)}</span></div>`;
+      const cards=document.createElement('div');cards.className='export-card-row';
+      row.forEach(card=>{
+        const cardEl=document.createElement('div');cardEl.className='export-card';
+        const shown=displayedValue(card),sub=subtitle(card);
+        cardEl.innerHTML=`<div class="export-card-name">${card.type==='note'?'♪ ':''}${esc(shown)}</div><div class="export-card-subtitle">${esc(sub||' ')}</div><div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div>`;
+        cards.appendChild(cardEl);
+      });
+      line.appendChild(cards);sheet.appendChild(line);
+    });
+
+    const notes=$('notesEditor').innerHTML.trim();
+    if(notes&&$('notesEditor').textContent.trim()){
+      const n=document.createElement('section');n.className='export-notes';n.innerHTML=`<h3>Project notes</h3><div class="export-notes-body">${notes}</div>`;sheet.appendChild(n);
+    }
+    const footer=document.createElement('footer');footer.className='export-sheet-footer';
+    footer.innerHTML=`<img src="assets/rider-and-bones-icon.png" alt="Rider and Bones"><span>Created with Chord Rider Pro • Rider &amp; Bones</span>`;
+    sheet.appendChild(footer);stage.appendChild(sheet);return sheet;
+  }
+  async function waitForExportImages(root){
+    const imgs=[...root.querySelectorAll('img')];
+    await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=img.onerror=resolve;})));
+  }
+  async function captureExportSheet(){
+    if(typeof html2canvas!=='function')throw new Error('Export tools did not load. Check your connection and try again.');
+    const sheet=buildExportSheet();await waitForExportImages(sheet);
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    const bounds=sheet.getBoundingClientRect();
+    const breaks=[...sheet.querySelectorAll('.export-sheet-header,.export-line,.export-notes,.export-sheet-footer')]
+      .map(el=>Math.round(el.getBoundingClientRect().bottom-bounds.top));
+    const canvas=await html2canvas(sheet,{backgroundColor:'#f7f5ef',scale:2,useCORS:true,logging:false});
+    return{sheet,canvas,breaks};
+  }
+  function downloadDataUrl(dataUrl,name){const a=document.createElement('a');a.href=dataUrl;a.download=name;document.body.appendChild(a);a.click();a.remove();}
+  async function exportPng(){
+    closeExportMenu();$('status').textContent='Creating PNG chord sheet…';
+    try{const {canvas}=await captureExportSheet();downloadDataUrl(canvas.toDataURL('image/png'),exportFileName('png'));$('status').textContent='PNG chord sheet exported.';}
+    catch(e){$('status').textContent=e.message||'Could not export PNG.';}
+  }
+  async function exportPdf(){
+    closeExportMenu();$('status').textContent='Creating PDF chord sheet…';
+    try{
+      if(!window.jspdf?.jsPDF)throw new Error('PDF tools did not load. Check your connection and try again.');
+      const {canvas,breaks}=await captureExportSheet(),{jsPDF}=window.jspdf;
+      const pdf=new jsPDF({orientation:'portrait',unit:'pt',format:'letter',compress:true});
+      const pageW=pdf.internal.pageSize.getWidth(),pageH=pdf.internal.pageSize.getHeight(),margin=18,drawW=pageW-margin*2,drawH=pageH-margin*2;
+      const scale=canvas.width/1120,idealSliceCss=(drawH/(drawW/canvas.width))/scale;
+      let topCss=0,page=0,totalCss=canvas.height/scale;
+      while(topCss<totalCss-1){
+        const limit=Math.min(totalCss,topCss+idealSliceCss);
+        const candidates=breaks.filter(y=>y>topCss+idealSliceCss*.35&&y<=limit+1);
+        const bottomCss=(limit>=totalCss-1)?totalCss:(candidates.length?candidates[candidates.length-1]:limit);
+        const sy=Math.round(topCss*scale),sh=Math.max(1,Math.round((bottomCss-topCss)*scale));
+        const slice=document.createElement('canvas');slice.width=canvas.width;slice.height=sh;
+        slice.getContext('2d').drawImage(canvas,0,sy,canvas.width,sh,0,0,canvas.width,sh);
+        if(page++)pdf.addPage();
+        const imgH=sh*(drawW/canvas.width);pdf.addImage(slice.toDataURL('image/jpeg',.94),'JPEG',margin,margin,drawW,imgH,undefined,'FAST');
+        topCss=bottomCss;
+      }
+      pdf.save(exportFileName('pdf'));$('status').textContent='PDF chord sheet exported.';
+    }catch(e){$('status').textContent=e.message||'Could not export PDF.';}
+  }
+  function closeExportMenu(){const m=$('exportMenu'),b=$('exportBtn');if(m)m.hidden=true;if(b)b.setAttribute('aria-expanded','false');}
+  function toggleExportMenu(){const m=$('exportMenu'),b=$('exportBtn'),open=m.hidden;m.hidden=!open;b.setAttribute('aria-expanded',String(open));}
+
+
   function init(){
     for(let i=0;i<=12;i++){const o=document.createElement('option');o.value=i;o.textContent=i?'Capo '+i:'None';$('capoSelect').appendChild(o);}
     $('buildBtn').onclick=()=>{const bad=commitBuildInput();$('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';syncBuildInput();autoPopulateKeyFromEntry();renderAll();};
@@ -439,6 +560,8 @@
     $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);renderAll();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);renderAll();};
     $('capoSelect').onchange=e=>{state.capo=+e.target.value;renderAll();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;renderAll();};
     $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();};$('playAllBtn').onclick=playProgression;$('saveProjectBtn').onclick=saveProject;
+    $('exportBtn').onclick=e=>{e.stopPropagation();toggleExportMenu();};$('exportPdfBtn').onclick=exportPdf;$('exportPngBtn').onclick=exportPng;
+    document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))closeExportMenu();});
     $('loginBtn').onclick=login;$('registerBtn').onclick=register;$('logoutBtn').onclick=logout;$('changePasswordBtn').onclick=changePassword;
     $('accountSummaryBtn').onclick=()=>{const panel=$('accountPanel');setAccountCollapsed(!panel.classList.contains('is-collapsed'));};
     document.querySelectorAll('.notes-toolbar [data-cmd]').forEach(b=>b.onclick=()=>document.execCommand(b.dataset.cmd,false,null));$('clearNotesBtn').onclick=()=>{if(confirm('Clear notes?'))$('notesEditor').innerHTML='';};

@@ -131,8 +131,15 @@
         <h2>Projects</h2>
         <span id="projectStorageLabel" class="subtle">Saved on this device</span>
       </div>
-      <div class="save-row">
+      <div class="save-row project-save-row">
         <input id="projectName" type="text" placeholder="Project name" />
+        <div class="export-wrap">
+          <button id="exportBtn" class="export-btn" type="button" aria-haspopup="true" aria-expanded="false">Export ▾</button>
+          <div id="exportMenu" class="export-menu" hidden>
+            <button id="exportPdfBtn" type="button">PDF chord sheet</button>
+            <button id="exportPngBtn" type="button">PNG image</button>
+          </div>
+        </div>
         <button id="saveProjectBtn" class="accent">Save</button>
       </div>
       <div id="projectList" class="project-list"></div>
@@ -193,7 +200,11 @@
     <span>Rider &amp; Bones</span>
   </footer>
 
+  <div id="exportStage" class="export-stage" aria-hidden="true"></div>
+
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="app.js"></script>
   <script src="beat-maker.js"></script>
 </body>

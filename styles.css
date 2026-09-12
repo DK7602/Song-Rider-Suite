@@ -545,3 +545,118 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
     text-align: right;
   }
 }
+
+/* v2.6 — compact project export + printable CRP chord sheet */
+.project-save-row { flex-wrap:nowrap; position:relative; }
+.project-save-row #projectName { min-width:0; }
+.export-wrap { position:relative; flex:0 0 auto; }
+.export-btn {
+  padding:9px 10px;
+  font-size:.78rem;
+  line-height:1;
+  white-space:nowrap;
+  background:#171b20;
+  border-color:#59616c;
+  color:var(--accent);
+  font-weight:800;
+}
+.export-menu {
+  position:absolute;
+  right:0;
+  top:calc(100% + 6px);
+  z-index:30;
+  width:164px;
+  padding:6px;
+  border:1px solid #454d58;
+  border-radius:11px;
+  background:#101318;
+  box-shadow:0 12px 28px rgba(0,0,0,.38);
+}
+.export-menu button { width:100%; text-align:left; padding:9px 10px; border:0; background:transparent; }
+.export-menu button:hover { background:#20262e; color:var(--accent); }
+.export-stage {
+  position:fixed;
+  left:-20000px;
+  top:0;
+  width:1200px;
+  pointer-events:none;
+  z-index:-1;
+}
+.export-sheet {
+  width:1120px;
+  padding:42px 44px 30px;
+  background:#f7f5ef;
+  color:#171a1f;
+  font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+.export-sheet * { box-sizing:border-box; }
+.export-sheet-header { border-bottom:3px solid #e9c46a; padding-bottom:18px; margin-bottom:20px; }
+.export-sheet-title-row { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; }
+.export-sheet h1 { color:#15181d; font-size:32px; line-height:1.08; }
+.export-sheet-subtitle { color:#65707c; font-size:13px; margin-top:5px; }
+.export-sheet-key {
+  flex:0 0 auto;
+  min-width:110px;
+  padding:9px 14px;
+  border-radius:14px;
+  background:#171a1f;
+  color:#e9c46a;
+  text-align:center;
+  font-weight:900;
+  font-size:22px;
+}
+.export-meta-grid { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.export-meta-chip {
+  padding:6px 10px;
+  border:1px solid #c9c3b4;
+  border-radius:999px;
+  background:#fffdf8;
+  color:#383d45;
+  font-size:12px;
+  font-weight:700;
+}
+.export-summary { margin-top:14px; padding:11px 13px; background:#fffdf8; border:1px solid #d9d3c5; border-radius:12px; }
+.export-summary strong { color:#171a1f; }
+.export-summary-line { margin-top:4px; color:#555e69; font-size:13px; line-height:1.35; overflow-wrap:anywhere; }
+.export-line { margin:20px 0 0; break-inside:avoid; }
+.export-line-heading { display:flex; align-items:baseline; gap:10px; margin:0 0 9px; }
+.export-line-heading strong { font-size:14px; color:#171a1f; }
+.export-line-heading span { color:#747d87; font-size:12px; overflow-wrap:anywhere; }
+.export-card-row { display:flex; flex-wrap:wrap; gap:10px; align-items:stretch; }
+.export-card {
+  flex:0 0 246px;
+  width:246px;
+  min-height:190px;
+  padding:10px;
+  border:1px solid #414a55;
+  border-radius:14px;
+  background:#11151a;
+  color:#f3f4f6;
+  overflow:hidden;
+}
+.export-card-name { color:#e9c46a; font-size:20px; line-height:1.1; font-weight:900; margin-bottom:5px; }
+.export-card-subtitle { color:#a8b0b9; font-size:10px; margin-bottom:5px; min-height:12px; }
+.export-card .diagram { width:100%; overflow:hidden; }
+.export-card .diagram svg { width:100%; height:auto; display:block; }
+.export-notes { margin-top:22px; padding:14px 16px; border:1px solid #d9d3c5; border-radius:12px; background:#fffdf8; color:#474e57; }
+.export-notes h3 { margin:0 0 6px; color:#171a1f; font-size:14px; }
+.export-notes-body { font-size:12px; line-height:1.45; }
+.export-sheet-footer {
+  margin-top:26px;
+  padding-top:13px;
+  border-top:1px solid #cbc5b8;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  color:#66707a;
+  font-size:11px;
+  font-weight:700;
+}
+.export-sheet-footer img { width:58px; height:44px; object-fit:contain; }
+@media(max-width:700px){
+  .project-save-row { gap:6px; }
+  .project-save-row #projectName { flex:1 1 auto; min-width:0; padding-left:10px; padding-right:10px; }
+  .project-save-row .export-btn { padding:9px 8px; font-size:.72rem; }
+  .project-save-row #saveProjectBtn { padding:9px 10px; }
+}
