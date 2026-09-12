@@ -83,7 +83,11 @@
       <div>
         <div class="section-heading-row">
           <h2 id="fitHeading">Chords that fit</h2>
-          <span id="keyHint" class="subtle"></span>
+          <div class="fit-key-row">
+            <input id="keyInput" class="key-input" type="text" autocomplete="off" autocapitalize="characters"
+              placeholder="Key, e.g. F or F#m" aria-label="Key for chord suggestions" />
+            <span id="keyHint" class="subtle"></span>
+          </div>
         </div>
         <div id="compatibleChords" class="chip-row"></div>
       </div>

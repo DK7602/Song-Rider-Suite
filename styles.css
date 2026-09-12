@@ -476,3 +476,14 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
     opacity:1 !important;
   }
 }
+
+
+/* v2.4 — key override beside the chord-family hint */
+.fit-key-row { display:flex; align-items:center; justify-content:flex-end; gap:8px; min-width:0; }
+.key-input { width:128px; min-width:108px; padding:7px 9px; font-size:.82rem; }
+@media(max-width:700px){
+  .section-heading-row { align-items:center; gap:8px; }
+  .fit-key-row { flex:1; min-width:0; gap:6px; }
+  .key-input { width:112px; min-width:92px; padding:7px 8px; }
+  #keyHint { min-width:0; font-size:.68rem; line-height:1.15; text-align:right; }
+}
