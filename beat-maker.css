@@ -169,3 +169,58 @@
     text-align:right !important;
   }
 }
+
+
+/* v3.0 — deterministic volume slider fill on mobile/Chrome.
+   At 0% there is no leftover colored track; fill matches the numeric value. */
+.crp-volume-main input[type="range"],
+.crp-volume-tool input[type="range"]{
+  --crp-volume-fill:50%;
+  -webkit-appearance:none;
+  appearance:none;
+  height:18px;
+  background:transparent;
+  accent-color:transparent;
+}
+.crp-volume-main input[type="range"]::-webkit-slider-runnable-track,
+.crp-volume-tool input[type="range"]::-webkit-slider-runnable-track{
+  height:5px;
+  border-radius:999px;
+  background:linear-gradient(to right,
+    var(--accent,#e9c46a) 0,
+    var(--accent,#e9c46a) var(--crp-volume-fill),
+    #515965 var(--crp-volume-fill),
+    #515965 100%);
+}
+.crp-volume-main input[type="range"]::-webkit-slider-thumb,
+.crp-volume-tool input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  appearance:none;
+  width:16px;
+  height:16px;
+  margin-top:-5.5px;
+  border-radius:50%;
+  border:2px solid #171b20;
+  background:var(--accent,#e9c46a);
+  box-shadow:0 0 0 1px rgba(255,255,255,.16);
+}
+.crp-volume-main input[type="range"]::-moz-range-track,
+.crp-volume-tool input[type="range"]::-moz-range-track{
+  height:5px;
+  border-radius:999px;
+  background:#515965;
+}
+.crp-volume-main input[type="range"]::-moz-range-progress,
+.crp-volume-tool input[type="range"]::-moz-range-progress{
+  height:5px;
+  border-radius:999px;
+  background:var(--accent,#e9c46a);
+}
+.crp-volume-main input[type="range"]::-moz-range-thumb,
+.crp-volume-tool input[type="range"]::-moz-range-thumb{
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  border:2px solid #171b20;
+  background:var(--accent,#e9c46a);
+}

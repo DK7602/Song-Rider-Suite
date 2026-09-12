@@ -3,7 +3,8 @@
 
   const STORAGE_KEY = 'crp-projects';
   const DRAFT_KEY = 'crp-beat-draft-v1';
-  const VERSION = 2;
+  const VERSION = 3;
+  const DRUM_OUTPUT_SCALE = .18;
   const SCRIPT_URL = document.currentScript?.src || new URL('beat-maker.js', window.location.href).href;
   const $ = id => document.getElementById(id);
 
@@ -48,7 +49,7 @@
   function freshBeat(){
     const tracks = {};
     DRUMS.forEach(([id]) => tracks[id] = Array.from({length:16}, () => []));
-    return {version:VERSION, enabled:true, bars:1, resolution:16, gain:.4225, tracks};
+    return {version:VERSION, enabled:true, bars:1, resolution:16, gain:.50, tracks};
   }
   function normalizeBeat(src){
     const b = freshBeat();
@@ -56,9 +57,19 @@
     b.enabled = src.enabled !== false;
     b.bars = clamp(+src.bars || 1, 1, 16);
     b.resolution = [8,16,32,64].includes(+src.resolution) ? +src.resolution : 16;
-    const sourceGain = Number.isFinite(+src.gain) ? +src.gain : .65;
-    // v2 mix rebalance: drums are 35% quieter than v1. Migrate old saved beats once.
-    b.gain = Math.max(0, Math.min(1, (+src.version || 1) < 2 ? sourceGain * .65 : sourceGain));
+    const sourceGain = Number.isFinite(+src.gain) ? +src.gain : .50;
+    const sourceVersion = +src.version || 1;
+    // v3: the UI still reads 0–100%, but the drum WAVs now run through a
+    // fixed output scale so 40–60% is a useful musical range instead of ~7%.
+    // Preserve the approximate heard loudness of already-saved v2 beats.
+    if(sourceVersion < 2){
+      const v2Gain = sourceGain * .65;
+      b.gain = Math.max(0, Math.min(1, v2Gain / DRUM_OUTPUT_SCALE));
+    }else if(sourceVersion < 3){
+      b.gain = Math.max(0, Math.min(1, sourceGain / DRUM_OUTPUT_SCALE));
+    }else{
+      b.gain = Math.max(0, Math.min(1, sourceGain));
+    }
     DRUMS.forEach(([id]) => {
       const bars = src.tracks && Array.isArray(src.tracks[id]) ? src.tracks[id] : [];
       b.tracks[id] = Array.from({length:16}, (_,bar) => {
@@ -223,9 +234,16 @@
 
   function updateVolumeControls(){
     const pct=Math.round(beat.gain*100);
-    if($('crpDrumVolume')) $('crpDrumVolume').value=String(pct);
+    const main=$('crpDrumVolume'), editor=$('crpBeatVolume');
+    if(main){
+      main.value=String(pct);
+      main.style.setProperty('--crp-volume-fill',`${pct}%`);
+    }
     if($('crpDrumVolumeValue')) $('crpDrumVolumeValue').textContent=`${pct}%`;
-    if($('crpBeatVolume')) $('crpBeatVolume').value=String(pct);
+    if(editor){
+      editor.value=String(pct);
+      editor.style.setProperty('--crp-volume-fill',`${pct}%`);
+    }
     if($('crpBeatVolumeValue')) $('crpBeatVolumeValue').textContent=`${pct}%`;
   }
   function updateMainControls(){
@@ -474,7 +492,7 @@
   }
   function hit(id,time,gain=1){
     const buf=buffers.get(id); if(!buf||!audioCtx) return;
-    const src=audioCtx.createBufferSource(), g=audioCtx.createGain(); src.buffer=buf; g.gain.value=beat.gain*gain; src.connect(g).connect(audioCtx.destination); src.start(time);
+    const src=audioCtx.createBufferSource(), g=audioCtx.createGain(); src.buffer=buf; g.gain.value=beat.gain*DRUM_OUTPUT_SCALE*gain; src.connect(g).connect(audioCtx.destination); src.start(time);
   }
   async function audition(id,gain=.78){ try{await ensureDrums();hit(id,audioCtx.currentTime+.01,gain)}catch(e){console.error(e);status(`Drum error: ${e.message||e}`);} }
   function scheduleCanonicalStep(absStep,time,barIndex){

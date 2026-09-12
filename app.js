@@ -31,6 +31,7 @@
     instrument: savedInstrument === 'guitar' ? 'guitar' : 'piano',
     mode: localStorage.getItem('crp-last-mode') === 'note' ? 'note' : 'chord',
     sound:'', octave:0, capo:0, neck:'open', transpose:false,
+    instrumentBus:null, instrumentLimiter:null,
     rows:[[]], selectedRow:0, playing:false, timer:null,
     audioCtx:null, player:null, playerName:'', currentProjectId:null, drag:null, lineDrag:null
   };
@@ -169,13 +170,42 @@
     return card.type==='chord'?transposeChord(card.value,-state.capo):transposeRoot(card.value,-state.capo);
   }
 
+  function instrumentOutputGain(){
+    // MusyngKite instrument samples are much quieter than the drum WAVs.
+    // These multipliers normalize the four main chord instruments so they
+    // remain clearly audible at ordinary phone/device volume.
+    const gains={
+      acoustic_grand_piano:2.75,
+      electric_piano_1:2.75,
+      acoustic_guitar_steel:2.95,
+      electric_guitar_clean:2.85,
+      synth_strings_1:1.10,
+      electric_bass_finger:1.10
+    };
+    return gains[state.sound]||1.0;
+  }
+  function ensureInstrumentBus(){
+    if(state.instrumentBus&&state.instrumentLimiter)return;
+    const bus=state.audioCtx.createGain();
+    const limiter=state.audioCtx.createDynamicsCompressor();
+    limiter.threshold.value=-3;
+    limiter.knee.value=0;
+    limiter.ratio.value=20;
+    limiter.attack.value=.003;
+    limiter.release.value=.12;
+    bus.connect(limiter).connect(state.audioCtx.destination);
+    state.instrumentBus=bus;
+    state.instrumentLimiter=limiter;
+  }
   function ensureAudio(){
     if(!state.audioCtx)state.audioCtx=new (window.AudioContext||window.webkitAudioContext)();
     if(state.audioCtx.state==='suspended')state.audioCtx.resume();
+    ensureInstrumentBus();
+    state.instrumentBus.gain.value=instrumentOutputGain();
     if(state.player&&state.playerName===state.sound)return Promise.resolve(state.player);
     if(!window.Soundfont)return Promise.reject(new Error('Sound engine unavailable'));
     $('status').textContent='Loading instrument samples…';
-    return Soundfont.instrument(state.audioCtx,state.sound,{format:'mp3',soundfont:'MusyngKite'}).then(p=>{state.player=p;state.playerName=state.sound;$('status').textContent='';return p;});
+    return Soundfont.instrument(state.audioCtx,state.sound,{format:'mp3',soundfont:'MusyngKite',destination:state.instrumentBus}).then(p=>{state.player=p;state.playerName=state.sound;$('status').textContent='';return p;});
   }
   async function playCard(card,seconds=1.5){
     const p=await ensureAudio(),val=displayedValue(card);let notes;
@@ -187,9 +217,9 @@
       if(!notes.length)notes=chordNotes(val,3+state.octave);
     }else notes=chordNotes(val,4+state.octave);
     if(state.sound==='electric_bass_finger')notes=notes.slice(0,card.type==='note'?1:3).map(n=>noteAtMidi(midiOf(n)-12));
-    const boostedSounds=new Set(['acoustic_grand_piano','electric_piano_1','acoustic_guitar_steel','electric_guitar_clean']);
-    const instrumentGain=boostedSounds.has(state.sound)?.90*1.55:.90;
-    const now=state.audioCtx.currentTime;notes.forEach((n,i)=>p.play(n,now+(state.instrument==='guitar'?i*.035:0),{duration:seconds,gain:instrumentGain}));
+    // Keep note gain near unity; overall instrument loudness is handled by
+    // the normalized instrument bus above, followed by a peak limiter.
+    const now=state.audioCtx.currentTime;notes.forEach((n,i)=>p.play(n,now+(state.instrument==='guitar'?i*.035:0),{duration:seconds,gain:.95}));
   }
   function setRiderBonesRiding(on){['riderBonesLeft','riderBonesRight'].forEach(id=>{const img=$(id);if(img)img.src=on?img.dataset.animated:img.dataset.still;});}
 
