@@ -631,7 +631,11 @@
         : Math.max(.35,stepSeconds*.62);
       await playCard(item.c,noteSeconds);
       document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');
-      const playingCard=document.querySelector(`.progression-line[data-row="${item.ri}"]`)?.querySelectorAll('.chord-card')[item.ci];
+      // In mobile infinite-carousel mode there is a visual clone of the last line
+      // before Line 1. Always target the real project line so Auto Scroll never
+      // mistakes that edge clone for the actual last line.
+      const playingLine=document.querySelector(`.progression-line:not(.carousel-clone)[data-row="${item.ri}"]`);
+      const playingCard=playingLine?.querySelectorAll('.chord-card')[item.ci];
       playingCard?.style.setProperty('outline','2px solid var(--accent)');
       if(state.autoScroll&&playingCard){
         if(isMobileCarousel()){
