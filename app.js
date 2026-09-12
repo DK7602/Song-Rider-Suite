@@ -756,7 +756,7 @@
   function capture(id,name){
     const existing=id?localProjects().find(x=>x.id===id):null;
     const liveBeat=window.CRPBeatMaker?.getBeat?.();
-    return{id:id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())),name,updatedAt:Date.now(),instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:state.rows,bpm:+$('bpmInput').value||92,beats:+$('beatsSelect').value||4,loop:$('loopToggle').checked,notes:$('notesEditor').innerHTML,key:$('keyInput').value.trim(),beatMaker:liveBeat||existing?.beatMaker};
+    return{id:id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())),name,updatedAt:Date.now(),archived:!!existing?.archived,instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:state.rows,bpm:+$('bpmInput').value||92,beats:+$('beatsSelect').value||4,loop:$('loopToggle').checked,notes:$('notesEditor').innerHTML,key:$('keyInput').value.trim(),beatMaker:liveBeat||existing?.beatMaker};
   }
   function upsertLocal(p){const ps=localProjects(),i=ps.findIndex(x=>x.id===p.id);if(i>=0)ps[i]=p;else ps.unshift(p);saveLocalProjects(ps);}
   async function refreshCloudProjects(){if(!accountUser){cloudProjects=null;cloudSyncState='idle';renderProjects();return;}cloudSyncState='syncing';updateAccountSummary();try{const d=await api('/api/projects');cloudProjects=d.projects||[];cloudProjects.forEach(upsertLocal);cloudSyncState='ready';updateAccountSummary();renderProjects();}catch(e){cloudSyncState='error';updateAccountSummary();$('status').textContent='Cloud sync unavailable — using local backup.';renderProjects();}}
@@ -825,10 +825,114 @@
   }
 
   async function saveProject(){clearTimeout(autoSaveTimer);autoSaveTimer=null;const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);state.currentProjectId=p.id;$('projectName').value=name;upsertLocal(p);if(accountUser){try{const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});upsertLocal(d.project);await refreshCloudProjects();$('status').textContent=`Saved “${name}” to cloud.`;}catch(e){$('status').textContent=`Saved locally; cloud sync failed: ${e.message}`;}}else{$('status').textContent=`Saved “${name}” on this device.`;renderProjects();}}
+  let projectBrowserMode='projects';
+
   function projectSource(){return (accountUser&&cloudProjects)?cloudProjects:localProjects();}
+
+  function setProjectBrowserMode(mode){
+    projectBrowserMode=mode==='archive'?'archive':'projects';
+    $('projectsTabBtn')?.classList.toggle('active',projectBrowserMode==='projects');
+    $('archiveTabBtn')?.classList.toggle('active',projectBrowserMode==='archive');
+    $('projectsTabBtn')?.setAttribute('aria-selected',String(projectBrowserMode==='projects'));
+    $('archiveTabBtn')?.setAttribute('aria-selected',String(projectBrowserMode==='archive'));
+    renderProjects();
+    const win=document.querySelector('.project-browser-window');
+    if(win)win.scrollTop=0;
+  }
+
+  async function setProjectArchived(project,archived){
+    const p={...project,archived:!!archived,updatedAt:Date.now()};
+    upsertLocal(p);
+    updateCloudSnapshot(p);
+    renderProjects();
+
+    if(accountUser){
+      try{
+        const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
+        if(d?.project){upsertLocal(d.project);updateCloudSnapshot(d.project);}
+        cloudSyncState='ready';
+        updateAccountSummary();
+        renderProjects();
+      }catch(err){
+        cloudSyncState='error';
+        updateAccountSummary();
+        $('status').textContent=`${archived?'Archived':'Restored'} locally; cloud sync failed: ${err.message}`;
+      }
+    }
+
+    $('status').textContent=archived
+      ? `“${p.name}” moved to Archive.`
+      : `“${p.name}” restored to Projects.`;
+  }
   function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();const p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;state.currentProjectId=id;state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
-  function renderProjects(){const w=$('projectList'),ps=[...projectSource()].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));$('projectStorageLabel').textContent=accountUser?'Synced to your cloud account':'Saved on this device';w.innerHTML=ps.length?'':'<div class="subtle">No saved projects yet.</div>';ps.forEach(p=>{const e=document.createElement('div');e.className='project-item';const count=p.rows?p.rows.flat().length:(p.chords||[]).length;e.innerHTML=`<div class="name">${esc(p.name)}</div><div class="meta">${count} cards</div><button class="open">Open</button><button class="rename">Rename</button><button class="delete">Delete</button>`;e.querySelector('.open').onclick=()=>loadProject(p.id);e.querySelector('.rename').onclick=async()=>{const n=prompt('New project name:',p.name);if(!n?.trim())return;const name=n.trim();const locals=localProjects(),i=locals.findIndex(x=>x.id===p.id);if(i>=0){locals[i].name=name;locals[i].updatedAt=Date.now();saveLocalProjects(locals);}if(accountUser){try{await api('/api/projects/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({name})});await refreshCloudProjects();}catch(err){$('status').textContent='Rename saved locally; cloud sync failed.';renderProjects();}}else renderProjects();};e.querySelector('.delete').onclick=async()=>{if(!confirm(`Delete “${p.name}”?`))return;if(state.currentProjectId===p.id){clearTimeout(autoSaveTimer);autoSaveTimer=null;state.currentProjectId=null;}saveLocalProjects(localProjects().filter(x=>x.id!==p.id));if(accountUser){try{await api('/api/projects/'+encodeURIComponent(p.id),{method:'DELETE'});await refreshCloudProjects();}catch(err){$('status').textContent='Deleted locally; cloud delete failed.';renderProjects();}}else renderProjects();};w.appendChild(e);});}
+  function renderProjects(){
+    const w=$('projectList');
+    const all=[...projectSource()].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    const active=all.filter(p=>!p.archived), archived=all.filter(p=>!!p.archived);
+    const ps=projectBrowserMode==='archive'?archived:active;
+
+    $('projectStorageLabel').textContent=accountUser?'Synced to your cloud account':'Saved on this device';
+    if($('projectsCount'))$('projectsCount').textContent=String(active.length);
+    if($('archiveCount'))$('archiveCount').textContent=String(archived.length);
+
+    $('projectsTabBtn')?.classList.toggle('active',projectBrowserMode==='projects');
+    $('archiveTabBtn')?.classList.toggle('active',projectBrowserMode==='archive');
+    $('projectsTabBtn')?.setAttribute('aria-selected',String(projectBrowserMode==='projects'));
+    $('archiveTabBtn')?.setAttribute('aria-selected',String(projectBrowserMode==='archive'));
+
+    w.innerHTML=ps.length?'':`<div class="project-empty subtle">${projectBrowserMode==='archive'?'No archived projects yet.':'No active projects yet.'}</div>`;
+
+    ps.forEach(p=>{
+      const e=document.createElement('div');
+      e.className='project-item'+(state.currentProjectId===p.id?' current':'');
+      const count=p.rows?p.rows.flat().length:(p.chords||[]).length;
+      const moveLabel=projectBrowserMode==='archive'?'Restore':'Archive';
+      e.innerHTML=`<div class="name">${esc(p.name)}</div><div class="meta">${count} cards</div><button class="open">Open</button><button class="rename">Rename</button><button class="archive-toggle">${moveLabel}</button><button class="delete">Delete</button>`;
+
+      e.querySelector('.open').onclick=()=>loadProject(p.id);
+
+      e.querySelector('.rename').onclick=async()=>{
+        const n=prompt('New project name:',p.name);
+        if(!n?.trim())return;
+        const name=n.trim(),locals=localProjects(),i=locals.findIndex(x=>x.id===p.id);
+        if(i>=0){locals[i].name=name;locals[i].updatedAt=Date.now();saveLocalProjects(locals);}
+        if(cloudProjects){const ci=cloudProjects.findIndex(x=>x.id===p.id);if(ci>=0)cloudProjects[ci]={...cloudProjects[ci],name,updatedAt:Date.now()};}
+        if(state.currentProjectId===p.id)$('projectName').value=name;
+
+        if(accountUser){
+          try{
+            await api('/api/projects/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({name})});
+            await refreshCloudProjects();
+          }catch(err){
+            $('status').textContent='Rename saved locally; cloud sync failed.';
+            renderProjects();
+          }
+        }else renderProjects();
+      };
+
+      e.querySelector('.archive-toggle').onclick=()=>setProjectArchived(p,projectBrowserMode!=='archive');
+
+      e.querySelector('.delete').onclick=async()=>{
+        if(!confirm(`Delete “${p.name}”?`))return;
+        if(state.currentProjectId===p.id){
+          clearTimeout(autoSaveTimer);autoSaveTimer=null;state.currentProjectId=null;
+        }
+        saveLocalProjects(localProjects().filter(x=>x.id!==p.id));
+        if(cloudProjects)cloudProjects=cloudProjects.filter(x=>x.id!==p.id);
+        if(accountUser){
+          try{
+            await api('/api/projects/'+encodeURIComponent(p.id),{method:'DELETE'});
+            await refreshCloudProjects();
+          }catch(err){
+            $('status').textContent='Deleted locally; cloud delete failed.';
+            renderProjects();
+          }
+        }else renderProjects();
+      };
+      w.appendChild(e);
+    });
+  }
   function showAccount(){const logged=!!accountUser;const panel=$('accountPanel');panel?.classList.toggle('is-logged-in',logged);$('accountSummaryBtn').hidden=!logged;$('authForms').hidden=logged;$('accountTools').hidden=!logged;$('logoutBtn').hidden=!logged;$('accountStatus').textContent=logged?`Signed in as ${accountDisplayName()}`:'Not signed in — local projects still work.';$('projectStorageLabel').textContent=logged?'Synced to your cloud account':'Saved on this device';if(logged){updateAccountSummary();setAccountCollapsed(true);}else{setAccountCollapsed(false);cloudSyncState='idle';}renderProjects();}
   async function checkAccount(){try{const d=await api('/api/auth/me');accountUser=d.user||null;}catch{accountUser=null;}showAccount();if(accountUser)await refreshCloudProjects();}
   async function login(){try{const d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:$('loginEmail').value,password:$('loginPassword').value})});accountUser=d.user;$('loginPassword').value='';$('authMessage').textContent='Logged in. Syncing projects…';showAccount();await refreshCloudProjects();$('authMessage').textContent='Cloud sync ready.';}catch(e){$('authMessage').textContent=e.message;}}
@@ -1005,6 +1109,8 @@
     ['bpmInput','beatsSelect','loopToggle'].forEach(id=>$(id)?.addEventListener('change',scheduleAutoSave));
     $('notesEditor')?.addEventListener('input',scheduleAutoSave);
 
+    $('projectsTabBtn').onclick=()=>setProjectBrowserMode('projects');
+    $('archiveTabBtn').onclick=()=>setProjectBrowserMode('archive');
     $('loginBtn').onclick=login;$('registerBtn').onclick=register;$('logoutBtn').onclick=logout;$('changePasswordBtn').onclick=changePassword;
     $('accountSummaryBtn').onclick=()=>{const panel=$('accountPanel');setAccountCollapsed(!panel.classList.contains('is-collapsed'));};
     document.querySelectorAll('.notes-toolbar [data-cmd]').forEach(b=>b.onclick=()=>{document.execCommand(b.dataset.cmd,false,null);scheduleAutoSave();});$('clearNotesBtn').onclick=()=>{if(confirm('Clear notes?')){$('notesEditor').innerHTML='';scheduleAutoSave();}};

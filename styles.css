@@ -1521,3 +1521,95 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
     z-index:6;
   }
 }
+
+
+/* v1.6.5 — compact Projects / Archive browser */
+.save-panel{
+  overflow:visible;
+}
+.project-controls-fixed{
+  position:relative;
+  z-index:12;
+}
+.project-browser-tabs{
+  display:flex;
+  gap:8px;
+  margin-top:12px;
+  padding-bottom:8px;
+  border-bottom:1px solid #343c46;
+}
+.project-browser-tab{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-width:112px;
+  padding:8px 12px;
+  border-radius:10px;
+  color:var(--muted);
+  font-weight:800;
+}
+.project-browser-tab.active{
+  background:var(--accent);
+  border-color:#d7b654;
+  color:#17130a;
+}
+.project-tab-count{
+  min-width:22px;
+  height:20px;
+  padding:0 6px;
+  display:inline-grid;
+  place-items:center;
+  border-radius:999px;
+  background:rgba(255,255,255,.10);
+  font-size:.72rem;
+  line-height:1;
+}
+.project-browser-tab.active .project-tab-count{
+  background:rgba(23,19,10,.14);
+}
+.project-browser-window{
+  margin-top:10px;
+  max-height:132px; /* roughly two compact desktop cards */
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+  padding-right:4px;
+}
+.project-browser-window .project-list{
+  margin-top:0;
+}
+.project-item.current{
+  border-color:rgba(233,196,106,.72);
+  box-shadow:0 0 0 1px rgba(233,196,106,.12);
+}
+.project-item .archive-toggle{
+  color:var(--accent);
+}
+.project-empty{
+  min-height:108px;
+  display:grid;
+  place-items:center;
+  text-align:center;
+}
+
+@media(max-width:700px){
+  .project-browser-tabs{
+    position:relative;
+    z-index:11;
+  }
+  .project-browser-tab{
+    flex:1 1 0;
+    min-width:0;
+  }
+  .project-browser-window{
+    max-height:358px; /* about two phone-sized project cards */
+    padding-right:3px;
+  }
+  .project-item{
+    min-height:168px;
+  }
+  .project-item .archive-toggle{
+    min-width:84px;
+  }
+}
