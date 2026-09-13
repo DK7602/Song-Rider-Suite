@@ -1247,8 +1247,14 @@
     try{
       const doc=frame.contentDocument;if(!doc)return;
       const body=doc.body, root=doc.documentElement;
-      const h=Math.max(body?.scrollHeight||0,body?.offsetHeight||0,root?.scrollHeight||0,root?.offsetHeight||0);
-      if(h>200)frame.style.height=`${Math.ceil(h+6)}px`;
+      const editor=doc.getElementById('editorRoot');
+      const header=doc.querySelector('header');
+      let h=0;
+      if(editor){const r=editor.getBoundingClientRect();h=Math.max(h,r.bottom+(root?.scrollTop||body?.scrollTop||0));}
+      if(header){const r=header.getBoundingClientRect();h=Math.max(h,r.bottom+(root?.scrollTop||body?.scrollTop||0));}
+      if(!h)h=Math.max(body?.offsetHeight||0,root?.offsetHeight||0);
+      h=Math.max(320,Math.min(h+18,6000));
+      frame.style.height=`${Math.ceil(h)}px`;
     }catch{}
   }
   function watchSongRiderSize(){

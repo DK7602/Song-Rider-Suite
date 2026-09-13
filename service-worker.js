@@ -1,4 +1,4 @@
-const CACHE = 'chord-rider-pro-v2.0.2';
+const CACHE = 'chord-rider-pro-v2.0.3';
 const ASSETS = [
   './',
   './index.html',
@@ -15,7 +15,6 @@ const ASSETS = [
   './assets/baby-daw-generated-source.png',
   './assets/rider-bones-mode-sticker.png',
   './assets/baby-daw-head-chain-sticker.png',
-  './assets/song-rider-mode-sticker.png',
   './song-rider/index.html',
   './song-rider/app.js'
 ];

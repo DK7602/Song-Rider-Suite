@@ -1766,3 +1766,13 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .song-mode-art img{width:64px!important;height:50px!important;}
   #songRiderFrame{height:900px;min-height:0!important;border-radius:10px;}
 }
+
+/* v2.0.3 — SRP height + mode icon hard fix */
+.song-mode-art{flex:0 0 72px!important;width:72px!important;height:56px!important;}
+.song-mode-art img{width:72px!important;height:56px!important;object-fit:contain!important;}
+#songRiderFrame{height:640px;min-height:0!important;overflow:hidden!important;}
+@media(max-width:640px){
+  .song-mode-art{flex-basis:66px!important;width:66px!important;height:52px!important;}
+  .song-mode-art img{width:66px!important;height:52px!important;}
+  #songRiderFrame{height:640px;}
+}
