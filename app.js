@@ -60,6 +60,55 @@
   function midiOf(note){const m=note.match(/^([A-G])(#?)(-?\d+)$/);return m?(Number(m[3])+1)*12+NOTE_INDEX[m[1]+m[2]]:null;}
   function noteAtMidi(m){return NOTES[(m%12+12)%12]+(Math.floor(m/12)-1);}
 
+  // Build musical piano voicings instead of forcing every chord into root position.
+  // The first chord is centered in a comfortable register; each following chord
+  // chooses the nearest inversion so progressions move smoothly rather than jumping
+  // down simply because a root letter is lower (for example G -> D).
+  function pianoVoicingCandidates(name,octaveShift=0){
+    const c=parseChord(name);if(!c)return[];
+    const rootPc=NOTE_INDEX[c.root],intervals=QUALITY[c.quality],out=[];
+    for(let inv=0;inv<intervals.length;inv++){
+      const rotated=intervals.slice(inv).concat(intervals.slice(0,inv).map(x=>x+12));
+      for(let rootMidi=48;rootMidi<=72;rootMidi+=12){
+        const base=rootMidi+rootPc+octaveShift*12;
+        const mids=rotated.map(iv=>base+iv);
+        const lo=Math.min(...mids),hi=Math.max(...mids);
+        if(lo<48+octaveShift*12||hi>84+octaveShift*12)continue;
+        out.push(mids);
+      }
+    }
+    return out;
+  }
+  function pianoVoicingCost(mids,prev=null,octaveShift=0){
+    const target=64+octaveShift*12,lo=Math.min(...mids),hi=Math.max(...mids);
+    let score=Math.abs((lo+hi)/2-target)*.8+Math.abs(lo-(57+octaveShift*12))*.18+(hi-lo)*.08;
+    if(!prev?.length)return score;
+    const nearest=(x,a)=>Math.min(...a.map(y=>Math.abs(x-y)));
+    score+=mids.reduce((n,x)=>n+nearest(x,prev),0)*1.35;
+    score+=prev.reduce((n,x)=>n+nearest(x,mids),0)*.55;
+    score+=Math.abs(lo-Math.min(...prev))*1.15;
+    return score;
+  }
+  function choosePianoVoicing(name,prev=null,octaveShift=0){
+    const choices=pianoVoicingCandidates(name,octaveShift);
+    if(!choices.length)return chordNotes(name,4+octaveShift).map(midiOf).filter(x=>x!=null);
+    choices.sort((a,b)=>pianoVoicingCost(a,prev,octaveShift)-pianoVoicingCost(b,prev,octaveShift));
+    return choices[0];
+  }
+  function projectPianoVoicings(){
+    const map=new Map();let prev=null;
+    state.rows.forEach(row=>row.forEach(card=>{
+      if(card.type!=='chord')return;
+      const mids=choosePianoVoicing(displayedValue(card),prev,state.octave);
+      map.set(card,mids);prev=mids;
+    }));
+    return map;
+  }
+  function pianoMidisForCard(card){
+    if(card.type==='note')return[midiOf(displayedValue(card)+(4+state.octave))].filter(x=>x!=null);
+    return projectPianoVoicings().get(card)||choosePianoVoicing(displayedValue(card),null,state.octave);
+  }
+
   const allCards=()=>state.rows.flat();
   function firstChord(){return allCards().find(c=>c.type==='chord')?.value||null;}
   function inferredKey(){const c=firstChord();if(c){const p=parseChord(c);return{root:p.root,minor:p.quality.startsWith('m')&&!p.quality.startsWith('maj')}}const n=allCards().find(c=>c.type==='note')?.value||'C';return{root:n,minor:false};}
@@ -217,7 +266,7 @@
       const frets=guitarShapeForCard(card),opens=[40,45,50,55,59,64];
       notes=frets.map((f,i)=>f==null?null:noteAtMidi(opens[i]+f+state.capo+state.octave*12)).filter(Boolean);
       if(!notes.length)notes=chordNotes(val,3+state.octave);
-    }else notes=chordNotes(val,4+state.octave);
+    }else notes=pianoMidisForCard(card).map(noteAtMidi);
     if(state.sound==='electric_bass_finger')notes=notes.slice(0,card.type==='note'?1:3).map(n=>noteAtMidi(midiOf(n)-12));
     // Keep note gain near unity; overall instrument loudness is handled by
     // the normalized instrument bus above, followed by a peak limiter.
@@ -226,7 +275,7 @@
   function setRiderBonesRiding(on){['riderBonesLeft','riderBonesRight'].forEach(id=>{const img=$(id);if(img)img.src=on?img.dataset.animated:img.dataset.still;});}
 
   function pianoSvg(card){
-    const val=displayedValue(card),base=4+state.octave,ns=card.type==='note'?[val+base]:chordNotes(val,base),mids=ns.map(midiOf).filter(x=>x!=null),targets=new Set(mids);
+    const val=displayedValue(card),mids=pianoMidisForCard(card),targets=new Set(mids);
     let start=Math.min(...mids)-2,end=Math.max(...mids)+3;const black=m=>NOTES[(m%12+12)%12].includes('#');
     while(black(start))start--;while(black(end-1))end++;while(end-start<10){start--;if(black(start))start--;if(end-start>=10)break;end++;if(black(end-1))end++;}
     const whites=[];for(let m=start;m<end;m++)if(!black(m))whites.push(m);
@@ -277,14 +326,29 @@
     });
     if(!choices.length)return null;choices.sort((a,b)=>a.score-b.score);const full=Array(6).fill(null);choices[0].frets.forEach((f,i)=>full[strings[i]]=f);return full;
   }
+  function generatedChordShape(name){
+    const c=parseChord(name);if(!c)return[null,null,null,null,null,null];
+    const root=NOTE_INDEX[c.root];
+    const pcs=[...new Set(QUALITY[c.quality].map(iv=>(root+iv)%12))];
+    const stringSets=pcs.length>=5?[[1,2,3,4,5],[0,1,2,3,4]]:pcs.length===4?[[2,3,4,5],[1,2,3,4],[0,1,2,3]]:[[3,4,5],[2,3,4],[1,2,3]];
+    for(const strings of stringSets){
+      const shape=compactVoicing(pcs,strings,root);
+      if(shape)return shape;
+    }
+    return[null,null,null,null,null,null];
+  }
   function barreShape(name){
     const c=parseChord(name);if(!c)return[null,null,null,null,null,null];
     const f=(NOTE_INDEX[c.root]-NOTE_INDEX.E+12)%12,q=c.quality;
-    if(q==='m'||q==='m7'||q==='m9'||q==='m6'||q==='madd9')return q==='m7'?[f,f+2,f,f,f,f]:[f,f+2,f+2,f,f,f];
-    if(q==='7'||q==='9')return[f,f+2,f,f+1,f,f];
-    if(q==='maj7'||q==='maj9')return[f,f+2,f+1,f+1,f,f];
+    if(q==='m'||q==='m7')return q==='m7'?[f,f+2,f,f,f,f]:[f,f+2,f+2,f,f,f];
+    if(q==='7')return[f,f+2,f,f+1,f,f];
+    if(q==='maj7')return[f,f+2,f+1,f+1,f,f];
     if(q==='sus4')return[f,f+2,f+2,f+2,f,f];
-    return[f,f+2,f+2,f+1,f,f];
+    if(q==='')return[f,f+2,f+2,f+1,f,f];
+    // Special qualities (sus2, diminished, augmented, half-diminished, add9,
+    // etc.) must not fall through to a major chord shape. Generate a voicing
+    // from the actual chord pitch classes instead.
+    return generatedChordShape(name);
   }
   function powerShape(name){
     const c=parseChord(name);if(!c)return[null,null,null,null,null,null];
