@@ -58,7 +58,7 @@ async function api(request,env,url){
   // Vocal masters live in authenticated R2 object storage, not in D1 project JSON.
   const audioMatch=path.match(/^\/api\/audio\/([^/]+)$/);
   if(audioMatch){
-    if(!env.AUDIO)return json({ok:false,error:'Cloud audio storage is not configured. Add the AUDIO R2 binding.'},503);
+    if(!env.AUDIO)return json({ok:false,error:'Cloud vocal storage is not connected. Bind the R2 bucket chord-rider-pro-audio to this Worker with binding name AUDIO.'},503);
     const takeId=decodeURIComponent(audioMatch[1]), projectId=String(url.searchParams.get('projectId')||'');
     if(!projectId)return json({ok:false,error:'projectId is required.'},400);
     const owns=await env.DB.prepare('SELECT id FROM projects WHERE id=? AND user_id=?').bind(projectId,u.id).first();

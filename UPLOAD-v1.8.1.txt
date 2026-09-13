@@ -1,0 +1,20 @@
+Chord Rider Pro v1.8.1 FIXED
+
+Replace these ROOT files in GitHub:
+index.html
+styles.css
+app.js
+parts.js
+beat-maker.js
+worker.js
+service-worker.js
+wrangler.jsonc
+
+No asset replacement is needed.
+
+Cloud vocals require Cloudflare R2:
+1. Create bucket chord-rider-pro-audio
+2. Bind that bucket to this Worker as AUDIO
+3. Redeploy
+
+This build forces the new service worker to activate immediately and cache-busts the main JS/CSS, so the phone should no longer stay on the old build.
