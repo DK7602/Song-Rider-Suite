@@ -1,0 +1,21 @@
+Chord Rider Pro — Parts Foundation update
+
+Built in this version:
+- New + Add Part workflow.
+- Chord / Note parts: each added part gets its own full existing Chord Rider editor, lines, instrument, sound, key, capo/transpose settings, etc.
+- Lead / Bass parts: piano-roll style grid using real note/octave names, Piano/Guitar sound families, per-part volume, 1/8, 1/16, 1/32 and 1/64 resolution, 1–16 bars, and one-bar-at-a-time mobile editing.
+- Vocal parts: project structure/UI is in place, but recording is deliberately NOT rushed into this build.
+- Every part has a playback checkbox, rename, volume, and delete (the first chord part is protected).
+- Parts are saved in the same local/cloud project JSON; older projects automatically become a Chords 1 part.
+- Main playback now schedules all enabled Chord/Note and Lead/Bass parts against the same BPM clock.
+- Existing drums remain global and are started/stopped from the master transport.
+- Existing line-from-view playback behavior is retained when the selected active chord part starts playback.
+
+Deliberately held for the next recording phase:
+- High-quality vocal capture.
+- Vocal effects.
+- WAV/MP3 song mix export and stems.
+- DAW export (planned after stems/MIDI export are solid).
+
+Why vocals are held:
+SRP had recording-quality concerns. The next phase should capture a clean dry high-quality master (preferably PCM/WAV style), use headphone backing playback without printing the music into the mic file, keep the original take untouched, and apply effects non-destructively. We should test this on the actual Android/Chrome device before calling it finished.

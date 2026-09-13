@@ -561,7 +561,13 @@
     },
     persist(){
       return persistBeatIntoProject();
-    }
+    },
+    async startMainNow(){
+      if(!beat.enabled || countHits()===0) return;
+      stopPreview();
+      try{await ensureDrums();startMainDrums();}catch(e){console.error(e);}
+    },
+    stopMainNow(){stopMainDrums();}
   };
 
   // Initial beat belongs to the most recently saved project, if any.

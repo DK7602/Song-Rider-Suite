@@ -714,6 +714,7 @@
   }
 
   async function playProgression(){
+    if(window.CRPParts?.handlesPlayback)return window.CRPParts.togglePlayback();
     if(state.playing)return stopProgression();if(!allCards().length){$('status').textContent='Add at least one chord or note first.';return;}
 
     const startRow=playbackStartRow();
@@ -761,7 +762,7 @@
     };
     step();
   }
-  function stopProgression(){state.playing=false;clearTimeout(state.timer);state.timer=null;setRiderBonesRiding(false);$('playAllBtn').textContent='▶ Play';document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');}
+  function stopProgression(){if(window.CRPParts?.handlesPlayback&&window.CRPParts?.isPlaying?.())return window.CRPParts.stopPlayback();state.playing=false;clearTimeout(state.timer);state.timer=null;setRiderBonesRiding(false);$('playAllBtn').textContent='▶ Play';document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');}
 
   let accountUser=null, cloudProjects=null, cloudSyncState='idle';
   function accountDisplayName(){return accountUser?.display_name||accountUser?.email||'Account';}
@@ -813,6 +814,7 @@
     renderAll();
     syncBuildInput();
     renderFits();
+    window.CRPParts?.newProject?.();
     $('status').textContent='New blank project.';
     $('projectName').focus();
   }
@@ -820,7 +822,7 @@
   function capture(id,name){
     const existing=id?localProjects().find(x=>x.id===id):null;
     const liveBeat=window.CRPBeatMaker?.getBeat?.();
-    return{id:id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())),name,updatedAt:Date.now(),archived:!!existing?.archived,instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:state.rows,bpm:+$('bpmInput').value||92,beats:+$('beatsSelect').value||4,loop:$('loopToggle').checked,notes:$('notesEditor').innerHTML,key:$('keyInput').value.trim(),beatMaker:liveBeat||existing?.beatMaker};
+    return{id:id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())),name,updatedAt:Date.now(),archived:!!existing?.archived,instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:state.rows,bpm:+$('bpmInput').value||92,beats:+$('beatsSelect').value||4,loop:$('loopToggle').checked,notes:$('notesEditor').innerHTML,key:$('keyInput').value.trim(),beatMaker:liveBeat||existing?.beatMaker,parts:window.CRPParts?.capture?.()||existing?.parts};
   }
   function upsertLocal(p){const ps=localProjects(),i=ps.findIndex(x=>x.id===p.id);if(i>=0)ps[i]=p;else ps.unshift(p);saveLocalProjects(ps);}
   async function refreshCloudProjects(){if(!accountUser){cloudProjects=null;cloudSyncState='idle';renderProjects();return;}cloudSyncState='syncing';updateAccountSummary();try{const d=await api('/api/projects');cloudProjects=d.projects||[];cloudProjects.forEach(upsertLocal);cloudSyncState='ready';updateAccountSummary();renderProjects();}catch(e){cloudSyncState='error';updateAccountSummary();$('status').textContent='Cloud sync unavailable — using local backup.';renderProjects();}}
@@ -834,6 +836,7 @@
   }
 
   function scheduleAutoSave(){
+    window.CRPParts?.syncActiveChord?.();
     // Brand-new/unnamed projects wait for the first manual Save.
     if(!state.currentProjectId)return;
     clearTimeout(autoSaveTimer);
@@ -928,7 +931,7 @@
       ? `“${p.name}” moved to Archive.`
       : `“${p.name}” restored to Projects.`;
   }
-  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();const p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;state.currentProjectId=id;state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);}
+  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();const p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;state.currentProjectId=id;state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
   function renderProjects(){
     const w=$('projectList');
@@ -1181,5 +1184,47 @@
     $('keyInput').dataset.autoKey=$('keyInput').value.trim()?'0':'1';
     renderProjects();renderAll();syncBuildInput();autoPopulateKeyFromEntry();setRiderBonesRiding(false);checkAccount();if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
   }
+
+  function coreSnapshot(){
+    return JSON.parse(JSON.stringify({instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:state.rows,key:$('keyInput').value.trim()}));
+  }
+  function coreApply(snapshot){
+    if(!snapshot)return;
+    state.instrument=snapshot.instrument==='guitar'?'guitar':'piano';
+    state.mode=snapshot.mode==='note'?'note':'chord';
+    state.sound=snapshot.sound||SOUNDS[state.instrument][0][0];
+    state.octave=Number(snapshot.octave)||0;state.capo=Number(snapshot.capo)||0;
+    state.neck=['open','triad','barre','power','shell','inversion','color'].includes(snapshot.neck)?snapshot.neck:'open';
+    state.transpose=!!snapshot.transpose;state.rows=JSON.parse(JSON.stringify(snapshot.rows||[[]]));if(!state.rows.length)state.rows=[[]];state.selectedRow=0;
+    $('capoSelect').value=String(state.capo);$('neckSelect').value=state.neck;$('keyInput').value=snapshot.key||'';$('keyInput').dataset.autoKey=snapshot.key?'0':'1';
+    state.player=null;state.playerName='';renderAll();syncBuildInput();autoPopulateKeyFromEntry();
+  }
+  function coreNotesFor(card,snapshot){
+    const saved=coreSnapshot();
+    try{
+      if(snapshot){state.instrument=snapshot.instrument||'piano';state.mode=snapshot.mode||'chord';state.sound=snapshot.sound||SOUNDS[state.instrument][0][0];state.octave=Number(snapshot.octave)||0;state.capo=Number(snapshot.capo)||0;state.neck=snapshot.neck||'open';state.transpose=!!snapshot.transpose;}
+      const val=displayedValue(card);let notes;
+      if(card.type==='note'){const oct=(state.instrument==='piano'?4:3)+state.octave;notes=[val+oct];}
+      else if(state.instrument==='guitar'){
+        const frets=guitarShapeForCard(card),opens=[40,45,50,55,59,64];
+        notes=frets.map((f,i)=>f==null?null:noteAtMidi(opens[i]+f+state.capo+state.octave*12)).filter(Boolean);
+        if(!notes.length)notes=chordNotes(val,3+state.octave);
+      }else notes=pianoMidisForCard(card).map(noteAtMidi);
+      if(state.sound==='electric_bass_finger')notes=notes.slice(0,card.type==='note'?1:3).map(n=>noteAtMidi(midiOf(n)-12));
+      return notes;
+    } finally {
+      state.instrument=saved.instrument;state.mode=saved.mode;state.sound=saved.sound;state.octave=saved.octave;state.capo=saved.capo;state.neck=saved.neck;state.transpose=saved.transpose;state.rows=saved.rows;
+    }
+  }
+  window.CRPCore={
+    snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,
+    scheduleAutoSave,renderAll,syncBuildInput,
+    get beats(){return +$('beatsSelect').value||4},get bpm(){return +$('bpmInput').value||92},get loop(){return $('loopToggle').checked},
+    startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).reduce((n,r)=>n+r.length,0)*(+$('beatsSelect').value||4);},
+    setPlaying(on){state.playing=!!on;setRiderBonesRiding(!!on);$('playAllBtn').textContent=on?'■ Stop':'▶ Play';if(!on)document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');},
+    status(msg){$('status').textContent=msg||'';},
+    noteAtMidi
+  };
+
   init();
 })();
