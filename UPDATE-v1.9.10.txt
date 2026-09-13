@@ -1,0 +1,8 @@
+Chord Rider Pro v1.9.10 — Blank Drum Start Fix
+
+- New/blank projects now always start with an empty drum pattern.
+- Beat Maker no longer falls back to the most recently saved project when there is no active project.
+- Opening Beat Maker on a new project no longer reloads stale draft drums.
+- Pressing New clears any stale unsaved drum draft.
+- Saved projects still load their own saved drum pattern normally.
+- Manual drum entry and Randomize Beat continue to work normally.

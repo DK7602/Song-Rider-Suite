@@ -91,7 +91,9 @@
       const matches = ps.filter(p=>p.name===name).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
       if(matches[0]) { activeProjectId=matches[0].id; return matches[0]; }
     }
-    return ps.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0] || null;
+    // With no active project ID and no project name, this is a genuinely blank/new
+    // project. Never borrow the most recently saved project's drums.
+    return null;
   }
   function loadBeatFromProject(p){
     activeProjectId = p?.id || null;
@@ -258,7 +260,8 @@
   function openEditor(){
     const p=inferActiveProject();
     if(p && p.id!==activeProjectId) loadBeatFromProject(p);
-    else if(!p){ try{beat=normalizeBeat(JSON.parse(localStorage.getItem(DRAFT_KEY)||'null'))}catch{} }
+    // No saved project: keep the current in-memory beat. A brand-new project is
+    // reset explicitly by loadProject(null), so stale draft drums cannot leak in.
     renderEditor(); $('crpBeatModal').classList.add('open');
   }
   function closeEditor(){ stopPreview(); $('crpBeatModal')?.classList.remove('open'); }
@@ -557,6 +560,9 @@
       return JSON.parse(JSON.stringify(normalizeBeat(beat)));
     },
     loadProject(project){
+      // Passing null means New/blank project. Reset the sequencer and discard any
+      // stale unsaved drum draft so another project's beat can never carry over.
+      if(!project) localStorage.removeItem(DRAFT_KEY);
       loadBeatFromProject(project || null);
     },
     persist(){
@@ -570,14 +576,16 @@
     stopMainNow(){stopMainDrums();}
   };
 
-  // Initial beat belongs to the most recently saved project, if any.
+  // App startup begins with a blank beat. A saved project's drums are loaded only
+  // when that project is explicitly opened by the core app.
   function init(){
     if(!document.querySelector('link[href$="beat-maker.css"]')){
       const css=document.createElement('link'); css.rel='stylesheet'; css.href='beat-maker.css'; document.head.appendChild(css);
     }
     injectUi();
-    const p=inferActiveProject(); if(p) loadBeatFromProject(p);
-    else { try{beat=normalizeBeat(JSON.parse(localStorage.getItem(DRAFT_KEY)||'null'))}catch{} updateMainControls(); }
+    beat=freshBeat();
+    activeProjectId=null;
+    updateMainControls();
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
