@@ -1756,3 +1756,14 @@ body.workspace-chord-rider #chordPartControls.part-hidden > .toolbar,body.worksp
 #songRiderFrame{display:block;width:100%;min-height:1050px;border:0;border-radius:16px;background:#fff;}
 body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:none!important;}
 @media(max-width:640px){.workspace-mode-switch{gap:7px}.workspace-mode-btn{padding:8px 6px}.workspace-mode-btn .mode-copy strong{font-size:.92rem}.workspace-mode-btn .mode-copy small{font-size:.66rem}.mode-art{width:48px;min-width:48px}.song-rider-workspace{padding:0 5px}#songRiderFrame{min-height:1200px;border-radius:10px}}
+
+
+/* v2.0.1 — SRP integration polish: larger mode sticker + natural embedded page flow */
+.song-mode-art{flex-basis:76px;width:76px;height:58px;overflow:visible!important;background:transparent!important;border:0!important;}
+.song-mode-art img{width:76px;height:58px;object-fit:contain;transform:scale(1.16);transform-origin:center;}
+#songRiderFrame{height:1100px;min-height:0;overflow:hidden;}
+@media(max-width:640px){
+  .song-mode-art{flex-basis:64px;width:64px;height:50px;}
+  .song-mode-art img{width:64px;height:50px;transform:scale(1.18);}
+  #songRiderFrame{height:1200px;min-height:0;}
+}

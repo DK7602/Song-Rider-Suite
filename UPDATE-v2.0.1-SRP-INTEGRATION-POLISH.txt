@@ -1,0 +1,8 @@
+Chord Rider Pro v2.0.1 — SRP Integration Polish
+
+- Enlarged Song Rider mode artwork to match the visual weight of Chord Rider.
+- Removed SRP nested lower-pane scrolling while embedded in CRP.
+- SRP now expands naturally and uses the outer CRP page for vertical scrolling.
+- Added automatic same-origin iframe height fitting with ResizeObserver/MutationObserver.
+- Kept SRP standalone behavior unchanged.
+- Test Worker name remains chord-rider-pro-srp-test for the srp-merge branch.
