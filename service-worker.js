@@ -1,9 +1,11 @@
-const CACHE = 'chord-rider-pro-v1.7.0';
+const CACHE = 'chord-rider-pro-v1.7.1';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './parts.js',
+  './beat-maker.js',
   './manifest.webmanifest',
   './assets/rider-and-bones-icon.png',
   './assets/rider-and-bones-left.gif',
