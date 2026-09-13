@@ -149,7 +149,7 @@
       const label=document.createElement('div');label.className='lead-grid-note';label.textContent=midiName(midi);grid.appendChild(label);
       for(let s=0;s<stepsPerBar;s++){
         const abs=startStep+s,key=`${abs}:${midi}`;const cell=document.createElement('button');cell.type='button';cell.className='lead-cell'+(s%subdiv===0?' beat-edge':'')+(on.has(key)?' on':'');cell.dataset.step=String(abs);cell.dataset.midi=String(midi);cell.title=`${midiName(midi)} • bar ${leadBarPage+1}`;
-        cell.onclick=()=>{const i=p.events.findIndex(e=>e.step===abs&&e.midi===midi);if(i>=0)p.events.splice(i,1);else p.events.push({step:abs,midi});cell.classList.toggle('on',i<0);core.scheduleAutoSave();};
+        cell.onclick=()=>{const i=p.events.findIndex(e=>e.step===abs&&e.midi===midi);if(i>=0)p.events.splice(i,1);else p.events.push({step:abs,midi});cell.classList.toggle('on',i<0);auditionLeadNote(p,midi);core.scheduleAutoSave();};
         grid.appendChild(cell);
       }
     }
@@ -270,6 +270,20 @@
     const promise=Soundfont.instrument(audioCtx,sound,{format:'mp3',soundfont:'MusyngKite',destination:busFor(p)});playerCache.set(key,promise);return promise;
   }
   async function preload(ps){await Promise.all(ps.map(p=>playerFor(p)));}
+  async function auditionLeadNote(p,midi){
+    if(!p||p.type!=='lead')return;
+    try{
+      const player=await playerFor(p);
+      busFor(p);
+      let soundingMidi=midi+(Number(p.octave)||0)*12;
+      if(p.sound==='electric_bass_finger')soundingMidi-=12;
+      const at=(audioCtx?.currentTime||0)+.01;
+      playTracked(player,midiName(soundingMidi),at,{duration:.42,gain:.96});
+    }catch(e){
+      console.warn('Could not audition lead/bass note',e);
+      core.status('Could not preview that note.');
+    }
+  }
   async function vocalBufferFor(p){
     const take=p.recordings?.find(r=>r.id===p.activeTakeId);if(!take)return null;
     if(vocalBufferCache.has(take.id))return vocalBufferCache.get(take.id);
