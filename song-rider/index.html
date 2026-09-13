@@ -2007,6 +2007,24 @@
     }
 
 </style>
+
+<style id="srpEmbeddedOverrides">
+html.srp-embedded,html.srp-embedded body{height:auto!important;min-height:0!important;overflow:visible!important;}
+html.srp-embedded body{display:block!important;min-height:0!important;}
+html.srp-embedded header{position:relative!important;top:auto!important;}
+html.srp-embedded .horseWrap{display:none!important;}
+html.srp-embedded main{display:block!important;flex:none!important;min-height:0!important;height:auto!important;padding-bottom:20px!important;}
+html.srp-embedded .sheet{display:block!important;flex:none!important;min-height:0!important;height:auto!important;overflow:visible!important;}
+html.srp-embedded .sheetHeader{position:relative!important;top:auto!important;}
+html.srp-embedded #sheetBody{display:block!important;flex:none!important;min-height:0!important;height:auto!important;overflow:visible!important;overscroll-behavior:auto!important;}
+html.srp-embedded #sheetInner{display:block!important;flex:none!important;min-height:0!important;height:auto!important;}
+html.srp-embedded .cards{padding-bottom:32px!important;}
+html.srp-embedded .fullPerf,html.srp-embedded .fullPerfScroll{display:block!important;flex:none!important;min-height:0!important;height:auto!important;overflow:visible!important;}
+html.srp-embedded #drumSelect,html.srp-embedded #mDrumSelect,html.srp-embedded #instrumentSelect,html.srp-embedded #mInstrumentSelect{display:none!important;}
+html.srp-embedded [title="Drums"],html.srp-embedded [title="Instrument"]{display:none!important;}
+</style>
+<script>if(new URLSearchParams(location.search).get('embedded')==='1')document.documentElement.classList.add('srp-embedded');</script>
+
 </head>
 
 <body>
@@ -2409,8 +2427,3 @@
 </script>
 </body>
 </html>
-<style>
-html.srp-embedded #drumSelect,html.srp-embedded #mDrumSelect,html.srp-embedded #instrumentSelect,html.srp-embedded #mInstrumentSelect{display:none!important}
-html.srp-embedded [title="Drums"],html.srp-embedded [title="Instrument"]{display:none!important}
-</style>
-<script>if(new URLSearchParams(location.search).get('embedded')==='1')document.documentElement.classList.add('srp-embedded');</script>
