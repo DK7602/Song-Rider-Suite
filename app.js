@@ -60,53 +60,24 @@
   function midiOf(note){const m=note.match(/^([A-G])(#?)(-?\d+)$/);return m?(Number(m[3])+1)*12+NOTE_INDEX[m[1]+m[2]]:null;}
   function noteAtMidi(m){return NOTES[(m%12+12)%12]+(Math.floor(m/12)-1);}
 
-  // Build musical piano voicings instead of forcing every chord into root position.
-  // The first chord is centered in a comfortable register; each following chord
-  // chooses the nearest inversion so progressions move smoothly rather than jumping
-  // down simply because a root letter is lower (for example G -> D).
-  function pianoVoicingCandidates(name,octaveShift=0){
+  // Canonical piano voicing: always spell chords upward from the root.
+  // This is the single source used by playback, on-screen diagrams and PDF export.
+  // Example: F = F-A-C (never silently C-F-A); extended chords continue upward.
+  function canonicalPianoMidis(name,octaveShift=0){
     const c=parseChord(name);if(!c)return[];
-    const rootPc=NOTE_INDEX[c.root],intervals=QUALITY[c.quality],out=[];
-    for(let inv=0;inv<intervals.length;inv++){
-      const rotated=intervals.slice(inv).concat(intervals.slice(0,inv).map(x=>x+12));
-      for(let rootMidi=48;rootMidi<=72;rootMidi+=12){
-        const base=rootMidi+rootPc+octaveShift*12;
-        const mids=rotated.map(iv=>base+iv);
-        const lo=Math.min(...mids),hi=Math.max(...mids);
-        if(lo<48+octaveShift*12||hi>84+octaveShift*12)continue;
-        out.push(mids);
-      }
-    }
-    return out;
-  }
-  function pianoVoicingCost(mids,prev=null,octaveShift=0){
-    const target=64+octaveShift*12,lo=Math.min(...mids),hi=Math.max(...mids);
-    let score=Math.abs((lo+hi)/2-target)*.8+Math.abs(lo-(57+octaveShift*12))*.18+(hi-lo)*.08;
-    if(!prev?.length)return score;
-    const nearest=(x,a)=>Math.min(...a.map(y=>Math.abs(x-y)));
-    score+=mids.reduce((n,x)=>n+nearest(x,prev),0)*1.35;
-    score+=prev.reduce((n,x)=>n+nearest(x,mids),0)*.55;
-    score+=Math.abs(lo-Math.min(...prev))*1.15;
-    return score;
-  }
-  function choosePianoVoicing(name,prev=null,octaveShift=0){
-    const choices=pianoVoicingCandidates(name,octaveShift);
-    if(!choices.length)return chordNotes(name,4+octaveShift).map(midiOf).filter(x=>x!=null);
-    choices.sort((a,b)=>pianoVoicingCost(a,prev,octaveShift)-pianoVoicingCost(b,prev,octaveShift));
-    return choices[0];
+    const rootPc=NOTE_INDEX[c.root],baseOct=4+octaveShift;
+    return QUALITY[c.quality].map(iv=>midiOf(NOTES[(rootPc+iv)%12]+(baseOct+Math.floor((rootPc+iv)/12))));
   }
   function projectPianoVoicings(){
-    const map=new Map();let prev=null;
+    const map=new Map();
     state.rows.forEach(row=>row.forEach(card=>{
-      if(card.type!=='chord')return;
-      const mids=choosePianoVoicing(displayedValue(card),prev,state.octave);
-      map.set(card,mids);prev=mids;
+      if(card.type==='chord')map.set(card,canonicalPianoMidis(displayedValue(card),state.octave));
     }));
     return map;
   }
   function pianoMidisForCard(card){
     if(card.type==='note')return[midiOf(displayedValue(card)+(4+state.octave))].filter(x=>x!=null);
-    return projectPianoVoicings().get(card)||choosePianoVoicing(displayedValue(card),null,state.octave);
+    return canonicalPianoMidis(displayedValue(card),state.octave).filter(x=>x!=null);
   }
 
   const allCards=()=>state.rows.flat();
