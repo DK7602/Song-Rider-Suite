@@ -1700,3 +1700,18 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
 /* v1.9.7 Lead/Bass sustain */
 .lead-play-options{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}.lead-play-options .part-repeat-toggle{margin:0}
 @media(max-width:520px){.lead-play-options{gap:10px}}
+
+
+/* v1.9.8 — two synchronized workspace views */
+.workspace-mode-switch{display:flex;justify-content:center;gap:10px;max-width:760px;margin:8px auto 2px;padding:0 14px}
+.workspace-mode-btn{display:flex;align-items:center;gap:9px;min-width:0;flex:1;max-width:310px;padding:7px 12px;border:1px solid #46505d;border-radius:16px;background:#11161d;color:#c8ced6;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease,transform .12s ease}
+.workspace-mode-btn:active{transform:scale(.985)}
+.workspace-mode-btn.active{border-color:var(--accent);background:#18170f;color:#fff3c5;box-shadow:0 0 0 1px rgba(233,196,106,.42),0 0 18px rgba(233,196,106,.42),inset 0 0 18px rgba(233,196,106,.08)}
+.mode-art{display:block;flex:0 0 48px;width:48px;height:48px;border-radius:12px;overflow:hidden;background:#080b0f;border:1px solid #343d49}
+.rider-mode-art img{width:100%;height:100%;object-fit:contain}
+/* Generated Baby DAW artwork is used as a sprite so the doll head stays compact in the mode toggle. */
+.baby-mode-art{background-image:url('assets/baby-daw-generated-source.png');background-repeat:no-repeat;background-size:768px 512px;background-position:-420px -13px}
+.mode-copy{display:flex;flex-direction:column;align-items:flex-start;min-width:0;line-height:1.05}.mode-copy strong{font-size:1rem}.mode-copy small{margin-top:4px;color:#909aa6;font-size:.72rem}.workspace-mode-btn.active .mode-copy small{color:#d9c98f}
+body.workspace-chord-rider #partManager,body.workspace-chord-rider #leadPartEditor,body.workspace-chord-rider #vocalPartEditor,body.workspace-chord-rider .baby-daw-only{display:none!important}
+body.workspace-chord-rider #chordPartControls.part-hidden > .toolbar,body.workspace-chord-rider #chordPartControls.part-hidden > .entry-row,body.workspace-chord-rider #chordPartControls.part-hidden > div:not(.status),body.workspace-chord-rider #chordPartRows.part-hidden{display:revert!important}
+@media(max-width:520px){.workspace-mode-switch{gap:7px;padding:0 8px}.workspace-mode-btn{padding:6px 8px;gap:6px;border-radius:13px}.mode-art{flex-basis:40px;width:40px;height:40px}.baby-mode-art{background-size:640px 427px;background-position:-350px -11px}.mode-copy strong{font-size:.88rem}.mode-copy small{font-size:.64rem}}

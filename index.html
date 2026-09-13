@@ -8,7 +8,7 @@
   <title>Chord Rider Pro</title>
   <link rel="icon" href="assets/rider-and-bones-icon.png" type="image/png" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=1.8.1" />
+  <link rel="stylesheet" href="styles.css?v=1.9.8" />
 </head>
 <body>
   <header class="app-header">
@@ -19,6 +19,17 @@
     </div>
     <img id="riderBonesRight" src="assets/rider-and-bones-left-still.png" class="brand-mark brand-right" alt="Rider and Bones" data-still="assets/rider-and-bones-left-still.png" data-animated="assets/rider-and-bones-left.gif" />
   </header>
+
+  <nav id="workspaceModeSwitch" class="workspace-mode-switch" aria-label="Workspace mode">
+    <button id="chordRiderModeBtn" class="workspace-mode-btn active" type="button" data-workspace-mode="chord-rider" aria-pressed="true">
+      <span class="mode-art rider-mode-art"><img src="assets/rider-and-bones-icon.png" alt="" /></span>
+      <span class="mode-copy"><strong>Chord Rider</strong><small>Chords + Beat</small></span>
+    </button>
+    <button id="babyDawModeBtn" class="workspace-mode-btn" type="button" data-workspace-mode="baby-daw" aria-pressed="false">
+      <span class="mode-art baby-mode-art" aria-hidden="true"></span>
+      <span class="mode-copy"><strong>Baby DAW</strong><small>Parts + Production</small></span>
+    </button>
+  </nav>
 
   <main class="app-shell">
     
@@ -259,7 +270,7 @@
       </div>
     </section>
 
-    <section class="panel notes-panel">
+    <section class="panel notes-panel baby-daw-only">
       <div class="section-heading-row">
         <h2>Notes</h2>
         <span class="subtle">Per project</span>
@@ -330,8 +341,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
-  <script src="app.js?v=1.8.1"></script>
-  <script src="parts.js?v=1.8.1"></script>
-  <script src="beat-maker.js?v=1.8.1"></script>
+  <script src="app.js?v=1.9.8"></script>
+  <script src="parts.js?v=1.9.8"></script>
+  <script src="beat-maker.js?v=1.9.8"></script>
 </body>
 </html>

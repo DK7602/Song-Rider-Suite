@@ -1,0 +1,9 @@
+Chord Rider Pro v1.9.8 — Chord Rider / Baby DAW workspace modes
+
+- Added two top-level workspace views over the SAME project data.
+- Chord Rider: chords/notes + Beat Maker, transport, projects, save and all export functions.
+- Baby DAW: full Parts workspace including Lead/Bass and Vocals.
+- Mode buttons use a gold active glow and generated Baby DAW doll artwork.
+- Mode preference is remembered on the device; it is not a separate project and never duplicates song data.
+- Entering Chord Rider focuses the project’s chord part without deleting/hiding any saved production parts from the project.
+- Exports remain identical in either view.

@@ -1192,7 +1192,24 @@
     $('accountSummaryBtn').onclick=()=>{const panel=$('accountPanel');setAccountCollapsed(!panel.classList.contains('is-collapsed'));};
     document.querySelectorAll('.notes-toolbar [data-cmd]').forEach(b=>b.onclick=()=>{document.execCommand(b.dataset.cmd,false,null);scheduleAutoSave();});$('clearNotesBtn').onclick=()=>{if(confirm('Clear notes?')){$('notesEditor').innerHTML='';scheduleAutoSave();}};
     $('keyInput').dataset.autoKey=$('keyInput').value.trim()?'0':'1';
-    renderProjects();renderAll();syncBuildInput();autoPopulateKeyFromEntry();setRiderBonesRiding(false);checkAccount();if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+    renderProjects();renderAll();syncBuildInput();autoPopulateKeyFromEntry();setRiderBonesRiding(false);initWorkspaceMode();checkAccount();if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+  }
+
+  const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
+  function applyWorkspaceMode(mode, persist=true){
+    mode=mode==='baby-daw'?'baby-daw':'chord-rider';
+    document.body.classList.toggle('workspace-chord-rider',mode==='chord-rider');
+    document.body.classList.toggle('workspace-baby-daw',mode==='baby-daw');
+    document.querySelectorAll('[data-workspace-mode]').forEach(btn=>{
+      const on=btn.dataset.workspaceMode===mode;btn.classList.toggle('active',on);btn.setAttribute('aria-pressed',String(on));
+    });
+    if(mode==='chord-rider') window.CRPParts?.focusChordPart?.();
+    if(persist){try{localStorage.setItem(WORKSPACE_MODE_KEY,mode)}catch{}}
+  }
+  function initWorkspaceMode(){
+    let mode='chord-rider';try{mode=localStorage.getItem(WORKSPACE_MODE_KEY)||mode}catch{}
+    document.querySelectorAll('[data-workspace-mode]').forEach(btn=>btn.addEventListener('click',()=>applyWorkspaceMode(btn.dataset.workspaceMode,true)));
+    applyWorkspaceMode(mode,false);
   }
 
   function coreSnapshot(){
