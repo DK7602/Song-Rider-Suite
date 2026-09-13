@@ -1078,14 +1078,25 @@
   }
   function chordBlockForLine(part,lineIndex){
     const row=part.data?.rows?.[lineIndex]||[];if(!row.length)return null;
-    const sec=document.createElement('div');sec.className='export-chord-block';
+    const sec=document.createElement('div');sec.className='export-chord-block export-aligned-chords';
     const h=document.createElement('div');h.className='export-part-label';h.textContent=part.name;sec.appendChild(h);
-    const names=document.createElement('div');names.className='export-chord-names';names.textContent=row.map(displayedValue).join('  •  ');sec.appendChild(names);
-    // The currently loaded chord part can also show its familiar diagrams.
-    if(part.id===window.CRPParts?.getActiveChordId?.() || (!window.CRPParts?.getActiveChordId && lineIndex<state.rows.length)){
-      const cards=document.createElement('div');cards.className='export-card-row compact';
-      row.forEach(card=>{const el=document.createElement('div');el.className='export-card';const shown=displayedValue(card),sub=subtitle(card);el.innerHTML=`<div class="export-card-name">${card.type==='note'?'♪ ':''}${esc(shown)}</div><div class="export-card-subtitle">${esc(sub||' ')}</div><div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div>`;cards.appendChild(el)});sec.appendChild(cards);
-    }
+
+    // Use the SAME left label gutter as the drum/lead grids, then divide the
+    // musical lane into equal beat/bar slots. This keeps chord boundaries
+    // vertically aligned with 1 / 2 / 3 / 4 above every sequencer grid.
+    const lane=document.createElement('div');lane.className='export-chord-lane';
+    const gutter=document.createElement('div');gutter.className='export-chord-gutter';lane.appendChild(gutter);
+    const slots=document.createElement('div');slots.className='export-chord-slots';
+    slots.style.setProperty('--slot-count',String(Math.max(1,row.length)));
+
+    const canDiagram=(part.id===window.CRPParts?.getActiveChordId?.() || (!window.CRPParts?.getActiveChordId && lineIndex<state.rows.length));
+    row.forEach(card=>{
+      const cell=document.createElement('div');cell.className='export-chord-slot';
+      const shown=displayedValue(card),sub=subtitle(card);
+      cell.innerHTML=`<div class="export-card-name">${card.type==='note'?'♪ ':''}${esc(shown)}</div><div class="export-card-subtitle">${esc(sub||' ')}</div>${canDiagram?`<div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div>`:''}`;
+      slots.appendChild(cell);
+    });
+    lane.appendChild(slots);sec.appendChild(lane);
     return sec;
   }
   function buildExportSheet(selection={}){

@@ -1683,3 +1683,16 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
 .export-seq-grid col.label-col{width:82px}.export-seq-grid col.step-col{width:auto}.export-seq-grid th.row-label{width:auto!important}.export-seq-grid th.beat-key{font-weight:900;background:#eee}.export-seq-grid th.sub-key{font-size:7px;color:#666}.export-seq-grid th,.export-seq-grid td{box-sizing:border-box}
 
 .vocal-transcribe-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 8px}.vocal-transcribe-row button{white-space:nowrap}
+
+
+/* v1.9.4 — PDF bar-axis alignment: drums, lead/bass and chords share one timeline */
+.export-chord-lane{display:grid;grid-template-columns:82px minmax(0,1fr);width:100%;align-items:start}
+.export-chord-gutter{width:82px;min-width:82px}
+.export-chord-slots{display:grid;grid-template-columns:repeat(var(--slot-count,4),minmax(0,1fr));width:100%;min-width:0}
+.export-chord-slot{min-width:0;padding:4px 5px 2px;border-left:1px solid #aeb4ba;box-sizing:border-box;overflow:hidden}
+.export-chord-slot:last-child{border-right:1px solid #aeb4ba}
+.export-chord-slot .export-card-name{font-size:12px;margin:0 0 2px;color:#111}
+.export-chord-slot .export-card-subtitle{font-size:7px;min-height:8px;margin:0 0 2px;color:#555}
+.export-chord-slot .diagram{width:100%;overflow:hidden}
+.export-chord-slot .diagram svg{display:block;width:100%;height:auto;max-height:112px}
+.export-sheet.pdf-print .export-chord-slot{background:#fff}

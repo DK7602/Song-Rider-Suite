@@ -1,0 +1,7 @@
+Chord Rider Pro v1.9.4
+
+PDF timeline alignment fix:
+- Drum and Lead/Bass grids retain the shared 82px label gutter.
+- Chord diagrams now use the same 82px gutter and are divided into equal musical slots, so their vertical boundaries line up with the beat/bar grid above.
+- Cloud speech-to-text from v1.9.3 is preserved unchanged.
+- Service-worker cache bumped to v1.9.4.
