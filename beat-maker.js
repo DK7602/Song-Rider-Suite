@@ -545,8 +545,15 @@
     };
     requestAnimationFrame(sync);
   }
-  function startMainDrums(){
-    if(!audioCtx||!beat.enabled) return; mainPlaying=true; mainStep=0; mainNextTime=audioCtx.currentTime+.01; startScheduler('main');
+  function startMainDrums(delaySeconds=.01,startBeat=0){
+    if(!audioCtx||!beat.enabled) return;
+    mainPlaying=true;
+    // 16 canonical drum steps per quarter-note beat (64 per 4/4 bar).
+    // Starting from the same song beat keeps drums aligned when playback begins
+    // from Line 2/3/etc. instead of always forcing the drums back to Bar 1.
+    mainStep=Math.max(0,Math.round((Number(startBeat)||0)*16));
+    mainNextTime=audioCtx.currentTime+Math.max(.01,Number(delaySeconds)||.01);
+    startScheduler('main');
   }
   function stopMainDrums(){ mainPlaying=false; if(scheduler && !previewing){clearInterval(scheduler);scheduler=null;} }
 
@@ -568,10 +575,10 @@
     persist(){
       return persistBeatIntoProject();
     },
-    async startMainNow(){
+    async startMainNow(delaySeconds=.01,startBeat=0){
       if(!beat.enabled || countHits()===0) return;
       stopPreview();
-      try{await ensureDrums();startMainDrums();}catch(e){console.error(e);}
+      try{await ensureDrums();startMainDrums(delaySeconds,startBeat);}catch(e){console.error(e);}
     },
     stopMainNow(){stopMainDrums();}
   };

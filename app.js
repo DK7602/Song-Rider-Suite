@@ -1146,9 +1146,9 @@
     $('chordInput').onkeydown=e=>{if(e.key==='Enter')$('buildBtn').click();};
     $('keyInput').oninput=()=>{const key=$('keyInput');key.dataset.autoKey='0';const raw=key.value.trim();scheduleAutoSave();if(!raw){key.dataset.autoKey='1';autoPopulateKeyFromEntry();return;}if(!enteredKey()){$('keyHint').textContent='Enter a key like F, F#m, Bb, or C minor';return;}renderFits();};
     $('keyInput').onkeydown=e=>{if(e.key==='Enter'){$('buildBtn').click();}};
-    document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.onclick=()=>{state.instrument=b.dataset.instrument;localStorage.setItem('crp-last-instrument',state.instrument);state.sound=SOUNDS[state.instrument][0][0];state.player=null;renderAll();scheduleAutoSave();});
+    document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.onclick=()=>{state.instrument=b.dataset.instrument;localStorage.setItem('crp-last-instrument',state.instrument);state.sound=SOUNDS[state.instrument][0][0];state.player=null;renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();});
     document.querySelectorAll('#modeTabs .seg').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;localStorage.setItem('crp-last-mode',state.mode);renderAll();syncBuildInput();scheduleAutoSave();});
-    $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;scheduleAutoSave();};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);renderAll();scheduleAutoSave();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);renderAll();scheduleAutoSave();};
+    $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;window.CRPParts?.syncCoreLive?.();scheduleAutoSave();};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);renderAll();scheduleAutoSave();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);renderAll();scheduleAutoSave();};
     $('sustainBtn').onclick=()=>{state.sustain=!state.sustain;localStorage.setItem('crp-sustain',state.sustain?'1':'0');updateSustainButton();};
     updateSustainButton();
     $('capoSelect').onchange=e=>{state.capo=+e.target.value;renderAll();scheduleAutoSave();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();scheduleAutoSave();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;renderAll();scheduleAutoSave();};

@@ -270,6 +270,13 @@
     const promise=Soundfont.instrument(audioCtx,sound,{format:'mp3',soundfont:'MusyngKite',destination:busFor(p)});playerCache.set(key,promise);return promise;
   }
   async function preload(ps){await Promise.all(ps.map(p=>playerFor(p)));}
+  function invalidatePartPlayers(p){for(const key of [...playerCache.keys()])if(key.startsWith(`${p.id}:`))playerCache.delete(key);}
+  function warmLivePlayer(p){if(!p||!playing)return;playerFor(p).catch(e=>console.warn('Live sound preload failed',e));}
+  function syncCoreLive(){
+    syncLoadedChord();
+    const p=loadedChord();
+    if(p){invalidatePartPlayers(p);warmLivePlayer(p);busFor(p);}
+  }
   async function auditionLeadNote(p,midi){
     if(!p||p.type!=='lead')return;
     try{
@@ -337,7 +344,7 @@
     playerCache.clear();
     if(masterLimiter){try{masterLimiter.disconnect();}catch{}masterLimiter=null;}
   }
-  async function scheduleSegment(startTime,fromBeat,toBeat,generation){
+  async function scheduleSegment(startTime,fromBeat,toBeat,generation,withVocals=true){
     const beatSec=60/core.bpm;
     for(const p of enabledPlayable()){
       if(!playing||generation!==playbackGeneration)return;
@@ -355,7 +362,7 @@
         for(let cyc=firstCycle;cyc<=lastCycle;cyc++)p.events.forEach(e=>{if(!playing||generation!==playbackGeneration)return;const local=e.step*stepBeats,b=local+cyc*partBeats;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;let midi=e.midi+(Number(p.octave)||0)*12;if(p.sound==='electric_bass_finger')midi-=12;playTracked(player,midiName(midi),at,{duration,gain:.92});scheduleLeadHighlight((at-audioCtx.currentTime)*1000,p,e.step);});
       }
     }
-    for(const p of enabledVocals()){
+    if(withVocals)for(const p of enabledVocals()){
       if(!playing||generation!==playbackGeneration)return;
       await scheduleVocalSegment(p,startTime,fromBeat,toBeat,generation);
     }
@@ -368,19 +375,55 @@
     try{
       core.status('Loading parts…');ensureAudio();await Promise.all([preload(ps),...vs.map(v=>vocalBufferFor(v))]);
       if(generation!==playbackGeneration)return;
-      starting=false;playing=true;core.setPlaying(true);core.status('');await window.CRPBeatMaker?.startMainNow?.();
+
+      // Keep every playback source on the same musical downbeat. Drums use a
+      // separate AudioContext, so both engines receive the same relative lead-in
+      // instead of drums starting immediately and the parts starting ~100 ms later.
+      const leadIn=.16;
+      const total=Math.max(...ps.map(partDurationBeats),...vs.map(vocalDurationBeats),4);
+      let cursorBeat=(active()?.type==='chord'&&active()?.enabled&&activePartId===loadedChordPartId)?Math.min(core.startBeat(),Math.max(0,total-0.001)):0;
+      const initialBeat=cursorBeat;
+      await window.CRPBeatMaker?.startMainNow?.(leadIn,initialBeat);
+      if(generation!==playbackGeneration)return;
+
+      starting=false;playing=true;core.setPlaying(true);core.status('');
       if(generation!==playbackGeneration||!playing){window.CRPBeatMaker?.stopMainNow?.();return;}
-      const total=Math.max(...ps.map(partDurationBeats),...vs.map(vocalDurationBeats),4);let fromBeat=(active()?.type==='chord'&&active()?.enabled&&activePartId===loadedChordPartId)?Math.min(core.startBeat(),Math.max(0,total-0.001)):0;
-      let nextAudioStart=audioCtx.currentTime+.10;
+
+      let nextAudioStart=audioCtx.currentTime+leadIn;
+      const chunkBeats=1; // rolling scheduler: enables live sound changes without losing timing
+      let vocalsScheduledForCycle=false;
+
       const scheduleNext=async()=>{
         if(!playing||generation!==playbackGeneration)return;
-        const toBeat=total,beatSec=60/core.bpm,span=(toBeat-fromBeat)*beatSec,start=nextAudioStart,end=start+span;
-        await scheduleSegment(start,fromBeat,toBeat,generation);
+        const beatSec=60/Math.max(40,Math.min(240,+core.bpm||92));
+        const fromBeat=cursorBeat;
+        const toBeat=Math.min(total,fromBeat+chunkBeats);
+        const span=(toBeat-fromBeat)*beatSec;
+        const start=nextAudioStart,end=start+span;
+
+        // Vocals stay as one continuous source for the remainder of each song cycle;
+        // chopping a recorded take into one-beat scheduler chunks can click at boundaries.
+        if(!vocalsScheduledForCycle){
+          for(const v of enabledVocals())await scheduleVocalSegment(v,start,fromBeat,total,generation);
+          vocalsScheduledForCycle=true;
+        }
+        await scheduleSegment(start,fromBeat,toBeat,generation,false);
         if(!playing||generation!==playbackGeneration)return;
+
         nextAudioStart=end;
-        if(!core.loop){cycleTimer=setTimeout(()=>{if(generation===playbackGeneration)stopPlayback();},Math.max(10,(end-audioCtx.currentTime)*1000+40));return;}
-        const wakeMs=Math.max(10,(end-audioCtx.currentTime-.08)*1000);
-        cycleTimer=setTimeout(()=>{if(generation!==playbackGeneration||!playing)return;fromBeat=0;scheduleNext();},wakeMs);
+        cursorBeat=toBeat;
+        if(cursorBeat>=total-1e-7){
+          if(core.loop){cursorBeat=0;vocalsScheduledForCycle=false;}
+          else{
+            cycleTimer=setTimeout(()=>{if(generation===playbackGeneration)stopPlayback();},Math.max(10,(end-audioCtx.currentTime)*1000+35));
+            return;
+          }
+        }
+
+        // Schedule the next beat before the current one reaches the speakers.
+        // Web Audio handles the exact timestamp; this timer only feeds the queue.
+        const wakeMs=Math.max(8,(end-audioCtx.currentTime-.22)*1000);
+        cycleTimer=setTimeout(scheduleNext,wakeMs);
       };
       scheduleNext();
     }catch(e){
@@ -436,10 +479,10 @@
   function wire(){
     ensureInitial();renderParts();
     $('addPartBtn')?.addEventListener('click',openModal);$('closePartModal')?.addEventListener('click',closeModal);document.querySelector('[data-close-part-modal]')?.addEventListener('click',closeModal);document.querySelectorAll('.part-choice').forEach(b=>b.addEventListener('click',()=>addPart(b.dataset.partType)));
-    document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;p.instrument=b.dataset.leadInstrument;p.sound=(core.sounds[p.instrument]||[])[0]?.[0]||p.sound;playerCache.clear();renderLeadEditor(p);core.scheduleAutoSave();});
+    document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;p.instrument=b.dataset.leadInstrument;p.sound=(core.sounds[p.instrument]||[])[0]?.[0]||p.sound;invalidatePartPlayers(p);renderLeadEditor(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();});
     $('leadRepeat').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.repeat=e.target.checked;core.scheduleAutoSave();};
     $('leadSustain').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sustain=e.target.checked;core.scheduleAutoSave();};
-    $('leadSoundSelect').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sound=e.target.value;playerCache.clear();core.scheduleAutoSave();};
+    $('leadSoundSelect').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sound=e.target.value;invalidatePartPlayers(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();};
     $('leadGridOctave').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.gridOctave=+e.target.value;renderLeadGrid(p);core.scheduleAutoSave();};
     $('leadResolution').onchange=e=>{const p=active();if(p?.type!=='lead')return;const old=p.resolution,neu=+e.target.value;if(old!==neu&&p.events.length&&!confirm('Changing resolution keeps notes at their step numbers, so their timing may shift. Continue?')){e.target.value=String(old);return;}p.resolution=neu;renderLeadEditor(p);core.scheduleAutoSave();};
     $('leadBars').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.bars=+e.target.value;const maxSteps=p.bars*(p.resolution/4)*4;p.events=p.events.filter(x=>x.step<maxSteps);leadBarPage=Math.min(leadBarPage,p.bars-1);renderLeadEditor(p);core.scheduleAutoSave();};
@@ -458,6 +501,6 @@
     for(const id of ['vocalFxEq','vocalFxComp','vocalFxReverb','vocalFxDelay'])$(id).onchange=()=>{const p=active();if(p?.type!=='vocal')return;p.fx={eq:$('vocalFxEq').value,comp:$('vocalFxComp').value,reverb:+$('vocalFxReverb').value,delay:+$('vocalFxDelay').value};core.scheduleAutoSave();};
   }
 
-  window.CRPParts={handlesPlayback:true,togglePlayback,startPlayback,isPlaying:()=>playing||starting,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCloudAudio,openStudioExport,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(c&&activePartId!==c.id)selectPart(c.id);},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
+  window.CRPParts={handlesPlayback:true,togglePlayback,startPlayback,isPlaying:()=>playing||starting,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncCloudAudio,openStudioExport,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(c&&activePartId!==c.id)selectPart(c.id);},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wire);else wire();
 })();
