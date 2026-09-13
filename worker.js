@@ -54,9 +54,35 @@ async function api(request,env,url){
     const salt=b64(crypto.getRandomValues(new Uint8Array(16))),hash=await hashPassword(newP,salt),now=Date.now();await env.DB.batch([env.DB.prepare('UPDATE users SET password_hash=?,password_salt=?,password_iterations=?,updated_at=? WHERE id=?').bind(hash,salt,ITERATIONS,now,u.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(u.id)]);const token=await createSession(u.id,env);return json({ok:true},200,{'Set-Cookie':sessionCookie(token)});
   }
   const u=await userFor(request,env);if(!u)return json({ok:false,error:'Please log in.'},401);
+
+  // Vocal masters live in authenticated R2 object storage, not in D1 project JSON.
+  const audioMatch=path.match(/^\/api\/audio\/([^/]+)$/);
+  if(audioMatch){
+    if(!env.AUDIO)return json({ok:false,error:'Cloud audio storage is not configured. Add the AUDIO R2 binding.'},503);
+    const takeId=decodeURIComponent(audioMatch[1]), projectId=String(url.searchParams.get('projectId')||'');
+    if(!projectId)return json({ok:false,error:'projectId is required.'},400);
+    const owns=await env.DB.prepare('SELECT id FROM projects WHERE id=? AND user_id=?').bind(projectId,u.id).first();
+    if(!owns)return json({ok:false,error:'Project not found.'},404);
+    const key=`${u.id}/${projectId}/${takeId}.wav`;
+    if(method==='PUT'){
+      const buf=await request.arrayBuffer();
+      if(!buf.byteLength)return json({ok:false,error:'Audio body is empty.'},400);
+      if(buf.byteLength>100*1024*1024)return json({ok:false,error:'Audio file is too large.'},413);
+      await env.AUDIO.put(key,buf,{httpMetadata:{contentType:request.headers.get('Content-Type')||'audio/wav'},customMetadata:{takeId,projectId,uploadedAt:String(Date.now())}});
+      return json({ok:true,size:buf.byteLength});
+    }
+    if(method==='GET'){
+      const obj=await env.AUDIO.get(key);
+      if(!obj)return json({ok:false,error:'Audio take not found in cloud.'},404);
+      const headers=new Headers();obj.writeHttpMetadata(headers);headers.set('Cache-Control','private, max-age=0, no-store');headers.set('Content-Length',String(obj.size));
+      return new Response(obj.body,{status:200,headers});
+    }
+    if(method==='HEAD'){const obj=await env.AUDIO.head(key);return obj?new Response(null,{status:200,headers:{'Content-Length':String(obj.size)}}):new Response(null,{status:404});}
+    if(method==='DELETE'){await env.AUDIO.delete(key);return json({ok:true});}
+  }
   if(path==='/api/projects'&&method==='GET'){const rs=await env.DB.prepare('SELECT id,name,data,created_at,updated_at FROM projects WHERE user_id=? ORDER BY updated_at DESC').bind(u.id).all();return json({ok:true,projects:(rs.results||[]).map(r=>{let data={};try{data=JSON.parse(r.data)}catch{}return {...data,id:r.id,name:r.name,createdAt:r.created_at,updatedAt:r.updated_at};})});}
   if(path==='/api/projects'&&method==='POST'){const b=await body(request),p=b.project||{},id=String(p.id||crypto.randomUUID()),name=String(p.name||'Untitled Project').trim().slice(0,160)||'Untitled Project',now=Date.now();const existing=await env.DB.prepare('SELECT created_at FROM projects WHERE id=? AND user_id=?').bind(id,u.id).first();const clean={...p,id,name};await env.DB.prepare(`INSERT INTO projects(id,user_id,name,data,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,data=excluded.data,updated_at=excluded.updated_at WHERE user_id=?`).bind(id,u.id,name,JSON.stringify(clean),existing?.created_at||now,now,u.id).run();return json({ok:true,project:{...clean,updatedAt:now}});}
-  const m=path.match(/^\/api\/projects\/([^/]+)$/);if(m){const id=decodeURIComponent(m[1]);if(method==='DELETE'){await env.DB.prepare('DELETE FROM projects WHERE id=? AND user_id=?').bind(id,u.id).run();return json({ok:true});}if(method==='PATCH'){const b=await body(request),name=String(b.name||'').trim().slice(0,160);if(!name)return json({ok:false,error:'Project name is required.'},400);const r=await env.DB.prepare('SELECT data FROM projects WHERE id=? AND user_id=?').bind(id,u.id).first();if(!r)return json({ok:false,error:'Project not found.'},404);let d={};try{d=JSON.parse(r.data)}catch{}d.name=name;d.updatedAt=Date.now();await env.DB.prepare('UPDATE projects SET name=?,data=?,updated_at=? WHERE id=? AND user_id=?').bind(name,JSON.stringify(d),d.updatedAt,id,u.id).run();return json({ok:true});}}
+  const m=path.match(/^\/api\/projects\/([^/]+)$/);if(m){const id=decodeURIComponent(m[1]);if(method==='DELETE'){await env.DB.prepare('DELETE FROM projects WHERE id=? AND user_id=?').bind(id,u.id).run();if(env.AUDIO){try{let cursor;do{const list=await env.AUDIO.list({prefix:`${u.id}/${id}/`,cursor});if(list.objects.length)await env.AUDIO.delete(list.objects.map(o=>o.key));cursor=list.truncated?list.cursor:undefined;}while(cursor);}catch(e){console.warn('Could not clean project audio',e);}}return json({ok:true});}if(method==='PATCH'){const b=await body(request),name=String(b.name||'').trim().slice(0,160);if(!name)return json({ok:false,error:'Project name is required.'},400);const r=await env.DB.prepare('SELECT data FROM projects WHERE id=? AND user_id=?').bind(id,u.id).first();if(!r)return json({ok:false,error:'Project not found.'},404);let d={};try{d=JSON.parse(r.data)}catch{}d.name=name;d.updatedAt=Date.now();await env.DB.prepare('UPDATE projects SET name=?,data=?,updated_at=? WHERE id=? AND user_id=?').bind(name,JSON.stringify(d),d.updatedAt,id,u.id).run();return json({ok:true});}}
   return json({ok:false,error:'API route not found.'},404);
 }
 

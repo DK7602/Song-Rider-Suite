@@ -873,6 +873,7 @@
     if(accountUser){
       try{
         await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
+        await window.CRPParts?.syncCloudAudio?.(projectId);
         cloudSyncState='ready';
         updateAccountSummary();
       }catch(e){
@@ -891,7 +892,20 @@
     }
   }
 
-  async function saveProject(){clearTimeout(autoSaveTimer);autoSaveTimer=null;const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);state.currentProjectId=p.id;$('projectName').value=name;upsertLocal(p);if(accountUser){try{const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});upsertLocal(d.project);await refreshCloudProjects();$('status').textContent=`Saved “${name}” to cloud.`;}catch(e){$('status').textContent=`Saved locally; cloud sync failed: ${e.message}`;}}else{$('status').textContent=`Saved “${name}” on this device.`;renderProjects();}}
+  async function saveProject(){
+    clearTimeout(autoSaveTimer);autoSaveTimer=null;
+    const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);
+    state.currentProjectId=p.id;$('projectName').value=name;upsertLocal(p);
+    if(accountUser){
+      try{
+        const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
+        upsertLocal(d.project);
+        await window.CRPParts?.syncCloudAudio?.(p.id);
+        await refreshCloudProjects();
+        $('status').textContent=`Saved “${name}” and vocal audio to cloud.`;
+      }catch(e){$('status').textContent=`Saved locally; cloud sync failed: ${e.message}`;}
+    }else{$('status').textContent=`Saved “${name}” on this device.`;renderProjects();}
+  }
   let projectBrowserMode='projects';
 
   function projectSource(){return (accountUser&&cloudProjects)?cloudProjects:localProjects();}
@@ -1150,7 +1164,7 @@
     $('playAllBtn').onclick=playProgression;
     $('newProjectBtn').onclick=newProject;
     $('saveProjectBtn').onclick=saveProject;
-    $('exportBtn').onclick=e=>{e.stopPropagation();toggleExportMenu();};$('exportPdfBtn').onclick=exportPdf;$('exportPngBtn').onclick=exportPng;
+    $('exportBtn').onclick=e=>{e.stopPropagation();toggleExportMenu();};$('exportPdfBtn').onclick=exportPdf;$('exportPngBtn').onclick=exportPng;$('exportStudioBtn').onclick=()=>{closeExportMenu();window.CRPParts?.openStudioExport?.();};
     document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))closeExportMenu();});
 
     // Programmatic scrollIntoView does not generate touchmove/wheel events,
@@ -1220,6 +1234,7 @@
     snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,
     scheduleAutoSave,renderAll,syncBuildInput,
     get beats(){return +$('beatsSelect').value||4},get bpm(){return +$('bpmInput').value||92},get loop(){return $('loopToggle').checked},
+    get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
     startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).reduce((n,r)=>n+r.length,0)*(+$('beatsSelect').value||4);},
     setPlaying(on){state.playing=!!on;setRiderBonesRiding(!!on);$('playAllBtn').textContent=on?'■ Stop':'▶ Play';if(!on)document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');},
     status(msg){$('status').textContent=msg||'';},

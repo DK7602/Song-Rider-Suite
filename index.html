@@ -153,7 +153,7 @@
           <button id="leadPrevBar" type="button">‹</button>
           <strong id="leadBarLabel">Bar 1 / 4</strong>
           <button id="leadNextBar" type="button">›</button>
-          <button id="leadClearBar" type="button">Clear bar</button>
+          <div class="lead-bar-tools"><button id="leadCopyBar" type="button">Copy</button><button id="leadPasteBar" type="button" disabled>Paste</button><button id="leadClearBar" type="button">Clear</button></div>
         </div>
         <div id="leadGridWrap" class="lead-grid-wrap"><div id="leadGrid" class="lead-grid"></div></div>
       </div>
@@ -178,7 +178,7 @@
               <h4>🎙 Mic</h4>
               <div class="mic-meter"><span id="vocalMicMeter"></span></div>
               <div class="mic-meter-labels"><span>Input</span><strong id="vocalMicDb">— dB</strong></div>
-              <button id="vocalArmMic" type="button">Check mic</button>
+              <button id="vocalArmMic" type="button" aria-pressed="false">Mic check</button>
               <p id="vocalMicInfo" class="subtle tiny">Requests the cleanest mic mode your browser allows.</p>
             </section>
           </div>
@@ -190,7 +190,7 @@
           </div>
 
           <section class="vocal-panel vocal-effects">
-            <div class="vocal-panel-heading"><h4>Vocal effects</h4><span class="subtle tiny">Preview only — dry recording is preserved</span></div>
+            <div class="vocal-panel-heading"><h4>Vocal effects</h4><span class="subtle tiny">Editable anytime • dry recording is preserved</span></div>
             <div class="vocal-effects-grid">
               <label>EQ<select id="vocalFxEq"><option value="flat">Natural</option><option value="clear" selected>Clear</option><option value="warm">Warm</option><option value="bright">Bright</option></select></label>
               <label>Compression<select id="vocalFxComp"><option value="off">Off</option><option value="light">Light</option><option value="medium" selected>Medium</option><option value="heavy">Heavy</option></select></label>
@@ -200,7 +200,7 @@
           </section>
 
           <section class="vocal-panel">
-            <div class="vocal-panel-heading"><h4>Takes</h4><span id="vocalStorageNote" class="subtle tiny">Audio stays on this device; project/cloud stores the take list.</span></div>
+            <div class="vocal-panel-heading"><h4>Takes</h4><span id="vocalStorageNote" class="subtle tiny">Dry WAV masters sync to your cloud account when signed in.</span></div>
             <div id="vocalTakes" class="vocal-takes"></div>
           </section>
         </div>
@@ -234,6 +234,7 @@
           <div id="exportMenu" class="export-menu" hidden>
             <button id="exportPdfBtn" type="button">PDF chord sheet</button>
             <button id="exportPngBtn" type="button">PNG image</button>
+            <button id="exportStudioBtn" type="button">Studio package…</button>
           </div>
         </div>
       </div>

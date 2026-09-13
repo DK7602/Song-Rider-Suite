@@ -16,5 +16,12 @@
       "database_name": "chord-rider-pro-db",
       "database_id": "623e5268-36b0-4046-b302-9c305588dccb"
     }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "AUDIO",
+      "bucket_name": "chord-rider-pro-audio"
+    }
   ]
 }
