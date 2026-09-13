@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "chord-rider-pro",
+  "name": "chord-rider-pro-srp-test",
   "main": "worker.js",
   "compatibility_date": "2026-09-11",
 
