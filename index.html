@@ -127,7 +127,7 @@
       <div id="partManager" class="part-manager" aria-label="Song parts">
         <div class="part-manager-top">
           <div id="partStrip" class="part-strip" aria-label="Parts"></div>
-          <button id="addPartBtn" class="add-part-btn" type="button">＋ Add Part</button>
+          <button id="addPartBtn" class="add-part-btn" type="button"><span>Add</span><span>Part</span></button>
         </div>
       </div>
 
@@ -160,10 +160,49 @@
 
       <div id="vocalPartEditor" class="vocal-part-editor" hidden>
         <div class="vocal-editor-card">
-          <h3 id="vocalPartTitle">Vocals</h3>
-          <p><strong>Studio recorder is intentionally next.</strong> The Part system is ready for it, but I am not using a quick browser MP3 recorder here because that is where SRP quality could get compromised.</p>
-          <p class="subtle">The recording phase will capture a dry high-quality WAV-style master, keep the original take untouched, use headphone backing playback, and add effects non-destructively.</p>
-          <label class="part-volume-label">Playback volume <input id="vocalVolume" type="range" min="0" max="100" value="100" /><span id="vocalVolumeValue">100%</span></label>
+          <div class="vocal-title-row">
+            <div><h3 id="vocalPartTitle">Vocals</h3><p class="subtle">Dry WAV master • effects stay non-destructive</p></div>
+            <label class="part-volume-label">Part volume <input id="vocalVolume" type="range" min="0" max="100" value="100" /><span id="vocalVolumeValue">100%</span></label>
+          </div>
+
+          <div class="vocal-recorder-grid">
+            <section class="vocal-panel">
+              <h4>🎧 Backing while recording</h4>
+              <div id="vocalBackingParts" class="vocal-backing-list"></div>
+              <label class="check-label vocal-drum-check"><input id="vocalBackingDrums" type="checkbox" checked><span>Drums</span></label>
+              <label class="vocal-playback-level">Playback level <input id="vocalBackingVolume" type="range" min="0" max="100" value="80"><strong id="vocalBackingVolumeValue">80%</strong></label>
+              <p class="subtle tiny">Use headphones. Only the microphone is captured.</p>
+            </section>
+
+            <section class="vocal-panel">
+              <h4>🎙 Mic</h4>
+              <div class="mic-meter"><span id="vocalMicMeter"></span></div>
+              <div class="mic-meter-labels"><span>Input</span><strong id="vocalMicDb">— dB</strong></div>
+              <button id="vocalArmMic" type="button">Check mic</button>
+              <p id="vocalMicInfo" class="subtle tiny">Requests the cleanest mic mode your browser allows.</p>
+            </section>
+          </div>
+
+          <div class="vocal-transport">
+            <button id="vocalRecordBtn" class="vocal-record-btn" type="button"><span class="record-dot"></span> Record</button>
+            <button id="vocalStopBtn" type="button" disabled>■ Stop</button>
+            <strong id="vocalTimer">00:00.0</strong>
+          </div>
+
+          <section class="vocal-panel vocal-effects">
+            <div class="vocal-panel-heading"><h4>Vocal effects</h4><span class="subtle tiny">Preview only — dry recording is preserved</span></div>
+            <div class="vocal-effects-grid">
+              <label>EQ<select id="vocalFxEq"><option value="flat">Natural</option><option value="clear" selected>Clear</option><option value="warm">Warm</option><option value="bright">Bright</option></select></label>
+              <label>Compression<select id="vocalFxComp"><option value="off">Off</option><option value="light">Light</option><option value="medium" selected>Medium</option><option value="heavy">Heavy</option></select></label>
+              <label>Reverb<select id="vocalFxReverb"><option value="0">Off</option><option value="0.12" selected>Small</option><option value="0.22">Medium</option><option value="0.34">Large</option></select></label>
+              <label>Delay<select id="vocalFxDelay"><option value="0" selected>Off</option><option value="0.10">Slap</option><option value="0.18">1/8</option><option value="0.28">1/4</option></select></label>
+            </div>
+          </section>
+
+          <section class="vocal-panel">
+            <div class="vocal-panel-heading"><h4>Takes</h4><span id="vocalStorageNote" class="subtle tiny">Audio stays on this device; project/cloud stores the take list.</span></div>
+            <div id="vocalTakes" class="vocal-takes"></div>
+          </section>
         </div>
       </div>
 
@@ -275,7 +314,7 @@
       <div class="part-modal-heading"><h2 id="addPartTitle">Add Part</h2><button id="closePartModal" type="button" aria-label="Close">×</button></div>
       <button class="part-choice" data-part-type="chord" type="button"><strong>Chord / Note</strong><span>Another full Chord Rider line editor. No extra drums.</span></button>
       <button class="part-choice" data-part-type="lead" type="button"><strong>Lead / Bass</strong><span>Piano-roll style note grid with 1/8 through 1/64 resolution.</span></button>
-      <button class="part-choice" data-part-type="vocal" type="button"><strong>Vocals</strong><span>Creates the vocal part now; high-quality recording engine comes next.</span></button>
+      <button class="part-choice" data-part-type="vocal" type="button"><strong>Vocals</strong><span>Record clean dry WAV takes while selected parts play in headphones.</span></button>
     </div>
   </div>
 

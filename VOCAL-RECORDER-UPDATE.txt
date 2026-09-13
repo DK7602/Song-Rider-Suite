@@ -1,0 +1,19 @@
+Chord Rider Pro — Serious Vocal Recorder Update
+
+What changed
+- + Add Part is now stacked as Add / Part and no longer uses the plus symbol.
+- Part-volume sliders use a custom track/thumb so 100% visually reaches the end.
+- Removed duplicate visible volume controls inside Lead/Vocal editors; the Part volume row is the single control.
+- Vocals now record a clean dry mono PCM WAV master instead of browser-compressed MP3/WebM.
+- Mic request asks the browser for 48 kHz, mono, with echo cancellation, noise suppression and auto-gain disabled when supported.
+- Live input meter + mic device/sample-rate info.
+- Choose which Chord/Lead parts and drums play in headphones during recording.
+- Separate backing playback level while recording; original part/drum levels restore after stopping.
+- Multiple vocal takes stored locally in IndexedDB, with Use / Preview / Download WAV / Delete.
+- Vocal effects (EQ, compression, reverb, delay) are non-destructive preview effects; the stored take remains dry.
+- Project/cloud data stores vocal take metadata and settings. Actual WAV audio stays on the recording device for now to avoid bloating D1/cloud project data.
+
+Important
+- Use headphones while recording. The app records only the mic, but phone speakers can acoustically bleed into the mic.
+- Browser/device audio constraints are requests; Android/Chrome may override some hardware processing.
+- This phase intentionally stores WAV audio locally. Cloud audio sync and song/stem/DAW export are the next audio architecture phase.
