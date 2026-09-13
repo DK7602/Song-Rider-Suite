@@ -1,4 +1,4 @@
-const CACHE = 'chord-rider-pro-v1.9.8';
+const CACHE = 'chord-rider-pro-v1.9.9';
 const ASSETS = [
   './',
   './index.html',
@@ -12,7 +12,9 @@ const ASSETS = [
   './assets/rider-and-bones-right.gif',
   './assets/rider-and-bones-left-still.png',
   './assets/rider-and-bones-right-still.png',
-  './assets/baby-daw-generated-source.png'
+  './assets/baby-daw-generated-source.png',
+  './assets/rider-bones-mode-sticker.png',
+  './assets/baby-daw-head-chain-sticker.png'
 ];
 self.addEventListener('install', e => e.waitUntil((async()=>{await caches.open(CACHE).then(c=>c.addAll(ASSETS));await self.skipWaiting();})()));
 self.addEventListener('activate', e => e.waitUntil(Promise.all([self.clients.claim(), caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))])));

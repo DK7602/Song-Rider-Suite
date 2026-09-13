@@ -1715,3 +1715,32 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
 body.workspace-chord-rider #partManager,body.workspace-chord-rider #leadPartEditor,body.workspace-chord-rider #vocalPartEditor,body.workspace-chord-rider .baby-daw-only{display:none!important}
 body.workspace-chord-rider #chordPartControls.part-hidden > .toolbar,body.workspace-chord-rider #chordPartControls.part-hidden > .entry-row,body.workspace-chord-rider #chordPartControls.part-hidden > div:not(.status),body.workspace-chord-rider #chordPartRows.part-hidden{display:revert!important}
 @media(max-width:520px){.workspace-mode-switch{gap:7px;padding:0 8px}.workspace-mode-btn{padding:6px 8px;gap:6px;border-radius:13px}.mode-art{flex-basis:40px;width:40px;height:40px}.baby-mode-art{background-size:640px 427px;background-position:-350px -11px}.mode-copy strong{font-size:.88rem}.mode-copy small{font-size:.64rem}}
+\n/* v1.9.9 — sticker-style mode art + metallic CRP wordmark */
+.brand-copy h1{
+  font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif;
+  font-style:italic;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.025em;
+  line-height:.95;
+  background:linear-gradient(180deg,#fff3bf 0%,#ffd968 20%,#e9a92f 47%,#9b5b08 72%,#ffd86a 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-text-stroke:1px rgba(109,63,4,.7);
+  filter:drop-shadow(0 2px 0 #4e2b00) drop-shadow(0 0 7px rgba(242,183,54,.38));
+}
+.mode-art{
+  flex:0 0 64px;width:64px;height:56px;
+  border:0;border-radius:0;overflow:visible;background:transparent;
+  display:flex;align-items:center;justify-content:center;
+}
+.mode-art img{display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(0,0,0,.55));}
+.rider-mode-art{flex-basis:76px;width:76px;height:56px;}
+.baby-mode-art{background:none!important;flex-basis:58px;width:58px;height:58px;}
+.baby-mode-art img{width:54px;height:58px;}
+@media(max-width:520px){
+  .brand-copy h1{font-size:clamp(1.55rem,7vw,2rem);letter-spacing:.015em;}
+  .mode-art{border:0;background:transparent;border-radius:0;overflow:visible;}
+  .rider-mode-art{flex-basis:64px;width:64px;height:48px;}
+  .baby-mode-art{flex-basis:48px;width:48px;height:50px;background:none!important;}
+  .baby-mode-art img{width:46px;height:50px;}
+}

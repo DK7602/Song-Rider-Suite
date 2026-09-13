@@ -1,0 +1,7 @@
+Chord Rider Pro v1.9.9
+
+- Metallic gold CHORD RIDER PRO wordmark styling.
+- Chord Rider mode selector now uses the supplied Standard Rider & Bones artwork as frameless sticker art.
+- Baby DAW selector now uses the approved head-only artwork with sunglasses, cap, and gold chain as frameless sticker art.
+- Removed the image-window treatment from both mode-selector characters.
+- No project/data behavior changed.
