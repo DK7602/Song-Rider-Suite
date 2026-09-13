@@ -27,7 +27,7 @@
     return {id:uid(),type:'chord',name,enabled:true,volume:.85,data:d};
   }
   function leadPart(name='Lead 1'){
-    return {id:uid(),type:'lead',name,enabled:true,repeat:true,volume:.8,instrument:'piano',sound:'acoustic_grand_piano',octave:0,gridOctave:3,resolution:16,bars:4,events:[]};
+    return {id:uid(),type:'lead',name,enabled:true,repeat:true,sustain:false,volume:.8,instrument:'piano',sound:'acoustic_grand_piano',octave:0,gridOctave:3,resolution:16,bars:4,events:[]};
   }
   function vocalPart(name='Vocals 1'){
     return {id:uid(),type:'vocal',name,enabled:true,repeat:true,volume:1,transcript:'',recordings:[],activeTakeId:null,backingPartIds:[],backingDrums:true,backingVolume:.8,fx:{eq:'clear',comp:'medium',reverb:.12,delay:0}};
@@ -36,7 +36,7 @@
     if(!p||!p.type)return null;
     const base={id:p.id||uid(),name:p.name||`${p.type==='chord'?'Chords':p.type==='lead'?'Lead':'Vocals'} ${i+1}`,enabled:p.enabled!==false,volume:Number.isFinite(+p.volume)?Math.max(0,Math.min(1,+p.volume)):.85};
     if(p.type==='chord')return {...base,type:'chord',data:clone(p.data||core.snapshot())};
-    if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,instrument:p.instrument==='guitar'?'guitar':'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(16,+p.bars||4)),events:Array.isArray(p.events)?p.events.map(e=>({step:+e.step,midi:+e.midi})).filter(e=>Number.isFinite(e.step)&&Number.isFinite(e.midi)):[]};
+    if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,sustain:p.sustain===true,instrument:p.instrument==='guitar'?'guitar':'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(16,+p.bars||4)),events:Array.isArray(p.events)?p.events.map(e=>({step:+e.step,midi:+e.midi})).filter(e=>Number.isFinite(e.step)&&Number.isFinite(e.midi)):[]};
     return {...base,type:'vocal',repeat:p.repeat!==false,transcript:String(p.transcript||''),transcriptWords:Array.isArray(p.transcriptWords)?p.transcriptWords:[],recordings:Array.isArray(p.recordings)?p.recordings.map(r=>({...r,blob:null})):[],activeTakeId:p.activeTakeId||null,backingPartIds:Array.isArray(p.backingPartIds)?p.backingPartIds:[],backingDrums:p.backingDrums!==false,backingVolume:Number.isFinite(+p.backingVolume)?Math.max(0,Math.min(1,+p.backingVolume)):.8,fx:{eq:p.fx?.eq||'clear',comp:p.fx?.comp||'medium',reverb:Number(p.fx?.reverb??.12),delay:Number(p.fx?.delay||0)}};
   }
   function ensureInitial(){
@@ -127,7 +127,7 @@
   function midiName(m){return NOTE_NAMES[(m%12+12)%12]+(Math.floor(m/12)-1);}
   function renderLeadEditor(p=active()){
     if(!p||p.type!=='lead')return;
-    $('leadPartTitle').textContent=p.name;if($('leadRepeat'))$('leadRepeat').checked=p.repeat!==false;
+    $('leadPartTitle').textContent=p.name;if($('leadRepeat'))$('leadRepeat').checked=p.repeat!==false;if($('leadSustain'))$('leadSustain').checked=p.sustain===true;
     $('leadVolume').value=Math.round(p.volume*100);$('leadVolumeValue').textContent=`${Math.round(p.volume*100)}%`;
     document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.classList.toggle('active',b.dataset.leadInstrument===p.instrument));
     leadSoundOptions(p);$('leadGridOctave').value=String(p.gridOctave);$('leadResolution').value=String(p.resolution);$('leadBars').value=String(p.bars);
@@ -278,7 +278,9 @@
       let soundingMidi=midi+(Number(p.octave)||0)*12;
       if(p.sound==='electric_bass_finger')soundingMidi-=12;
       const at=(audioCtx?.currentTime||0)+.01;
-      playTracked(player,midiName(soundingMidi),at,{duration:.42,gain:.96});
+      const beatSec=60/Math.max(40,Math.min(240,+core.bpm||92));
+      const auditionDuration=p.sustain?Math.max(.65,beatSec*1.03):.42;
+      playTracked(player,midiName(soundingMidi),at,{duration:auditionDuration,gain:.96});
     }catch(e){
       console.warn('Could not audition lead/bass note',e);
       core.status('Could not preview that note.');
@@ -346,7 +348,9 @@
         const cards=(p.data.rows||[]).flat();const durBeats=core.beats;
         cards.forEach((card,i)=>{if(!playing||generation!==playbackGeneration)return;const b=i*durBeats;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;const duration=Math.max(.18,durBeats*beatSec*.92);const notes=core.notesFor(card,p.data)||[];notes.forEach((n,j)=>playTracked(player,n,at+(p.data.instrument==='guitar'?j*.035:0),{duration,gain:.94}));scheduleHighlight((at-audioCtx.currentTime)*1000,p,i);});
       }else{
-        const subdiv=p.resolution/4,stepBeats=1/subdiv,duration=Math.max(.05,stepBeats*beatSec*.86);
+        const subdiv=p.resolution/4,stepBeats=1/subdiv;
+        // Sustain OFF keeps notes tight to the selected grid step. Sustain ON lets each note ring for a full beat.
+        const duration=p.sustain?Math.max(.12,beatSec*1.03):Math.max(.05,stepBeats*beatSec*.86);
         const partBeats=Math.max(stepBeats,p.bars*4),firstCycle=p.repeat?Math.max(0,Math.floor(fromBeat/partBeats)):0,lastCycle=p.repeat?Math.floor((toBeat-1e-6)/partBeats):0;
         for(let cyc=firstCycle;cyc<=lastCycle;cyc++)p.events.forEach(e=>{if(!playing||generation!==playbackGeneration)return;const local=e.step*stepBeats,b=local+cyc*partBeats;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;let midi=e.midi+(Number(p.octave)||0)*12;if(p.sound==='electric_bass_finger')midi-=12;playTracked(player,midiName(midi),at,{duration,gain:.92});scheduleLeadHighlight((at-audioCtx.currentTime)*1000,p,e.step);});
       }
@@ -403,7 +407,7 @@
   function midiNum(note){const m=String(note).match(/^([A-G])(#|b)?(-?\d+)$/);if(!m)return 60;const pc={C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]]+(m[2]==='#'?1:m[2]==='b'?-1:0);return Math.max(0,Math.min(127,(+m[3]+1)*12+pc));}
   function vlq(n){n=Math.max(0,Math.floor(n));let a=[n&127];while(n>>=7)a.unshift((n&127)|128);return a;}
   function midiFile(events,bpm=120){const ppq=480,tempo=Math.round(60000000/bpm),ev=[];events.sort((a,b)=>a.t-b.t||a.on-b.on);let last=0;for(const e of events){ev.push(...vlq(e.t-last),e.on?0x90:0x80,e.note&127,e.on?(e.vel||96):0);last=e.t;}ev.push(0,0xff,0x2f,0);const tr=new Uint8Array(ev),head=new Uint8Array([77,84,104,100,0,0,0,6,0,0,0,1,ppq>>8,ppq&255]),th=new Uint8Array([77,84,114,107,(tr.length>>>24)&255,(tr.length>>>16)&255,(tr.length>>>8)&255,tr.length&255]);return concatBytes([head,th,tr]);}
-  function partMidi(p){const ppq=480,E=[];if(p.type==='lead'){const stepBeat=4/p.resolution;for(const x of p.events){const t=Math.round(x.step*stepBeat*ppq),n=Math.max(0,Math.min(127,x.midi+(p.octave||0)*12+(p.sound==='electric_bass_finger'?-12:0)));E.push({t,on:1,note:n},{t:t+Math.max(30,Math.round(stepBeat*ppq*.86)),on:0,note:n});}}else if(p.type==='chord'){let beat=0;for(const row of p.data.rows||[])for(const card of row){const notes=core.notesFor(card,p.data)||[],dur=Math.max(1,core.beats);for(const n of notes){const mn=midiNum(n);E.push({t:Math.round(beat*ppq),on:1,note:mn},{t:Math.round((beat+dur*.92)*ppq),on:0,note:mn});}beat+=dur;}}return midiFile(E,core.bpm);}
+  function partMidi(p){const ppq=480,E=[];if(p.type==='lead'){const stepBeat=4/p.resolution;for(const x of p.events){const t=Math.round(x.step*stepBeat*ppq),n=Math.max(0,Math.min(127,x.midi+(p.octave||0)*12+(p.sound==='electric_bass_finger'?-12:0)));const durTicks=p.sustain?Math.max(30,Math.round(ppq*1.03)):Math.max(30,Math.round(stepBeat*ppq*.86));E.push({t,on:1,note:n},{t:t+durTicks,on:0,note:n});}}else if(p.type==='chord'){let beat=0;for(const row of p.data.rows||[])for(const card of row){const notes=core.notesFor(card,p.data)||[],dur=Math.max(1,core.beats);for(const n of notes){const mn=midiNum(n);E.push({t:Math.round(beat*ppq),on:1,note:mn},{t:Math.round((beat+dur*.92)*ppq),on:0,note:mn});}beat+=dur;}}return midiFile(E,core.bpm);}
   function drumMidi(b){const map={kick1:36,kick2:36,kick3:35,snare1:38,snare2:38,snare3:40,snare4:38,snare5:40,chh:42,ohh:46,tomHi:50,tomMid:47,tomLow:45,clap:39,rim:37,shaker:82,tamb:54,cowbell:56,conga:64},E=[];if(!b)return midiFile(E,core.bpm);for(const [id,bars] of Object.entries(b.tracks||{}))for(let bar=0;bar<(b.bars||1);bar++)for(const st of bars[bar]||[]){const t=Math.round((bar*4+st/16)*480),n=map[id]||37;E.push({t,on:1,note:n},{t:t+60,on:0,note:n});}return midiFile(E,core.bpm);}
   function closeStudioExport(){document.getElementById('studioExportModal')?.remove();}
   function openStudioExport(){
@@ -434,6 +438,7 @@
     $('addPartBtn')?.addEventListener('click',openModal);$('closePartModal')?.addEventListener('click',closeModal);document.querySelector('[data-close-part-modal]')?.addEventListener('click',closeModal);document.querySelectorAll('.part-choice').forEach(b=>b.addEventListener('click',()=>addPart(b.dataset.partType)));
     document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;p.instrument=b.dataset.leadInstrument;p.sound=(core.sounds[p.instrument]||[])[0]?.[0]||p.sound;playerCache.clear();renderLeadEditor(p);core.scheduleAutoSave();});
     $('leadRepeat').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.repeat=e.target.checked;core.scheduleAutoSave();};
+    $('leadSustain').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sustain=e.target.checked;core.scheduleAutoSave();};
     $('leadSoundSelect').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sound=e.target.value;playerCache.clear();core.scheduleAutoSave();};
     $('leadGridOctave').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.gridOctave=+e.target.value;renderLeadGrid(p);core.scheduleAutoSave();};
     $('leadResolution').onchange=e=>{const p=active();if(p?.type!=='lead')return;const old=p.resolution,neu=+e.target.value;if(old!==neu&&p.events.length&&!confirm('Changing resolution keeps notes at their step numbers, so their timing may shift. Continue?')){e.target.value=String(old);return;}p.resolution=neu;renderLeadEditor(p);core.scheduleAutoSave();};

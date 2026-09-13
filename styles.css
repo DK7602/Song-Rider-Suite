@@ -1696,3 +1696,7 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
 .export-chord-slot .diagram{width:100%;overflow:hidden}
 .export-chord-slot .diagram svg{display:block;width:100%;height:auto;max-height:112px}
 .export-sheet.pdf-print .export-chord-slot{background:#fff}
+
+/* v1.9.7 Lead/Bass sustain */
+.lead-play-options{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}.lead-play-options .part-repeat-toggle{margin:0}
+@media(max-width:520px){.lead-play-options{gap:10px}}
