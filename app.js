@@ -1044,79 +1044,82 @@
     return labels[state.neck]||labels.open;
   }
   function makeMetaChip(text){const e=document.createElement('span');e.className='export-meta-chip';e.textContent=text;return e;}
-  function buildExportSheet(){
-    // A user may type a chord and export without tapping Build first. Commit it so
-    // the exported sheet always matches the visible Build field.
-    const bad=commitBuildInput();
-    if(bad.length)$('status').textContent=`Skipped unrecognized: ${bad.join(', ')}`;
-    syncBuildInput();autoPopulateKeyFromEntry();renderAll();
-
-    if(!allCards().length)throw new Error('Add at least one chord or note before exporting.');
-    const stage=$('exportStage');stage.innerHTML='';
-    const sheet=document.createElement('section');sheet.className='export-sheet';
-    const projectName=$('projectName').value.trim()||'Untitled Chord Project';
-    const keyLabel=exportKeyLabel();
-    const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92));
-    const beats=+$('beatsSelect').value||4;
-    const used=uniqueUsedValues();
-    const kind=state.mode==='note'?'Notes':'Chords / notes';
-    const header=document.createElement('header');header.className='export-sheet-header';
-    header.innerHTML=`<div class="export-sheet-title-row"><div><h1>${esc(projectName)}</h1><div class="export-sheet-subtitle">Chord Rider Pro chord sheet</div></div><div class="export-sheet-key">Key ${esc(keyLabel)}</div></div>`;
-    const meta=document.createElement('div');meta.className='export-meta-grid';
-    meta.append(makeMetaChip(`${bpm} BPM`),makeMetaChip(`${beats} beat${beats===1?'':'s'} / chord`),makeMetaChip(state.instrument==='guitar'?'Guitar':'Piano'),makeMetaChip(state.mode==='note'?'Note mode':'Chord mode'));
-    if(state.instrument==='guitar'){
-      meta.append(makeMetaChip(`Voicing: ${guitarVoicingLabel()}`));
-      if(state.capo)meta.append(makeMetaChip(`Capo ${state.capo}${state.transpose?' • transpose view':''}`));
-    }else if(state.octave)meta.append(makeMetaChip(`Octave ${state.octave>0?'+':''}${state.octave}`));
-    header.appendChild(meta);
-    const summary=document.createElement('div');summary.className='export-summary';
-    const usedLine=document.createElement('div');usedLine.className='export-summary-line';usedLine.innerHTML=`<strong>${kind} used:</strong> ${esc(used.join(' • '))}`;
-    const progLine=document.createElement('div');progLine.className='export-summary-line';progLine.innerHTML=`<strong>Progression:</strong> ${state.rows.map((r,i)=>`L${i+1}: ${r.map(displayedValue).join(' – ')||'—'}`).map(esc).join(' &nbsp; | &nbsp; ')}`;
-    summary.append(usedLine,progLine);header.appendChild(summary);sheet.appendChild(header);
-
-    state.rows.forEach((row,ri)=>{
-      const line=document.createElement('section');line.className='export-line';
-      const text=row.map(displayedValue).join(' – ')||'Empty line';
-      line.innerHTML=`<div class="export-line-heading"><strong>Line ${ri+1}</strong><span>${esc(text)}</span></div>`;
-      const cards=document.createElement('div');cards.className='export-card-row';
-      row.forEach(card=>{
-        const cardEl=document.createElement('div');cardEl.className='export-card';
-        const shown=displayedValue(card),sub=subtitle(card);
-        cardEl.innerHTML=`<div class="export-card-name">${card.type==='note'?'♪ ':''}${esc(shown)}</div><div class="export-card-subtitle">${esc(sub||' ')}</div><div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div>`;
-        cards.appendChild(cardEl);
-      });
-      line.appendChild(cards);sheet.appendChild(line);
-    });
-
-
-    // Song blueprint appendix: every enabled Part is treated as checked for PDF export.
-    const exportParts=window.CRPParts?.getExportData?.()||[];
+  function exportGrid(title, rows, columns, activeByRow){
+    if(!rows.length)return null;
+    const sec=document.createElement('div');sec.className='export-grid-block';
+    const h=document.createElement('div');h.className='export-part-label';h.textContent=title;sec.appendChild(h);
+    const wrap=document.createElement('div');wrap.className='export-grid-wrap';
+    const table=document.createElement('table');table.className='export-seq-grid';
+    const head=document.createElement('tr');head.innerHTML='<th class="row-label"></th>'+columns.map(c=>`<th>${esc(c)}</th>`).join('');table.appendChild(head);
+    rows.forEach(r=>{const tr=document.createElement('tr');tr.innerHTML=`<th class="row-label">${esc(r)}</th>`+columns.map((_,i)=>`<td class="${activeByRow(r,i)?'hit':''}">${activeByRow(r,i)?'●':''}</td>`).join('');table.appendChild(tr);});
+    wrap.appendChild(table);sec.appendChild(wrap);return sec;
+  }
+  function drumGridForBar(db,bar){
+    if(!db?.enabled)return null;
+    const labels={kick1:'Kick 1',kick2:'Kick 2',kick3:'Kick 3',snare1:'Snare 1',snare2:'Snare 2',snare3:'Snare 3',snare4:'Snare 4',snare5:'Snare 5',chh:'Closed HH',ohh:'Open HH',tomHi:'High Tom',tomMid:'Mid Tom',tomLow:'Low Tom',clap:'Clap',rim:'Rim',shaker:'Shaker',tamb:'Tambourine',cowbell:'Cowbell',conga:'Conga'};
+    const bi=(bar%Math.max(1,db.bars||1));
+    const used=Object.entries(db.tracks||{}).filter(([id,bars])=>(bars[bi]||[]).length);
+    if(!used.length)return null;
+    const res=[8,16,32,64].includes(+db.resolution)?+db.resolution:16,stride=64/res;
+    const cols=Array.from({length:res},(_,i)=>i%(res/4)===0?String(Math.floor(i/(res/4))+1):'·');
+    const hitsets=Object.fromEntries(used.map(([id,bars])=>[labels[id]||id,new Set(bars[bi]||[])]));
+    return exportGrid(`Drums — Bar ${bi+1}`,Object.keys(hitsets),cols,(r,i)=>hitsets[r].has(i*stride));
+  }
+  function leadGridForBar(part,bar){
+    const res=+part.resolution||16,bi=bar%Math.max(1,+part.bars||1),start=bi*res;
+    const ev=(part.events||[]).filter(e=>e.step>=start&&e.step<start+res);
+    if(!ev.length)return null;
     const nn=n=>['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((n%12)+12)%12]+(Math.floor(n/12)-1);
-    for(const p of exportParts.filter(x=>x.enabled!==false)){
-      if(p.type==='lead'){
-        const sec=document.createElement('section');sec.className='export-pattern';sec.innerHTML=`<h3>${esc(p.name)} — ${esc(p.sound||'Lead / Bass')}</h3>`;
-        for(let bar=0;bar<p.bars;bar++){const line=document.createElement('div'),spb=p.resolution,start=bar*spb,ev=(p.events||[]).filter(e=>e.step>=start&&e.step<start+spb).sort((a,b)=>a.step-b.step);line.innerHTML=`<strong>Bar ${bar+1}:</strong> ${ev.length?ev.map(e=>`${nn(e.midi+(p.octave||0)*12)} @ ${((e.step-start)/(p.resolution/4)+1).toFixed(2)}`).join(' • '):'—'}`;sec.appendChild(line);}sheet.appendChild(sec);
-      }else if(p.type==='vocal'){
-        const sec=document.createElement('section');sec.className='export-pattern';sec.innerHTML=`<h3>${esc(p.name)} — Lyrics / transcript</h3><div class="export-lyrics">${esc(p.transcript||'No transcript captured. Edit the Lyrics / transcript box in the Vocal part to add or correct words.')}</div>`;sheet.appendChild(sec);
-      }
+    const notes=[...new Set(ev.map(e=>nn(e.midi+(part.octave||0)*12)))].sort((a,b)=>{const m=x=>{const z=x.match(/^([A-G])(#?)(-?\d+)$/),pc={C:0,D:2,E:4,F:5,G:7,A:9,B:11}[z[1]]+(z[2]?1:0);return (+z[3]+1)*12+pc};return m(b)-m(a)});
+    const sets=Object.fromEntries(notes.map(n=>[n,new Set()]));ev.forEach(e=>sets[nn(e.midi+(part.octave||0)*12)].add(e.step-start));
+    const cols=Array.from({length:res},(_,i)=>i%(res/4)===0?String(Math.floor(i/(res/4))+1):'·');
+    return exportGrid(`${part.name} — Bar ${bi+1}`,notes,cols,(r,i)=>sets[r].has(i));
+  }
+  function chordBlockForLine(part,lineIndex){
+    const row=part.data?.rows?.[lineIndex]||[];if(!row.length)return null;
+    const sec=document.createElement('div');sec.className='export-chord-block';
+    const h=document.createElement('div');h.className='export-part-label';h.textContent=part.name;sec.appendChild(h);
+    const names=document.createElement('div');names.className='export-chord-names';names.textContent=row.map(displayedValue).join('  •  ');sec.appendChild(names);
+    // The currently loaded chord part can also show its familiar diagrams.
+    if(part.id===window.CRPParts?.getActiveChordId?.() || (!window.CRPParts?.getActiveChordId && lineIndex<state.rows.length)){
+      const cards=document.createElement('div');cards.className='export-card-row compact';
+      row.forEach(card=>{const el=document.createElement('div');el.className='export-card';const shown=displayedValue(card),sub=subtitle(card);el.innerHTML=`<div class="export-card-name">${card.type==='note'?'♪ ':''}${esc(shown)}</div><div class="export-card-subtitle">${esc(sub||' ')}</div><div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div>`;cards.appendChild(el)});sec.appendChild(cards);
     }
-    const db=window.CRPBeatMaker?.getBeat?.();if(db?.enabled){const labels={kick1:'Kick 1',kick2:'Kick 2',kick3:'Kick 3',snare1:'Snare 1',snare2:'Snare 2',snare3:'Snare 3',snare4:'Snare 4',snare5:'Snare 5',chh:'Closed Hat',ohh:'Open Hat',tomHi:'High Tom',tomMid:'Mid Tom',tomLow:'Low Tom',clap:'Clap',rim:'Rim',shaker:'Shaker',tamb:'Tambourine',cowbell:'Cowbell',conga:'Conga'};const sec=document.createElement('section');sec.className='export-pattern';sec.innerHTML='<h3>Drum pattern</h3>';for(let bar=0;bar<db.bars;bar++){const used=Object.entries(db.tracks||{}).filter(([id,bars])=>(bars[bar]||[]).length);const d=document.createElement('div');d.innerHTML=`<strong>Bar ${bar+1}:</strong> ${used.length?used.map(([id,bars])=>`${labels[id]||id}: ${(bars[bar]||[]).map(x=>(x/16+1).toFixed(2)).join(', ')}`).join(' | '):'—'}`;sec.appendChild(d);}sheet.appendChild(sec);}
-
-    const notes=$('notesEditor').innerHTML.trim();
-    if(notes&&$('notesEditor').textContent.trim()){
-      const n=document.createElement('section');n.className='export-notes';n.innerHTML=`<h3>Project notes</h3><div class="export-notes-body">${notes}</div>`;sheet.appendChild(n);
+    return sec;
+  }
+  function buildExportSheet(selection={}){
+    const bad=commitBuildInput();if(bad.length)$('status').textContent=`Skipped unrecognized: ${bad.join(', ')}`;
+    syncBuildInput();autoPopulateKeyFromEntry();renderAll();
+    const exportParts=window.CRPParts?.getExportData?.()||[];
+    const selectedIds=new Set(selection.partIds||exportParts.filter(p=>p.enabled!==false).map(p=>p.id));
+    const selectedParts=exportParts.filter(p=>selectedIds.has(p.id));
+    if(!selectedParts.length&&!selection.drums&&!selection.notes)throw new Error('Choose at least one part to export.');
+    const stage=$('exportStage');stage.innerHTML='';const sheet=document.createElement('section');sheet.className='export-sheet';
+    const projectName=$('projectName').value.trim()||'Untitled Chord Project',keyLabel=exportKeyLabel(),bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4;
+    const header=document.createElement('header');header.className='export-sheet-header';header.innerHTML=`<div class="export-sheet-title-row"><div><h1>${esc(projectName)}</h1><div class="export-sheet-subtitle">Chord Rider Pro song blueprint</div></div><div class="export-sheet-key">Key ${esc(keyLabel)}</div></div>`;
+    const meta=document.createElement('div');meta.className='export-meta-grid';meta.append(makeMetaChip(`${bpm} BPM`),makeMetaChip(`${beats} beat${beats===1?'':'s'} / chord`));header.appendChild(meta);sheet.appendChild(header);
+    const chordParts=selectedParts.filter(p=>p.type==='chord'),leadParts=selectedParts.filter(p=>p.type==='lead'&&!/bass/i.test(p.name||'')&&p.sound!=='electric_bass_finger'),bassParts=selectedParts.filter(p=>p.type==='lead'&&(/bass/i.test(p.name||'')||p.sound==='electric_bass_finger')),vocals=selectedParts.filter(p=>p.type==='vocal');
+    const db=selection.drums?window.CRPBeatMaker?.getBeat?.():null;
+    const maxLines=Math.max(1,...chordParts.map(p=>p.data?.rows?.length||0),...leadParts.map(p=>p.bars||0),...bassParts.map(p=>p.bars||0),db?.bars||0);
+    for(let li=0;li<maxLines;li++){
+      const line=document.createElement('section');line.className='export-line export-song-line';line.innerHTML=`<div class="export-line-heading"><strong>Line ${li+1}</strong></div>`;
+      const dg=drumGridForBar(db,li);if(dg)line.appendChild(dg);
+      vocals.forEach(v=>{if(!v.transcript?.trim())return;const b=document.createElement('div');b.className='export-vocal-block';b.innerHTML=`<div class="export-part-label">${esc(v.name)}</div><div class="export-lyrics">${esc(v.transcript)}</div>`;line.appendChild(b)});
+      leadParts.forEach(p=>{const g=leadGridForBar(p,li);if(g)line.appendChild(g)});
+      bassParts.forEach(p=>{const g=leadGridForBar(p,li);if(g)line.appendChild(g)});
+      chordParts.forEach(p=>{const c=chordBlockForLine(p,li);if(c)line.appendChild(c)});
+      sheet.appendChild(line);
     }
-    const footer=document.createElement('footer');footer.className='export-sheet-footer';
-    footer.innerHTML=`<img src="assets/rider-and-bones-left-still.png" alt="Rider and Bones"><span>Created with Chord Rider Pro</span>`;
-    sheet.appendChild(footer);stage.appendChild(sheet);return sheet;
+    if(selection.notes){const notes=$('notesEditor').innerHTML.trim();if(notes&&$('notesEditor').textContent.trim()){const n=document.createElement('section');n.className='export-notes';n.innerHTML=`<h3>Project notes</h3><div class="export-notes-body">${notes}</div>`;sheet.appendChild(n)}}
+    const footer=document.createElement('footer');footer.className='export-sheet-footer';footer.innerHTML=`<img src="assets/rider-and-bones-left-still.png" alt="Rider and Bones"><span>Created with Chord Rider Pro</span>`;sheet.appendChild(footer);stage.appendChild(sheet);return sheet;
   }
   async function waitForExportImages(root){
     const imgs=[...root.querySelectorAll('img')];
     await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=img.onerror=resolve;})));
   }
-  async function captureExportSheet(forPdf=false){
+  async function captureExportSheet(forPdf=false,selection={}){
     if(typeof html2canvas!=='function')throw new Error('Export tools did not load. Check your connection and try again.');
-    const sheet=buildExportSheet();sheet.classList.toggle('pdf-print',forPdf);await waitForExportImages(sheet);
+    const sheet=buildExportSheet(selection);sheet.classList.toggle('pdf-print',forPdf);await waitForExportImages(sheet);
     await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
     const bounds=sheet.getBoundingClientRect();
     const breaks=[...sheet.querySelectorAll('.export-sheet-header,.export-line,.export-notes,.export-sheet-footer')]
@@ -1130,27 +1133,23 @@
     try{const {canvas}=await captureExportSheet();downloadDataUrl(canvas.toDataURL('image/png'),exportFileName('png'));$('status').textContent='PNG chord sheet exported.';}
     catch(e){$('status').textContent=e.message||'Could not export PNG.';}
   }
-  async function exportPdf(){
-    closeExportMenu();$('status').textContent='Creating PDF chord sheet…';
+  function closePdfExport(){document.getElementById('pdfExportModal')?.remove();}
+  function openPdfExport(){
+    closeExportMenu();closePdfExport();const parts=window.CRPParts?.getExportData?.()||[];
+    const rows=parts.map(p=>`<label class="studio-export-row"><input type="checkbox" data-pdf-part="${p.id}" ${p.enabled===false?'':'checked'}><span><strong>${esc(p.name)}</strong><br><span class="subtle tiny">${p.type==='chord'?'Chord / Note':p.type==='lead'?'Lead / Bass':'Vocals'}</span></span></label>`).join('');
+    const modal=document.createElement('div');modal.id='pdfExportModal';modal.className='studio-export-modal';modal.innerHTML=`<div class="studio-export-backdrop"></div><div class="studio-export-card"><h2>PDF song blueprint</h2><p class="subtle">Choose exactly what appears in the PDF. Each Line is grouped as Drums → Vocals → Lead → Bass → Chords.</p><div class="studio-export-list">${rows}<label class="studio-export-row"><input id="pdfExportDrums" type="checkbox" checked><span><strong>Drums</strong><br><span class="subtle tiny">Visual pattern grid</span></span></label><label class="studio-export-row"><input id="pdfExportNotes" type="checkbox"><span><strong>Project notes</strong><br><span class="subtle tiny">Only included when checked</span></span></label></div><div class="studio-export-actions"><button id="pdfExportCancel" type="button">Cancel</button><button id="pdfExportGo" class="accent" type="button">Create PDF</button></div></div>`;
+    document.body.appendChild(modal);modal.querySelector('.studio-export-backdrop').onclick=closePdfExport;modal.querySelector('#pdfExportCancel').onclick=closePdfExport;modal.querySelector('#pdfExportGo').onclick=()=>{const partIds=[...modal.querySelectorAll('[data-pdf-part]:checked')].map(x=>x.dataset.pdfPart);const selection={partIds,drums:modal.querySelector('#pdfExportDrums').checked,notes:modal.querySelector('#pdfExportNotes').checked};closePdfExport();exportPdf(selection)};
+  }
+  async function exportPdf(selection={}){
+    $('status').textContent='Creating PDF song blueprint…';
     try{
       if(!window.jspdf?.jsPDF)throw new Error('PDF tools did not load. Check your connection and try again.');
-      const {canvas,breaks}=await captureExportSheet(true),{jsPDF}=window.jspdf;
+      const {canvas,breaks}=await captureExportSheet(true,selection),{jsPDF}=window.jspdf;
       const pdf=new jsPDF({orientation:'portrait',unit:'pt',format:'letter',compress:true});
       const pageW=pdf.internal.pageSize.getWidth(),pageH=pdf.internal.pageSize.getHeight(),margin=18,drawW=pageW-margin*2,drawH=pageH-margin*2;
-      const scale=canvas.width/1120,idealSliceCss=(drawH/(drawW/canvas.width))/scale;
-      let topCss=0,page=0,totalCss=canvas.height/scale;
-      while(topCss<totalCss-1){
-        const limit=Math.min(totalCss,topCss+idealSliceCss);
-        const candidates=breaks.filter(y=>y>topCss+idealSliceCss*.35&&y<=limit+1);
-        const bottomCss=(limit>=totalCss-1)?totalCss:(candidates.length?candidates[candidates.length-1]:limit);
-        const sy=Math.round(topCss*scale),sh=Math.max(1,Math.round((bottomCss-topCss)*scale));
-        const slice=document.createElement('canvas');slice.width=canvas.width;slice.height=sh;
-        slice.getContext('2d').drawImage(canvas,0,sy,canvas.width,sh,0,0,canvas.width,sh);
-        if(page++)pdf.addPage();
-        const imgH=sh*(drawW/canvas.width);pdf.addImage(slice.toDataURL('image/jpeg',.94),'JPEG',margin,margin,drawW,imgH,undefined,'FAST');
-        topCss=bottomCss;
-      }
-      pdf.save(exportFileName('pdf'));$('status').textContent='PDF chord sheet exported.';
+      const scale=canvas.width/1120,idealSliceCss=(drawH/(drawW/canvas.width))/scale;let topCss=0,page=0,totalCss=canvas.height/scale;
+      while(topCss<totalCss-1){const limit=Math.min(totalCss,topCss+idealSliceCss),candidates=breaks.filter(y=>y>topCss+idealSliceCss*.35&&y<=limit+1),bottomCss=(limit>=totalCss-1)?totalCss:(candidates.length?candidates[candidates.length-1]:limit),sy=Math.round(topCss*scale),sh=Math.max(1,Math.round((bottomCss-topCss)*scale)),slice=document.createElement('canvas');slice.width=canvas.width;slice.height=sh;slice.getContext('2d').drawImage(canvas,0,sy,canvas.width,sh,0,0,canvas.width,sh);if(page++)pdf.addPage();const imgH=sh*(drawW/canvas.width);pdf.addImage(slice.toDataURL('image/jpeg',.94),'JPEG',margin,margin,drawW,imgH,undefined,'FAST');topCss=bottomCss;}
+      pdf.save(exportFileName('pdf'));$('status').textContent='PDF song blueprint exported.';
     }catch(e){$('status').textContent=e.message||'Could not export PDF.';}
   }
   function closeExportMenu(){const m=$('exportMenu'),b=$('exportBtn');if(m)m.hidden=true;if(b)b.setAttribute('aria-expanded','false');}
@@ -1178,7 +1177,7 @@
     $('playAllBtn').onclick=playProgression;
     $('newProjectBtn').onclick=newProject;
     $('saveProjectBtn').onclick=saveProject;
-    $('exportBtn').onclick=e=>{e.stopPropagation();toggleExportMenu();};$('exportPdfBtn').onclick=exportPdf;$('exportPngBtn').onclick=exportPng;$('exportStudioBtn').onclick=()=>{closeExportMenu();window.CRPParts?.openStudioExport?.();};
+    $('exportBtn').onclick=e=>{e.stopPropagation();toggleExportMenu();};$('exportPdfBtn').onclick=openPdfExport;$('exportPngBtn').onclick=exportPng;$('exportStudioBtn').onclick=()=>{closeExportMenu();window.CRPParts?.openStudioExport?.();};
     document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))closeExportMenu();});
 
     // Programmatic scrollIntoView does not generate touchmove/wheel events,

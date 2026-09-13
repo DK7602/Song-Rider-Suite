@@ -1661,3 +1661,16 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
 .active-part-volume-row input[type=range],.vocal-playback-level input[type=range]{appearance:auto!important;-webkit-appearance:auto!important;height:auto!important;background:transparent!important;accent-color:var(--accent);}
 .vocal-transcript-panel textarea{width:100%;box-sizing:border-box;resize:vertical;min-height:96px;background:#0a0f16;color:#eef2f6;border:1px solid #3b4755;border-radius:10px;padding:10px;font:inherit;line-height:1.4}
 .export-pattern{margin:14px 0;padding:12px;border:1px solid #c8c2b6;border-radius:10px;background:#fff;color:#111;break-inside:avoid}.export-pattern h3{margin:0 0 8px}.export-pattern table{width:100%;border-collapse:collapse;font-size:11px}.export-pattern th,.export-pattern td{border:1px solid #aaa;padding:3px;text-align:center}.export-pattern .hit{background:#222;color:#fff;font-weight:700}.export-lyrics{white-space:pre-wrap;line-height:1.45}
+
+/* v1.9.1 — line-first PDF song blueprint */
+.export-song-line{padding:12px 0 18px;border-bottom:2px solid #d6b44f;break-inside:avoid-page}
+.export-part-label{font-size:12px;font-weight:800;color:#20242a;margin:7px 0 5px}
+.export-grid-block,.export-vocal-block,.export-chord-block{margin:8px 0 10px;break-inside:avoid}
+.export-grid-wrap{width:100%;overflow:hidden}
+.export-seq-grid{width:100%;table-layout:fixed;border-collapse:collapse;font-size:8px;background:#fff}
+.export-seq-grid th,.export-seq-grid td{border:1px solid #aeb4ba;text-align:center;height:18px;padding:0;color:#222}
+.export-seq-grid th.row-label{width:82px;text-align:left;padding:0 4px;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.export-seq-grid td.hit{background:#e9c46a;color:#111;font-weight:900}
+.export-chord-names{font-weight:800;font-size:12px;margin-bottom:5px}
+.export-card-row.compact{gap:6px}.export-card-row.compact .export-card{min-width:145px;flex:1 1 22%;padding:6px}
+.export-card-row.compact .diagram svg{max-height:112px}
