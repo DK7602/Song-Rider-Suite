@@ -1,0 +1,9 @@
+Chord Rider Pro v2.0.0 — SRP Merge Preview
+- Adds Song Rider as a third workspace beside Chord Rider and Baby DAW.
+- Chord Rider + Baby DAW remain the same CRP project.
+- Song Rider is optional: a saved CRP project must be intentionally linked.
+- Linking creates/reuses a dedicated SRP project and syncs CRP name, BPM, key metadata, beats/chord, and chord rows into SRP.
+- SRP lyrics/flow remain SRP-owned; syncing chords preserves existing lyrics by row.
+- Unlink removes the relationship without deleting either project.
+- SRP drum/instrument selectors are hidden in embedded mode; CRP/Baby DAW owns music playback/production.
+- Standalone Song Rider files remain bundled under /song-rider for isolation and rollback safety.

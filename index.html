@@ -8,7 +8,7 @@
   <title>Chord Rider Pro</title>
   <link rel="icon" href="assets/rider-and-bones-icon.png" type="image/png" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=1.9.9" />
+  <link rel="stylesheet" href="styles.css?v=2.0.0" />
 </head>
 <body>
   <header class="app-header">
@@ -29,7 +29,21 @@
       <span class="mode-art baby-mode-art" aria-hidden="true"><img src="assets/baby-daw-head-chain-sticker.png" alt="" /></span>
       <span class="mode-copy"><strong>Baby DAW</strong><small>Parts + Production</small></span>
     </button>
+    <button id="songRiderModeBtn" class="workspace-mode-btn" type="button" data-workspace-mode="song-rider" aria-pressed="false">
+      <span class="mode-art song-mode-art" aria-hidden="true"><img src="song-rider/horse-parked.png" alt="" /></span>
+      <span class="mode-copy"><strong>Song Rider</strong><small>Lyrics + Flow</small></span>
+    </button>
   </nav>
+
+
+  <section id="songRiderWorkspace" class="song-rider-workspace" hidden>
+    <div class="srp-linkbar">
+      <div><strong>Song Rider Pro</strong><span id="srpLinkStatus">Not linked to this CRP project</span></div>
+      <button id="srpLinkBtn" type="button">🔗 Link this project to SRP</button>
+      <button id="srpUnlinkBtn" type="button" hidden>Unlink</button>
+    </div>
+    <iframe id="songRiderFrame" title="Song Rider Pro" src="song-rider/index.html?embedded=1"></iframe>
+  </section>
 
   <main class="app-shell">
     
@@ -341,8 +355,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
-  <script src="app.js?v=1.9.8"></script>
-  <script src="parts.js?v=1.9.8"></script>
-  <script src="beat-maker.js?v=1.9.8"></script>
+  <script src="app.js?v=2.0.0"></script>
+  <script src="parts.js?v=2.0.0"></script>
+  <script src="beat-maker.js?v=2.0.0"></script>
 </body>
 </html>

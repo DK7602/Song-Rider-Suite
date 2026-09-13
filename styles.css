@@ -1744,3 +1744,15 @@ body.workspace-chord-rider #chordPartControls.part-hidden > .toolbar,body.worksp
   .baby-mode-art{flex-basis:48px;width:48px;height:50px;background:none!important;}
   .baby-mode-art img{width:46px;height:50px;}
 }
+
+/* v2.0.0 — three-workspace shell + optional SRP link */
+.workspace-mode-switch{grid-template-columns:repeat(3,minmax(0,1fr));}
+.song-mode-art img{object-fit:contain;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55));}
+.song-rider-workspace{max-width:1180px;margin:0 auto 18px;padding:0 14px;}
+.song-rider-workspace[hidden]{display:none!important;}
+.srp-linkbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:10px 12px;border:1px solid rgba(216,174,82,.45);border-radius:14px;background:#15181d;}
+.srp-linkbar>div{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 220px}.srp-linkbar span{font-size:.78rem;color:#aeb4bf}
+.srp-linkbar button{border:1px solid #d8ae52;border-radius:10px;background:#20242b;color:#f4d47d;padding:9px 12px;font-weight:800}
+#songRiderFrame{display:block;width:100%;min-height:1050px;border:0;border-radius:16px;background:#fff;}
+body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:none!important;}
+@media(max-width:640px){.workspace-mode-switch{gap:7px}.workspace-mode-btn{padding:8px 6px}.workspace-mode-btn .mode-copy strong{font-size:.92rem}.workspace-mode-btn .mode-copy small{font-size:.66rem}.mode-art{width:48px;min-width:48px}.song-rider-workspace{padding:0 5px}#songRiderFrame{min-height:1200px;border-radius:10px}}
