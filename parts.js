@@ -15,7 +15,7 @@
   let leadBarPage=0;
   let playing=false, starting=false, playbackGeneration=0;
   let audioCtx=null, masterLimiter=null, cycleTimer=null;
-  let playerCache=new Map(), partBuses=new Map(), highlightTimers=[], activeVoices=new Set();
+  let playerCache=new Map(), partBuses=new Map(), highlightTimers=[], activeVoices=new Set(), vocalBufferCache=new Map(), activeVocalSources=new Set();
   let micStream=null,micCtx=null,micSource=null,micAnalyser=null,micProcessor=null,micSilentGain=null,micMeterRaf=0;
   let recording=false,recordChunks=[],recordSampleRate=48000,recordStartedAt=0,recordTimer=null,currentPreview=null;
 
@@ -159,7 +159,7 @@
   async function vocalDbDelete(id){const db=await openVocalDb();return new Promise((resolve,reject)=>{const tx=db.transaction('takes','readwrite');tx.objectStore('takes').delete(id);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>{db.close();reject(tx.error);};});}
   function fmtTime(sec){sec=Math.max(0,Number(sec)||0);const m=Math.floor(sec/60),s=sec-m*60;return `${String(m).padStart(2,'0')}:${s.toFixed(1).padStart(4,'0')}`;}
   function renderVocalBacking(p){const box=$('vocalBackingParts');if(!box)return;const candidates=parts.filter(x=>x.id!==p.id&&(x.type==='chord'||x.type==='lead'));if(!p.backingPartIds?.length)p.backingPartIds=candidates.filter(x=>x.enabled).map(x=>x.id);box.innerHTML='';candidates.forEach(x=>{const lab=document.createElement('label');lab.className='vocal-backing-item';const chk=document.createElement('input');chk.type='checkbox';chk.checked=p.backingPartIds.includes(x.id);chk.onchange=()=>{p.backingPartIds=candidates.filter(c=>box.querySelector(`[data-back-id="${c.id}"]`)?.checked).map(c=>c.id);core.scheduleAutoSave();};chk.dataset.backId=x.id;const span=document.createElement('span');span.textContent=x.name;lab.append(chk,span);box.appendChild(lab);});if(!candidates.length)box.innerHTML='<span class="subtle tiny">Add a Chord/Note or Lead/Bass part for a headphone backing track.</span>';}
-  async function renderVocalTakes(p){const box=$('vocalTakes');if(!box)return;box.innerHTML='';if(!p.recordings.length){box.innerHTML='<div class="vocal-empty">No takes yet. Put on headphones and tap Record.</div>';return;}for(const take of [...p.recordings].reverse()){const row=document.createElement('div');row.className='vocal-take'+(p.activeTakeId===take.id?' active':'');const main=document.createElement('div');main.className='vocal-take-main';main.innerHTML=`<div class="vocal-take-name">${escapeHtml(take.name||'Vocal take')}</div><div class="vocal-take-meta">${fmtTime(take.duration)} • ${take.sampleRate||48000} Hz WAV • ${new Date(take.createdAt).toLocaleString()}</div>`;const use=document.createElement('button');use.type='button';use.className='take-use';use.textContent=p.activeTakeId===take.id?'Using':'Use';use.onclick=()=>{p.activeTakeId=take.id;renderVocalTakes(p);core.scheduleAutoSave();};const play=document.createElement('button');play.type='button';play.textContent='▶';play.title='Preview take';play.onclick=()=>previewTake(p,take,play);const dl=document.createElement('button');dl.type='button';dl.className='take-download';dl.textContent='↓ WAV';dl.onclick=()=>downloadTake(take);const del=document.createElement('button');del.type='button';del.className='take-delete';del.textContent='×';del.title='Delete take';del.onclick=async()=>{if(!confirm(`Delete “${take.name}”?`))return;stopPreview();await vocalDbDelete(take.id).catch(()=>{});p.recordings=p.recordings.filter(r=>r.id!==take.id);if(p.activeTakeId===take.id)p.activeTakeId=p.recordings.at(-1)?.id||null;renderVocalTakes(p);core.scheduleAutoSave();};row.append(main,use,play,dl,del);box.appendChild(row);}}
+  async function renderVocalTakes(p){const box=$('vocalTakes');if(!box)return;box.innerHTML='';if(!p.recordings.length){box.innerHTML='<div class="vocal-empty">No takes yet. Put on headphones and tap Record.</div>';return;}for(const take of [...p.recordings].reverse()){const row=document.createElement('div');row.className='vocal-take'+(p.activeTakeId===take.id?' active':'');const main=document.createElement('div');main.className='vocal-take-main';main.innerHTML=`<div class="vocal-take-name">${escapeHtml(take.name||'Vocal take')}</div><div class="vocal-take-meta">${fmtTime(take.duration)} • ${take.sampleRate||48000} Hz WAV • ${new Date(take.createdAt).toLocaleString()}</div>`;const use=document.createElement('button');use.type='button';use.className='take-use';use.textContent=p.activeTakeId===take.id?'Using':'Use';use.onclick=()=>{p.activeTakeId=take.id;renderVocalTakes(p);core.scheduleAutoSave();};const play=document.createElement('button');play.type='button';play.textContent='▶';play.title='Preview take';play.onclick=()=>previewTake(p,take,play);const dl=document.createElement('button');dl.type='button';dl.className='take-download';dl.textContent='↓ WAV';dl.onclick=()=>downloadTake(take);const del=document.createElement('button');del.type='button';del.className='take-delete';del.textContent='×';del.title='Delete take';del.onclick=async()=>{if(!confirm(`Delete “${take.name}”?`))return;stopPreview();await vocalDbDelete(take.id).catch(()=>{});vocalBufferCache.delete(take.id);p.recordings=p.recordings.filter(r=>r.id!==take.id);if(p.activeTakeId===take.id)p.activeTakeId=p.recordings.at(-1)?.id||null;renderVocalTakes(p);core.scheduleAutoSave();};row.append(main,use,play,dl,del);box.appendChild(row);}}
   function renderVocalEditor(p=active()){
     if(!p||p.type!=='vocal')return;$('vocalPartTitle').textContent=p.name;$('vocalVolume').value=Math.round(p.volume*100);$('vocalVolumeValue').textContent=`${Math.round(p.volume*100)}%`;renderVocalBacking(p);$('vocalBackingDrums').checked=p.backingDrums!==false;$('vocalBackingVolume').value=Math.round((p.backingVolume??.8)*100);$('vocalBackingVolumeValue').textContent=`${Math.round((p.backingVolume??.8)*100)}%`;$('vocalFxEq').value=p.fx?.eq||'clear';$('vocalFxComp').value=p.fx?.comp||'medium';$('vocalFxReverb').value=String(p.fx?.reverb??.12);$('vocalFxDelay').value=String(p.fx?.delay||0);renderVocalTakes(p);
   }
@@ -177,7 +177,7 @@
   }
   async function endRecording(){
     const p=active();if(!p||p.type!=='vocal'||!recording)return;recording=false;clearInterval(recordTimer);recordTimer=null;$('vocalRecordBtn').classList.remove('recording');$('vocalRecordBtn').disabled=false;$('vocalStopBtn').disabled=true;window.CRPParts?.stopPlayback?.();micProcessor?.disconnect();micSilentGain?.disconnect();if(micProcessor)micProcessor.onaudioprocess=null;micProcessor=null;micSilentGain=null;
-    if(p._recordOldStates){for(const x of parts)x.enabled=p._recordOldStates.get(x.id)??x.enabled;delete p._recordOldStates;}if(p._recordOldVolumes){for(const x of parts)x.volume=p._recordOldVolumes.get(x.id)??x.volume;delete p._recordOldVolumes;}const drumToggle=$('crpDrumsToggle');if(drumToggle&&p._recordOldDrums!==undefined){drumToggle.checked=p._recordOldDrums;drumToggle.dispatchEvent(new Event('change'));delete p._recordOldDrums;}const drumVol=$('crpDrumVolume');if(drumVol&&p._recordOldDrumVol!==undefined){drumVol.value=p._recordOldDrumVol;drumVol.dispatchEvent(new Event('input'));delete p._recordOldDrumVol;}renderParts();const duration=(performance.now()-recordStartedAt)/1000;$('vocalTimer').textContent=fmtTime(duration);if(duration<.25||!recordChunks.length){core.status('Recording was too short.');return;}const blob=floatToWav(recordChunks,recordSampleRate),id=uid(),take={id,name:`Take ${p.recordings.length+1}`,createdAt:new Date().toISOString(),duration,sampleRate:recordSampleRate,size:blob.size};try{await vocalDbPut(id,blob);p.recordings.push(take);p.activeTakeId=id;core.scheduleAutoSave();await renderVocalTakes(p);core.status(`Saved ${take.name} as a dry WAV on this device.`);}catch(e){console.error(e);core.status('Take was recorded but could not be stored on this device.');}
+    if(p._recordOldStates){for(const x of parts)x.enabled=p._recordOldStates.get(x.id)??x.enabled;delete p._recordOldStates;}if(p._recordOldVolumes){for(const x of parts)x.volume=p._recordOldVolumes.get(x.id)??x.volume;delete p._recordOldVolumes;}const drumToggle=$('crpDrumsToggle');if(drumToggle&&p._recordOldDrums!==undefined){drumToggle.checked=p._recordOldDrums;drumToggle.dispatchEvent(new Event('change'));delete p._recordOldDrums;}const drumVol=$('crpDrumVolume');if(drumVol&&p._recordOldDrumVol!==undefined){drumVol.value=p._recordOldDrumVol;drumVol.dispatchEvent(new Event('input'));delete p._recordOldDrumVol;}renderParts();const duration=(performance.now()-recordStartedAt)/1000;$('vocalTimer').textContent=fmtTime(duration);if(duration<.25||!recordChunks.length){core.status('Recording was too short.');return;}const blob=floatToWav(recordChunks,recordSampleRate),id=uid(),take={id,name:`Take ${p.recordings.length+1}`,createdAt:new Date().toISOString(),duration,sampleRate:recordSampleRate,size:blob.size};try{await vocalDbPut(id,blob);vocalBufferCache.delete(id);p.recordings.push(take);p.activeTakeId=id;core.scheduleAutoSave();await renderVocalTakes(p);core.status(`Saved ${take.name} as a dry WAV on this device.`);}catch(e){console.error(e);core.status('Take was recorded but could not be stored on this device.');}
   }
   async function downloadTake(take){const blob=await vocalDbGet(take.id);if(!blob){core.status('This take audio is not stored on this device.');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${(take.name||'vocal-take').replace(/[^a-z0-9_-]+/gi,'-')}.wav`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);}
   function stopPreview(){if(currentPreview){try{currentPreview.source?.stop();currentPreview.audio?.pause();}catch{}try{currentPreview.ctx?.close();}catch{}currentPreview=null;}}
@@ -190,6 +190,8 @@
     return 0;
   }
   function enabledPlayable(){return parts.filter(p=>p.enabled&&(p.type==='chord'||p.type==='lead')&&partDurationBeats(p)>0);}
+  function enabledVocals(){return parts.filter(p=>p.enabled&&p.type==='vocal'&&p.activeTakeId&&p.recordings?.some(r=>r.id===p.activeTakeId));}
+  function vocalDurationBeats(p){const t=p.recordings?.find(r=>r.id===p.activeTakeId);return t?Math.max(0,(Number(t.duration)||0)*core.bpm/60):0;}
   function ensureAudio(){
     if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();
     if(!masterLimiter){masterLimiter=audioCtx.createDynamicsCompressor();masterLimiter.threshold.value=-2;masterLimiter.knee.value=0;masterLimiter.ratio.value=20;masterLimiter.attack.value=.003;masterLimiter.release.value=.12;masterLimiter.connect(audioCtx.destination);}
@@ -202,6 +204,27 @@
     const promise=Soundfont.instrument(audioCtx,sound,{format:'mp3',soundfont:'MusyngKite',destination:busFor(p)});playerCache.set(key,promise);return promise;
   }
   async function preload(ps){await Promise.all(ps.map(p=>playerFor(p)));}
+  async function vocalBufferFor(p){
+    const take=p.recordings?.find(r=>r.id===p.activeTakeId);if(!take)return null;
+    if(vocalBufferCache.has(take.id))return vocalBufferCache.get(take.id);
+    const promise=(async()=>{const blob=await vocalDbGet(take.id);if(!blob)return null;ensureAudio();return await audioCtx.decodeAudioData(await blob.arrayBuffer());})();
+    vocalBufferCache.set(take.id,promise);
+    try{return await promise;}catch(e){vocalBufferCache.delete(take.id);throw e;}
+  }
+  function connectVocalFx(p,src){
+    ensureAudio();const eq=audioCtx.createBiquadFilter(),comp=audioCtx.createDynamicsCompressor(),dry=audioCtx.createGain(),wet=audioCtx.createGain(),rev=audioCtx.createConvolver(),delay=audioCtx.createDelay(1),delayGain=audioCtx.createGain(),out=audioCtx.createGain();
+    const fx=p.fx||{};eq.type=fx.eq==='warm'?'lowshelf':fx.eq==='bright'?'highshelf':'peaking';eq.frequency.value=fx.eq==='warm'?180:fx.eq==='bright'?4500:2800;eq.gain.value=fx.eq==='flat'?0:fx.eq==='warm'?2:fx.eq==='bright'?2.5:1.5;
+    const c=fx.comp||'medium';comp.threshold.value=c==='off'?0:c==='light'?-12:c==='heavy'?-24:-18;comp.ratio.value=c==='off'?1:c==='light'?2:c==='heavy'?6:3.5;comp.attack.value=.008;comp.release.value=.12;
+    dry.gain.value=1;wet.gain.value=Number(fx.reverb||0);rev.buffer=impulse(audioCtx,fx.reverb>.25?1.6:fx.reverb>.15?1.1:.7);delay.delayTime.value=Number(fx.delay||0);delayGain.gain.value=fx.delay?0.22:0;out.gain.value=p.volume;
+    src.connect(eq);eq.connect(comp);comp.connect(dry);dry.connect(out);comp.connect(rev);rev.connect(wet);wet.connect(out);comp.connect(delay);delay.connect(delayGain);delayGain.connect(out);out.connect(masterLimiter);
+    return {eq,comp,dry,wet,rev,delay,delayGain,out};
+  }
+  async function scheduleVocalSegment(p,startTime,fromBeat,toBeat,generation){
+    if(!playing||generation!==playbackGeneration)return;const buf=await vocalBufferFor(p);if(!buf||!playing||generation!==playbackGeneration)return;
+    const beatSec=60/core.bpm,offsetSec=Math.max(0,fromBeat*beatSec),spanSec=Math.max(0,(toBeat-fromBeat)*beatSec);if(offsetSec>=buf.duration||spanSec<=0)return;
+    const src=audioCtx.createBufferSource();src.buffer=buf;connectVocalFx(p,src);activeVocalSources.add(src);src.onended=()=>activeVocalSources.delete(src);
+    try{src.start(startTime,offsetSec,Math.min(spanSec,buf.duration-offsetSec));}catch(e){activeVocalSources.delete(src);try{src.disconnect();}catch{}console.warn('Could not schedule vocal',e);}
+  }
   function scheduleHighlight(delayMs,p,cardIndex){
     if(p.id!==activePartId||p.type!=='chord')return;
     const t=setTimeout(()=>{document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');const cards=[...document.querySelectorAll('.progression-line:not(.carousel-clone) .chord-card')];cards[cardIndex]?.style.setProperty('outline','2px solid var(--accent)');},Math.max(0,delayMs));highlightTimers.push(t);
@@ -225,6 +248,8 @@
     // individually cancelled, it now has nowhere audible to go.
     for(const voice of activeVoices){try{voice.stop(0);}catch{}try{voice.disconnect?.();}catch{}}
     activeVoices.clear();
+    for(const src of activeVocalSources){try{src.stop(0);}catch{}try{src.disconnect();}catch{}}
+    activeVocalSources.clear();
     for(const bus of partBuses.values()){try{bus.gain.cancelScheduledValues(audioCtx?.currentTime||0);bus.gain.value=0;bus.disconnect();}catch{}}
     partBuses.clear();
     playerCache.clear();
@@ -245,18 +270,22 @@
         p.events.forEach(e=>{if(!playing||generation!==playbackGeneration)return;const b=e.step*stepBeats;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;let midi=e.midi+(Number(p.octave)||0)*12;if(p.sound==='electric_bass_finger')midi-=12;playTracked(player,midiName(midi),at,{duration,gain:.92});scheduleLeadHighlight((at-audioCtx.currentTime)*1000,p,e.step);});
       }
     }
+    for(const p of enabledVocals()){
+      if(!playing||generation!==playbackGeneration)return;
+      await scheduleVocalSegment(p,startTime,fromBeat,toBeat,generation);
+    }
   }
   async function startPlayback(){
     if(playing||starting)stopPlayback();
-    syncLoadedChord();const ps=enabledPlayable();if(!ps.length){core.status('Turn on a Chord/Note or Lead/Bass part with something in it first.');return;}
+    syncLoadedChord();const ps=enabledPlayable(),vs=enabledVocals();if(!ps.length&&!vs.length){core.status('Turn on a part with something in it first.');return;}
     const generation=++playbackGeneration;
     starting=true;
     try{
-      core.status('Loading part sounds…');ensureAudio();await preload(ps);
+      core.status('Loading parts…');ensureAudio();await Promise.all([preload(ps),...vs.map(v=>vocalBufferFor(v))]);
       if(generation!==playbackGeneration)return;
       starting=false;playing=true;core.setPlaying(true);core.status('');await window.CRPBeatMaker?.startMainNow?.();
       if(generation!==playbackGeneration||!playing){window.CRPBeatMaker?.stopMainNow?.();return;}
-      const total=Math.max(...ps.map(partDurationBeats),4);let fromBeat=(active()?.type==='chord'&&active()?.enabled&&activePartId===loadedChordPartId)?Math.min(core.startBeat(),Math.max(0,total-0.001)):0;
+      const total=Math.max(...ps.map(partDurationBeats),...vs.map(vocalDurationBeats),4);let fromBeat=(active()?.type==='chord'&&active()?.enabled&&activePartId===loadedChordPartId)?Math.min(core.startBeat(),Math.max(0,total-0.001)):0;
       let nextAudioStart=audioCtx.currentTime+.10;
       const scheduleNext=async()=>{
         if(!playing||generation!==playbackGeneration)return;
