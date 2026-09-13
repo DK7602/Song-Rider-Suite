@@ -1,0 +1,11 @@
+Chord Rider Pro v1.9.3 — Universal Cloud Transcription
+
+- Server-side vocal transcription through Cloudflare Workers AI.
+- Uses the dry WAV master stored in the private R2 AUDIO bucket.
+- Works independently of browser speech-recognition support.
+- New takes auto-upload/transcribe when signed in and the project is saved.
+- Added Transcribe active take retry button.
+- Transcript remains editable and is saved with the take/project.
+- Word timing is retained when returned by the transcription model so PDF lyrics can be placed by song line.
+
+Cloudflare setup required once: add a Workers AI binding named AI to the chord-rider-pro Worker. R2 AUDIO and D1 DB bindings remain unchanged.

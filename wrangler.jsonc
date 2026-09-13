@@ -18,6 +18,10 @@
     }
   ],
 
+  "ai": {
+    "binding": "AI"
+  },
+
   "r2_buckets": [
     {
       "binding": "AUDIO",

@@ -1050,7 +1050,8 @@
     const h=document.createElement('div');h.className='export-part-label';h.textContent=title;sec.appendChild(h);
     const wrap=document.createElement('div');wrap.className='export-grid-wrap';
     const table=document.createElement('table');table.className='export-seq-grid';
-    const head=document.createElement('tr');head.innerHTML='<th class="row-label"></th>'+columns.map(c=>`<th>${esc(c)}</th>`).join('');table.appendChild(head);
+    const cg=document.createElement('colgroup');cg.innerHTML='<col class="label-col">'+columns.map(()=>'<col class="step-col">').join('');table.appendChild(cg);
+    const head=document.createElement('tr');head.innerHTML='<th class="row-label"></th>'+columns.map((c,i)=>`<th class="${String(c).match(/^\d/) ? 'beat-key' : 'sub-key'}">${esc(c)}</th>`).join('');table.appendChild(head);
     rows.forEach(r=>{const tr=document.createElement('tr');tr.innerHTML=`<th class="row-label">${esc(r)}</th>`+columns.map((_,i)=>`<td class="${activeByRow(r,i)?'hit':''}">${activeByRow(r,i)?'●':''}</td>`).join('');table.appendChild(tr);});
     wrap.appendChild(table);sec.appendChild(wrap);return sec;
   }
@@ -1061,7 +1062,7 @@
     const used=Object.entries(db.tracks||{}).filter(([id,bars])=>(bars[bi]||[]).length);
     if(!used.length)return null;
     const res=[8,16,32,64].includes(+db.resolution)?+db.resolution:16,stride=64/res;
-    const cols=Array.from({length:res},(_,i)=>i%(res/4)===0?String(Math.floor(i/(res/4))+1):'·');
+    const spb=res/4,sub16=['1','e','&','a'];const cols=Array.from({length:res},(_,i)=>{const pos=i%spb,beat=Math.floor(i/spb)+1;if(pos===0)return String(beat);if(spb===2)return '&';if(spb===4)return sub16[pos];return pos===spb/2?'&':String(pos+1);});
     const hitsets=Object.fromEntries(used.map(([id,bars])=>[labels[id]||id,new Set(bars[bi]||[])]));
     return exportGrid(`Drums — Bar ${bi+1}`,Object.keys(hitsets),cols,(r,i)=>hitsets[r].has(i*stride));
   }
@@ -1072,7 +1073,7 @@
     const nn=n=>['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((n%12)+12)%12]+(Math.floor(n/12)-1);
     const notes=[...new Set(ev.map(e=>nn(e.midi+(part.octave||0)*12)))].sort((a,b)=>{const m=x=>{const z=x.match(/^([A-G])(#?)(-?\d+)$/),pc={C:0,D:2,E:4,F:5,G:7,A:9,B:11}[z[1]]+(z[2]?1:0);return (+z[3]+1)*12+pc};return m(b)-m(a)});
     const sets=Object.fromEntries(notes.map(n=>[n,new Set()]));ev.forEach(e=>sets[nn(e.midi+(part.octave||0)*12)].add(e.step-start));
-    const cols=Array.from({length:res},(_,i)=>i%(res/4)===0?String(Math.floor(i/(res/4))+1):'·');
+    const spb=res/4,sub16=['1','e','&','a'];const cols=Array.from({length:res},(_,i)=>{const pos=i%spb,beat=Math.floor(i/spb)+1;if(pos===0)return String(beat);if(spb===2)return '&';if(spb===4)return sub16[pos];return pos===spb/2?'&':String(pos+1);});
     return exportGrid(`${part.name} — Bar ${bi+1}`,notes,cols,(r,i)=>sets[r].has(i));
   }
   function chordBlockForLine(part,lineIndex){
@@ -1104,7 +1105,7 @@
     for(let li=0;li<maxLines;li++){
       const line=document.createElement('section');line.className='export-line export-song-line';line.innerHTML=`<div class="export-line-heading"><strong>Line ${li+1}</strong></div>`;
       const dg=drumGridForBar(db,li);if(dg)line.appendChild(dg);
-      vocals.forEach(v=>{if(!v.transcript?.trim())return;const b=document.createElement('div');b.className='export-vocal-block';b.innerHTML=`<div class="export-part-label">${esc(v.name)}</div><div class="export-lyrics">${esc(v.transcript)}</div>`;line.appendChild(b)});
+      vocals.forEach(v=>{if(!v.transcript?.trim())return;let text=v.transcript;const words=Array.isArray(v.transcriptWords)?v.transcriptWords:[];if(words.length){const barSec=4*60/bpm,start=li*barSec,end=(li+1)*barSec;const timed=words.filter(w=>{const a=Number(w.start??w.start_time??w.begin??0),z=Number(w.end??w.end_time??a);return z>start&&a<end;}).map(w=>String(w.word??w.text??'').trim()).filter(Boolean);text=timed.join(' ').replace(/\s+/g,' ').trim();if(!text)return;}else if(li>0)return;const b=document.createElement('div');b.className='export-vocal-block';b.innerHTML=`<div class="export-part-label">${esc(v.name)}</div><div class="export-lyrics">${esc(text)}</div>`;line.appendChild(b)});
       leadParts.forEach(p=>{const g=leadGridForBar(p,li);if(g)line.appendChild(g)});
       bassParts.forEach(p=>{const g=leadGridForBar(p,li);if(g)line.appendChild(g)});
       chordParts.forEach(p=>{const c=chordBlockForLine(p,li);if(c)line.appendChild(c)});

@@ -1674,3 +1674,12 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
 .export-chord-names{font-weight:800;font-size:12px;margin-bottom:5px}
 .export-card-row.compact{gap:6px}.export-card-row.compact .export-card{min-width:145px;flex:1 1 22%;padding:6px}
 .export-card-row.compact .diagram svg{max-height:112px}
+
+/* v1.9.2 repeat + exact range fill + PDF grid alignment */
+.part-repeat-toggle{display:flex!important;flex-direction:row!important;align-items:center;gap:7px;margin-top:7px;color:var(--muted);font-size:.82rem}.part-repeat-toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.active-part-volume-row input[type=range]{-webkit-appearance:none!important;appearance:none!important;height:22px!important;background:transparent!important;accent-color:var(--accent)}
+.active-part-volume-row input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:999px;background:linear-gradient(to right,var(--accent) 0,var(--accent) var(--range-fill,100%),#485463 var(--range-fill,100%),#485463 100%)}
+.active-part-volume-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);border:2px solid #1a2029;margin-top:-7px}
+.export-seq-grid col.label-col{width:82px}.export-seq-grid col.step-col{width:auto}.export-seq-grid th.row-label{width:auto!important}.export-seq-grid th.beat-key{font-weight:900;background:#eee}.export-seq-grid th.sub-key{font-size:7px;color:#666}.export-seq-grid th,.export-seq-grid td{box-sizing:border-box}
+
+.vocal-transcribe-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 8px}.vocal-transcribe-row button{white-space:nowrap}

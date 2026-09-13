@@ -55,6 +55,30 @@ async function api(request,env,url){
   }
   const u=await userFor(request,env);if(!u)return json({ok:false,error:'Please log in.'},401);
 
+  // Cross-device vocal transcription. The browser only records WAV; Cloudflare Workers AI transcribes the R2 master.
+  const transcribeMatch=path.match(/^\/api\/transcribe\/([^/]+)$/);
+  if(transcribeMatch&&method==='POST'){
+    if(!env.AUDIO)return json({ok:false,error:'Cloud vocal storage is not connected.'},503);
+    if(!env.AI)return json({ok:false,error:'Workers AI is not connected. Add a Workers AI binding named AI.'},503);
+    const takeId=decodeURIComponent(transcribeMatch[1]), projectId=String(url.searchParams.get('projectId')||'');
+    if(!projectId)return json({ok:false,error:'projectId is required.'},400);
+    const owns=await env.DB.prepare('SELECT id FROM projects WHERE id=? AND user_id=?').bind(projectId,u.id).first();
+    if(!owns)return json({ok:false,error:'Project not found.'},404);
+    const key=`${u.id}/${projectId}/${takeId}.wav`, obj=await env.AUDIO.get(key);
+    if(!obj)return json({ok:false,error:'Vocal WAV is not in cloud yet. Save the project, then try Transcribe again.'},404);
+    if(obj.size>25*1024*1024)return json({ok:false,error:'This vocal take is too large for one-pass transcription. Split it into shorter takes for now.'},413);
+    try{
+      const bytes=new Uint8Array(await obj.arrayBuffer());
+      // @cf/openai/whisper accepts audio bytes and returns text plus word timing/VTT when available.
+      const result=await env.AI.run('@cf/openai/whisper',{audio:[...bytes]});
+      const text=String(result?.text||result?.transcription_info?.text||'').trim();
+      const words=Array.isArray(result?.words)?result.words:Array.isArray(result?.transcription_info?.words)?result.transcription_info.words:[];
+      const vtt=String(result?.vtt||result?.transcription_info?.vtt||'');
+      if(!text)return json({ok:false,error:'No speech was detected in this take.'},422);
+      return json({ok:true,text,words,vtt,model:'@cf/openai/whisper'});
+    }catch(e){console.error('Transcription failed',e);return json({ok:false,error:`Transcription failed: ${String(e?.message||e)}`},502);}
+  }
+
   // Vocal masters live in authenticated R2 object storage, not in D1 project JSON.
   const audioMatch=path.match(/^\/api\/audio\/([^/]+)$/);
   if(audioMatch){

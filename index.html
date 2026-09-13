@@ -135,7 +135,7 @@
         <div class="lead-editor-head">
           <div>
             <h3 id="leadPartTitle">Lead / Bass</h3>
-            <p class="subtle">Tap cells to place notes. Pitch names are real MIDI-style note/octave names.</p>
+            <p class="subtle">Tap cells to place notes. Pitch names are real MIDI-style note/octave names.</p><label class="part-repeat-toggle"><input id="leadRepeat" type="checkbox" checked><span>Repeat this part</span></label>
           </div>
           <label class="part-volume-label">Volume <input id="leadVolume" type="range" min="0" max="100" value="80" /><span id="leadVolumeValue">80%</span></label>
         </div>
@@ -161,7 +161,7 @@
       <div id="vocalPartEditor" class="vocal-part-editor" hidden>
         <div class="vocal-editor-card">
           <div class="vocal-title-row">
-            <div><h3 id="vocalPartTitle">Vocals</h3><p class="subtle">Dry WAV master • effects stay non-destructive</p></div>
+            <div><h3 id="vocalPartTitle">Vocals</h3><p class="subtle">Dry WAV master • effects stay non-destructive</p><label class="part-repeat-toggle"><input id="vocalRepeat" type="checkbox" checked><span>Repeat this part</span></label></div>
             <label class="part-volume-label">Part volume <input id="vocalVolume" type="range" min="0" max="100" value="100" /><span id="vocalVolumeValue">100%</span></label>
           </div>
 
@@ -190,8 +190,9 @@
           </div>
 
           <section class="vocal-panel vocal-transcript-panel">
-            <div class="vocal-panel-heading"><h4>Lyrics / transcript</h4><span class="subtle tiny">Speech-to-text while recording when supported • always editable</span></div>
-            <textarea id="vocalTranscript" rows="5" placeholder="Recorded words appear here when speech recognition is available. You can also type or correct lyrics here."></textarea>
+            <div class="vocal-panel-heading"><h4>Lyrics / transcript</h4><span class="subtle tiny">Cloud transcription • works across phones, tablets & computers • always editable</span></div>
+            <div class="vocal-transcribe-row"><button id="vocalTranscribeBtn" type="button">Transcribe active take</button><span id="vocalSpeechStatus" class="subtle tiny">After a take is saved to cloud, tap Transcribe. New saved takes are transcribed automatically.</span></div>
+            <textarea id="vocalTranscript" rows="5" placeholder="Cloud speech-to-text appears here. You can always type or correct lyrics manually."></textarea>
           </section>
 
           <section class="vocal-panel vocal-effects">
