@@ -1088,6 +1088,20 @@
       line.appendChild(cards);sheet.appendChild(line);
     });
 
+
+    // Song blueprint appendix: every enabled Part is treated as checked for PDF export.
+    const exportParts=window.CRPParts?.getExportData?.()||[];
+    const nn=n=>['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((n%12)+12)%12]+(Math.floor(n/12)-1);
+    for(const p of exportParts.filter(x=>x.enabled!==false)){
+      if(p.type==='lead'){
+        const sec=document.createElement('section');sec.className='export-pattern';sec.innerHTML=`<h3>${esc(p.name)} — ${esc(p.sound||'Lead / Bass')}</h3>`;
+        for(let bar=0;bar<p.bars;bar++){const line=document.createElement('div'),spb=p.resolution,start=bar*spb,ev=(p.events||[]).filter(e=>e.step>=start&&e.step<start+spb).sort((a,b)=>a.step-b.step);line.innerHTML=`<strong>Bar ${bar+1}:</strong> ${ev.length?ev.map(e=>`${nn(e.midi+(p.octave||0)*12)} @ ${((e.step-start)/(p.resolution/4)+1).toFixed(2)}`).join(' • '):'—'}`;sec.appendChild(line);}sheet.appendChild(sec);
+      }else if(p.type==='vocal'){
+        const sec=document.createElement('section');sec.className='export-pattern';sec.innerHTML=`<h3>${esc(p.name)} — Lyrics / transcript</h3><div class="export-lyrics">${esc(p.transcript||'No transcript captured. Edit the Lyrics / transcript box in the Vocal part to add or correct words.')}</div>`;sheet.appendChild(sec);
+      }
+    }
+    const db=window.CRPBeatMaker?.getBeat?.();if(db?.enabled){const labels={kick1:'Kick 1',kick2:'Kick 2',kick3:'Kick 3',snare1:'Snare 1',snare2:'Snare 2',snare3:'Snare 3',snare4:'Snare 4',snare5:'Snare 5',chh:'Closed Hat',ohh:'Open Hat',tomHi:'High Tom',tomMid:'Mid Tom',tomLow:'Low Tom',clap:'Clap',rim:'Rim',shaker:'Shaker',tamb:'Tambourine',cowbell:'Cowbell',conga:'Conga'};const sec=document.createElement('section');sec.className='export-pattern';sec.innerHTML='<h3>Drum pattern</h3>';for(let bar=0;bar<db.bars;bar++){const used=Object.entries(db.tracks||{}).filter(([id,bars])=>(bars[bar]||[]).length);const d=document.createElement('div');d.innerHTML=`<strong>Bar ${bar+1}:</strong> ${used.length?used.map(([id,bars])=>`${labels[id]||id}: ${(bars[bar]||[]).map(x=>(x/16+1).toFixed(2)).join(', ')}`).join(' | '):'—'}`;sec.appendChild(d);}sheet.appendChild(sec);}
+
     const notes=$('notesEditor').innerHTML.trim();
     if(notes&&$('notesEditor').textContent.trim()){
       const n=document.createElement('section');n.className='export-notes';n.innerHTML=`<h3>Project notes</h3><div class="export-notes-body">${notes}</div>`;sheet.appendChild(n);
