@@ -1,6 +1,0 @@
-Chord Rider Pro v1.9.0
-- Lead/Bass playback output boosted 90% while preserving 0-100 part volume control.
-- Volume sliders use native filled mobile rendering so 100% visually reaches the end.
-- Vocal Lyrics/transcript field added. On supported browsers speech recognition runs during recording; transcript remains editable afterward. Dry WAV remains unchanged.
-- PDF song blueprint now includes enabled Lead/Bass note timing, enabled drum pattern, and vocal transcript.
-- Studio Package is now DAW-ready: selected Chord/Note and Lead/Bass parts export Standard MIDI .mid files, selected drums export Drums.mid, selected vocals export dry WAV. project.json remains for Chord Rider re-import/editing data.
