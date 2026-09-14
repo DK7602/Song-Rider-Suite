@@ -120,6 +120,47 @@ function ensureFullTextareaVisible(ta){
     scroller.scrollTop -= Math.ceil(92 - rect.top);
   }
 }
+
+// Keep the actual typing caret above the mobile keyboard in CRP-integrated mode.
+// The Full Song textareas autosize, so scrolling the textarea itself is not useful;
+// we measure the caret with a hidden mirror and move the PAGE instead.
+function ensureFullCaretVisible(ta){
+  if(!ta || !document.documentElement.classList.contains('crp-integrated')) return;
+  const sel = (typeof ta.selectionEnd === 'number') ? ta.selectionEnd : String(ta.value || '').length;
+  const cs = getComputedStyle(ta);
+  const mirror = document.createElement('div');
+  mirror.setAttribute('aria-hidden','true');
+  Object.assign(mirror.style,{
+    position:'fixed', left:'-100000px', top:'0', visibility:'hidden',
+    boxSizing:cs.boxSizing, width:ta.getBoundingClientRect().width+'px',
+    paddingTop:cs.paddingTop, paddingRight:cs.paddingRight, paddingBottom:cs.paddingBottom, paddingLeft:cs.paddingLeft,
+    borderTopWidth:cs.borderTopWidth, borderRightWidth:cs.borderRightWidth, borderBottomWidth:cs.borderBottomWidth, borderLeftWidth:cs.borderLeftWidth,
+    borderStyle:'solid', fontFamily:cs.fontFamily, fontSize:cs.fontSize, fontWeight:cs.fontWeight,
+    fontStyle:cs.fontStyle, letterSpacing:cs.letterSpacing, lineHeight:cs.lineHeight, textTransform:cs.textTransform,
+    whiteSpace:'pre-wrap', overflowWrap:'break-word', wordBreak:cs.wordBreak || 'normal'
+  });
+  mirror.textContent = String(ta.value || '').slice(0, sel);
+  const marker = document.createElement('span');
+  marker.textContent = '\u200b';
+  mirror.appendChild(marker);
+  document.body.appendChild(mirror);
+  const markerTop = marker.offsetTop;
+  const lineH = parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize)||16)*1.25;
+  mirror.remove();
+
+  const taRect = ta.getBoundingClientRect();
+  const caretTop = taRect.top + markerTop;
+  const caretBottom = caretTop + lineH;
+  const bottomLimit = _typingViewportBottom(18);
+  const topLimit = 92;
+  let delta = 0;
+  if(caretBottom > bottomLimit) delta = Math.ceil(caretBottom - bottomLimit);
+  else if(caretTop < topLimit) delta = -Math.ceil(topLimit - caretTop);
+  if(delta){
+    const scroller = document.scrollingElement || document.documentElement;
+    scroller.scrollTop = Math.max(0, (Number(scroller.scrollTop)||0) + delta);
+  }
+}
 function scrollFullSectionCardIntoView(card, opts={}){
   if(!card) return;
   const scroller = _getSheetScroller();
@@ -9679,9 +9720,17 @@ if(state.currentSection === "Full"){
       autosizeTextarea(ta);
       refreshFullSectionSyllableOverlay(ta, syllOverlay);
       requestAnimationFrame(() => {
-        keepFullTextareaSteady(ta, snap);
+        if(document.documentElement.classList.contains('crp-integrated')){
+          ensureFullCaretVisible(ta);
+        }else{
+          keepFullTextareaSteady(ta, snap);
+        }
         refreshFullSectionSyllableOverlay(ta, syllOverlay);
       });
+      if(document.documentElement.classList.contains('crp-integrated')){
+        setTimeout(() => ensureFullCaretVisible(ta), 0);
+        setTimeout(() => ensureFullCaretVisible(ta), 80);
+      }
       const displaySemis = getTransposeSemis() || 0;
       const rawBodyText = transposeFullSectionBodyForDisplay(
         String(ta.value || ""),
