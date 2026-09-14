@@ -1221,11 +1221,21 @@
     renderProjects();renderAll();syncBuildInput();autoPopulateKeyFromEntry();setRiderBonesRiding(false);initWorkspaceMode();
     // Restore the exact project the user was working on before switching to SRP/Baby DAW.
     restoreActiveProjectFromStorage();
+    setTimeout(applyLinkedMetaFromSrpHandoff,0);
     checkAccount();if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
   const SRP_HANDOFF_KEY='crp-srp-handoff-v2';
+  const SRP_META_PREFIX='crp-srp-meta-v1:';
+  function srpMetaKey(projectId){return SRP_META_PREFIX+String(projectId||'')}
+  function readSharedSrpMeta(projectId){
+    try{return JSON.parse(localStorage.getItem(srpMetaKey(projectId))||'null')}catch{return null}
+  }
+  function writeSharedSrpMeta(projectId,meta){
+    if(!projectId)return;
+    try{localStorage.setItem(srpMetaKey(projectId),JSON.stringify({...meta,projectId:String(projectId),updatedAt:Date.now()}))}catch{}
+  }
   function openSongRiderWorkspace(){
     try{
       // Persist the exact active project snapshot before leaving CRP.
@@ -1286,13 +1296,20 @@
       if(!payload?.crpProjectId)return;
       const rec=srpLinks()[payload.crpProjectId]||null;
       localStorage.setItem(SRP_HANDOFF_KEY,JSON.stringify({payload,rec,ts:Date.now()}));
+      writeSharedSrpMeta(payload.crpProjectId,{bpm:payload.bpm,capo:payload.capo,octave:payload.octave,transpose:payload.transpose,key:payload.key,source:'crp'});
     }catch(err){console.warn('Could not publish linked SRP state',err)}
   }
 
   function applyLinkedMetaFromSrpHandoff(){
     try{
-      const h=JSON.parse(localStorage.getItem(SRP_HANDOFF_KEY)||'{}')||{};const payload=h.payload;
-      if(!payload?.crpProjectId||String(payload.crpProjectId)!==String(state.currentProjectId||''))return;
+      const h=JSON.parse(localStorage.getItem(SRP_HANDOFF_KEY)||'{}')||{};let payload=h.payload;
+      const activeId=String(state.currentProjectId||'');
+      if(!activeId)return;
+      const shared=readSharedSrpMeta(activeId);
+      if(shared && (!payload || String(payload.crpProjectId||'')!==activeId || Number(shared.updatedAt||0)>=Number(h.ts||0))){
+        payload={...(payload||{}),crpProjectId:activeId,bpm:shared.bpm,capo:shared.capo,octave:shared.octave,transpose:shared.transpose,key:shared.key};
+      }
+      if(!payload?.crpProjectId||String(payload.crpProjectId)!==activeId)return;
       const bpm=Math.max(40,Math.min(240,Number(payload.bpm)||92));
       if($('bpmInput'))$('bpmInput').value=String(bpm);
       state.capo=Math.max(0,Math.min(12,Number(payload.capo)||0));if($('capoSelect'))$('capoSelect').value=String(state.capo);
@@ -1305,7 +1322,7 @@
       renderAll();syncBuildInput();window.CRPParts?.syncCoreLive?.();
     }catch(err){console.warn('Could not apply linked SRP metadata',err)}
   }
-  window.addEventListener('storage',e=>{if(e.key===SRP_HANDOFF_KEY)applyLinkedMetaFromSrpHandoff();});
+  window.addEventListener('storage',e=>{if(e.key===SRP_HANDOFF_KEY||String(e.key||'').startsWith(SRP_META_PREFIX))applyLinkedMetaFromSrpHandoff();});
   window.addEventListener('pageshow',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
   window.addEventListener('focus',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
 
