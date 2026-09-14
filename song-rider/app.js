@@ -15925,9 +15925,10 @@ if(el.capoInput){
         state.project.bpm = n;
         upsertProject(state.project);
       }
+      // Keep the live SRP preview responsive, but do NOT publish linked metadata while
+      // the user is still typing. The final value is committed on change/blur/Enter.
       if(state.drumsOn) startDrums();
       restartClockIfRunning();
-      window.CRP_SRP_syncMetaToCrp?.();
     }
   });
 
@@ -16522,19 +16523,30 @@ KEEP RHYME UI ABOVE KEYBOARD
   const ACTIVE_LINK_KEY='crp-srp-active-link-id-v1';
   const UNIFIED_META_PREFIX='crp-srp-unified-meta-v1:';
   const HARD_SYNC_KEY='crp-srp-hard-sync-v1';
+  // v2.6.0: exact linked-project transport state. One authority for BPM/CAPO/STEP.
+  const CANONICAL_PREFIX='crp-srp-canonical-v1:';
   function sharedMetaKey(id){return SHARED_META_PREFIX+String(id||'')}
   function unifiedMetaKey(id){return UNIFIED_META_PREFIX+String(id||'')}
+  function canonicalMetaKey(id){return CANONICAL_PREFIX+String(id||'')}
+  function readCanonicalMeta(id){try{const sid=String(id||activeUnifiedCrpId()||'');if(!sid)return null;const m=readJson(canonicalMetaKey(sid),null);return m&&String(m.projectId||'')===sid?m:null}catch{return null}}
+  function writeCanonicalMeta(id,meta,source='srp'){
+    if(!id)return null;
+    try{const sid=String(id),prev=readCanonicalMeta(sid)||{};const next={...prev,...meta,projectId:sid,source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};writeJson(canonicalMetaKey(sid),next);try{window.__CRP_SRP_CANONICAL_CHANNEL?.postMessage(next)}catch{}return next}catch{return null}
+  }
   function activeUnifiedCrpId(){
     try{return String(state.project?.linkedCrpProjectId||localStorage.getItem(ACTIVE_LINK_KEY)||handoff()?.payload?.crpProjectId||localStorage.getItem('crp-active-project-id')||'')}catch{return String(state.project?.linkedCrpProjectId||'')}
   }
   function readLiveMeta(){
     const id=activeUnifiedCrpId();
+    const canonical=readCanonicalMeta(id);
+    if(canonical)return {...canonical,crpProjectId:id};
     if(id){const unified=readJson(unifiedMetaKey(id),null);if(unified&&String(unified.crpProjectId||'')===id)return unified;}
     return readJson(LIVE_META_KEY,null);
   }
   function writeLiveMeta(id,meta){
     if(!id)return null;
     const sid=String(id);
+    writeCanonicalMeta(sid,meta,String(meta?.source||'srp'));
     // ACTIVE_LINK_KEY is intentionally a raw string for easy use from the CRP page too.
     try{localStorage.setItem(ACTIVE_LINK_KEY,sid)}catch{}
     const old=readJson(unifiedMetaKey(sid),null);
@@ -16545,7 +16557,7 @@ KEEP RHYME UI ABOVE KEYBOARD
     try{window.__CRP_SRP_META_CHANNEL?.postMessage(next)}catch{}
     return next;
   }
-  function readHardSync(){return readJson(HARD_SYNC_KEY,null)}
+  function readHardSync(){return readCanonicalMeta(activeUnifiedCrpId())||readJson(HARD_SYNC_KEY,null)}
   function writeHardSyncFromSrp(){
     try{
       const prev=readHardSync()||{};
@@ -16558,7 +16570,9 @@ KEEP RHYME UI ABOVE KEYBOARD
         if(mode==='capo')capo=Math.max(0,Math.min(12,Math.round(raw)));
         else octave=Math.max(-2,Math.min(3,raw));
       }
-      const next={bpm,capo,octave,pitchMode:mode,projectId:activeUnifiedCrpId(),source:'srp',rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
+      const projectId=activeUnifiedCrpId();
+      const next={bpm,capo,octave,pitchMode:mode,projectId,source:'srp',rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
+      writeCanonicalMeta(projectId,{bpm,capo,octave,pitchMode:mode},'srp');
       writeJson(HARD_SYNC_KEY,next);
       return next;
     }catch{return null}
@@ -16585,9 +16599,11 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
   function readSharedMeta(id){
     if(!id)return null;
-    const base=readJson(sharedMetaKey(id),null);
+    const sid=String(id), base=readJson(sharedMetaKey(sid),null);
+    const canonical=readCanonicalMeta(sid);
+    if(canonical)return {...(base||{}),...canonical,crpProjectId:sid};
     const live=readLiveMeta();
-    return live&&String(live.crpProjectId||'')===String(id)?{...(base||{}),...live}:base;
+    return live&&String(live.crpProjectId||'')===sid?{...(base||{}),...live}:base;
   }
   function writeSharedMeta(id,meta){if(!id)return;const base=readJson(sharedMetaKey(id),{})||{};writeJson(sharedMetaKey(id),{...base,...meta,projectId:String(id),updatedAt:Date.now()});}
 
@@ -16934,7 +16950,8 @@ KEEP RHYME UI ABOVE KEYBOARD
       const all=links();delete all[payload.crpProjectId];setLinks(all);refreshCrpLinkUi();
     });
     try{window.__CRP_SRP_META_CHANNEL=new BroadcastChannel('crp-srp-live-meta-v3');window.__CRP_SRP_META_CHANNEL.onmessage=()=>setTimeout(applyLiveMetaToSrp,0);}catch{}
-    window.addEventListener('storage',e=>{if(e.key===HARD_SYNC_KEY)setTimeout(applyHardSyncToSrp,0);});
+    try{window.__CRP_SRP_CANONICAL_CHANNEL=new BroadcastChannel('crp-srp-canonical-v1');window.__CRP_SRP_CANONICAL_CHANNEL.onmessage=()=>setTimeout(applyHardSyncToSrp,0);}catch{}
+    window.addEventListener('storage',e=>{if(e.key===HARD_SYNC_KEY||String(e.key||'').startsWith(CANONICAL_PREFIX))setTimeout(applyHardSyncToSrp,0);});
     window.addEventListener('pageshow',()=>setTimeout(applyHardSyncToSrp,0));
     window.addEventListener('focus',()=>setTimeout(applyHardSyncToSrp,0));
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSyncToSrp,0);});

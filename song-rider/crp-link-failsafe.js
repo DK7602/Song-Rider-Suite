@@ -10,6 +10,7 @@
   const LINKS_KEY = 'crp-srp-links-v1';
   const PROJECTS_PREFIX = 'songrider_v25_projects::';
   const CURRENT_PREFIX = 'songrider_v25_currentProjectId::';
+  const CANONICAL_PREFIX = 'crp-srp-canonical-v1:';
 
   const readJson = (key, fallback) => {
     try { const raw = localStorage.getItem(key); return raw ? (JSON.parse(raw) ?? fallback) : fallback; }
@@ -123,6 +124,12 @@
     links[payload.crpProjectId]=rec;
     writeJson(LINKS_KEY,links);
     writeJson(HANDOFF_KEY,{payload,rec,ts:Date.now()});
+    // Seed the same project-scoped authority used by CRP, Baby DAW and SRP.
+    const ckey=CANONICAL_PREFIX+String(payload.crpProjectId);
+    const prev=readJson(ckey,{})||{};
+    writeJson(ckey,{...prev,projectId:String(payload.crpProjectId),bpm:Number(payload.bpm)||95,
+      capo:Math.max(0,Math.min(12,Number(payload.capo)||0)),octave:Math.max(-2,Math.min(3,Number(payload.octave)||0)),
+      pitchMode:payload.pitchMode==='step'?'step':'capo',source:'link',rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()});
     return rec;
   }
 
