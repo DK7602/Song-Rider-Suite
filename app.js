@@ -940,7 +940,7 @@
       ? `“${p.name}” moved to Archive.`
       : `“${p.name}” restored to Projects.`;
   }
-  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;const shared=readSharedSrpMeta(id);if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
+  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;const shared=readSharedSrpMeta(id);if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));localStorage.setItem(SRP_ACTIVE_LINK_KEY,String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
   function renderProjects(){
     const w=$('projectList');
@@ -1232,17 +1232,36 @@
   // Only real workspaces publish to it; the hidden SRP playback iframe is read-only so it can never
   // push a stale BPM/capo/octave snapshot back over the user's latest edit.
   const SRP_LIVE_META_KEY='crp-srp-live-meta-v3';
+  // v2.5.1: project-scoped single source of truth. The old global live key could point at
+  // a different project than the currently linked CRP/SRP pair, which is why the UI could say
+  // "Linked" while BPM/capo/STEP still came from different records.
+  const SRP_ACTIVE_LINK_KEY='crp-srp-active-link-id-v1';
+  const SRP_UNIFIED_META_PREFIX='crp-srp-unified-meta-v1:';
   const IS_PLAYBACK_BRIDGE=new URLSearchParams(location.search).get('playbackBridge')==='1';
   function srpMetaKey(projectId){return SRP_META_PREFIX+String(projectId||'')}
+  function unifiedSrpMetaKey(projectId){return SRP_UNIFIED_META_PREFIX+String(projectId||'')}
+  function activeSrpLinkId(){
+    try{return String(state.currentProjectId||localStorage.getItem(SRP_ACTIVE_LINK_KEY)||localStorage.getItem('crp-active-project-id')||'')}catch{return String(state.currentProjectId||'')}
+  }
   function readLiveSrpMeta(){
-    try{return JSON.parse(localStorage.getItem(SRP_LIVE_META_KEY)||'null')}catch{return null}
+    try{
+      const id=activeSrpLinkId();
+      if(id){const unified=JSON.parse(localStorage.getItem(unifiedSrpMetaKey(id))||'null');if(unified&&String(unified.crpProjectId||'')===id)return unified;}
+      return JSON.parse(localStorage.getItem(SRP_LIVE_META_KEY)||'null');
+    }catch{return null}
   }
   function writeLiveSrpMeta(projectId,meta){
     if(IS_PLAYBACK_BRIDGE||!projectId)return null;
     try{
-      const id=String(projectId),old=readLiveSrpMeta();
+      const id=String(projectId);
+      localStorage.setItem(SRP_ACTIVE_LINK_KEY,id);
+      const key=unifiedSrpMetaKey(id);
+      const old=JSON.parse(localStorage.getItem(key)||'null');
       const prev=(old&&String(old.crpProjectId||'')===id)?old:{};
       const next={...prev,...meta,crpProjectId:id,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
+      // Unified project-scoped record is authoritative. Keep the legacy key mirrored only so
+      // older code paths cannot reintroduce a stale value during this migration.
+      localStorage.setItem(key,JSON.stringify(next));
       localStorage.setItem(SRP_LIVE_META_KEY,JSON.stringify(next));
       try{window.__CRP_SRP_META_CHANNEL?.postMessage(next)}catch{}
       return next;
@@ -1294,7 +1313,7 @@
       publishLiveSrpMeta('crp');
       const payload=srpPayload();
       const rec=payload?srpLinks()[payload.crpProjectId]||null:null;
-      if(payload?.crpProjectId)localStorage.setItem('crp-active-project-id',String(payload.crpProjectId));
+      if(payload?.crpProjectId){localStorage.setItem('crp-active-project-id',String(payload.crpProjectId));localStorage.setItem(SRP_ACTIVE_LINK_KEY,String(payload.crpProjectId));}
       localStorage.setItem(SRP_HANDOFF_KEY,JSON.stringify({payload,rec,ts:Date.now()}));
       localStorage.setItem(WORKSPACE_MODE_KEY,'song-rider');
     }catch(err){console.error('Could not hand CRP project to Song Rider',err)}
