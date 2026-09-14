@@ -1246,38 +1246,86 @@
     const frame=document.getElementById('songRiderFrame');if(!frame)return;
     try{
       const doc=frame.contentDocument;if(!doc)return;
-      const body=doc.body, root=doc.documentElement;
-      const editor=doc.getElementById('editorRoot');
+      const body=doc.body;
       const header=doc.querySelector('header');
-      let h=0;
-      if(editor){const r=editor.getBoundingClientRect();h=Math.max(h,r.bottom+(root?.scrollTop||body?.scrollTop||0));}
-      if(header){const r=header.getBoundingClientRect();h=Math.max(h,r.bottom+(root?.scrollTop||body?.scrollTop||0));}
-      if(!h)h=Math.max(body?.offsetHeight||0,root?.offsetHeight||0);
-      h=Math.max(320,Math.min(h+18,6000));
-      frame.style.height=`${Math.ceil(h)}px`;
+      const main=doc.querySelector('main');
+      const sheetHeader=doc.querySelector('.sheetHeader');
+      const inner=doc.getElementById('sheetInner');
+      const bottoms=[];
+      [header,main,sheetHeader,inner].forEach(el=>{
+        if(!el)return;
+        const r=el.getBoundingClientRect();
+        if(Number.isFinite(r.bottom))bottoms.push(r.bottom);
+      });
+      // The embedded SRP document is intentionally non-scrolling.  Measure the
+      // actual rendered content, not document.scrollHeight (which includes SRP's
+      // standalone keyboard-safe/viewport spacers and caused the giant blank tail).
+      let h=bottoms.length?Math.max(...bottoms):0;
+      if(body){
+        for(const child of body.children){
+          const cs=doc.defaultView?.getComputedStyle?.(child);
+          if(cs && (cs.position==='fixed' || cs.display==='none'))continue;
+          const r=child.getBoundingClientRect();
+          if(Number.isFinite(r.bottom))h=Math.max(h,r.bottom);
+        }
+      }
+      h=Math.max(320,Math.min(Math.ceil(h+12),5000));
+      if(Math.abs((parseFloat(frame.style.height)||0)-h)>1)frame.style.height=`${h}px`;
+    }catch{}
+  }
+  function installSongRiderScrollBridge(){
+    const frame=document.getElementById('songRiderFrame');if(!frame)return;
+    try{
+      const doc=frame.contentDocument;if(!doc||doc._crpScrollBridge)return;
+      doc._crpScrollBridge=true;
+      let lastY=null;
+      doc.addEventListener('touchstart',e=>{
+        if(e.touches?.length===1)lastY=e.touches[0].clientY;
+        else lastY=null;
+      },{passive:true});
+      doc.addEventListener('touchmove',e=>{
+        if(lastY==null||e.touches?.length!==1)return;
+        const y=e.touches[0].clientY;
+        const dy=lastY-y;
+        lastY=y;
+        if(Math.abs(dy)<1)return;
+        window.scrollBy(0,dy);
+        if(e.cancelable)e.preventDefault();
+      },{passive:false});
+      const clear=()=>{lastY=null};
+      doc.addEventListener('touchend',clear,{passive:true});
+      doc.addEventListener('touchcancel',clear,{passive:true});
+      doc.addEventListener('wheel',e=>{
+        if(!e.deltaY)return;
+        window.scrollBy(0,e.deltaY);
+        if(e.cancelable)e.preventDefault();
+      },{passive:false});
     }catch{}
   }
   function watchSongRiderSize(){
     const frame=document.getElementById('songRiderFrame');if(!frame)return;
     try{
       frame._srpResizeObserver?.disconnect?.();
+      frame._srpMutationObserver?.disconnect?.();
       const doc=frame.contentDocument;if(!doc)return;
       if('ResizeObserver' in window){
         const ro=new ResizeObserver(()=>requestAnimationFrame(fitSongRiderFrame));
-        if(doc.documentElement)ro.observe(doc.documentElement);
-        if(doc.body)ro.observe(doc.body);
+        const inner=doc.getElementById('sheetInner');
+        const header=doc.querySelector('header');
+        if(inner)ro.observe(inner);
+        if(header)ro.observe(header);
         frame._srpResizeObserver=ro;
       }
       if('MutationObserver' in window&&doc.body){
-        frame._srpMutationObserver?.disconnect?.();
         let raf=0;
         const mo=new MutationObserver(()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(fitSongRiderFrame)});
         mo.observe(doc.body,{subtree:true,childList:true,attributes:true,characterData:true});
         frame._srpMutationObserver=mo;
       }
     }catch{}
+    installSongRiderScrollBridge();
     fitSongRiderFrame();
-    [80,220,500,1000].forEach(ms=>setTimeout(fitSongRiderFrame,ms));
+    [80,220,500,1000].forEach(ms=>setTimeout(()=>{fitSongRiderFrame();installSongRiderScrollBridge()},ms));
   }
   document.getElementById('songRiderFrame')?.addEventListener('load',()=>{updateSrpLinkUi();syncLinkedSrp(false);watchSongRiderSize()});
 
