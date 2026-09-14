@@ -7788,8 +7788,8 @@ function ensureCapoStepToggle(){
       el.capoInput.inputMode = "numeric";
       el.capoInput.value = String(Number.isFinite(state.capo) ? state.capo : 0);
     }else{
-      el.capoInput.step = "0.5";
-      el.capoInput.inputMode = "decimal";
+      el.capoInput.step = "1";
+      el.capoInput.inputMode = "numeric";
       el.capoInput.value = String(Number.isFinite(state.steps) ? state.steps : 0);
     }
   }
@@ -12185,7 +12185,7 @@ function applyProjectSettingsToUI(){
   state.bpm = clamp(parseInt(state.project.bpm,10) || 95, 40, 220);
   state.capo = clamp(parseInt(state.project.capo,10) || 0, 0, 12);
   state.transposeMode = state.project.transposeMode || "capo";
-state.steps = clamp(roundToHalf(parseFloat(state.project.steps) || 0), -24, 24);
+state.steps = clamp(Math.round(parseFloat(state.project.steps) || 0), -2, 3);
 
 
   if(el.bpmInput) el.bpmInput.value = String(state.bpm);
@@ -15469,9 +15469,30 @@ function wire(){
   injectHeaderControlTightStyle();
   // ✅ CAPTURE commit: prevents any other blur/change handlers from snapping .5 to int
 if(el.capoInput){
+  // v2.5.4: CAPO/STEP is one authoritative editor. Older SRP builds accumulated several
+  // legacy input/change/blur handlers; some of those always treated this field as CAPO,
+  // so STEP edits could be converted to an integer capo or overwritten before the CRP sync ran.
+  // Capture-phase handlers below own this control and stop those legacy handlers completely.
+  const previewCapoStep_CAPTURE = (e) => {
+    e.stopImmediatePropagation();
+    const mode = (state.transposeMode === "step") ? "step" : "capo";
+    const raw = parseFloat(el.capoInput.value);
+    if(!Number.isFinite(raw)) return; // allow an empty/intermediate mobile editing buffer
+    if(mode === "capo"){
+      state.capo = clamp(raw, 0, 12);
+      if(state.project) state.project.capo = state.capo;
+    }else{
+      // CRP/BD octave range is -2..+3, so SRP STEP must represent that exact same value.
+      state.steps = clamp(raw, -2, 3);
+      if(state.project){ state.project.steps = state.steps; state.project.linkedOctave = state.steps; }
+    }
+    refreshDisplayedNoteCells();
+    updateKeyFromAllNotes();
+    if(state.currentSection === "Full"){ try{ renderSheet(); }catch{} }
+  };
+
   const commitCapoStep_CAPTURE = (e) => {
     e.stopImmediatePropagation();
-
     const mode = (state.transposeMode === "step") ? "step" : "capo";
     let v = parseFloat(el.capoInput.value);
     if(!Number.isFinite(v)) v = 0;
@@ -15482,25 +15503,30 @@ if(el.capoInput){
       if(state.project) state.project.capo = v;
       el.capoInput.value = String(v);
     }else{
-      v = clamp(Math.round(v * 2) / 2, -24, 24);
+      // One CRP octave step == one SRP STEP. Keep the same integer range as CRP/BD.
+      v = clamp(Math.round(v), -2, 3);
       state.steps = v;
-      if(state.project) state.project.steps = v;
+      if(state.project){ state.project.steps = v; state.project.linkedOctave = v; }
       el.capoInput.value = String(v);
     }
 
-    if(state.project) upsertProject(state.project);
+    if(state.project){
+      state.project.transposeMode = mode;
+      upsertProject(state.project);
+    }
 
-    // keep UI synced
     ensureCapoStepToggle();
     refreshDisplayedNoteCells();
     updateKeyFromAllNotes();
     updateFullIfVisible?.();
-    if(state.currentSection === "Full"){
-      try{ renderSheet(); }catch{}
-    }
+    if(state.currentSection === "Full"){ try{ renderSheet(); }catch{} }
+
+    // Commit once, after editing is complete, to the same hard sync bus used by CRP + BD.
     window.CRP_SRP_syncMetaToCrp?.();
+    try{ writeHardSyncFromSrp(); }catch{}
   };
 
+  el.capoInput.addEventListener("input", previewCapoStep_CAPTURE, true);
   el.capoInput.addEventListener("change", commitCapoStep_CAPTURE, true);
   el.capoInput.addEventListener("blur", commitCapoStep_CAPTURE, true);
 }
@@ -15873,7 +15899,7 @@ if(el.capoInput){
     if(!el.bpmInput) return;
     let n = parseInt(el.bpmInput.value, 10);
     if(!Number.isFinite(n)) n = state.bpm || 95;
-    n = clamp(n, 40, 220);
+    n = clamp(n, 40, 240);
 
     state.bpm = n;
     el.bpmInput.value = String(n);
@@ -15893,7 +15919,7 @@ if(el.capoInput){
     if(raw === "") return;
 
     const n = parseInt(raw, 10);
-    if(Number.isFinite(n) && n >= 40 && n <= 220){
+    if(Number.isFinite(n) && n >= 40 && n <= 240){
       state.bpm = n;
       if(state.project){
         state.project.bpm = n;
@@ -16541,6 +16567,10 @@ KEEP RHYME UI ABOVE KEYBOARD
   function applyHardSyncToSrp(){
     try{
       const m=readHardSync();if(!m)return false;
+      // Do not let the background sync poll fight the user's active BPM/CAPO/STEP edit.
+      // Crucially, do not mark this revision applied until the field is no longer focused.
+      const active=document.activeElement;
+      if(active===el?.bpmInput||active===el?.capoInput)return false;
       const rev=Number(m.rev)||0;if(rev===__hardSyncRev)return false;__hardSyncRev=rev;
       state.bpm=Math.max(40,Math.min(240,Number(m.bpm)||state.bpm||95));
       state.capo=Math.max(0,Math.min(12,Number(m.capo)||0));
@@ -16795,13 +16825,14 @@ KEEP RHYME UI ABOVE KEYBOARD
     }catch(err){console.warn('Could not sync SRP metadata back to CRP',err)}
   }
   window.CRP_SRP_syncMetaToCrp=syncMetaToCrp;
-  // Bulletproof mobile sync: SRP metadata changes commit on input, change and blur.
-  // Capture phase ensures this runs even if another legacy handler stops propagation.
+  // v2.5.4: number fields are editing buffers. Do not hard-sync on every keystroke.
+  // Mobile number keyboards emit intermediate values (e.g. 1 -> 12 -> 120), and the old
+  // 250 ms reconciliation loop could clamp/write those partial values back into the box.
+  // Commit only when the user finishes the edit (change/blur/Enter).
+  const commitSrpLinkedNumber=()=>{ syncMetaToCrp(); writeHardSyncFromSrp(); };
   [el?.bpmInput,el?.capoInput].filter(Boolean).forEach(node=>{
-    ['input','change','blur'].forEach(type=>node.addEventListener(type,()=>{
-      syncMetaToCrp();
-      writeHardSyncFromSrp();
-    },true));
+    ['change','blur'].forEach(type=>node.addEventListener(type,commitSrpLinkedNumber,true));
+    node.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitSrpLinkedNumber();node.blur();}},true);
   });
 
   let __lastAppliedLiveRev=-1;
