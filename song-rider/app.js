@@ -9501,6 +9501,16 @@ if(state.currentSection === "Full"){
       l1.className = "fullPerfLine";
       const pill = document.createElement("div");
       pill.className = "fullPerfPill";
+      // v2.2.5: this is the ACTUAL title pill visible in Full Song View.
+      // Style it at creation time so no inherited/mobile theme can turn it dark.
+      pill.style.setProperty("background", "#efc85d", "important");
+      pill.style.setProperty("background-image", "linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)", "important");
+      pill.style.setProperty("color", "#111", "important");
+      pill.style.setProperty("-webkit-text-fill-color", "#111", "important");
+      pill.style.setProperty("border", "1px solid #d6aa3f", "important");
+      pill.style.setProperty("font-weight", "1000", "important");
+      pill.style.setProperty("text-shadow", "none", "important");
+      pill.style.setProperty("box-shadow", "inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.25)", "important");
       pill.textContent = String(b.title || "Song Part").trim() || "Song Part";
       const l2 = document.createElement("div");
       l2.className = "fullPerfLine";
