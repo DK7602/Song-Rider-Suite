@@ -32,6 +32,8 @@
       bpm:Number(p.bpm)||92,
       beats:Number(p.beats)||4,
       key:String(p.key||''),
+      capo:Number(p.capo)||0,
+      octave:Number(p.octave)||0,
       rows:(Array.isArray(p.rows)?p.rows:[]).map((row,rowIndex)=>({
         lineId:`crp-line-${rowIndex+1}`,
         cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord', value:String(c?.value||'')}))
@@ -88,6 +90,9 @@
     p={...p};
     p.linkedCrpProjectId=payload.crpProjectId;
     p.bpm=Number(payload.bpm)||Number(p.bpm)||95;
+    p.capo=Math.max(0,Math.min(12,Number(payload.capo)||0));
+    p.steps=Math.max(-2,Math.min(3,Number(payload.octave)||0));
+    p.linkedOctave=p.steps;
     p.crpKey=String(payload.key||'');
     p.crpBeatsPerChord=Number(payload.beats)||4;
     p.crpChordRows=Array.isArray(payload.rows)?payload.rows:[];

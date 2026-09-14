@@ -15567,6 +15567,7 @@ if(el.capoInput){
     if(state.currentSection === "Full"){
       try{ renderSheet(); }catch{}
     }
+    if(state.project){ upsertProject(state.project); window.CRP_SRP_syncMetaToCrp?.(); }
   });
 
   el.capoInput.addEventListener("change", () => {
@@ -16566,29 +16567,24 @@ KEEP RHYME UI ABOVE KEYBOARD
   function links(){return readJson(LINKS_KEY,{})||{}}
   function setLinks(v){writeJson(LINKS_KEY,v||{})}
   function recoverCrpPayload(){
-    const h=handoff();
-    if(h?.payload?.crpProjectId) return h.payload;
     try{
       const projects=readJson('crp-projects',[])||[];
-      const activeId=String(localStorage.getItem('crp-active-project-id')||'');
-      let p=(activeId&&projects.find(x=>String(x?.id||'')===activeId))||projects.slice().sort((a,b)=>(Number(b?.updatedAt)||0)-(Number(a?.updatedAt)||0))[0];
-      if(!p?.id) return null;
-      const payload={
-        crpProjectId:p.id,
-        name:p.name||'Untitled',
-        bpm:Number(p.bpm)||92,
-        beats:Number(p.beats)||4,
-        key:String(p.key||''),
-        capo:Number(p.capo)||0,
-        transpose:!!p.transpose,
-        rows:(Array.isArray(p.rows)?p.rows:[]).map((row,rowIndex)=>({
-          lineId:`crp-line-${rowIndex+1}`,
-          cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))
-        }))
-      };
-      writeJson(HANDOFF_KEY,{payload,rec:links()[p.id]||null,ts:Date.now()});
-      return payload;
-    }catch(err){ console.error('Could not recover CRP project for SRP link',err); return null; }
+      const h=handoff();
+      const activeId=String(localStorage.getItem('crp-active-project-id')||h?.payload?.crpProjectId||'');
+      let p=(activeId&&projects.find(x=>String(x?.id||'')===activeId)) ||
+        (h?.payload?.crpProjectId&&projects.find(x=>String(x?.id||'')===String(h.payload.crpProjectId))) || null;
+      if(p?.id){
+        const payload={
+          crpProjectId:p.id,name:p.name||'Untitled',bpm:Number(p.bpm)||92,beats:Number(p.beats)||4,
+          key:String(p.key||''),capo:Number(p.capo)||0,octave:Number(p.octave)||0,transpose:!!p.transpose,
+          rows:(Array.isArray(p.rows)?p.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))
+        };
+        writeJson(HANDOFF_KEY,{payload,rec:links()[p.id]||h?.rec||null,ts:Date.now()});
+        return payload;
+      }
+      if(h?.payload?.crpProjectId) return h.payload;
+      return null;
+    }catch(err){ console.error('Could not recover CRP project for SRP link',err); return handoff()?.payload||null; }
   }
 
   function reportLink(payload,p){
@@ -16617,6 +16613,8 @@ KEEP RHYME UI ABOVE KEYBOARD
       p.bpm=Number(payload.bpm)||p.bpm||95;
       p.crpKey=String(payload.key||'');
       p.capo=Math.max(0,Math.min(12,Number(payload.capo)||0));
+      p.steps=Math.max(-2,Math.min(3,Number(payload.octave)||0));
+      p.linkedOctave=p.steps;
       p.linkedTranspose=!!payload.transpose;
       p.crpBeatsPerChord=Number(payload.beats)||4;
       p.crpChordRows=payload.rows||[];
@@ -16650,11 +16648,13 @@ KEEP RHYME UI ABOVE KEYBOARD
       const projects=readJson('crp-projects',[])||[];const i=projects.findIndex(x=>String(x?.id||'')===String(p.linkedCrpProjectId));if(i<0)return;
       const cp={...projects[i]};
       cp.bpm=Math.max(40,Math.min(240,Number(state.bpm||p.bpm)||92));
-      cp.capo=Math.max(0,Math.min(12,Number(state.capo||p.capo)||0));
+      cp.capo=Math.max(0,Math.min(12,Number(state.capo ?? p.capo)||0));
+      cp.octave=Math.max(-2,Math.min(3,Number(state.steps ?? p.steps ?? p.linkedOctave)||0));
+      p.linkedOctave=cp.octave;
       cp.transpose=!!p.linkedTranspose;
       const key=String(p.crpKey||el?.keyOutput?.value||'').trim();if(key)cp.key=key;
       cp.updatedAt=Date.now();projects[i]=cp;writeJson('crp-projects',projects);
-      const payload={crpProjectId:cp.id,name:cp.name||p.name||'Untitled',bpm:cp.bpm,beats:Number(cp.beats)||4,key:String(cp.key||''),capo:cp.capo,transpose:cp.transpose,rows:(Array.isArray(cp.rows)?cp.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))};
+      const payload={crpProjectId:cp.id,name:cp.name||p.name||'Untitled',bpm:cp.bpm,beats:Number(cp.beats)||4,key:String(cp.key||''),capo:cp.capo,octave:cp.octave,transpose:cp.transpose,rows:(Array.isArray(cp.rows)?cp.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))};
       const rec=links()[cp.id]||null;writeJson(HANDOFF_KEY,{payload,rec,ts:Date.now()});
     }catch(err){console.warn('Could not sync SRP metadata back to CRP',err)}
   }
