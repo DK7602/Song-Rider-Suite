@@ -69,8 +69,17 @@ Instrument playback uses the `soundfont-player` browser library and MusyngKite s
 - Mobile Full Song typing now follows the caret above the soft keyboard in integrated SRP mode.
 - Keeps native single-page scrolling; no nested scroll containers reintroduced.
 
-## v2.2.1 — Song Rider UI overhaul
+## v2.2.2 — Song Rider UI overhaul
 - Restyled integrated Song Rider to match Chord Rider Pro's dark charcoal/gold interface.
 - Standardized SRP buttons, fields, panels, song sections, and modals to CRP styling.
 - Added a multicolor chrome treatment to the SONG RIDER PRO title.
 - Preserved the native single-scroll and typing-caret autoscroll fixes from v2.1.1.
+
+
+## v2.2.2 SRP layout polish
+- SRP top header now matches CRP/Baby DAW with facing Rider & Bones, CRP title, and tagline.
+- Header mascots animate during SRP audio playback or active autoscroll.
+- Removed the parked mascot from the Song Rider Pro title bar.
+- Undo/redo moved to the right side of the archive/action row.
+- Mobile top-control layout reserves space for the key window.
+- Section headers use the CRP/rhyme-button gold with bold black text.
