@@ -1,4 +1,4 @@
-const CACHE = 'chord-rider-pro-v2.2.8';
+const CACHE = 'chord-rider-pro-v2.2.9';
 const ASSETS = [
   './',
   './index.html',
@@ -16,7 +16,8 @@ const ASSETS = [
   './assets/rider-bones-mode-sticker.png',
   './assets/baby-daw-head-chain-sticker.png',
   './song-rider/index.html',
-  './song-rider/app.js'
+  './song-rider/app.js',
+  './song-rider/crp-link-failsafe.js'
 ];
 self.addEventListener('install', e => e.waitUntil((async()=>{await caches.open(CACHE).then(c=>c.addAll(ASSETS));await self.skipWaiting();})()));
 self.addEventListener('activate', e => e.waitUntil(Promise.all([self.clients.claim(), caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))])));
