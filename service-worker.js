@@ -1,4 +1,4 @@
-const CACHE = 'chord-rider-pro-v2.8.3-srp-card-transport';
+const CACHE = 'chord-rider-pro-v2.8.4-srp-card-transport';
 const ASSETS = [
   './',
   './index.html',
