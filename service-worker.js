@@ -1,5 +1,11 @@
-const CACHE = 'song-rider-suite-v2.8.5-exact-branding';
+const CACHE = 'song-rider-suite-v2.8.6-exact-assets';
 const ASSETS = [
+  './song-rider/assets/baby-daw-sticker.png',
+  './song-rider/assets/song-rider-pro-wordmark.png',
+  './song-rider/assets/song-rider-suite-wordmark.png',
+  './assets/baby-daw-sticker.png',
+  './assets/song-rider-pro-wordmark.png',
+  './assets/song-rider-suite-wordmark.png',
   './',
   './index.html',
   './styles.css',
