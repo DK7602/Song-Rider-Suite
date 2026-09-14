@@ -16505,7 +16505,7 @@ KEEP RHYME UI ABOVE KEYBOARD
     }
     const rec=links()[payload.crpProjectId];
     if(st)st.textContent=rec?`Linked • ${rec.srpName||payload.name||'Song Rider project'}`:'Ready to link to this CRP project';
-    if(b){b.hidden=!!rec;b.disabled=false;b.textContent='Link SRP'} if(u)u.hidden=!rec;
+    if(b){b.hidden=false;b.disabled=!!rec;b.textContent=rec?'Linked ✓':'Link SRP';b.classList.toggle('is-linked',!!rec)} if(u)u.hidden=true;
   }
 
   function syncFromHandoff(forceCreate=false){
