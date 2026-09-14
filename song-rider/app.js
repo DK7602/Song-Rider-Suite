@@ -3303,6 +3303,8 @@ lastChordRaw: "",
   autoScrollPaused: false,
   autoScrollPausedUiTick8: 0,
   autoScrollPausedAt: 0,
+  autoScrollArmTimer: 0,
+  autoScrollArmed: false,
   playCardIndex: null,
 
   // ✅ Full Song View (BSP-style) AutoScroll state
@@ -7832,23 +7834,54 @@ function renderDrumUI(){
   if(el.mDrumSelect) el.mDrumSelect.value = value;
 }
 
+function getLinkedPlaybackTiming(){
+  try{
+    if(typeof window.CRP_SRP_getLinkedPlaybackTiming === "function"){
+      const t=window.CRP_SRP_getLinkedPlaybackTiming();
+      if(t && t.playing) return t;
+    }
+  }catch{}
+  return null;
+}
+
+function clearAutoScrollArm(){
+  if(state.autoScrollArmTimer){ clearTimeout(state.autoScrollArmTimer); state.autoScrollArmTimer=0; }
+  state.autoScrollArmed=false;
+}
+
+function runAutoScrollOnNextLinkedBeat(action){
+  const t=getLinkedPlaybackTiming();
+  if(!t || !t.playing){ action(); return; }
+  clearAutoScrollArm();
+  const delay=Math.max(0, Math.min(Number(t.beatMs)||1000, Number(t.msUntilNextBeat)||0));
+  if(delay<=14){ action(); return; }
+  state.autoScrollArmed=true;
+  updateAutoScrollButtons();
+  state.autoScrollArmTimer=setTimeout(()=>{
+    state.autoScrollArmTimer=0;
+    state.autoScrollArmed=false;
+    action();
+  }, delay);
+}
+
 function updateAutoScrollButtons(){
   const isOn = !!state.autoScrollOn;
   const isPaused = !!state.autoScrollPaused;
+  const isArmed = !!state.autoScrollArmed;
 
   // Idle keeps the original SRP up/down AutoScroll icon.
   // Running becomes Pause, and Paused becomes Resume.
-  const mainLabel = !isOn ? "⇅" : (isPaused ? "▶" : "❚❚");
-  const mainTitle = !isOn
+  const mainLabel = isArmed ? "…" : (!isOn ? "⇅" : (isPaused ? "▶" : "❚❚"));
+  const mainTitle = isArmed ? "AutoScroll armed for next beat" : (!isOn
     ? "Start AutoScroll"
-    : (isPaused ? "Resume AutoScroll" : "Pause AutoScroll");
+    : (isPaused ? "Resume AutoScroll" : "Pause AutoScroll"));
 
   [el.autoPlayBtn, el.mScrollBtn].forEach(btn => {
     if(!btn) return;
     btn.textContent = mainLabel;
     btn.title = mainTitle;
     btn.setAttribute("aria-label", mainTitle);
-    btn.classList.toggle("on", isOn);
+    btn.classList.toggle("on", isOn || isArmed);
   });
 
   [el.autoStopBtn, el.mAutoStopBtn].forEach(btn => {
@@ -7880,14 +7913,17 @@ function pauseAutoScroll(){
   updateAutoScrollButtons();
 }
 
-function resumeAutoScroll(){
+function resumeAutoScrollNow(){
   if(!state.autoScrollOn || !state.autoScrollPaused) return;
 
   const frozenUiTick8 = Number(state.autoScrollPausedUiTick8) || 0;
 
   if(state.currentSection === "Full" && state.fullPerfMode){
-    const elapsed = Number(state.fullPerfPausedElapsedMs) || 0;
-    state.fullPerfClockStartMs = performance.now() - elapsed;
+    // Rejoin on an exact beat boundary. Preserve the visual line, but restart that
+    // line's beat phase from the shared transport beat so scrolling cannot drift.
+    state.fullPerfClockStartMs = performance.now();
+    state.fullPerfBeatMs = Math.round((60 / clamp(Number(state.bpm)||95, 40, 260)) * 1000);
+    state.fullPerfLastBeat4 = -1;
     state.fullPerfPausedElapsedMs = 0;
   }else{
     state.autoScrollTickOffset = state.tick8 - frozenUiTick8;
@@ -7904,9 +7940,19 @@ function resumeAutoScroll(){
   }
 }
 
+function resumeAutoScroll(){
+  if(!state.autoScrollOn || !state.autoScrollPaused || state.autoScrollArmed) return;
+  runAutoScrollOnNextLinkedBeat(resumeAutoScrollNow);
+}
+
 function handleAutoScrollPrimaryAction(){
+  if(state.autoScrollArmed){
+    clearAutoScrollArm();
+    updateAutoScrollButtons();
+    return;
+  }
   if(!state.autoScrollOn){
-    setAutoScroll(true);
+    runAutoScrollOnNextLinkedBeat(()=>setAutoScroll(true));
     return;
   }
   if(state.autoScrollPaused){
@@ -7917,6 +7963,7 @@ function handleAutoScrollPrimaryAction(){
 }
 
 function setAutoScroll(on){
+  if(!on) clearAutoScrollArm();
   state.autoScrollOn = !!on;
   state.autoScrollPaused = false;
   state.autoScrollPausedUiTick8 = 0;
@@ -9339,9 +9386,9 @@ function renderSheetTitleBar(){
 
   const headerAuto=document.createElement('button');
   headerAuto.id='srpHeaderAutoScroll';headerAuto.type='button';
-  headerAuto.textContent=state.autoScrollOn?(state.autoScrollPaused?'▶':'Ⅱ'):'↕';
-  headerAuto.title=state.autoScrollOn?(state.autoScrollPaused?'Resume AutoScroll':'Pause AutoScroll'):'Start AutoScroll';
-  headerAuto.classList.toggle('on',!!state.autoScrollOn&&!state.autoScrollPaused);
+  headerAuto.textContent=state.autoScrollArmed?'…':(state.autoScrollOn?(state.autoScrollPaused?'▶':'Ⅱ'):'↕');
+  headerAuto.title=state.autoScrollArmed?'AutoScroll armed for next beat':(state.autoScrollOn?(state.autoScrollPaused?'Resume AutoScroll':'Pause AutoScroll'):'Start AutoScroll');
+  headerAuto.classList.toggle('on',!!state.autoScrollArmed||(!!state.autoScrollOn&&!state.autoScrollPaused));
   headerAuto.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();handleAutoScrollPrimaryAction();setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);});
   right.appendChild(headerAuto);
 
@@ -16439,6 +16486,14 @@ KEEP RHYME UI ABOVE KEYBOARD
       if(activeId && typeof w?.CRPCore?.loadProjectById==='function') w.CRPCore.loadProjectById(activeId);
     }catch(err){console.warn('Could not refresh linked CRP playback project',err)}
   }
+  window.CRP_SRP_getLinkedPlaybackTiming=function(){
+    try{
+      const f=ensureLinkedPlaybackBridge();
+      const parts=f?.contentWindow?.CRPParts;
+      return parts?.getPlaybackTiming?.() || null;
+    }catch{return null;}
+  };
+
   window.CRP_SRP_linkedPlaybackCommand=function(command){
     const f=ensureLinkedPlaybackBridge();
     const w=f?.contentWindow;
