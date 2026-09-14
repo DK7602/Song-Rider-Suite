@@ -121,12 +121,7 @@
       </div>
 
       <div class="play-row">
-        <button id="playAllBtn" class="accent big">▶ Play</button>
-
-        <label class="check-label repeat-control">
-          <input id="loopToggle" type="checkbox" checked />
-          <span>Repeat</span>
-        </label>
+        <button id="addLineBtn" type="button">＋ Add blank line</button>
 
         <label class="bpm-control">
           <span class="transport-label">BPM</span>
@@ -233,8 +228,12 @@
       </div>
 
       <div id="chordPartRows">
-      <div class="line-actions">
-        <button id="addLineBtn" type="button">＋ Add blank line</button>
+      <div class="line-actions transport-line-actions">
+        <button id="playAllBtn" class="accent big">▶ Play</button>
+        <label class="check-label repeat-control">
+          <input id="loopToggle" type="checkbox" checked />
+          <span>Repeat</span>
+        </label>
         <button id="autoScrollBtn" class="auto-scroll-btn" type="button" aria-pressed="false" title="Keep the playing card in view" aria-label="Auto scroll">↕</button>
       </div>
 

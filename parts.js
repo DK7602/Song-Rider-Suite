@@ -316,7 +316,13 @@
   }
   function scheduleHighlight(delayMs,p,cardIndex){
     if(p.id!==activePartId||p.type!=='chord')return;
-    const t=setTimeout(()=>{document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');const cards=[...document.querySelectorAll('.progression-line:not(.carousel-clone) .chord-card')];cards[cardIndex]?.style.setProperty('outline','2px solid var(--accent)');},Math.max(0,delayMs));highlightTimers.push(t);
+    const t=setTimeout(()=>{
+      document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');
+      const cards=[...document.querySelectorAll('.progression-line:not(.carousel-clone) .chord-card')];
+      cards[cardIndex]?.style.setProperty('outline','2px solid var(--accent)');
+      core.followChordCard?.(cardIndex);
+    },Math.max(0,delayMs));
+    highlightTimers.push(t);
   }
   function scheduleLeadHighlight(delayMs,p,step){
     if(p.id!==activePartId||p.type!=='lead')return;const t=setTimeout(()=>{document.querySelectorAll('.lead-cell.playing').forEach(c=>c.classList.remove('playing'));document.querySelectorAll(`.lead-cell[data-step="${step}"]`).forEach(c=>c.classList.add('playing'));},Math.max(0,delayMs));highlightTimers.push(t);

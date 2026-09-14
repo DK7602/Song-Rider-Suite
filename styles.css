@@ -1781,3 +1781,15 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
 /* v2.0.4 — SRP single-scroll integration */
 #songRiderFrame{height:640px;min-height:0!important;overflow:hidden!important;touch-action:pan-y;}
 @media(max-width:640px){#songRiderFrame{height:640px;min-height:0!important;}}
+
+/* v2.3.1 transport flow: Add Line lives with setup controls; playback controls sit directly above lines. */
+.transport-line-actions{gap:10px;align-items:center;}
+.transport-line-actions .repeat-control{display:flex;align-items:center;gap:6px;margin:0;}
+.transport-line-actions #playAllBtn{margin:0;}
+@media (max-width:640px){
+  .transport-line-actions{flex-wrap:nowrap;width:100%;}
+  .transport-line-actions #playAllBtn{flex:0 0 auto;}
+  .transport-line-actions .repeat-control{flex:0 0 auto;white-space:nowrap;}
+  .transport-line-actions #autoScrollBtn{flex:0 0 auto;margin-left:0;}
+  .play-row #addLineBtn{flex:0 0 auto;}
+}

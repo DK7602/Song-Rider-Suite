@@ -1315,6 +1315,26 @@
     get beats(){return +$('beatsSelect').value||4},get bpm(){return +$('bpmInput').value||92},get loop(){return $('loopToggle').checked},
     get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
     startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).reduce((n,r)=>n+r.length,0)*(+$('beatsSelect').value||4);},
+    get autoScroll(){return !!state.autoScroll;},
+    followChordCard(cardIndex){
+      if(!state.autoScroll)return;
+      const cards=[...document.querySelectorAll('.progression-line:not(.carousel-clone) .chord-card')];
+      const card=cards[Number(cardIndex)||0];
+      if(!card)return;
+      const line=card.closest('.progression-line:not(.carousel-clone)');
+      const ri=Number(line?.dataset.row);
+      if(Number.isFinite(ri)){
+        state.selectedRow=ri;
+        updateMobileLineIndicator(ri);
+        realCarouselLines().forEach(el=>el.classList.toggle('selected',+el.dataset.row===ri));
+      }
+      if(isMobileCarousel()&&Number.isFinite(ri)){
+        scrollMobileLineTo(ri,true);
+        setTimeout(()=>{if(state.autoScroll)card.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});},180);
+      }else{
+        card.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
+      }
+    },
     setPlaying(on){state.playing=!!on;setRiderBonesRiding(!!on);$('playAllBtn').textContent=on?'■ Stop':'▶ Play';if(!on)document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');},
     status(msg){$('status').textContent=msg||'';},
     noteAtMidi
