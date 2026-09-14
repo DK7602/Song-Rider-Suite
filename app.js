@@ -866,6 +866,14 @@
 
   async function saveProject(){
     clearTimeout(autoSaveTimer);autoSaveTimer=null;
+    // If navigation temporarily lost the in-memory id, recover the exact saved project
+    // instead of creating a duplicate with a new UUID.
+    if(!state.currentProjectId){
+      try{
+        const storedId=String(localStorage.getItem('crp-active-project-id')||'').trim();
+        if(storedId && localProjects().some(x=>String(x?.id||'')===storedId)) state.currentProjectId=storedId;
+      }catch{}
+    }
     const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);
     state.currentProjectId=p.id;try{localStorage.setItem('crp-active-project-id',String(p.id));}catch{}$('projectName').value=name;upsertLocal(p);
     if(accountUser){
@@ -881,6 +889,18 @@
   let projectBrowserMode='projects';
 
   function projectSource(){return (accountUser&&cloudProjects)?cloudProjects:localProjects();}
+
+  function restoreActiveProjectFromStorage(){
+    try{
+      if(state.currentProjectId)return true;
+      const id=String(localStorage.getItem('crp-active-project-id')||'').trim();
+      if(!id)return false;
+      const p=localProjects().find(x=>String(x?.id||'')===id);
+      if(!p){localStorage.removeItem('crp-active-project-id');return false;}
+      loadProject(p.id);
+      return true;
+    }catch(err){console.error('Could not restore active CRP project',err);return false;}
+  }
 
   function setProjectBrowserMode(mode){
     projectBrowserMode=mode==='archive'?'archive':'projects';
@@ -1193,7 +1213,10 @@
     $('accountSummaryBtn').onclick=()=>{const panel=$('accountPanel');setAccountCollapsed(!panel.classList.contains('is-collapsed'));};
     document.querySelectorAll('.notes-toolbar [data-cmd]').forEach(b=>b.onclick=()=>{document.execCommand(b.dataset.cmd,false,null);scheduleAutoSave();});$('clearNotesBtn').onclick=()=>{if(confirm('Clear notes?')){$('notesEditor').innerHTML='';scheduleAutoSave();}};
     $('keyInput').dataset.autoKey=$('keyInput').value.trim()?'0':'1';
-    renderProjects();renderAll();syncBuildInput();autoPopulateKeyFromEntry();setRiderBonesRiding(false);initWorkspaceMode();checkAccount();if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+    renderProjects();renderAll();syncBuildInput();autoPopulateKeyFromEntry();setRiderBonesRiding(false);initWorkspaceMode();
+    // Restore the exact project the user was working on before switching to SRP/Baby DAW.
+    restoreActiveProjectFromStorage();
+    checkAccount();if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
