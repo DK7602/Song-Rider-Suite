@@ -1256,15 +1256,32 @@
   // v2.5.2: deliberately simple last-writer-wins transport metadata bus.
   // This is global to the currently open linked workspace so project-id/link-map races cannot block BPM/capo/STEP sync.
   const SRP_HARD_SYNC_KEY='crp-srp-hard-sync-v1';
+  // v2.6.0: project-scoped canonical transport state. This is the ONLY authority for linked BPM/CAPO/STEP.
+  const SRP_CANONICAL_PREFIX='crp-srp-canonical-v1:';
   const IS_PLAYBACK_BRIDGE=new URLSearchParams(location.search).get('playbackBridge')==='1';
   function srpMetaKey(projectId){return SRP_META_PREFIX+String(projectId||'')}
   function unifiedSrpMetaKey(projectId){return SRP_UNIFIED_META_PREFIX+String(projectId||'')}
+  function canonicalSrpKey(projectId){return SRP_CANONICAL_PREFIX+String(projectId||'')}
+  function readCanonicalSrp(projectId){try{const id=String(projectId||activeSrpLinkId()||'');if(!id)return null;const m=JSON.parse(localStorage.getItem(canonicalSrpKey(id))||'null');return m&&String(m.projectId||'')===id?m:null}catch{return null}}
+  function writeCanonicalSrp(projectId,meta,source='crp'){
+    if(IS_PLAYBACK_BRIDGE||!projectId)return null;
+    try{
+      const id=String(projectId), prev=readCanonicalSrp(id)||{};
+      const next={...prev,...meta,projectId:id,source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
+      localStorage.setItem(SRP_ACTIVE_LINK_KEY,id);
+      localStorage.setItem(canonicalSrpKey(id),JSON.stringify(next));
+      try{window.__CRP_SRP_CANONICAL_CHANNEL?.postMessage(next)}catch{}
+      return next;
+    }catch{return null}
+  }
   function activeSrpLinkId(){
     try{return String(state.currentProjectId||localStorage.getItem(SRP_ACTIVE_LINK_KEY)||localStorage.getItem('crp-active-project-id')||'')}catch{return String(state.currentProjectId||'')}
   }
   function readLiveSrpMeta(){
     try{
       const id=activeSrpLinkId();
+      const canonical=readCanonicalSrp(id);
+      if(canonical)return {...canonical,crpProjectId:id};
       if(id){const unified=JSON.parse(localStorage.getItem(unifiedSrpMetaKey(id))||'null');if(unified&&String(unified.crpProjectId||'')===id)return unified;}
       return JSON.parse(localStorage.getItem(SRP_LIVE_META_KEY)||'null');
     }catch{return null}
@@ -1273,6 +1290,8 @@
     if(IS_PLAYBACK_BRIDGE||!projectId)return null;
     try{
       const id=String(projectId);
+      // Every legacy publication also advances the canonical project record.
+      writeCanonicalSrp(id,meta,String(meta?.source||'crp'));
       localStorage.setItem(SRP_ACTIVE_LINK_KEY,id);
       const key=unifiedSrpMetaKey(id);
       const old=JSON.parse(localStorage.getItem(key)||'null');
@@ -1288,9 +1307,14 @@
   }
   function readSharedSrpMeta(projectId){
     try{
-      const base=JSON.parse(localStorage.getItem(srpMetaKey(projectId))||'null');
+      const id=String(projectId||'');
+      const base=JSON.parse(localStorage.getItem(srpMetaKey(id))||'null');
+      // Read the requested project's canonical record directly. Do not depend on whatever
+      // project happened to be active before loadProject() switches state.currentProjectId.
+      const canonical=readCanonicalSrp(id);
+      if(canonical)return {...(base||{}),...canonical,crpProjectId:id};
       const live=readLiveSrpMeta();
-      return live&&String(live.crpProjectId||'')===String(projectId||'')?{...(base||{}),...live}:base;
+      return live&&String(live.crpProjectId||'')===id?{...(base||{}),...live}:base;
     }catch{return null}
   }
   function writeSharedSrpMeta(projectId,meta){
@@ -1320,7 +1344,7 @@
     return live;
   }
   function readHardSync(){
-    try{return JSON.parse(localStorage.getItem(SRP_HARD_SYNC_KEY)||'null')}catch{return null}
+    try{return readCanonicalSrp(activeSrpLinkId())||JSON.parse(localStorage.getItem(SRP_HARD_SYNC_KEY)||'null')}catch{return null}
   }
   function writeHardSync(source='crp',modeOverride){
     if(IS_PLAYBACK_BRIDGE)return null;
@@ -1332,6 +1356,7 @@
       const prev=readHardSync()||{};
       const pitchMode=modeOverride==='step'||modeOverride==='capo'?modeOverride:(prev.pitchMode==='step'?'step':'capo');
       const next={bpm,capo,octave,pitchMode,projectId:id,source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
+      writeCanonicalSrp(id,{bpm,capo,octave,pitchMode},source);
       localStorage.setItem(SRP_HARD_SYNC_KEY,JSON.stringify(next));
       return next;
     }catch{return null}
@@ -1482,10 +1507,11 @@
     }catch(err){console.warn('Could not apply linked SRP metadata',err);return false}
   }
   try{window.__CRP_SRP_META_CHANNEL=new BroadcastChannel('crp-srp-live-meta-v3');window.__CRP_SRP_META_CHANNEL.onmessage=()=>setTimeout(applyLinkedMetaFromSrpHandoff,0);}catch{}
+  try{window.__CRP_SRP_CANONICAL_CHANNEL=new BroadcastChannel('crp-srp-canonical-v1');window.__CRP_SRP_CANONICAL_CHANNEL.onmessage=()=>setTimeout(applyHardSync,0);}catch{}
   window.addEventListener('storage',e=>{if(e.key===SRP_LIVE_META_KEY||e.key===SRP_HANDOFF_KEY||String(e.key||'').startsWith(SRP_META_PREFIX))applyLinkedMetaFromSrpHandoff();});
   window.addEventListener('pageshow',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
   window.addEventListener('focus',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
-  window.addEventListener('storage',e=>{if(e.key===SRP_HARD_SYNC_KEY)setTimeout(applyHardSync,0);});
+  window.addEventListener('storage',e=>{if(e.key===SRP_HARD_SYNC_KEY||String(e.key||'').startsWith(SRP_CANONICAL_PREFIX))setTimeout(applyHardSync,0);});
   window.addEventListener('pageshow',()=>setTimeout(applyHardSync,0));
   window.addEventListener('focus',()=>setTimeout(applyHardSync,0));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSync,0);});
