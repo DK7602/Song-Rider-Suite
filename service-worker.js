@@ -1,5 +1,9 @@
-const CACHE = 'song-rider-suite-v2.8.8-header-match';
+const CACHE = 'song-rider-suite-v2.8.9-master-branding';
 const ASSETS = [
+  './song-rider/suite-header-master.png',
+  './song-rider/branding-shell.css',
+  './assets/suite-header-master.png',
+  './branding-shell.css',
   './song-rider/suite-header.css',
   './suite-header.css',
   './song-rider/song-rider-pro-wordmark.png',
