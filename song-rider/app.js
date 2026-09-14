@@ -9435,7 +9435,7 @@ function renderSheetTitleBar(){
     right.appendChild(autoStop);
   }
 
-  // v2.8.4: linked transport belongs on every SRP page, not only Full Song View.
+  // v2.8.5: linked transport belongs on every SRP page, not only Full Song View.
   // The same proven linked CRP/BD playback bridge is reused so card-page playback
   // cannot drift into a second audio/sync implementation.
   {
@@ -17042,5 +17042,5 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
 })();
 
-// v2.8.4: SRP card-page linked transport + single-button link/unlink toggle; close the main SRP application IIFE after the nested CRP/SRP bridge.
+// v2.8.5: SRP card-page linked transport + single-button link/unlink toggle; close the main SRP application IIFE after the nested CRP/SRP bridge.
 })();
