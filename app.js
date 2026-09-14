@@ -940,7 +940,7 @@
       ? `“${p.name}” moved to Archive.`
       : `“${p.name}” restored to Projects.`;
   }
-  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;const shared=readSharedSrpMeta(id);if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
+  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;const __srpSession=readSrpLinkSession();const shared=(__srpSession&&String(__srpSession.crpProjectId||'')===String(id))?readSharedSrpMeta(id):null;if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
   function renderProjects(){
     const w=$('projectList');
@@ -1258,7 +1258,7 @@
   const SRP_HARD_SYNC_KEY='crp-srp-hard-sync-v1';
   // v2.6.0: project-scoped canonical transport state. This is the ONLY authority for linked BPM/CAPO/STEP.
   const SRP_CANONICAL_PREFIX='crp-srp-canonical-v1:';
-  const SRP_LINK_SESSION_KEY='crp-srp-link-session-v2';
+  const SRP_LINK_SESSION_KEY='crp-srp-link-session-v3';
   const IS_PLAYBACK_BRIDGE=new URLSearchParams(location.search).get('playbackBridge')==='1';
   function srpMetaKey(projectId){return SRP_META_PREFIX+String(projectId||'')}
   function unifiedSrpMetaKey(projectId){return SRP_UNIFIED_META_PREFIX+String(projectId||'')}
@@ -1314,6 +1314,9 @@
       const base=JSON.parse(localStorage.getItem(srpMetaKey(id))||'null');
       // Read the requested project's canonical record directly. Do not depend on whatever
       // project happened to be active before loadProject() switches state.currentProjectId.
+      const session=readSrpLinkSession();
+      const explicitlyLinked=!!(session&&String(session.crpProjectId||'')===id);
+      if(!explicitlyLinked)return base;
       const canonical=readCanonicalSrp(id);
       if(canonical)return {...(base||{}),...canonical,crpProjectId:id};
       const live=readLiveSrpMeta();
