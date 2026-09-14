@@ -69,7 +69,7 @@ Instrument playback uses the `soundfont-player` browser library and MusyngKite s
 - Mobile Full Song typing now follows the caret above the soft keyboard in integrated SRP mode.
 - Keeps native single-page scrolling; no nested scroll containers reintroduced.
 
-## v2.2.0 — Song Rider UI overhaul
+## v2.2.1 — Song Rider UI overhaul
 - Restyled integrated Song Rider to match Chord Rider Pro's dark charcoal/gold interface.
 - Standardized SRP buttons, fields, panels, song sections, and modals to CRP styling.
 - Added a multicolor chrome treatment to the SONG RIDER PRO title.
