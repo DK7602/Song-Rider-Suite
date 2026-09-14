@@ -1844,3 +1844,161 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
     font-size:.72rem !important;
   }
 }
+
+/* v2.3.3 — mobile setup + playback transport cleanup after control re-order.
+   Setup row has exactly 3 controls now: Add line | BPM | Beats/chord.
+   Playback row has exactly 3 controls: Play | Repeat | Auto-scroll. */
+@media (max-width:700px){
+  /* Setup row: prevent the old 4-column transport grid from squeezing/overlapping. */
+  .play-row{
+    display:grid !important;
+    grid-template-columns:minmax(0,1.35fr) minmax(0,.82fr) minmax(0,1fr) !important;
+    align-items:center !important;
+    column-gap:7px !important;
+    row-gap:0 !important;
+    width:100% !important;
+    min-width:0 !important;
+    overflow:visible !important;
+  }
+  .play-row #addLineBtn{
+    grid-column:1 !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    margin:0 !important;
+    padding:10px 8px !important;
+    font-size:clamp(.67rem,2.65vw,.82rem) !important;
+    line-height:1.05 !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:clip !important;
+  }
+  .play-row .bpm-control{
+    grid-column:2 !important;
+    display:grid !important;
+    grid-template-columns:auto minmax(0,1fr) !important;
+    align-items:center !important;
+    gap:3px !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+    white-space:nowrap !important;
+  }
+  .play-row .bpm-control #bpmInput{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    box-sizing:border-box !important;
+    padding:8px 3px !important;
+    text-align:center !important;
+  }
+  .play-row .beats-control{
+    grid-column:3 !important;
+    display:grid !important;
+    grid-template-columns:auto minmax(44px,1fr) !important;
+    align-items:center !important;
+    justify-content:stretch !important;
+    gap:4px !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+  }
+  .play-row .beats-label{
+    min-width:0 !important;
+    width:auto !important;
+    line-height:.92 !important;
+    font-size:clamp(.56rem,2.2vw,.66rem) !important;
+  }
+  .play-row #beatsSelect{
+    width:100% !important;
+    min-width:44px !important;
+    max-width:none !important;
+    box-sizing:border-box !important;
+  }
+
+  /* Playback row: keep all three controls visible and comfortably spaced. */
+  .transport-line-actions{
+    display:grid !important;
+    grid-template-columns:minmax(96px,128px) auto 40px !important;
+    align-items:center !important;
+    justify-content:start !important;
+    gap:10px !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin:14px 0 8px !important;
+    overflow:visible !important;
+  }
+  .transport-line-actions #playAllBtn{
+    grid-column:1 !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:128px !important;
+    margin:0 !important;
+    padding:11px 12px !important;
+    font-size:.82rem !important;
+    line-height:1 !important;
+    white-space:nowrap !important;
+  }
+  .transport-line-actions .repeat-control{
+    grid-column:2 !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-start !important;
+    gap:5px !important;
+    width:auto !important;
+    min-width:0 !important;
+    margin:0 !important;
+    padding:0 !important;
+    white-space:nowrap !important;
+    font-size:.76rem !important;
+  }
+  .transport-line-actions .repeat-control input{
+    width:20px !important;
+    height:20px !important;
+    flex:0 0 20px !important;
+    margin:0 !important;
+  }
+  .transport-line-actions #autoScrollBtn{
+    grid-column:3 !important;
+    width:40px !important;
+    min-width:40px !important;
+    height:40px !important;
+    min-height:40px !important;
+    margin:0 !important;
+    padding:0 !important;
+    justify-self:start !important;
+    font-size:1rem !important;
+  }
+}
+
+@media (max-width:380px){
+  .play-row{
+    grid-template-columns:minmax(0,1.25fr) minmax(0,.84fr) minmax(0,1fr) !important;
+    column-gap:5px !important;
+  }
+  .play-row #addLineBtn{
+    font-size:0 !important;
+  }
+  .play-row #addLineBtn::after{
+    content:"+ Blank line" !important;
+    font-size:.70rem !important;
+  }
+  .transport-line-actions{
+    grid-template-columns:minmax(90px,116px) auto 38px !important;
+    gap:8px !important;
+  }
+  .transport-line-actions #playAllBtn{
+    max-width:116px !important;
+    padding-inline:9px !important;
+    font-size:.76rem !important;
+  }
+  .transport-line-actions .repeat-control span{
+    font-size:.70rem !important;
+  }
+  .transport-line-actions #autoScrollBtn{
+    width:38px !important;
+    min-width:38px !important;
+    height:38px !important;
+    min-height:38px !important;
+  }
+}
