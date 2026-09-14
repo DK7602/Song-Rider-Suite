@@ -2708,7 +2708,7 @@ html.crp-integrated .crpSectionTitlePill{
 <div class="tinyField">
   <input id="capoInput" type="number" min="0" max="12" step="1" value="0"/>
 </div>
-          <div class="tinyField key"><input id="keyOutput" type="text" readonly value="—"/></div>
+          <div class="tinyField key"><input id="keyOutput" type="text" value="—" aria-label="Song key"/></div>
           <button id="crpSrpLinkBtn" class="srp-inline-link-btn" type="button" title="Link this project to Song Rider Pro">Link SRP</button>
           <button id="crpSrpUnlinkBtn" class="srp-inline-link-btn" type="button" hidden>Unlink</button>
         </div>
@@ -2978,7 +2978,7 @@ html.crp-integrated .crpSectionTitlePill{
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <!-- cache-buster -->
-<script src="./app.js?v=CRPSRPLINK230"></script>
+<script src="./app.js?v=CRPSRPLINK240"></script>
 <script src="./crp-link-failsafe.js?v=230"></script>
 
 <script>
@@ -3026,4 +3026,19 @@ html.crp-integrated .crpSectionTitlePill{
 </html><style id="srp230RemoveLegacyNoteLength">
 html.crp-integrated #noteLenSelect,
 html.crp-integrated #mNoteLenSelect{display:none!important;}
+</style>
+
+<style id="srp240LinkedWorkflow">
+html.crp-integrated #recordBtn,html.crp-integrated #mRecordBtn{display:none!important;}
+html.crp-integrated #panelBody > .controlSelectRow{display:none!important;}
+html.crp-integrated .sheetHeader #srpHeaderAutoScroll{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:38px!important;flex:0 0 42px!important;border-radius:11px!important;border:1px solid #d8ae52!important;background:#252b33!important;color:#f4d47d!important;font-weight:1000!important;font-size:19px!important;}
+html.crp-integrated .sheetHeader #srpHeaderAutoScroll.on{background:linear-gradient(180deg,#f7d774,#dda93a)!important;color:#111!important;}
+html.crp-integrated #autoPlayBtn,html.crp-integrated #autoStopBtn,html.crp-integrated #mScrollBtn,html.crp-integrated #mAutoStopBtn{display:none!important;}
+html.crp-integrated input.headingPill{background:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;color:#111!important;-webkit-text-fill-color:#111!important;border:1px solid #d6aa3f!important;border-radius:999px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.24)!important;}
+html.crp-integrated #srpTransposeLinkBtn{width:23px!important;min-width:23px!important;height:38px!important;padding:0!important;border-radius:999px!important;font-size:11px!important;font-weight:1000!important;}
+html.crp-integrated #srpTransposeLinkBtn.on{background:#efc85d!important;color:#111!important;}
+html.srp-lyrics-overlay-mode .crp-srp-app-header,html.srp-lyrics-overlay-mode header{display:none!important;}
+html.srp-lyrics-overlay-mode main{padding:0 0 86px!important;}
+html.srp-lyrics-overlay-mode .sheet{border:0!important;border-radius:0!important;margin:0!important;}
+html.srp-lyrics-overlay-mode .sheetHeader{position:sticky!important;top:0!important;z-index:20!important;background:#151a21!important;}
 </style>

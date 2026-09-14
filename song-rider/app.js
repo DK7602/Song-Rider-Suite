@@ -7770,6 +7770,15 @@ function ensureCapoStepToggle(){
     if(btn.parentNode !== wrap) wrap.appendChild(btn);
   }
 
+  // Linked CRP transpose toggle. Kept separate from CAPO/STEP so capo and transpose can stay synced at once.
+  let transBtn=document.getElementById('srpTransposeLinkBtn');
+  if(!transBtn){
+    transBtn=document.createElement('button');transBtn.id='srpTransposeLinkBtn';transBtn.type='button';transBtn.className='miniIconBtn';transBtn.textContent='T';transBtn.title='Transpose';wrap.appendChild(transBtn);
+  }else if(transBtn.parentNode!==wrap) wrap.appendChild(transBtn);
+  const repaintTranspose=()=>{const on=!!state.project?.linkedTranspose;transBtn.classList.toggle('on',on);transBtn.setAttribute('aria-pressed',String(on));};
+  if(!transBtn.dataset.wired){transBtn.dataset.wired='1';transBtn.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();if(!state.project)return;state.project.linkedTranspose=!state.project.linkedTranspose;upsertProject(state.project);repaintTranspose();window.CRP_SRP_syncMetaToCrp?.();});}
+  repaintTranspose();
+
   // Paint pill + input based on mode
   function repaint(){
     const mode = (state.transposeMode === "step") ? "step" : "capo";
@@ -8632,6 +8641,10 @@ function keyFromHistogram(hist){
 }
 
 function updateKeyFromAllNotes(){
+  if(state.project?.linkedCrpProjectId && String(state.project.crpKey||'').trim()){
+    if(el.keyOutput) el.keyOutput.value=String(state.project.crpKey||'').trim();
+    return;
+  }
   if(!state.project || !state.project.sections){
     if(el.keyOutput) el.keyOutput.value = "—";
     return;
@@ -9272,7 +9285,7 @@ function renderSheetTitleBar(){
 
     titleInput = document.createElement("input");
     titleInput.type = "text";
-    titleInput.placeholder = "Title (optional)…";
+    titleInput.placeholder = "Section title";
     titleInput.className = "songPartPill headingPill";
     titleInput.style.setProperty("background", "#efc85d", "important");
     titleInput.style.setProperty("background-image", "linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)", "important");
@@ -9325,6 +9338,12 @@ function renderSheetTitleBar(){
   right.style.gap = "8px";
   right.style.flex = "0 0 auto";
 
+  const headerAuto=document.createElement('button');
+  headerAuto.id='srpHeaderAutoScroll';headerAuto.type='button';headerAuto.textContent='↕';
+  headerAuto.title=state.autoScrollOn?(state.autoScrollPaused?'Resume AutoScroll':'Pause AutoScroll'):'Start AutoScroll';
+  headerAuto.classList.toggle('on',!!state.autoScrollOn&&!state.autoScrollPaused);
+  headerAuto.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();handleAutoScrollPrimaryAction();setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);});
+  right.appendChild(headerAuto);
 
   if(state.currentSection === "Full"){
     // ✅ Full page gets + / ✕ to add/remove pages without leaving Full view
@@ -11192,6 +11211,7 @@ async function renderRecordings(){
     const d = document.createElement("div");
     d.style.color="#666";
     d.style.fontWeight="900";
+    if(document.documentElement.classList.contains("crp-integrated")){ el.recordingsList.innerHTML=""; return; }
     d.textContent = "No recordings yet.";
     el.recordingsList.appendChild(d);
     return;
@@ -15321,6 +15341,11 @@ function wire(){
   });
   // ✅ create the CAPO/STEP pill + force inline wrap
   ensureCapoStepToggle();
+  if(el.keyOutput && !el.keyOutput.dataset.linkKeyWired){
+    el.keyOutput.dataset.linkKeyWired='1';
+    el.keyOutput.addEventListener('change',()=>{if(!state.project?.linkedCrpProjectId)return;const v=String(el.keyOutput.value||'').trim();state.project.crpKey=v;upsertProject(state.project);window.CRP_SRP_syncMetaToCrp?.();});
+    el.keyOutput.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();el.keyOutput.blur();}});
+  }
   injectHeaderControlTightStyle();
   // ✅ CAPTURE commit: prevents any other blur/change handlers from snapping .5 to int
 if(el.capoInput){
@@ -15353,6 +15378,7 @@ if(el.capoInput){
     if(state.currentSection === "Full"){
       try{ renderSheet(); }catch{}
     }
+    window.CRP_SRP_syncMetaToCrp?.();
   };
 
   el.capoInput.addEventListener("change", commitCapoStep_CAPTURE, true);
@@ -15738,6 +15764,7 @@ if(el.capoInput){
 
     if(state.drumsOn) startDrums();
     restartClockIfRunning();
+    window.CRP_SRP_syncMetaToCrp?.();
   }
 
   if(el.bpmInput) el.bpmInput.addEventListener("input", () => {
@@ -15753,6 +15780,7 @@ if(el.capoInput){
       }
       if(state.drumsOn) startDrums();
       restartClockIfRunning();
+      window.CRP_SRP_syncMetaToCrp?.();
     }
   });
 
@@ -16072,6 +16100,11 @@ async function init(){
 
   // These are “nice to have” UI tweaks — keep them at the end
   ensureCapoStepToggle();
+  if(el.keyOutput && !el.keyOutput.dataset.linkKeyWired){
+    el.keyOutput.dataset.linkKeyWired='1';
+    el.keyOutput.addEventListener('change',()=>{if(!state.project?.linkedCrpProjectId)return;const v=String(el.keyOutput.value||'').trim();state.project.crpKey=v;upsertProject(state.project);window.CRP_SRP_syncMetaToCrp?.();});
+    el.keyOutput.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();el.keyOutput.blur();}});
+  }
   injectHeaderControlTightStyle();
 
   pushHistory("init"); // seed the first snapshot
@@ -16324,6 +16357,8 @@ KEEP RHYME UI ABOVE KEYBOARD
   const q=new URLSearchParams(location.search);
   const embedded=q.get('embedded')==='1';
   const integrated=q.get('crpMode')==='1';
+  const lyricsOverlay=q.get('lyricsOverlay')==='1';
+  if(lyricsOverlay)document.documentElement.classList.add('srp-lyrics-overlay-mode');
   if(!embedded && !integrated) return;
   const HANDOFF_KEY='crp-srp-handoff-v2';
   const LINKS_KEY='crp-srp-links-v1';
@@ -16347,6 +16382,8 @@ KEEP RHYME UI ABOVE KEYBOARD
         bpm:Number(p.bpm)||92,
         beats:Number(p.beats)||4,
         key:String(p.key||''),
+        capo:Number(p.capo)||0,
+        transpose:!!p.transpose,
         rows:(Array.isArray(p.rows)?p.rows:[]).map((row,rowIndex)=>({
           lineId:`crp-line-${rowIndex+1}`,
           cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))
@@ -16382,6 +16419,8 @@ KEEP RHYME UI ABOVE KEYBOARD
       p.name=payload.name||p.name;
       p.bpm=Number(payload.bpm)||p.bpm||95;
       p.crpKey=String(payload.key||'');
+      p.capo=Math.max(0,Math.min(12,Number(payload.capo)||0));
+      p.linkedTranspose=!!payload.transpose;
       p.crpBeatsPerChord=Number(payload.beats)||4;
       p.crpChordRows=payload.rows||[];
       const sec='PAGE 1';
@@ -16407,6 +16446,22 @@ KEEP RHYME UI ABOVE KEYBOARD
       return p;
     }catch(err){console.error('CRP/SRP link sync failed',err);return null}
   }
+
+  function syncMetaToCrp(){
+    try{
+      const p=state.project;if(!p?.linkedCrpProjectId)return;
+      const projects=readJson('crp-projects',[])||[];const i=projects.findIndex(x=>String(x?.id||'')===String(p.linkedCrpProjectId));if(i<0)return;
+      const cp={...projects[i]};
+      cp.bpm=Math.max(40,Math.min(240,Number(state.bpm||p.bpm)||92));
+      cp.capo=Math.max(0,Math.min(12,Number(state.capo||p.capo)||0));
+      cp.transpose=!!p.linkedTranspose;
+      const key=String(p.crpKey||el?.keyOutput?.value||'').trim();if(key)cp.key=key;
+      cp.updatedAt=Date.now();projects[i]=cp;writeJson('crp-projects',projects);
+      const payload={crpProjectId:cp.id,name:cp.name||p.name||'Untitled',bpm:cp.bpm,beats:Number(cp.beats)||4,key:String(cp.key||''),capo:cp.capo,transpose:cp.transpose,rows:(Array.isArray(cp.rows)?cp.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))};
+      const rec=links()[cp.id]||null;writeJson(HANDOFF_KEY,{payload,rec,ts:Date.now()});
+    }catch(err){console.warn('Could not sync SRP metadata back to CRP',err)}
+  }
+  window.CRP_SRP_syncMetaToCrp=syncMetaToCrp;
 
   function refreshCrpLinkUi(){
     if(!integrated)return;
@@ -16469,7 +16524,8 @@ KEEP RHYME UI ABOVE KEYBOARD
       const all=links();delete all[payload.crpProjectId];setLinks(all);refreshCrpLinkUi();
     });
     window.addEventListener('storage',e=>{if(e.key===HANDOFF_KEY||e.key===LINKS_KEY){refreshCrpLinkUi();syncFromHandoff(false)}});
-    setTimeout(()=>{refreshCrpLinkUi();syncFromHandoff(false)},80);
+    setTimeout(()=>{refreshCrpLinkUi();syncFromHandoff(false);if(lyricsOverlay){try{goToSection('Full');setAutoScroll(false);}catch{}}},80);
+    window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='srp-show-full-song'){try{goToSection('Full');}catch{}}});
   }
 })();
 
