@@ -2007,7 +2007,7 @@
     }
 
 
-/* v2.8.8 — preserve approved SRP tri-color metallic wordmark */
+/* v2.8.9 — preserve approved SRP tri-color metallic wordmark */
 html.crp-integrated .panelTop .left .srp-pink{
  background:linear-gradient(180deg,#fff 0%,#ffd9ef 12%,#ff4fa7 28%,#ff9fd0 43%,#fff 51%,#d71d79 62%,#ff70b7 80%,#7a1748 100%)!important;
  -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;
@@ -2810,7 +2810,7 @@ html.crp-integrated .crp-srp-mode:nth-child(2) img{
 }
 </style>
 
-  <link rel="stylesheet" href="./suite-header.css?v=2.8.8" />
+  <link rel="stylesheet" href="./suite-header.css?v=2.8.9" />
 
 <style id="babyStickerOnlyV288">
 html.crp-integrated .crp-srp-mode:nth-child(2) img{
@@ -2823,31 +2823,27 @@ html.crp-integrated .crp-srp-mode:nth-child(2) img{
 }
 </style>
 
+<link rel="stylesheet" href="./branding-shell.css?v=2.8.9">
 </head>
 
 <body>
 
   <section id="crpSrpShell" class="crp-srp-shell" aria-label="Chord Rider Pro workspace navigation">
-    <div class="crp-srp-app-header app-header" aria-label="Song Rider Suite">
-      <img id="srpBrandLeft" src="../assets/rider-and-bones-right-still.png" class="crp-srp-brand-mark brand-mark brand-left" alt="Rider and Bones" data-still="../assets/rider-and-bones-right-still.png" data-animated="../assets/rider-and-bones-right.gif" />
-      <div class="crp-srp-brand-copy brand-copy">
-        <h1>SONG RIDER SUITE</h1>
-        <p class="crp-srp-tagline tagline">Ride the progression. See it. Hear it. Build it.</p>
-      </div>
-      <img id="srpBrandRight" src="../assets/rider-and-bones-left-still.png" class="crp-srp-brand-mark brand-mark brand-right" alt="Rider and Bones" data-still="../assets/rider-and-bones-left-still.png" data-animated="../assets/rider-and-bones-left.gif" />
+    <div class="crp-srp-app-header app-header suite-master-header">
+      <img src="./suite-header-master.png?v=2.8.9" alt="Song Rider Suite — Ride the progression. See it. Hear it. Build it.">
     </div>
-    <nav class="crp-srp-modes" aria-label="Workspace mode">
-      <a class="crp-srp-mode" href="../index.html?workspace=chord-rider">
-        <img src="../assets/rider-bones-mode-sticker.png" alt="" />
-        <span class="copy"><strong>Chord Rider</strong><small>Chords + Beat</small></span>
+    <nav class="crp-srp-modes workspace-mode-switch" aria-label="Workspace mode">
+      <a class="crp-srp-mode workspace-mode-btn" href="../index.html?workspace=chord-rider">
+        <span class="mode-art rider-mode-art"><img src="../assets/rider-bones-mode-sticker.png" alt=""></span>
+        <span class="mode-copy"><strong>Chord Rider</strong><small>Chords + Beat</small></span>
       </a>
-      <a class="crp-srp-mode" href="../index.html?workspace=baby-daw">
-        <img src="./baby-daw-sticker.png?v=2.8.8" alt="" />
-        <span class="copy"><strong>Baby DAW</strong><small>Parts + Production</small></span>
+      <a class="crp-srp-mode workspace-mode-btn" href="../index.html?workspace=baby-daw">
+        <span class="mode-art baby-mode-art"><img src="./baby-daw-sticker.png?v=2.8.9" alt=""></span>
+        <span class="mode-copy"><strong>Baby DAW</strong><small>Parts + Production</small></span>
       </a>
-      <a class="crp-srp-mode active" href="./index.html?crpMode=1" aria-current="page">
-        <img src="../assets/rider-bones-mode-sticker.png" alt="" />
-        <span class="copy"><strong>Song Rider</strong><small>Lyrics + Flow</small></span>
+      <a class="crp-srp-mode workspace-mode-btn active" href="./index.html?crpMode=1" aria-current="page">
+        <span class="mode-art rider-mode-art"><img src="../assets/rider-bones-mode-sticker.png" alt=""></span>
+        <span class="mode-copy"><strong>Song Rider</strong><small>Lyrics + Flow</small></span>
       </a>
     </nav>
     <div class="crp-srp-linkbar srp-link-status-only">
@@ -2866,7 +2862,7 @@ html.crp-integrated .crp-srp-mode:nth-child(2) img{
       <div class="panelTop">
         <div style="display:flex; align-items:center; gap:10px;">
           <div class="left" aria-label="Song Rider Pro">
-            <img class="srp-exact-wordmark" src="./song-rider-pro-wordmark.png?v=2.8.8" alt="Song Rider Pro">
+            <img class="srp-exact-wordmark" src="./song-rider-pro-wordmark.png?v=2.8.9" alt="Song Rider Pro">
           </div>
 
           <!-- ✅ Parked horse (size controlled by #horseParked CSS) -->
@@ -3300,7 +3296,7 @@ html.srp-lyrics-overlay-mode .sheetHeader{position:sticky!important;top:0!import
 
 
 <style id="srp282CardPageTransport">
-/* v2.8.8 — keep SRP card-page title + AutoScroll + Play/Pause + Stop on one mobile row. */
+/* v2.8.9 — keep SRP card-page title + AutoScroll + Play/Pause + Stop on one mobile row. */
 html.crp-integrated .sheetHeader > div:first-child{
   min-width:0!important;
   flex:1 1 auto!important;

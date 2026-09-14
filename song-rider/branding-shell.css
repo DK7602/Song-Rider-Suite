@@ -1,0 +1,192 @@
+
+/* Song Rider Suite master branding shell — v2.8.9 */
+.suite-master-header{
+  display:block!important;
+  width:100%!important;
+  min-height:0!important;
+  height:auto!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:#080a0d!important;
+  box-shadow:none!important;
+  overflow:hidden!important;
+  position:relative!important;
+  top:auto!important;
+}
+.suite-master-header>img{
+  display:block!important;
+  width:100%!important;
+  height:auto!important;
+  object-fit:contain!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+/* Shared 3-button selector geometry */
+.workspace-mode-switch,
+.crp-srp-modes.workspace-mode-switch{
+  display:grid!important;
+  grid-template-columns:minmax(0,.94fr) minmax(0,1.12fr) minmax(0,.94fr)!important;
+  gap:8px!important;
+  width:100%!important;
+  max-width:1180px!important;
+  margin:0 auto!important;
+  padding:12px 14px!important;
+  box-sizing:border-box!important;
+  background:#10141a!important;
+  border-bottom:1px solid #2d3540!important;
+}
+.workspace-mode-btn,
+.crp-srp-mode.workspace-mode-btn{
+  min-width:0!important;
+  max-width:none!important;
+  min-height:92px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:8px!important;
+  padding:8px 7px!important;
+  border:1px solid #46505d!important;
+  border-radius:16px!important;
+  background:#11161d!important;
+  color:#c8ced6!important;
+  text-decoration:none!important;
+  overflow:visible!important;
+  box-sizing:border-box!important;
+}
+.workspace-mode-btn.active,
+.crp-srp-mode.workspace-mode-btn.active{
+  border-color:#f2c44d!important;
+  color:#fff5cf!important;
+  background:
+    radial-gradient(circle at 50% 35%,rgba(111,76,13,.30),transparent 66%),
+    linear-gradient(145deg,#2b2413,#14181e)!important;
+  box-shadow:
+    0 0 0 1px rgba(255,217,104,.55),
+    0 0 18px rgba(238,183,48,.55),
+    inset 0 0 22px rgba(231,178,43,.10)!important;
+}
+.workspace-mode-btn .mode-art,
+.crp-srp-mode.workspace-mode-btn .mode-art{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  flex:0 0 58px!important;
+  width:58px!important;
+  height:58px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  overflow:visible!important;
+}
+.workspace-mode-btn .mode-art img,
+.crp-srp-mode.workspace-mode-btn .mode-art img{
+  display:block!important;
+  width:58px!important;
+  height:58px!important;
+  object-fit:contain!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+.workspace-mode-btn .baby-mode-art,
+.crp-srp-mode.workspace-mode-btn .baby-mode-art{
+  flex-basis:66px!important;
+  width:66px!important;
+  height:66px!important;
+}
+.workspace-mode-btn .baby-mode-art img,
+.crp-srp-mode.workspace-mode-btn .baby-mode-art img{
+  width:66px!important;
+  height:66px!important;
+  filter:drop-shadow(0 4px 5px rgba(0,0,0,.72))!important;
+}
+.workspace-mode-btn .mode-copy,
+.crp-srp-mode.workspace-mode-btn .mode-copy{
+  min-width:0!important;
+  max-width:100%!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  text-align:left!important;
+  line-height:1.06!important;
+  overflow:visible!important;
+}
+.workspace-mode-btn .mode-copy strong,
+.crp-srp-mode.workspace-mode-btn .mode-copy strong{
+  font-size:1rem!important;
+  line-height:1.02!important;
+  white-space:normal!important;
+}
+.workspace-mode-btn .mode-copy small,
+.crp-srp-mode.workspace-mode-btn .mode-copy small{
+  margin-top:5px!important;
+  color:#9ba4b0!important;
+  font-size:.69rem!important;
+  line-height:1.08!important;
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  word-break:normal!important;
+}
+.workspace-mode-btn.active .mode-copy small,
+.crp-srp-mode.workspace-mode-btn.active .mode-copy small{
+  color:#e6d29a!important;
+}
+
+/* Give Baby DAW enough copy width so Production can never lose the N. */
+.workspace-mode-btn:nth-child(2) .mode-copy,
+.crp-srp-mode.workspace-mode-btn:nth-child(2) .mode-copy{
+  flex:1 1 auto!important;
+  min-width:0!important;
+}
+.workspace-mode-btn:nth-child(2) .mode-copy small,
+.crp-srp-mode.workspace-mode-btn:nth-child(2) .mode-copy small{
+  font-size:.66rem!important;
+}
+
+@media(max-width:520px){
+  .workspace-mode-switch,
+  .crp-srp-modes.workspace-mode-switch{
+    grid-template-columns:minmax(0,.92fr) minmax(0,1.16fr) minmax(0,.92fr)!important;
+    gap:7px!important;
+    padding:10px 12px!important;
+  }
+  .workspace-mode-btn,
+  .crp-srp-mode.workspace-mode-btn{
+    min-height:90px!important;
+    gap:5px!important;
+    padding:7px 5px!important;
+  }
+  .workspace-mode-btn .mode-art,
+  .crp-srp-mode.workspace-mode-btn .mode-art{
+    flex-basis:46px!important;width:46px!important;height:46px!important;
+  }
+  .workspace-mode-btn .mode-art img,
+  .crp-srp-mode.workspace-mode-btn .mode-art img{
+    width:46px!important;height:46px!important;
+  }
+  .workspace-mode-btn .baby-mode-art,
+  .crp-srp-mode.workspace-mode-btn .baby-mode-art{
+    flex-basis:60px!important;width:60px!important;height:60px!important;
+  }
+  .workspace-mode-btn .baby-mode-art img,
+  .crp-srp-mode.workspace-mode-btn .baby-mode-art img{
+    width:60px!important;height:60px!important;
+  }
+  .workspace-mode-btn .mode-copy strong,
+  .crp-srp-mode.workspace-mode-btn .mode-copy strong{
+    font-size:.88rem!important;
+  }
+  .workspace-mode-btn .mode-copy small,
+  .crp-srp-mode.workspace-mode-btn .mode-copy small{
+    font-size:.60rem!important;
+  }
+  .workspace-mode-btn:nth-child(2) .mode-copy small,
+  .crp-srp-mode.workspace-mode-btn:nth-child(2) .mode-copy small{
+    font-size:.58rem!important;
+  }
+}
