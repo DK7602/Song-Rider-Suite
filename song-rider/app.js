@@ -16487,9 +16487,27 @@ KEEP RHYME UI ABOVE KEYBOARD
   const HANDOFF_KEY='crp-srp-handoff-v2';
   const LINKS_KEY='crp-srp-links-v1';
   const SHARED_META_PREFIX='crp-srp-meta-v1:';
+  // v2.5.0: CRP/BD/SRP share one authoritative live metadata record.
+  // This deliberately does not depend on the CRP project being present in SRP's local project cache.
+  const LIVE_META_KEY='crp-srp-live-meta-v3';
   function sharedMetaKey(id){return SHARED_META_PREFIX+String(id||'')}
-  function readSharedMeta(id){return id?readJson(sharedMetaKey(id),null):null;}
-  function writeSharedMeta(id,meta){if(!id)return;const prev=readSharedMeta(id)||{};writeJson(sharedMetaKey(id),{...prev,...meta,projectId:String(id),updatedAt:Date.now()});}
+  function readLiveMeta(){return readJson(LIVE_META_KEY,null);}
+  function writeLiveMeta(id,meta){
+    if(!id)return null;
+    const sid=String(id),old=readLiveMeta();
+    const prev=(old&&String(old.crpProjectId||'')===sid)?old:{};
+    const next={...prev,...meta,crpProjectId:sid,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
+    writeJson(LIVE_META_KEY,next);
+    try{window.__CRP_SRP_META_CHANNEL?.postMessage(next)}catch{}
+    return next;
+  }
+  function readSharedMeta(id){
+    if(!id)return null;
+    const base=readJson(sharedMetaKey(id),null);
+    const live=readLiveMeta();
+    return live&&String(live.crpProjectId||'')===String(id)?{...(base||{}),...live}:base;
+  }
+  function writeSharedMeta(id,meta){if(!id)return;const base=readJson(sharedMetaKey(id),{})||{};writeJson(sharedMetaKey(id),{...base,...meta,projectId:String(id),updatedAt:Date.now()});}
 
   // Native SRP is a separate page, so the original CRP/BD audio engine would otherwise
   // be gone after navigation. Keep a tiny hidden same-origin copy of the main workspace
@@ -16676,39 +16694,50 @@ KEEP RHYME UI ABOVE KEYBOARD
     try{
       const p=state.project;if(!p)return;
       const crpId=activeLinkedCrpId();if(!crpId)return;
-      // If startup briefly selected another SRP project, do not write that project's defaults
-      // over CRP. Reconcile to the linked SRP project first.
+      // If startup briefly selected another SRP project, switch to the linked project before reading controls.
       const rec=links()[crpId];
       if(rec?.srpProjectId && String(p.id||'')!==String(rec.srpProjectId)){
         const linked=loadAllProjects().map(normalizeProject).filter(Boolean).find(x=>String(x.id)===String(rec.srpProjectId));
         if(linked){state.project=linked;setCurrentProjectIdForScope(getStorageScope(),linked.id);applyProjectSettingsToUI();renderAll();return;}
       }
       p.linkedCrpProjectId=crpId;
-      // Read the controls at the instant of the edit; mobile input/change/blur order varies.
       const liveBpm=Number(el?.bpmInput?.value);
       const rawAmount=Number(el?.capoInput?.value);
       const mode=(state.transposeMode==='step'?'step':'capo');
       p.transposeMode=mode;
-      if(Number.isFinite(liveBpm)){state.bpm=Math.max(40,Math.min(220,liveBpm));p.bpm=state.bpm;}
+      if(Number.isFinite(liveBpm)){state.bpm=Math.max(40,Math.min(240,liveBpm));p.bpm=state.bpm;}
       if(Number.isFinite(rawAmount)){
         if(mode==='capo'){state.capo=Math.max(0,Math.min(12,Math.round(rawAmount)));p.capo=state.capo;}
         else{state.steps=Math.max(-2,Math.min(3,rawAmount));p.steps=state.steps;p.linkedOctave=state.steps;}
       }
       upsertProject(p);
-      const projects=readJson('crp-projects',[])||[];const i=projects.findIndex(x=>String(x?.id||'')===String(crpId));if(i<0)return;
-      const cp={...projects[i]};
-      cp.bpm=Math.max(40,Math.min(240,Number(state.bpm ?? p.bpm)||92));
-      cp.capo=Math.max(0,Math.min(12,Number(state.capo ?? p.capo)||0));
-      cp.octave=Math.max(-2,Math.min(3,Number(state.steps ?? p.steps ?? p.linkedOctave)||0));
-      p.linkedOctave=cp.octave;
-      cp.transpose=!!p.linkedTranspose;
-      const key=String(p.crpKey||el?.keyOutput?.value||'').trim();if(key)cp.key=key;
-      cp.updatedAt=Date.now();projects[i]=cp;writeJson('crp-projects',projects);
-      const payload={crpProjectId:cp.id,name:cp.name||p.name||'Untitled',bpm:cp.bpm,beats:Number(cp.beats)||4,key:String(cp.key||''),capo:cp.capo,octave:cp.octave,transpose:cp.transpose,pitchMode:mode,rows:(Array.isArray(cp.rows)?cp.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))};
-      const recNow=links()[cp.id]||null;
-      // Write canonical meta first, then the snapshot. The canonical record always wins on reload.
-      writeSharedMeta(cp.id,{bpm:cp.bpm,capo:cp.capo,octave:cp.octave,transpose:cp.transpose,key:cp.key||'',pitchMode:mode,source:'srp'});
-      writeJson(HANDOFF_KEY,{payload,rec:recNow,ts:Date.now()});
+
+      const bpm=Math.max(40,Math.min(240,Number(state.bpm ?? p.bpm)||92));
+      const capo=Math.max(0,Math.min(12,Number(state.capo ?? p.capo)||0));
+      const octave=Math.max(-2,Math.min(3,Number(state.steps ?? p.steps ?? p.linkedOctave)||0));
+      const key=String(p.crpKey||el?.keyOutput?.value||'').trim();
+      const transpose=!!p.linkedTranspose;
+
+      // WRITE FIRST. This is the key v2.5.0 change: SRP no longer needs to find a local CRP
+      // project record before BPM/capo/STEP can reach CRP/BD.
+      const meta={bpm,capo,octave,transpose,key,pitchMode:mode,source:'srp'};
+      writeLiveMeta(crpId,meta);
+      writeSharedMeta(crpId,meta);
+
+      // Update the local CRP backup too when it exists, but its absence is no longer a sync failure.
+      const projects=readJson('crp-projects',[])||[];
+      const i=projects.findIndex(x=>String(x?.id||'')===String(crpId));
+      let cp=i>=0?{...projects[i]}:null;
+      if(cp){
+        cp.bpm=bpm;cp.capo=capo;cp.octave=octave;cp.transpose=transpose;
+        if(key)cp.key=key;
+        cp.updatedAt=Date.now();projects[i]=cp;writeJson('crp-projects',projects);
+      }
+
+      const h=handoff();
+      const oldPayload=h?.payload||{};
+      const payload={...oldPayload,crpProjectId:crpId,name:cp?.name||oldPayload.name||p.name||'Untitled',bpm,beats:Number(cp?.beats??oldPayload.beats)||4,key:key||String(cp?.key||oldPayload.key||''),capo,octave,transpose,pitchMode:mode,rows:oldPayload.rows||[]};
+      writeJson(HANDOFF_KEY,{payload,rec:links()[crpId]||h?.rec||null,ts:Date.now()});
     }catch(err){console.warn('Could not sync SRP metadata back to CRP',err)}
   }
   window.CRP_SRP_syncMetaToCrp=syncMetaToCrp;
@@ -16719,6 +16748,43 @@ KEEP RHYME UI ABOVE KEYBOARD
       syncMetaToCrp();
     },true));
   });
+
+  let __lastAppliedLiveRev=-1;
+  function applyLiveMetaToSrp(){
+    try{
+      if(!integrated)return false;
+      const crpId=activeLinkedCrpId()||String(recoverCrpPayload()?.crpProjectId||'');
+      if(!crpId)return false;
+      const live=readLiveMeta();
+      if(!live||String(live.crpProjectId||'')!==String(crpId))return false;
+      const rev=Number(live.rev)||0;
+      if(rev===__lastAppliedLiveRev)return false;
+      __lastAppliedLiveRev=rev;
+
+      const rec=links()[crpId];
+      let p=state.project;
+      if(rec?.srpProjectId && String(p?.id||'')!==String(rec.srpProjectId)){
+        const linked=loadAllProjects().map(normalizeProject).filter(Boolean).find(x=>String(x.id)===String(rec.srpProjectId));
+        if(linked)p=linked;
+      }
+      if(!p)return false;
+      p.linkedCrpProjectId=crpId;
+      p.bpm=Math.max(40,Math.min(240,Number(live.bpm)||p.bpm||95));
+      p.capo=Math.max(0,Math.min(12,Number(live.capo)||0));
+      p.steps=Math.max(-2,Math.min(3,Number(live.octave)||0));
+      p.linkedOctave=p.steps;
+      p.transposeMode=live.pitchMode==='step'?'step':'capo';
+      p.linkedTranspose=!!live.transpose;
+      if(live.key!=null)p.crpKey=String(live.key||'');
+      state.project=normalizeProject(p);
+      state.bpm=p.bpm;state.capo=p.capo;state.steps=p.steps;state.transposeMode=p.transposeMode;
+      upsertProject(state.project);
+      setCurrentProjectIdForScope(getStorageScope(),state.project.id);
+      applyProjectSettingsToUI();
+      renderAll();
+      return true;
+    }catch(err){console.warn('Could not apply live CRP/SRP metadata',err);return false;}
+  }
 
   function refreshCrpLinkUi(){
     if(!integrated)return;
@@ -16781,8 +16847,9 @@ KEEP RHYME UI ABOVE KEYBOARD
       const payload=handoff().payload;if(!payload?.crpProjectId)return;
       const all=links();delete all[payload.crpProjectId];setLinks(all);refreshCrpLinkUi();
     });
-    window.addEventListener('storage',e=>{if(e.key===HANDOFF_KEY||e.key===LINKS_KEY||String(e.key||'').startsWith(SHARED_META_PREFIX)){refreshCrpLinkUi();syncFromHandoff(false)}});
-    const reconcileLinkedWorkspace=()=>{try{refreshCrpLinkUi();syncFromHandoff(false);if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}}catch{}};
+    try{window.__CRP_SRP_META_CHANNEL=new BroadcastChannel('crp-srp-live-meta-v3');window.__CRP_SRP_META_CHANNEL.onmessage=()=>setTimeout(applyLiveMetaToSrp,0);}catch{}
+    window.addEventListener('storage',e=>{if(e.key===LIVE_META_KEY){applyLiveMetaToSrp();return;}if(e.key===HANDOFF_KEY||e.key===LINKS_KEY||String(e.key||'').startsWith(SHARED_META_PREFIX)){refreshCrpLinkUi();syncFromHandoff(false);applyLiveMetaToSrp();}});
+    const reconcileLinkedWorkspace=()=>{try{refreshCrpLinkUi();syncFromHandoff(false);applyLiveMetaToSrp();if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}}catch{}};
     // init() is async and used to overwrite the linked project after the early 80ms import.
     // Reconcile after init, and again on browser restore/focus.
     window.addEventListener('srp-init-done',reconcileLinkedWorkspace);
@@ -16790,6 +16857,9 @@ KEEP RHYME UI ABOVE KEYBOARD
     window.addEventListener('focus',()=>setTimeout(reconcileLinkedWorkspace,0));
     setTimeout(reconcileLinkedWorkspace,80);
     setTimeout(reconcileLinkedWorkspace,700);
+    // A lightweight revision poll closes the last Android/WebView timing gap where a storage/focus
+    // event can be skipped during page navigation. It does nothing unless the live revision changed.
+    setInterval(applyLiveMetaToSrp,500);
     if(window.__SRP_INIT_DONE)setTimeout(reconcileLinkedWorkspace,0);
     // Flush the live number fields before leaving SRP for CRP/BD.
     document.querySelectorAll('.crp-srp-mode[href^="../index.html"]').forEach(a=>a.addEventListener('pointerdown',()=>syncMetaToCrp(),true));
