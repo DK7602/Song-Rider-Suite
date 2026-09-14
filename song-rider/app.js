@@ -588,6 +588,8 @@ style.textContent = `
     border-radius:999px !important;
     border:1px solid rgba(0,0,0,.18) !important;
     background:#fff !important;
+    color:#090a0c !important;
+    -webkit-text-fill-color:#090a0c !important;
 
     align-items:center !important;
     justify-content:center !important;
@@ -603,7 +605,7 @@ style.textContent = `
     white-space:nowrap !important;
     overflow:hidden !important;
   }
-  #capoStepToggle.on{ background:#111 !important; color:#fff !important; }
+  #capoStepToggle.on{ background:#fff !important; color:#090a0c !important; -webkit-text-fill-color:#090a0c !important; }
 `;
   document.head.appendChild(style);
 }
@@ -9274,7 +9276,7 @@ function renderSheetTitleBar(){
   if(state.currentSection === "Full"){
     // ✅ Full page gets + / ✕ to add/remove pages without leaving Full view
     const addBtn = document.createElement("button");
-    addBtn.className = "btn secondary";
+    addBtn.className = "btn secondary sheetAddBtn";
     addBtn.textContent = "+";
     addBtn.title = "Add next page";
     addBtn.style.width = "38px";
@@ -9304,7 +9306,7 @@ function renderSheetTitleBar(){
     });
 
     const delBtn = document.createElement("button");
-    delBtn.className = "btn secondary";
+    delBtn.className = "btn secondary sheetDeleteBtn";
     delBtn.textContent = "✕";
     delBtn.title = "Delete last page";
     delBtn.style.width = "38px";
@@ -9337,7 +9339,7 @@ function renderSheetTitleBar(){
     right.appendChild(delBtn);
   }else{
     const addBtn = document.createElement("button");
-    addBtn.className = "btn secondary";
+    addBtn.className = "btn secondary sheetAddBtn";
     addBtn.textContent = "+";
     addBtn.title = "Add next page";
     addBtn.style.width = "38px";
@@ -9372,7 +9374,7 @@ function renderSheetTitleBar(){
 });
 
     const delBtn = document.createElement("button");
-    delBtn.className = "btn secondary";
+    delBtn.className = "btn secondary sheetDeleteBtn";
     delBtn.textContent = "✕";
     delBtn.title = "Delete this page";
     delBtn.style.width = "38px";
@@ -9751,7 +9753,7 @@ if(state.currentSection === "Full"){
     const actions = document.createElement("div");
     actions.className = "fullSectionActions";
     const addBtn = document.createElement("button");
-    addBtn.className = "pillBtn";
+    addBtn.className = "pillBtn fullAddBtn";
     addBtn.textContent = "+";
     addBtn.title = "Add song part";
     addBtn.type = "button";
@@ -9774,7 +9776,7 @@ if(state.currentSection === "Full"){
     });
 
     const delBtn = document.createElement("button");
-    delBtn.className = "pillBtn";
+    delBtn.className = "pillBtn fullDeleteBtn";
     delBtn.textContent = "×";
     delBtn.title = "Delete this song part";
     delBtn.type = "button";
