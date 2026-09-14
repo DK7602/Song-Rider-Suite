@@ -1206,10 +1206,26 @@
       if(state.playing&&state.autoScroll)disableAutoScrollForManualScroll();
     },{passive:true});
     // Full-project autosave: only active after the project has been manually saved once.
-    ['projectName','keyInput','bpmInput'].forEach(id=>$(id)?.addEventListener('input',scheduleAutoSave));
-    ['bpmInput','beatsSelect','loopToggle'].forEach(id=>$(id)?.addEventListener('change',scheduleAutoSave));
-    $('bpmInput')?.addEventListener('input',()=>{publishLiveSrpMeta('crp');writeHardSync('crp');publishSrpHandoff();});
-    $('bpmInput')?.addEventListener('change',()=>{publishLiveSrpMeta('crp');writeHardSync('crp');publishSrpHandoff();});
+    // BPM is intentionally excluded from input-time autosave. scheduleAutoSave() publishes the
+    // SRP handoff immediately, so including BPM here leaked partial mobile keystrokes ("4", "12")
+    // into the sync bus before the user finished typing. BPM commits on change/blur below.
+    ['projectName','keyInput'].forEach(id=>$(id)?.addEventListener('input',scheduleAutoSave));
+    ['beatsSelect','loopToggle'].forEach(id=>$(id)?.addEventListener('change',scheduleAutoSave));
+    // v2.5.3: do NOT publish BPM on every digit. On mobile, typing 120 fires input for
+    // "1", then "12", then "120". The old hard-sync clamped that first "1" to 40
+    // and the 250 ms poll wrote 40 back into the field before the user could finish typing.
+    // Let the field be an editing buffer; commit only when the edit is complete.
+    const commitCrpBpm=()=>{
+      const node=$('bpmInput'); if(!node)return;
+      const raw=Number(node.value);
+      if(!Number.isFinite(raw))return;
+      const bpm=Math.max(40,Math.min(240,Math.round(raw)));
+      node.value=String(bpm);
+      publishLiveSrpMeta('crp');writeHardSync('crp');publishSrpHandoff();scheduleAutoSave();
+    };
+    $('bpmInput')?.addEventListener('change',commitCrpBpm);
+    $('bpmInput')?.addEventListener('blur',commitCrpBpm);
+    $('bpmInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitCrpBpm();e.currentTarget.blur();}});
     $('notesEditor')?.addEventListener('input',scheduleAutoSave);
 
     $('projectsTabBtn').onclick=()=>setProjectBrowserMode('projects');
@@ -1326,6 +1342,10 @@
     try{
       const m=readHardSync();
       if(!m)return false;
+      // Never overwrite a number field while the user is actively typing into it.
+      // Leave the revision unapplied so the newest external value can still be consumed after blur.
+      const active=document.activeElement;
+      if(active===$('bpmInput')||active===$('capoSelect'))return false;
       const rev=Number(m.rev)||0;
       if(rev===__hardSyncRev)return false;
       __hardSyncRev=rev;
