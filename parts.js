@@ -559,14 +559,24 @@
   window.CRPParts={handlesPlayback:true,togglePlayback,startPlayback,isPlaying:()=>playing||starting,getPlaybackTiming(){
     const bpm=Math.max(40,Math.min(240,+playbackClockBpm||+core.bpm||92));
     const beatMs=60000/bpm;
-    if(!audioCtx||!playbackClockStartAudioTime||!(playing||starting)) return {playing:!!(playing||starting),bpm,beatMs,currentBeat:playbackClockStartBeat||0,msUntilNextBeat:0};
+    const transportActive=!!(playing||starting);
+    // While Play is still loading/preparing, the musical clock does not exist yet.
+    // SRP must wait for ready=true instead of interpreting 0 ms as "start now".
+    if(!transportActive) return {playing:false,ready:false,bpm,beatMs,currentBeat:playbackClockStartBeat||0,msUntilNextBeat:null};
+    if(!audioCtx||!playbackClockStartAudioTime) return {playing:true,ready:false,bpm,beatMs,currentBeat:playbackClockStartBeat||0,msUntilNextBeat:null};
+
     const elapsedMs=(audioCtx.currentTime-playbackClockStartAudioTime)*1000;
     const currentBeat=(playbackClockStartBeat||0)+(elapsedMs/beatMs);
-    let phase=((currentBeat%1)+1)%1;
+    const phase=((currentBeat%1)+1)%1;
     let msUntilNextBeat=(1-phase)*beatMs;
-    // If queried essentially on a beat, treat that beat as NOW rather than waiting a full beat.
-    if(msUntilNextBeat<14||beatMs-msUntilNextBeat<14) msUntilNextBeat=0;
-    return {playing:true,bpm,beatMs,currentBeat,msUntilNextBeat};
+
+    // "Next beat" means the NEXT STRICTLY-FUTURE beat. If the tap lands right on
+    // a beat boundary, wait one whole beat rather than firing immediately.
+    const boundaryToleranceMs=14;
+    if(msUntilNextBeat<boundaryToleranceMs || beatMs-msUntilNextBeat<boundaryToleranceMs){
+      msUntilNextBeat=beatMs;
+    }
+    return {playing:true,ready:true,bpm,beatMs,currentBeat,msUntilNextBeat};
   },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncCloudAudio,openStudioExport,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(c&&activePartId!==c.id)selectPart(c.id);},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wire);else wire();
 })();
