@@ -16239,6 +16239,9 @@ async function init(){
   }
 
   stopBeatClock();
+  // v2.4.8: integration runs before this async init finishes. Signal completion so
+  // the linked CRP project can be re-applied after startup/cloud restoration.
+  try{ window.__SRP_INIT_DONE=true; window.dispatchEvent(new Event('srp-init-done')); }catch{}
 }
 
 function showBootError(err){
@@ -16484,6 +16487,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   const LINKS_KEY='crp-srp-links-v1';
   const SHARED_META_PREFIX='crp-srp-meta-v1:';
   function sharedMetaKey(id){return SHARED_META_PREFIX+String(id||'')}
+  function readSharedMeta(id){return id?readJson(sharedMetaKey(id),null):null;}
   function writeSharedMeta(id,meta){if(!id)return;writeJson(sharedMetaKey(id),{...meta,projectId:String(id),updatedAt:Date.now()});}
 
   // Native SRP is a separate page, so the original CRP/BD audio engine would otherwise
@@ -16577,6 +16581,20 @@ KEEP RHYME UI ABOVE KEYBOARD
       let p=(activeId&&projects.find(x=>String(x?.id||'')===activeId)) ||
         (h?.payload?.crpProjectId&&projects.find(x=>String(x?.id||'')===String(h.payload.crpProjectId))) || null;
       if(p?.id){
+        // v2.4.8: shared meta is the single authority for BPM/capo/octave.
+        // This prevents a page reload or cloud/current-project restore from resurrecting stale values.
+        const shared=readSharedMeta(p.id);
+        if(shared){
+          p={...p,
+            bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,
+            capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,
+            octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,
+            transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,
+            key:String(shared.key ?? p.key ?? '')
+          };
+          const idx=projects.findIndex(x=>String(x?.id||'')===String(p.id));
+          if(idx>=0){projects[idx]={...projects[idx],bpm:p.bpm,capo:p.capo,octave:p.octave,transpose:p.transpose,key:p.key};writeJson('crp-projects',projects);}
+        }
         const payload={
           crpProjectId:p.id,name:p.name||'Untitled',bpm:Number(p.bpm)||92,beats:Number(p.beats)||4,
           key:String(p.key||''),capo:Number(p.capo)||0,octave:Number(p.octave)||0,transpose:!!p.transpose,
@@ -16645,21 +16663,36 @@ KEEP RHYME UI ABOVE KEYBOARD
     }catch(err){console.error('CRP/SRP link sync failed',err);return null}
   }
 
+  function activeLinkedCrpId(){
+    const h=handoff();
+    const byProject=String(state.project?.linkedCrpProjectId||'');
+    if(byProject)return byProject;
+    const active=String(localStorage.getItem('crp-active-project-id')||h?.payload?.crpProjectId||'');
+    return active && links()[active] ? active : '';
+  }
   function syncMetaToCrp(){
     try{
-      const p=state.project;if(!p?.linkedCrpProjectId)return;
-      // Read the controls at the instant of the edit. This avoids stale in-memory values
-      // when mobile fires input/change/blur in a different order.
+      const p=state.project;if(!p)return;
+      const crpId=activeLinkedCrpId();if(!crpId)return;
+      // If startup briefly selected another SRP project, do not write that project's defaults
+      // over CRP. Reconcile to the linked SRP project first.
+      const rec=links()[crpId];
+      if(rec?.srpProjectId && String(p.id||'')!==String(rec.srpProjectId)){
+        const linked=loadAllProjects().map(normalizeProject).filter(Boolean).find(x=>String(x.id)===String(rec.srpProjectId));
+        if(linked){state.project=linked;setCurrentProjectIdForScope(getStorageScope(),linked.id);applyProjectSettingsToUI();renderAll();return;}
+      }
+      p.linkedCrpProjectId=crpId;
+      // Read the controls at the instant of the edit; mobile input/change/blur order varies.
       const liveBpm=Number(el?.bpmInput?.value);
       const rawAmount=Number(el?.capoInput?.value);
-      const mode=state.transposeMode||'capo';
+      const mode=state.transposeMode||p.transposeMode||'capo';
       if(Number.isFinite(liveBpm)){state.bpm=Math.max(40,Math.min(220,liveBpm));p.bpm=state.bpm;}
       if(Number.isFinite(rawAmount)){
         if(mode==='capo'){state.capo=Math.max(0,Math.min(12,Math.round(rawAmount)));p.capo=state.capo;}
         else{state.steps=Math.max(-2,Math.min(3,rawAmount));p.steps=state.steps;p.linkedOctave=state.steps;}
       }
       upsertProject(p);
-      const projects=readJson('crp-projects',[])||[];const i=projects.findIndex(x=>String(x?.id||'')===String(p.linkedCrpProjectId));if(i<0)return;
+      const projects=readJson('crp-projects',[])||[];const i=projects.findIndex(x=>String(x?.id||'')===String(crpId));if(i<0)return;
       const cp={...projects[i]};
       cp.bpm=Math.max(40,Math.min(240,Number(state.bpm ?? p.bpm)||92));
       cp.capo=Math.max(0,Math.min(12,Number(state.capo ?? p.capo)||0));
@@ -16669,8 +16702,10 @@ KEEP RHYME UI ABOVE KEYBOARD
       const key=String(p.crpKey||el?.keyOutput?.value||'').trim();if(key)cp.key=key;
       cp.updatedAt=Date.now();projects[i]=cp;writeJson('crp-projects',projects);
       const payload={crpProjectId:cp.id,name:cp.name||p.name||'Untitled',bpm:cp.bpm,beats:Number(cp.beats)||4,key:String(cp.key||''),capo:cp.capo,octave:cp.octave,transpose:cp.transpose,rows:(Array.isArray(cp.rows)?cp.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))};
-      const rec=links()[cp.id]||null;writeJson(HANDOFF_KEY,{payload,rec,ts:Date.now()});
+      const recNow=links()[cp.id]||null;
+      // Write canonical meta first, then the snapshot. The canonical record always wins on reload.
       writeSharedMeta(cp.id,{bpm:cp.bpm,capo:cp.capo,octave:cp.octave,transpose:cp.transpose,key:cp.key||'',source:'srp'});
+      writeJson(HANDOFF_KEY,{payload,rec:recNow,ts:Date.now()});
     }catch(err){console.warn('Could not sync SRP metadata back to CRP',err)}
   }
   window.CRP_SRP_syncMetaToCrp=syncMetaToCrp;
@@ -16678,7 +16713,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   // Capture phase ensures this runs even if another legacy handler stops propagation.
   [el?.bpmInput,el?.capoInput].filter(Boolean).forEach(node=>{
     ['input','change','blur'].forEach(type=>node.addEventListener(type,()=>{
-      if(state.project?.linkedCrpProjectId) syncMetaToCrp();
+      syncMetaToCrp();
     },true));
   });
 
@@ -16743,8 +16778,20 @@ KEEP RHYME UI ABOVE KEYBOARD
       const payload=handoff().payload;if(!payload?.crpProjectId)return;
       const all=links();delete all[payload.crpProjectId];setLinks(all);refreshCrpLinkUi();
     });
-    window.addEventListener('storage',e=>{if(e.key===HANDOFF_KEY||e.key===LINKS_KEY){refreshCrpLinkUi();syncFromHandoff(false)}});
-    setTimeout(()=>{refreshCrpLinkUi();syncFromHandoff(false);if(lyricsOverlay){try{goToSection('Full');setAutoScroll(false);}catch{}}},80);
+    window.addEventListener('storage',e=>{if(e.key===HANDOFF_KEY||e.key===LINKS_KEY||String(e.key||'').startsWith(SHARED_META_PREFIX)){refreshCrpLinkUi();syncFromHandoff(false)}});
+    const reconcileLinkedWorkspace=()=>{try{refreshCrpLinkUi();syncFromHandoff(false);if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}}catch{}};
+    // init() is async and used to overwrite the linked project after the early 80ms import.
+    // Reconcile after init, and again on browser restore/focus.
+    window.addEventListener('srp-init-done',reconcileLinkedWorkspace);
+    window.addEventListener('pageshow',()=>setTimeout(reconcileLinkedWorkspace,0));
+    window.addEventListener('focus',()=>setTimeout(reconcileLinkedWorkspace,0));
+    setTimeout(reconcileLinkedWorkspace,80);
+    setTimeout(reconcileLinkedWorkspace,700);
+    if(window.__SRP_INIT_DONE)setTimeout(reconcileLinkedWorkspace,0);
+    // Flush the live number fields before leaving SRP for CRP/BD.
+    document.querySelectorAll('.crp-srp-mode[href^="../index.html"]').forEach(a=>a.addEventListener('pointerdown',()=>syncMetaToCrp(),true));
+    window.addEventListener('pagehide',()=>syncMetaToCrp());
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')syncMetaToCrp();});
     window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='srp-show-full-song'){try{goToSection('Full');}catch{}}if(e.data?.type==='crp-playback-state'){window.__SRP_LINKED_PLAYING=!!e.data.playing;try{renderSheetTitleBar();}catch{}}});
   }
 })();
