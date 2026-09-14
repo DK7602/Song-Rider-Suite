@@ -7770,14 +7770,6 @@ function ensureCapoStepToggle(){
     if(btn.parentNode !== wrap) wrap.appendChild(btn);
   }
 
-  // Linked CRP transpose toggle. Kept separate from CAPO/STEP so capo and transpose can stay synced at once.
-  let transBtn=document.getElementById('srpTransposeLinkBtn');
-  if(!transBtn){
-    transBtn=document.createElement('button');transBtn.id='srpTransposeLinkBtn';transBtn.type='button';transBtn.className='miniIconBtn';transBtn.textContent='T';transBtn.title='Transpose';wrap.appendChild(transBtn);
-  }else if(transBtn.parentNode!==wrap) wrap.appendChild(transBtn);
-  const repaintTranspose=()=>{const on=!!state.project?.linkedTranspose;transBtn.classList.toggle('on',on);transBtn.setAttribute('aria-pressed',String(on));};
-  if(!transBtn.dataset.wired){transBtn.dataset.wired='1';transBtn.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();if(!state.project)return;state.project.linkedTranspose=!state.project.linkedTranspose;upsertProject(state.project);repaintTranspose();window.CRP_SRP_syncMetaToCrp?.();});}
-  repaintTranspose();
 
   // Paint pill + input based on mode
   function repaint(){
@@ -9306,6 +9298,13 @@ function renderSheetTitleBar(){
     titleInput.style.fontWeight = "900";
     titleInput.style.height = "34px";
     titleInput.style.lineHeight = "34px";
+    // Keep the editable card-page section title unmistakably gold.
+    titleInput.style.setProperty("background", "linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)", "important");
+    titleInput.style.setProperty("background-color", "#efc85d", "important");
+    titleInput.style.setProperty("color", "#111", "important");
+    titleInput.style.setProperty("-webkit-text-fill-color", "#111", "important");
+    titleInput.style.setProperty("border", "1px solid #d6aa3f", "important");
+    titleInput.style.setProperty("border-radius", "999px", "important");
     titleInput.addEventListener("keydown", (e) => {
       if(e.key === "Enter"){ e.preventDefault(); titleInput.blur(); }
     });
@@ -9339,11 +9338,41 @@ function renderSheetTitleBar(){
   right.style.flex = "0 0 auto";
 
   const headerAuto=document.createElement('button');
-  headerAuto.id='srpHeaderAutoScroll';headerAuto.type='button';headerAuto.textContent='↕';
+  headerAuto.id='srpHeaderAutoScroll';headerAuto.type='button';
+  headerAuto.textContent=state.autoScrollOn?(state.autoScrollPaused?'▶':'Ⅱ'):'↕';
   headerAuto.title=state.autoScrollOn?(state.autoScrollPaused?'Resume AutoScroll':'Pause AutoScroll'):'Start AutoScroll';
   headerAuto.classList.toggle('on',!!state.autoScrollOn&&!state.autoScrollPaused);
   headerAuto.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();handleAutoScrollPrimaryAction();setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);});
   right.appendChild(headerAuto);
+
+  if(state.autoScrollOn){
+    const autoStop=document.createElement('button'); autoStop.id='srpHeaderAutoStop'; autoStop.type='button'; autoStop.textContent='■'; autoStop.title='Stop AutoScroll';
+    autoStop.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();setAutoScroll(false);setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);});
+    right.appendChild(autoStop);
+  }
+
+  if(state.currentSection === "Full"){
+    const playBtn=document.createElement('button'); playBtn.id='srpLinkedPlayBtn'; playBtn.type='button';
+    const ext=!!window.__SRP_LINKED_PLAYING; playBtn.textContent=ext?'Ⅱ':'▶'; playBtn.title=ext?'Pause linked song':'Play linked song';
+    playBtn.addEventListener('click',(e)=>{
+      e.preventDefault();e.stopPropagation();
+      const isPlaying=!!window.__SRP_LINKED_PLAYING;
+      if(window.parent && window.parent!==window){
+        window.parent.postMessage({type:'srp-playback-command',command:isPlaying?'pause':'play'},location.origin);
+      }else{
+        // Standalone linked SRP: use SRP's own chord-aware clock as the local fallback.
+        if(isPlaying){ stopBeatClock(); state.instrumentOn=false; }
+        else{ state.instrumentOn=true; startBeatClock(); }
+      }
+      window.__SRP_LINKED_PLAYING=!isPlaying; renderSheetTitleBar();
+    });
+    right.appendChild(playBtn);
+    if(ext){
+      const stopBtn=document.createElement('button');stopBtn.id='srpLinkedStopBtn';stopBtn.type='button';stopBtn.textContent='■';stopBtn.title='Stop linked song';
+      stopBtn.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();if(window.parent&&window.parent!==window)window.parent.postMessage({type:'srp-playback-command',command:'stop'},location.origin);else{stopBeatClock();state.instrumentOn=false;}window.__SRP_LINKED_PLAYING=false;renderSheetTitleBar();});
+      right.appendChild(stopBtn);
+    }
+  }
 
   if(state.currentSection === "Full"){
     // ✅ Full page gets + / ✕ to add/remove pages without leaving Full view
@@ -16525,7 +16554,7 @@ KEEP RHYME UI ABOVE KEYBOARD
     });
     window.addEventListener('storage',e=>{if(e.key===HANDOFF_KEY||e.key===LINKS_KEY){refreshCrpLinkUi();syncFromHandoff(false)}});
     setTimeout(()=>{refreshCrpLinkUi();syncFromHandoff(false);if(lyricsOverlay){try{goToSection('Full');setAutoScroll(false);}catch{}}},80);
-    window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='srp-show-full-song'){try{goToSection('Full');}catch{}}});
+    window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='srp-show-full-song'){try{goToSection('Full');}catch{}}if(e.data?.type==='crp-playback-state'){window.__SRP_LINKED_PLAYING=!!e.data.playing;try{renderSheetTitleBar();}catch{}}});
   }
 })();
 

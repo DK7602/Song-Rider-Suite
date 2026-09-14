@@ -2978,8 +2978,8 @@ html.crp-integrated .crpSectionTitlePill{
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <!-- cache-buster -->
-<script src="./app.js?v=CRPSRPLINK240"></script>
-<script src="./crp-link-failsafe.js?v=230"></script>
+<script src="./app.js?v=CRPSRPLINK241"></script>
+<script src="./crp-link-failsafe.js?v=241"></script>
 
 <script>
 (() => {
@@ -3022,6 +3022,30 @@ html.crp-integrated .crpSectionTitlePill{
   }
 })();
 </script>
+
+<style id="srp241WorkflowPolish">
+html.crp-integrated #crpSrpUnlinkBtn,html.crp-integrated #srpTransposeLinkBtn{display:none!important;}
+html.crp-integrated #topControlsRow{align-items:center!important;}
+html.crp-integrated #topControlsRow #crpSrpLinkBtn{margin:0!important;}
+html.crp-integrated .sheetHeader input.headingPill{
+  display:block!important;min-height:40px!important;height:40px!important;padding:0 16px!important;
+  background:#efc85d!important;background-image:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;
+  color:#111!important;-webkit-text-fill-color:#111!important;border:1px solid #d6aa3f!important;border-radius:999px!important;
+  font-weight:1000!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.25)!important;
+}
+html.crp-integrated .sheetHeader input.headingPill::placeholder{color:#55420f!important;-webkit-text-fill-color:#55420f!important;opacity:.78!important;}
+html.crp-integrated #srpHeaderAutoScroll,html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedPlayBtn,html.crp-integrated #srpLinkedStopBtn{
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;width:44px!important;height:40px!important;min-width:44px!important;padding:0!important;border-radius:12px!important;font-weight:1000!important;font-size:18px!important;
+}
+html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedStopBtn{background:#252b33!important;color:#f3f5f7!important;border:1px solid #414b57!important;}
+html.crp-integrated #srpLinkedPlayBtn{background:linear-gradient(180deg,#f7d774,#dda93a)!important;color:#111!important;border:1px solid #d6aa3f!important;}
+html.crp-integrated #srpHeaderAutoScroll.on{background:linear-gradient(180deg,#f7d774,#dda93a)!important;color:#111!important;}
+@media(max-width:430px){
+ html.crp-integrated .sheetHeader{padding-left:10px!important;padding-right:10px!important;}
+ html.crp-integrated .sheetHeader>div:last-child{gap:6px!important;}
+ html.crp-integrated #srpHeaderAutoScroll,html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedPlayBtn,html.crp-integrated #srpLinkedStopBtn{width:40px!important;min-width:40px!important;height:38px!important;}
+}
+</style>
 </body>
 </html><style id="srp230RemoveLegacyNoteLength">
 html.crp-integrated #noteLenSelect,
