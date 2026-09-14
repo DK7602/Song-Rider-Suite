@@ -16482,6 +16482,9 @@ KEEP RHYME UI ABOVE KEYBOARD
   if(!embedded && !integrated) return;
   const HANDOFF_KEY='crp-srp-handoff-v2';
   const LINKS_KEY='crp-srp-links-v1';
+  const SHARED_META_PREFIX='crp-srp-meta-v1:';
+  function sharedMetaKey(id){return SHARED_META_PREFIX+String(id||'')}
+  function writeSharedMeta(id,meta){if(!id)return;writeJson(sharedMetaKey(id),{...meta,projectId:String(id),updatedAt:Date.now()});}
 
   // Native SRP is a separate page, so the original CRP/BD audio engine would otherwise
   // be gone after navigation. Keep a tiny hidden same-origin copy of the main workspace
@@ -16645,9 +16648,20 @@ KEEP RHYME UI ABOVE KEYBOARD
   function syncMetaToCrp(){
     try{
       const p=state.project;if(!p?.linkedCrpProjectId)return;
+      // Read the controls at the instant of the edit. This avoids stale in-memory values
+      // when mobile fires input/change/blur in a different order.
+      const liveBpm=Number(el?.bpmInput?.value);
+      const rawAmount=Number(el?.capoInput?.value);
+      const mode=state.transposeMode||'capo';
+      if(Number.isFinite(liveBpm)){state.bpm=Math.max(40,Math.min(220,liveBpm));p.bpm=state.bpm;}
+      if(Number.isFinite(rawAmount)){
+        if(mode==='capo'){state.capo=Math.max(0,Math.min(12,Math.round(rawAmount)));p.capo=state.capo;}
+        else{state.steps=Math.max(-2,Math.min(3,rawAmount));p.steps=state.steps;p.linkedOctave=state.steps;}
+      }
+      upsertProject(p);
       const projects=readJson('crp-projects',[])||[];const i=projects.findIndex(x=>String(x?.id||'')===String(p.linkedCrpProjectId));if(i<0)return;
       const cp={...projects[i]};
-      cp.bpm=Math.max(40,Math.min(240,Number(state.bpm||p.bpm)||92));
+      cp.bpm=Math.max(40,Math.min(240,Number(state.bpm ?? p.bpm)||92));
       cp.capo=Math.max(0,Math.min(12,Number(state.capo ?? p.capo)||0));
       cp.octave=Math.max(-2,Math.min(3,Number(state.steps ?? p.steps ?? p.linkedOctave)||0));
       p.linkedOctave=cp.octave;
@@ -16656,9 +16670,17 @@ KEEP RHYME UI ABOVE KEYBOARD
       cp.updatedAt=Date.now();projects[i]=cp;writeJson('crp-projects',projects);
       const payload={crpProjectId:cp.id,name:cp.name||p.name||'Untitled',bpm:cp.bpm,beats:Number(cp.beats)||4,key:String(cp.key||''),capo:cp.capo,octave:cp.octave,transpose:cp.transpose,rows:(Array.isArray(cp.rows)?cp.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))};
       const rec=links()[cp.id]||null;writeJson(HANDOFF_KEY,{payload,rec,ts:Date.now()});
+      writeSharedMeta(cp.id,{bpm:cp.bpm,capo:cp.capo,octave:cp.octave,transpose:cp.transpose,key:cp.key||'',source:'srp'});
     }catch(err){console.warn('Could not sync SRP metadata back to CRP',err)}
   }
   window.CRP_SRP_syncMetaToCrp=syncMetaToCrp;
+  // Bulletproof mobile sync: SRP metadata changes commit on input, change and blur.
+  // Capture phase ensures this runs even if another legacy handler stops propagation.
+  [el?.bpmInput,el?.capoInput].filter(Boolean).forEach(node=>{
+    ['input','change','blur'].forEach(type=>node.addEventListener(type,()=>{
+      if(state.project?.linkedCrpProjectId) syncMetaToCrp();
+    },true));
+  });
 
   function refreshCrpLinkUi(){
     if(!integrated)return;
