@@ -9359,17 +9359,24 @@ function renderSheetTitleBar(){
       const isPlaying=!!window.__SRP_LINKED_PLAYING;
       if(window.parent && window.parent!==window){
         window.parent.postMessage({type:'srp-playback-command',command:isPlaying?'pause':'play'},location.origin);
+        window.__SRP_LINKED_PLAYING=!isPlaying;
+      }else if(typeof window.CRP_SRP_linkedPlaybackCommand==='function'){
+        // Native SRP workspace: route playback into a hidden same-origin CRP/BD bridge
+        // so the exact linked Chord Rider + Baby DAW parts/drums are what the user hears.
+        const ok=window.CRP_SRP_linkedPlaybackCommand(isPlaying?'pause':'play');
+        window.__SRP_LINKED_PLAYING=ok ? !isPlaying : false;
       }else{
-        // Standalone linked SRP: use SRP's own chord-aware clock as the local fallback.
+        // Emergency fallback only if the linked bridge is unavailable.
         if(isPlaying){ stopBeatClock(); state.instrumentOn=false; }
         else{ state.instrumentOn=true; startBeatClock(); }
+        window.__SRP_LINKED_PLAYING=!isPlaying;
       }
-      window.__SRP_LINKED_PLAYING=!isPlaying; renderSheetTitleBar();
+      renderSheetTitleBar();
     });
     right.appendChild(playBtn);
     if(ext){
       const stopBtn=document.createElement('button');stopBtn.id='srpLinkedStopBtn';stopBtn.type='button';stopBtn.textContent='■';stopBtn.title='Stop linked song';
-      stopBtn.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();if(window.parent&&window.parent!==window)window.parent.postMessage({type:'srp-playback-command',command:'stop'},location.origin);else{stopBeatClock();state.instrumentOn=false;}window.__SRP_LINKED_PLAYING=false;renderSheetTitleBar();});
+      stopBtn.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();if(window.parent&&window.parent!==window)window.parent.postMessage({type:'srp-playback-command',command:'stop'},location.origin);else if(typeof window.CRP_SRP_linkedPlaybackCommand==='function')window.CRP_SRP_linkedPlaybackCommand('stop');else{stopBeatClock();state.instrumentOn=false;}window.__SRP_LINKED_PLAYING=false;renderSheetTitleBar();});
       right.appendChild(stopBtn);
     }
   }
@@ -16392,6 +16399,76 @@ KEEP RHYME UI ABOVE KEYBOARD
   const HANDOFF_KEY='crp-srp-handoff-v2';
   const LINKS_KEY='crp-srp-links-v1';
 
+  // Native SRP is a separate page, so the original CRP/BD audio engine would otherwise
+  // be gone after navigation. Keep a tiny hidden same-origin copy of the main workspace
+  // alive strictly as the linked playback engine. Calling its CRPParts methods directly
+  // from the user's tap preserves browser audio permission and plays the actual saved parts.
+  let linkedPlaybackFrame=null;
+  let linkedPlaybackReady=false;
+  let linkedPlaybackWatch=0;
+  function watchLinkedPlaybackState(){
+    clearInterval(linkedPlaybackWatch);
+    linkedPlaybackWatch=setInterval(()=>{
+      try{
+        const actual=!!linkedPlaybackFrame?.contentWindow?.CRPParts?.isPlaying?.();
+        if(actual!==!!window.__SRP_LINKED_PLAYING){
+          window.__SRP_LINKED_PLAYING=actual;
+          renderSheetTitleBar();
+        }
+      }catch{}
+    },250);
+  }
+  function ensureLinkedPlaybackBridge(){
+    if(!integrated || lyricsOverlay || (window.parent&&window.parent!==window)) return null;
+    if(linkedPlaybackFrame?.isConnected) return linkedPlaybackFrame;
+    const f=document.createElement('iframe');
+    f.id='crpLinkedPlaybackBridge';
+    f.title='Linked Chord Rider playback engine';
+    f.setAttribute('aria-hidden','true');
+    f.tabIndex=-1;
+    Object.assign(f.style,{position:'fixed',width:'1px',height:'1px',left:'-10000px',top:'-10000px',opacity:'0',pointerEvents:'none',border:'0'});
+    f.src='../index.html?playbackBridge=1';
+    f.addEventListener('load',()=>{linkedPlaybackReady=true;watchLinkedPlaybackState();});
+    document.body.appendChild(f);
+    linkedPlaybackFrame=f;
+    return f;
+  }
+  function refreshLinkedPlaybackProject(w){
+    try{
+      const activeId=String(localStorage.getItem('crp-active-project-id')||'');
+      if(activeId && typeof w?.CRPCore?.loadProjectById==='function') w.CRPCore.loadProjectById(activeId);
+    }catch(err){console.warn('Could not refresh linked CRP playback project',err)}
+  }
+  window.CRP_SRP_linkedPlaybackCommand=function(command){
+    const f=ensureLinkedPlaybackBridge();
+    const w=f?.contentWindow;
+    if(!w){ return false; }
+    try{
+      // Reload the active saved project immediately before Play so BPM, capo, drums,
+      // chord parts, lead/bass parts, enabled states and volumes are current.
+      if(command==='play') refreshLinkedPlaybackProject(w);
+      const parts=w.CRPParts;
+      if(!parts){
+        // The bridge is preloaded on SRP entry. If a very fast tap beats initialization,
+        // leave the UI stopped rather than pretending audio started.
+        window.__SRP_LINKED_PLAYING=false;
+        setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);
+        return false;
+      }
+      if(command==='play') parts.startPlayback?.();
+      else if(command==='pause'||command==='stop') parts.stopPlayback?.();
+      const on=command==='play';
+      window.__SRP_LINKED_PLAYING=on;
+      setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);
+      return true;
+    }catch(err){
+      console.error('Linked CRP/BD playback failed',err);
+      window.__SRP_LINKED_PLAYING=false;
+      setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);
+      return false;
+    }
+  };
+
   function readJson(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'')||fallback}catch{return fallback}}
   function writeJson(key,v){try{localStorage.setItem(key,JSON.stringify(v))}catch{}}
   function handoff(){return readJson(HANDOFF_KEY,{})||{}}
@@ -16547,6 +16624,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
   if(integrated){
     window.CRP_SRP_importCrpStructure=importCrpStructure;
+    if(!lyricsOverlay && !(window.parent&&window.parent!==window)) setTimeout(ensureLinkedPlaybackBridge,0);
     document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();const b=e.currentTarget;b.disabled=true;b.textContent='Linking…';const st=document.getElementById('crpSrpLinkStatus');if(st)st.textContent='Linking CRP project…';setTimeout(()=>syncFromHandoff(true),0);});
     document.getElementById('crpSrpUnlinkBtn')?.addEventListener('click',()=>{
       const payload=handoff().payload;if(!payload?.crpProjectId)return;
