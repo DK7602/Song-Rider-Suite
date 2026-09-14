@@ -2006,6 +2006,20 @@
       color:#555;
     }
 
+
+/* v2.8.3 — preserve approved SRP tri-color metallic wordmark */
+html.crp-integrated .panelTop .left .srp-pink{
+ background:linear-gradient(180deg,#fff 0%,#ffd9ef 12%,#ff4fa7 28%,#ff9fd0 43%,#fff 51%,#d71d79 62%,#ff70b7 80%,#7a1748 100%)!important;
+ -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;
+}
+html.crp-integrated .panelTop .left .srp-blue{
+ background:linear-gradient(180deg,#fff 0%,#d9f6ff 12%,#2ec7ff 28%,#86e7ff 43%,#fff 51%,#1188d7 62%,#65d8ff 80%,#0f4f80 100%)!important;
+ -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;
+}
+html.crp-integrated .panelTop .left .srp-green{
+ background:linear-gradient(180deg,#fff 0%,#ddffe9 12%,#28d77d 28%,#83efad 43%,#fff 51%,#15934f 62%,#5ee99b 80%,#176238 100%)!important;
+ -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;
+}
 </style>
 
 <style id="srpEmbeddedOverrides">
@@ -2597,7 +2611,7 @@ html.crp-integrated .crpSectionTitlePill{
     <div class="crp-srp-app-header" aria-label="Chord Rider Pro">
       <img id="srpBrandLeft" src="../assets/rider-and-bones-right-still.png" class="crp-srp-brand-mark" alt="Rider and Bones" data-still="../assets/rider-and-bones-right-still.png" data-animated="../assets/rider-and-bones-right.gif" />
       <div class="crp-srp-brand-copy brand-copy">
-        <h1>CHORD RIDER PRO</h1>
+        <h1>SONG RIDER SUITE</h1>
         <p class="crp-srp-tagline tagline">Ride the progression. See it. Hear it. Build it.</p>
       </div>
       <img id="srpBrandRight" src="../assets/rider-and-bones-left-still.png" class="crp-srp-brand-mark" alt="Rider and Bones" data-still="../assets/rider-and-bones-left-still.png" data-animated="../assets/rider-and-bones-left.gif" />
@@ -3068,7 +3082,7 @@ html.srp-lyrics-overlay-mode .sheetHeader{position:sticky!important;top:0!import
 
 
 <style id="srp282CardPageTransport">
-/* v2.8.2 — keep SRP card-page title + AutoScroll + Play/Pause + Stop on one mobile row. */
+/* v2.8.3 — keep SRP card-page title + AutoScroll + Play/Pause + Stop on one mobile row. */
 html.crp-integrated .sheetHeader > div:first-child{
   min-width:0!important;
   flex:1 1 auto!important;
