@@ -809,6 +809,7 @@
 
   function scheduleAutoSave(){
     window.CRPParts?.syncActiveChord?.();
+    publishSrpHandoff();
     // Brand-new/unnamed projects wait for the first manual Save.
     if(!state.currentProjectId)return;
     clearTimeout(autoSaveTimer);
@@ -839,6 +840,7 @@
 
     // Local save happens synchronously first, so edits are protected even if cloud is unavailable.
     upsertLocal(p);
+    publishSrpHandoff();
     updateCloudSnapshot(p);
     renderProjects();
 
@@ -875,7 +877,7 @@
       }catch{}
     }
     const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);
-    state.currentProjectId=p.id;try{localStorage.setItem('crp-active-project-id',String(p.id));}catch{}$('projectName').value=name;upsertLocal(p);
+    state.currentProjectId=p.id;try{localStorage.setItem('crp-active-project-id',String(p.id));}catch{}$('projectName').value=name;upsertLocal(p);publishSrpHandoff();
     if(accountUser){
       try{
         const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
@@ -916,6 +918,7 @@
   async function setProjectArchived(project,archived){
     const p={...project,archived:!!archived,updatedAt:Date.now()};
     upsertLocal(p);
+    publishSrpHandoff();
     updateCloudSnapshot(p);
     renderProjects();
 
@@ -1172,7 +1175,7 @@
     $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;window.CRPParts?.syncCoreLive?.();scheduleAutoSave();};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);renderAll();scheduleAutoSave();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);renderAll();scheduleAutoSave();};
     $('sustainBtn').onclick=()=>{state.sustain=!state.sustain;localStorage.setItem('crp-sustain',state.sustain?'1':'0');updateSustainButton();};
     updateSustainButton();
-    $('capoSelect').onchange=e=>{state.capo=+e.target.value;renderAll();scheduleAutoSave();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();scheduleAutoSave();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;renderAll();scheduleAutoSave();};
+    $('capoSelect').onchange=e=>{state.capo=+e.target.value;renderAll();scheduleAutoSave();publishSrpHandoff();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();scheduleAutoSave();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;renderAll();scheduleAutoSave();publishSrpHandoff();};
     $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();scheduleAutoSave();};
     $('autoScrollBtn').onclick=()=>{state.autoScroll=!state.autoScroll;localStorage.setItem('crp-auto-scroll',state.autoScroll?'1':'0');updateAutoScrollButton();};
     updateAutoScrollButton();
@@ -1272,9 +1275,32 @@
   function currentCrpProject(){return state.currentProjectId?(localProjects().find(p=>p.id===state.currentProjectId)||null):null}
   function srpPayload(){
     const p=currentCrpProject(); if(!p)return null;
-    const live=projectPayload(p.id,p.archived);
-    return {crpProjectId:p.id,name:live.name||p.name||'Untitled',bpm:+live.bpm||92,beats:+live.beats||4,key:live.key||'',rows:(live.rows||[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(row||[]).map(c=>({type:c.type||'chord',value:c.value||''}))}))};
+    const live=capture(p.id,p.name||$('projectName').value.trim()||'Untitled');
+    return {crpProjectId:p.id,name:live.name||p.name||'Untitled',bpm:+live.bpm||92,beats:+live.beats||4,key:live.key||'',capo:Number(live.capo)||0,transpose:!!live.transpose,rows:(live.rows||[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(row||[]).map(c=>({type:c.type||'chord',value:c.value||''}))}))};
   }
+  function publishSrpHandoff(){
+    try{
+      const payload=srpPayload();
+      if(!payload?.crpProjectId)return;
+      const rec=srpLinks()[payload.crpProjectId]||null;
+      localStorage.setItem(SRP_HANDOFF_KEY,JSON.stringify({payload,rec,ts:Date.now()}));
+    }catch(err){console.warn('Could not publish linked SRP state',err)}
+  }
+
+  function applyLinkedMetaFromSrpHandoff(){
+    try{
+      const h=JSON.parse(localStorage.getItem(SRP_HANDOFF_KEY)||'{}')||{};const payload=h.payload;
+      if(!payload?.crpProjectId||String(payload.crpProjectId)!==String(state.currentProjectId||''))return;
+      const bpm=Math.max(40,Math.min(240,Number(payload.bpm)||92));
+      if($('bpmInput'))$('bpmInput').value=String(bpm);
+      state.capo=Math.max(0,Math.min(12,Number(payload.capo)||0));if($('capoSelect'))$('capoSelect').value=String(state.capo);
+      state.transpose=!!payload.transpose;
+      if($('keyInput')){$('keyInput').value=String(payload.key||'');$('keyInput').dataset.autoKey=payload.key?'0':'1';}
+      renderAll();syncBuildInput();
+    }catch(err){console.warn('Could not apply linked SRP metadata',err)}
+  }
+  window.addEventListener('storage',e=>{if(e.key===SRP_HANDOFF_KEY)applyLinkedMetaFromSrpHandoff();});
+
   // Song Rider now runs as a native same-origin workspace page.
   // The shared link map and handoff snapshot above are consumed directly by song-rider/app.js.
 
@@ -1311,7 +1337,7 @@
   }
   window.CRPCore={
     snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,
-    scheduleAutoSave,renderAll,syncBuildInput,
+    scheduleAutoSave,renderAll,syncBuildInput,publishSrpHandoff,
     get beats(){return +$('beatsSelect').value||4},get bpm(){return +$('bpmInput').value||92},get loop(){return $('loopToggle').checked},
     get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
     startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).reduce((n,r)=>n+r.length,0)*(+$('beatsSelect').value||4);},

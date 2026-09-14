@@ -2002,3 +2002,19 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
     min-height:38px !important;
   }
 }
+
+
+/* v2.4.0 SRP linked lyrics recorder overlay */
+.vocal-transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#vocalLyricsBtn{min-width:86px}
+.srp-lyrics-overlay{position:fixed;inset:0;z-index:9999;background:#0d1117;display:flex;flex-direction:column}
+.srp-lyrics-overlay[hidden]{display:none!important}
+.srp-lyrics-overlay-head{height:48px;flex:0 0 48px;padding:6px 10px;display:flex;align-items:center;justify-content:space-between;background:#151a21;border-bottom:1px solid #333;color:#f2ca65}
+.srp-lyrics-overlay-head button{width:38px;height:38px;border-radius:10px;font-size:24px;padding:0}
+#srpLyricsFrame{border:0;flex:1 1 auto;width:100%;min-height:0;background:#101318}
+.srp-record-float{position:fixed;z-index:10001;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:12px;padding:10px 14px;border-radius:999px;background:rgba(17,21,27,.94);border:1px solid #d7ad4a;box-shadow:0 8px 26px rgba(0,0,0,.45)}
+.srp-record-float button{width:52px;height:52px;border-radius:50%;font-size:20px;font-weight:900;padding:0}
+#srpFloatRecord{background:#ef5a4c;color:#fff;border-color:#ff7d71}
+#srpFloatPause{background:#f0c65a;color:#111}
+#srpFloatStop{background:#262c34;color:#fff}
+.srp-record-float button:disabled{opacity:.4}
