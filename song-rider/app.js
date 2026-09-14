@@ -9694,25 +9694,29 @@ if(state.currentSection === "Full"){
     const rightLine = document.createElement("div");
     rightLine.className = "fullBreakLine";
 
-    const pill = document.createElement("input");
-    pill.type = "text";
-    pill.className = "songPartPill";
-    pill.placeholder = "Song Part";
-    pill.value = String(b.title || "");
-    pill.addEventListener("keydown", (e) => {
-      if(e.key === "Enter"){ e.preventDefault(); pill.blur(); }
-    });
-    pill.addEventListener("input", () => {
-      b.title = String(pill.value || "");
+    // v2.2.6: rebuilt section heading as a real CRP gold button.
+    // Tapping it opens a simple rename prompt, avoiding mobile/theme input styling entirely.
+    const pill = document.createElement("button");
+    pill.type = "button";
+    pill.className = "crpSectionTitlePill";
+    const refreshSectionPill = () => { pill.textContent = String(b.title || "Song Part").trim() || "Song Part"; };
+    refreshSectionPill();
+    bindTap(pill, () => {
+      const current = String(b.title || "").trim();
+      const next = window.prompt("Section title", current || "Song Part");
+      if(next === null) return;
+      b.title = String(next || "").trim();
       editProject("pillTitle", () => {
         ensurePageMeta();
         if(!state.project.sectionTitles) state.project.sectionTitles = {};
         if(sec){
-          const v = String(b.title||"").trim();
+          const v = String(b.title || "").trim();
           if(v) state.project.sectionTitles[sec] = v;
           else { try{ delete state.project.sectionTitles[sec]; }catch{} }
         }
       });
+      refreshSectionPill();
+      quickSaveFullText();
       renderTabs();
       renderSheetTitleBar();
       commitDebounced();
@@ -16302,6 +16306,29 @@ KEEP RHYME UI ABOVE KEYBOARD
   function handoff(){return readJson(HANDOFF_KEY,{})||{}}
   function links(){return readJson(LINKS_KEY,{})||{}}
   function setLinks(v){writeJson(LINKS_KEY,v||{})}
+  function recoverCrpPayload(){
+    const h=handoff();
+    if(h?.payload?.crpProjectId) return h.payload;
+    try{
+      const projects=readJson('crp-projects',[])||[];
+      const activeId=String(localStorage.getItem('crp-active-project-id')||'');
+      let p=(activeId&&projects.find(x=>String(x?.id||'')===activeId))||projects.slice().sort((a,b)=>(Number(b?.updatedAt)||0)-(Number(a?.updatedAt)||0))[0];
+      if(!p?.id) return null;
+      const payload={
+        crpProjectId:p.id,
+        name:p.name||'Untitled',
+        bpm:Number(p.bpm)||92,
+        beats:Number(p.beats)||4,
+        key:String(p.key||''),
+        rows:(Array.isArray(p.rows)?p.rows:[]).map((row,rowIndex)=>({
+          lineId:`crp-line-${rowIndex+1}`,
+          cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))
+        }))
+      };
+      writeJson(HANDOFF_KEY,{payload,rec:links()[p.id]||null,ts:Date.now()});
+      return payload;
+    }catch(err){ console.error('Could not recover CRP project for SRP link',err); return null; }
+  }
 
   function reportLink(payload,p){
     if(!payload?.crpProjectId||!p)return;
@@ -16356,27 +16383,43 @@ KEEP RHYME UI ABOVE KEYBOARD
 
   function refreshCrpLinkUi(){
     if(!integrated)return;
-    const h=handoff(); const payload=h.payload;
+    const payload=recoverCrpPayload();
     const st=document.getElementById('crpSrpLinkStatus');
     const b=document.getElementById('crpSrpLinkBtn');
     const u=document.getElementById('crpSrpUnlinkBtn');
     if(!payload?.crpProjectId){
       if(st)st.textContent='Save this CRP project first';
-      if(b){b.hidden=false;b.disabled=true} if(u)u.hidden=true;
+      if(b){b.hidden=false;b.disabled=false;b.textContent='Link SRP'} if(u)u.hidden=true;
       return;
     }
     const rec=links()[payload.crpProjectId];
-    if(st)st.textContent=rec?`Linked • ${rec.srpName||payload.name||'Song Rider project'}`:'Not linked to this CRP project';
-    if(b){b.hidden=!!rec;b.disabled=false} if(u)u.hidden=!rec;
+    if(st)st.textContent=rec?`Linked • ${rec.srpName||payload.name||'Song Rider project'}`:'Ready to link to this CRP project';
+    if(b){b.hidden=!!rec;b.disabled=false;b.textContent='Link SRP'} if(u)u.hidden=!rec;
   }
 
   function syncFromHandoff(forceCreate=false){
-    const h=handoff(); const payload=h.payload;
-    if(!payload?.crpProjectId){refreshCrpLinkUi();return}
+    const payload=recoverCrpPayload();
+    const h=handoff();
+    const b=document.getElementById('crpSrpLinkBtn');
+    const st=document.getElementById('crpSrpLinkStatus');
+    if(!payload?.crpProjectId){
+      if(st)st.textContent='Save a CRP project first, then open Song Rider from that project.';
+      if(b){b.disabled=false;b.textContent='Link SRP'}
+      return null;
+    }
     const rec=links()[payload.crpProjectId]||h.rec||null;
-    if(!rec&&!forceCreate){refreshCrpLinkUi();return}
-    importCrpStructure(payload,forceCreate,rec?.srpProjectId||'');
-    refreshCrpLinkUi();
+    if(!rec&&!forceCreate){refreshCrpLinkUi();return null}
+    if(b){b.disabled=true;b.textContent='Linking…'}
+    const linked=importCrpStructure(payload,forceCreate,rec?.srpProjectId||'');
+    if(linked){
+      if(st)st.textContent=`Linked • ${linked.name||payload.name||'Song Rider project'}`;
+      if(b){b.textContent='Linked ✓';b.disabled=true}
+      setTimeout(refreshCrpLinkUi,450);
+    }else{
+      if(st)st.textContent='Link failed — tap Link SRP to try again.';
+      if(b){b.textContent='Link SRP';b.disabled=false}
+    }
+    return linked;
   }
 
   if(embedded){
@@ -16384,7 +16427,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
   if(integrated){
     window.CRP_SRP_importCrpStructure=importCrpStructure;
-    document.getElementById('crpSrpLinkBtn')?.addEventListener('click',()=>syncFromHandoff(true));
+    document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();syncFromHandoff(true);});
     document.getElementById('crpSrpUnlinkBtn')?.addEventListener('click',()=>{
       const payload=handoff().payload;if(!payload?.crpProjectId)return;
       const all=links();delete all[payload.crpProjectId];setLinks(all);refreshCrpLinkUi();
