@@ -15,6 +15,7 @@
   let loadedChordPartId=null;
   let leadBarPage=0;
   let playing=false, starting=false, playbackGeneration=0;
+  let playbackClockStartAudioTime=0, playbackClockStartBeat=0, playbackClockBpm=92;
   let audioCtx=null, masterLimiter=null, cycleTimer=null;
   let playerCache=new Map(), partBuses=new Map(), highlightTimers=[], activeVoices=new Set(), vocalBufferCache=new Map(), activeVocalSources=new Set();
   let micStream=null,micCtx=null,micSource=null,micAnalyser=null,micProcessor=null,micSilentGain=null,micMeterRaf=0;
@@ -411,6 +412,11 @@
       if(generation!==playbackGeneration||!playing){window.CRPBeatMaker?.stopMainNow?.();return;}
 
       let nextAudioStart=audioCtx.currentTime+leadIn;
+      // Shared musical clock exposed to linked SRP so lyric AutoScroll can quantize
+      // to the exact CRP/BD beat grid instead of using an independent timer.
+      playbackClockStartAudioTime=nextAudioStart;
+      playbackClockStartBeat=initialBeat;
+      playbackClockBpm=Math.max(40,Math.min(240,+core.bpm||92));
       const chunkBeats=1; // rolling scheduler: enables live sound changes without losing timing
       let vocalsScheduledForCycle=false;
 
@@ -454,6 +460,7 @@
   }
   function stopPlayback(){
     ++playbackGeneration;starting=false;playing=false;
+    playbackClockStartAudioTime=0;
     clearTimeout(cycleTimer);cycleTimer=null;
     highlightTimers.forEach(clearTimeout);highlightTimers=[];
     document.querySelectorAll('.lead-cell.playing').forEach(c=>c.classList.remove('playing'));
@@ -549,6 +556,17 @@
     for(const id of ['vocalFxEq','vocalFxComp','vocalFxReverb','vocalFxDelay'])$(id).onchange=()=>{const p=active();if(p?.type!=='vocal')return;p.fx={eq:$('vocalFxEq').value,comp:$('vocalFxComp').value,reverb:+$('vocalFxReverb').value,delay:+$('vocalFxDelay').value};core.scheduleAutoSave();};
   }
 
-  window.CRPParts={handlesPlayback:true,togglePlayback,startPlayback,isPlaying:()=>playing||starting,isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncCloudAudio,openStudioExport,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(c&&activePartId!==c.id)selectPart(c.id);},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
+  window.CRPParts={handlesPlayback:true,togglePlayback,startPlayback,isPlaying:()=>playing||starting,getPlaybackTiming(){
+    const bpm=Math.max(40,Math.min(240,+playbackClockBpm||+core.bpm||92));
+    const beatMs=60000/bpm;
+    if(!audioCtx||!playbackClockStartAudioTime||!(playing||starting)) return {playing:!!(playing||starting),bpm,beatMs,currentBeat:playbackClockStartBeat||0,msUntilNextBeat:0};
+    const elapsedMs=(audioCtx.currentTime-playbackClockStartAudioTime)*1000;
+    const currentBeat=(playbackClockStartBeat||0)+(elapsedMs/beatMs);
+    let phase=((currentBeat%1)+1)%1;
+    let msUntilNextBeat=(1-phase)*beatMs;
+    // If queried essentially on a beat, treat that beat as NOW rather than waiting a full beat.
+    if(msUntilNextBeat<14||beatMs-msUntilNextBeat<14) msUntilNextBeat=0;
+    return {playing:true,bpm,beatMs,currentBeat,msUntilNextBeat};
+  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncCloudAudio,openStudioExport,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(c&&activePartId!==c.id)selectPart(c.id);},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wire);else wire();
 })();
