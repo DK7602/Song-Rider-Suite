@@ -1172,7 +1172,7 @@
     $('keyInput').onkeydown=e=>{if(e.key==='Enter'){$('buildBtn').click();}};
     document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.onclick=()=>{state.instrument=b.dataset.instrument;localStorage.setItem('crp-last-instrument',state.instrument);state.sound=SOUNDS[state.instrument][0][0];state.player=null;renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();});
     document.querySelectorAll('#modeTabs .seg').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;localStorage.setItem('crp-last-mode',state.mode);renderAll();syncBuildInput();scheduleAutoSave();});
-    $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;window.CRPParts?.syncCoreLive?.();scheduleAutoSave();};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);renderAll();scheduleAutoSave();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);renderAll();scheduleAutoSave();};
+    $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;window.CRPParts?.syncCoreLive?.();scheduleAutoSave();};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);renderAll();scheduleAutoSave();publishSrpHandoff();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);renderAll();scheduleAutoSave();publishSrpHandoff();};
     $('sustainBtn').onclick=()=>{state.sustain=!state.sustain;localStorage.setItem('crp-sustain',state.sustain?'1':'0');updateSustainButton();};
     updateSustainButton();
     $('capoSelect').onchange=e=>{state.capo=+e.target.value;renderAll();scheduleAutoSave();publishSrpHandoff();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();scheduleAutoSave();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;renderAll();scheduleAutoSave();publishSrpHandoff();};
@@ -1208,6 +1208,8 @@
     // Full-project autosave: only active after the project has been manually saved once.
     ['projectName','keyInput','bpmInput'].forEach(id=>$(id)?.addEventListener('input',scheduleAutoSave));
     ['bpmInput','beatsSelect','loopToggle'].forEach(id=>$(id)?.addEventListener('change',scheduleAutoSave));
+    $('bpmInput')?.addEventListener('input',()=>{publishSrpHandoff();});
+    $('bpmInput')?.addEventListener('change',()=>{publishSrpHandoff();});
     $('notesEditor')?.addEventListener('input',scheduleAutoSave);
 
     $('projectsTabBtn').onclick=()=>setProjectBrowserMode('projects');
@@ -1276,7 +1278,7 @@
   function srpPayload(){
     const p=currentCrpProject(); if(!p)return null;
     const live=capture(p.id,p.name||$('projectName').value.trim()||'Untitled');
-    return {crpProjectId:p.id,name:live.name||p.name||'Untitled',bpm:+live.bpm||92,beats:+live.beats||4,key:live.key||'',capo:Number(live.capo)||0,transpose:!!live.transpose,rows:(live.rows||[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(row||[]).map(c=>({type:c.type||'chord',value:c.value||''}))}))};
+    return {crpProjectId:p.id,name:live.name||p.name||'Untitled',bpm:+live.bpm||92,beats:+live.beats||4,key:live.key||'',capo:Number(live.capo)||0,octave:Number(live.octave)||0,transpose:!!live.transpose,rows:(live.rows||[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(row||[]).map(c=>({type:c.type||'chord',value:c.value||''}))}))};
   }
   function publishSrpHandoff(){
     try{
@@ -1294,12 +1296,18 @@
       const bpm=Math.max(40,Math.min(240,Number(payload.bpm)||92));
       if($('bpmInput'))$('bpmInput').value=String(bpm);
       state.capo=Math.max(0,Math.min(12,Number(payload.capo)||0));if($('capoSelect'))$('capoSelect').value=String(state.capo);
+      state.octave=Math.max(-2,Math.min(3,Number(payload.octave)||0));
       state.transpose=!!payload.transpose;
       if($('keyInput')){$('keyInput').value=String(payload.key||'');$('keyInput').dataset.autoKey=payload.key?'0':'1';}
-      renderAll();syncBuildInput();
+      // Persist the linked SRP edits back into the CRP/BD project immediately so all three views reopen identically.
+      const projects=localProjects();const i=projects.findIndex(x=>String(x?.id||'')===String(state.currentProjectId||''));
+      if(i>=0){projects[i]={...projects[i],bpm,capo:state.capo,octave:state.octave,transpose:state.transpose,key:String(payload.key||projects[i].key||''),updatedAt:Date.now()};localStorage.setItem('crp-projects',JSON.stringify(projects));}
+      renderAll();syncBuildInput();window.CRPParts?.syncCoreLive?.();
     }catch(err){console.warn('Could not apply linked SRP metadata',err)}
   }
   window.addEventListener('storage',e=>{if(e.key===SRP_HANDOFF_KEY)applyLinkedMetaFromSrpHandoff();});
+  window.addEventListener('pageshow',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
+  window.addEventListener('focus',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
 
   // Song Rider now runs as a native same-origin workspace page.
   // The shared link map and handoff snapshot above are consumed directly by song-rider/app.js.
