@@ -2023,3 +2023,24 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
 .srp-lyrics-overlay-head{justify-content:flex-start!important;}
 .srp-record-float{gap:10px!important;}
 .srp-record-float #srpLyricsCloseBtn{display:inline-flex;align-items:center;justify-content:center;font-size:28px;line-height:1;background:#252b33;color:#f4f6f8;border:1px solid #46505b;}
+
+/* v2.8.3 — Song Rider Suite visual polish only */
+.app-header .brand-copy h1{
+  font-family:Impact,Haettenschweiler,"Arial Black",sans-serif;
+  font-weight:900;
+  letter-spacing:.025em;
+  color:transparent;
+  background:linear-gradient(180deg,#fff8bd 0%,#ffd85a 12%,#ffbd16 28%,#fff0a1 43%,#d98b00 58%,#ffc62c 74%,#8a4a00 100%);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-stroke:1px #6f3b00;
+  text-shadow:0 1px 0 #fff1a6,0 2px 0 #b46a00,0 4px 0 #6d3700,0 7px 12px rgba(0,0,0,.75),0 0 18px rgba(255,184,0,.48);
+  filter:drop-shadow(0 0 4px rgba(255,194,42,.38));
+}
+.baby-mode-art img{
+  width:100%!important;height:100%!important;object-fit:contain!important;
+  border-radius:18px;
+  filter:drop-shadow(0 4px 6px rgba(0,0,0,.6)) drop-shadow(0 0 6px rgba(255,190,32,.22));
+}
+@media(max-width:700px){
+  .app-header .brand-copy h1{font-size:clamp(1.55rem,7.5vw,2.15rem)!important;white-space:nowrap;}
+}
