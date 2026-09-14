@@ -1,4 +1,4 @@
-const CACHE = 'chord-rider-pro-v2.8.0-srp-scope-rebuild';
+const CACHE = 'chord-rider-pro-v2.8.1-single-link-toggle';
 const ASSETS = [
   './',
   './index.html',
