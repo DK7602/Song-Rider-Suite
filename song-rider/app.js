@@ -16500,7 +16500,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
 }
 
-})();
+
 
 /* CRP / SRP integration bridge. In v2.1 the CRP-integrated Song Rider runs as a real page,
    not inside an iframe. This eliminates Android/iOS nested-scroll gesture conflicts. */
@@ -16526,7 +16526,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   // v2.6.0: exact linked-project transport state. One authority for BPM/CAPO/STEP.
   const CANONICAL_PREFIX='crp-srp-canonical-v1:';
   // v2.7.0: explicit pair link. Merely opening SRP is never a link.
-  const LINK_SESSION_KEY='crp-srp-link-session-v2';
+  const LINK_SESSION_KEY='crp-srp-link-session-v3';
   function sharedMetaKey(id){return SHARED_META_PREFIX+String(id||'')}
   function unifiedMetaKey(id){return UNIFIED_META_PREFIX+String(id||'')}
   function canonicalMetaKey(id){return CANONICAL_PREFIX+String(id||'')}
@@ -16611,6 +16611,9 @@ KEEP RHYME UI ABOVE KEYBOARD
   function readSharedMeta(id){
     if(!id)return null;
     const sid=String(id), base=readJson(sharedMetaKey(sid),null);
+    const session=readLinkSession();
+    const explicitlyLinked=!!(session&&String(session.crpProjectId||'')===sid);
+    if(!explicitlyLinked)return base;
     const canonical=readCanonicalMeta(sid);
     if(canonical)return {...(base||{}),...canonical,crpProjectId:sid};
     const live=readLiveMeta();
@@ -16712,7 +16715,8 @@ KEEP RHYME UI ABOVE KEYBOARD
       if(p?.id){
         // v2.4.8: shared meta is the single authority for BPM/capo/octave.
         // This prevents a page reload or cloud/current-project restore from resurrecting stale values.
-        const shared=readSharedMeta(p.id);
+        const activeSession=readLinkSession();
+        const shared=(activeSession&&String(activeSession.crpProjectId||'')===String(p.id))?readSharedMeta(p.id):null;
         if(shared){
           p={...p,
             bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,
@@ -16947,6 +16951,10 @@ KEEP RHYME UI ABOVE KEYBOARD
       setLinks(all);
       writeLinkSession(payload.crpProjectId,linked.id);
       writeJson(HANDOFF_KEY,{payload,rec:recNow,ts:Date.now()});
+      // Seed the shared transport immediately from the just-linked project. This makes
+      // refresh deterministic before either workspace has a chance to restore an older snapshot.
+      syncMetaToCrp();
+      writeHardSyncFromSrp();
       if(st)st.textContent=`Linked • ${recNow.srpName}`;
       if(b){b.hidden=false;b.textContent='Linked ✓';b.disabled=true;b.classList.add('is-linked')}
       setTimeout(refreshCrpLinkUi,900);
@@ -17002,3 +17010,5 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
 })();
 
+// v2.8.0: close the main SRP application IIFE after the nested CRP/SRP bridge.
+})();
