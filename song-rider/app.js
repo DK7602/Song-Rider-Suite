@@ -16490,13 +16490,30 @@ KEEP RHYME UI ABOVE KEYBOARD
   // v2.5.0: CRP/BD/SRP share one authoritative live metadata record.
   // This deliberately does not depend on the CRP project being present in SRP's local project cache.
   const LIVE_META_KEY='crp-srp-live-meta-v3';
+  // v2.5.1: use one project-scoped metadata record for the exact CRP project linked to SRP.
+  // This removes the previous ambiguity between active CRP id, handoff id, link-map id and a
+  // single global live-meta record.
+  const ACTIVE_LINK_KEY='crp-srp-active-link-id-v1';
+  const UNIFIED_META_PREFIX='crp-srp-unified-meta-v1:';
   function sharedMetaKey(id){return SHARED_META_PREFIX+String(id||'')}
-  function readLiveMeta(){return readJson(LIVE_META_KEY,null);}
+  function unifiedMetaKey(id){return UNIFIED_META_PREFIX+String(id||'')}
+  function activeUnifiedCrpId(){
+    try{return String(state.project?.linkedCrpProjectId||localStorage.getItem(ACTIVE_LINK_KEY)||handoff()?.payload?.crpProjectId||localStorage.getItem('crp-active-project-id')||'')}catch{return String(state.project?.linkedCrpProjectId||'')}
+  }
+  function readLiveMeta(){
+    const id=activeUnifiedCrpId();
+    if(id){const unified=readJson(unifiedMetaKey(id),null);if(unified&&String(unified.crpProjectId||'')===id)return unified;}
+    return readJson(LIVE_META_KEY,null);
+  }
   function writeLiveMeta(id,meta){
     if(!id)return null;
-    const sid=String(id),old=readLiveMeta();
+    const sid=String(id);
+    // ACTIVE_LINK_KEY is intentionally a raw string for easy use from the CRP page too.
+    try{localStorage.setItem(ACTIVE_LINK_KEY,sid)}catch{}
+    const old=readJson(unifiedMetaKey(sid),null);
     const prev=(old&&String(old.crpProjectId||'')===sid)?old:{};
     const next={...prev,...meta,crpProjectId:sid,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
+    writeJson(unifiedMetaKey(sid),next);
     writeJson(LIVE_META_KEY,next);
     try{window.__CRP_SRP_META_CHANNEL?.postMessage(next)}catch{}
     return next;
@@ -16596,7 +16613,7 @@ KEEP RHYME UI ABOVE KEYBOARD
     try{
       const projects=readJson('crp-projects',[])||[];
       const h=handoff();
-      const activeId=String(localStorage.getItem('crp-active-project-id')||h?.payload?.crpProjectId||'');
+      const activeId=String(localStorage.getItem(ACTIVE_LINK_KEY)||h?.payload?.crpProjectId||localStorage.getItem('crp-active-project-id')||'');
       let p=(activeId&&projects.find(x=>String(x?.id||'')===activeId)) ||
         (h?.payload?.crpProjectId&&projects.find(x=>String(x?.id||'')===String(h.payload.crpProjectId))) || null;
       if(p?.id){
@@ -16686,19 +16703,20 @@ KEEP RHYME UI ABOVE KEYBOARD
   function activeLinkedCrpId(){
     const h=handoff();
     const byProject=String(state.project?.linkedCrpProjectId||'');
-    if(byProject)return byProject;
-    const active=String(localStorage.getItem('crp-active-project-id')||h?.payload?.crpProjectId||'');
-    return active && links()[active] ? active : '';
+    if(byProject){try{localStorage.setItem(ACTIVE_LINK_KEY,byProject)}catch{}return byProject;}
+    const active=String(localStorage.getItem(ACTIVE_LINK_KEY)||h?.payload?.crpProjectId||localStorage.getItem('crp-active-project-id')||'');
+    return active;
   }
   function syncMetaToCrp(){
     try{
-      const p=state.project;if(!p)return;
+      let p=state.project;if(!p)return;
       const crpId=activeLinkedCrpId();if(!crpId)return;
-      // If startup briefly selected another SRP project, switch to the linked project before reading controls.
+      // If startup briefly selected another SRP project, switch to the linked project BUT DO NOT
+      // return. Returning here used to discard the exact BPM/capo edit that triggered this sync.
       const rec=links()[crpId];
       if(rec?.srpProjectId && String(p.id||'')!==String(rec.srpProjectId)){
         const linked=loadAllProjects().map(normalizeProject).filter(Boolean).find(x=>String(x.id)===String(rec.srpProjectId));
-        if(linked){state.project=linked;setCurrentProjectIdForScope(getStorageScope(),linked.id);applyProjectSettingsToUI();renderAll();return;}
+        if(linked){p=linked;state.project=linked;setCurrentProjectIdForScope(getStorageScope(),linked.id);}
       }
       p.linkedCrpProjectId=crpId;
       const liveBpm=Number(el?.bpmInput?.value);
@@ -16848,7 +16866,7 @@ KEEP RHYME UI ABOVE KEYBOARD
       const all=links();delete all[payload.crpProjectId];setLinks(all);refreshCrpLinkUi();
     });
     try{window.__CRP_SRP_META_CHANNEL=new BroadcastChannel('crp-srp-live-meta-v3');window.__CRP_SRP_META_CHANNEL.onmessage=()=>setTimeout(applyLiveMetaToSrp,0);}catch{}
-    window.addEventListener('storage',e=>{if(e.key===LIVE_META_KEY){applyLiveMetaToSrp();return;}if(e.key===HANDOFF_KEY||e.key===LINKS_KEY||String(e.key||'').startsWith(SHARED_META_PREFIX)){refreshCrpLinkUi();syncFromHandoff(false);applyLiveMetaToSrp();}});
+    window.addEventListener('storage',e=>{if(e.key===LIVE_META_KEY||String(e.key||'').startsWith(UNIFIED_META_PREFIX)){applyLiveMetaToSrp();return;}if(e.key===HANDOFF_KEY||e.key===LINKS_KEY||String(e.key||'').startsWith(SHARED_META_PREFIX)){refreshCrpLinkUi();syncFromHandoff(false);applyLiveMetaToSrp();}});
     const reconcileLinkedWorkspace=()=>{try{refreshCrpLinkUi();syncFromHandoff(false);applyLiveMetaToSrp();if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}}catch{}};
     // init() is async and used to overwrite the linked project after the early 80ms import.
     // Reconcile after init, and again on browser restore/focus.
