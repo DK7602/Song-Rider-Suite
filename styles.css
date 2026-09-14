@@ -1793,3 +1793,54 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .transport-line-actions #autoScrollBtn{flex:0 0 auto;margin-left:0;}
   .play-row #addLineBtn{flex:0 0 auto;}
 }
+
+/* v2.3.2 — transport row must not inherit the generic 3-column .line-actions grid.
+   That grid reserves the middle column for the old 28px auto-scroll button and
+   was crushing the Repeat label after the transport controls were moved. */
+.transport-line-actions{
+  display:flex !important;
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:14px !important;
+  width:100% !important;
+  min-width:0 !important;
+}
+.transport-line-actions #playAllBtn{
+  flex:0 0 auto !important;
+}
+.transport-line-actions .repeat-control{
+  display:flex !important;
+  align-items:center !important;
+  gap:6px !important;
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:max-content !important;
+  margin:0 !important;
+  white-space:nowrap !important;
+}
+.transport-line-actions .repeat-control input{
+  flex:0 0 auto !important;
+}
+.transport-line-actions #autoScrollBtn{
+  flex:0 0 34px !important;
+  width:34px !important;
+  min-width:34px !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:0 !important;
+}
+@media(max-width:390px){
+  .transport-line-actions{
+    gap:10px !important;
+  }
+  .transport-line-actions #playAllBtn{
+    width:auto !important;
+    min-width:0 !important;
+    padding:10px 12px !important;
+    font-size:.78rem !important;
+  }
+  .transport-line-actions .repeat-control span{
+    font-size:.72rem !important;
+  }
+}
