@@ -8,7 +8,7 @@
   <title>Chord Rider Pro</title>
   <link rel="icon" href="assets/rider-and-bones-icon.png" type="image/png" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=2.0.1" />
+  <link rel="stylesheet" href="styles.css?v=2.1.0" />
 </head>
 <body>
   <header class="app-header">
@@ -36,14 +36,9 @@
   </nav>
 
 
-  <section id="songRiderWorkspace" class="song-rider-workspace" hidden>
-    <div class="srp-linkbar">
-      <div><strong>Song Rider Pro</strong><span id="srpLinkStatus">Not linked to this CRP project</span></div>
-      <button id="srpLinkBtn" type="button">🔗 Link this project to SRP</button>
-      <button id="srpUnlinkBtn" type="button" hidden>Unlink</button>
-    </div>
-    <iframe id="songRiderFrame" title="Song Rider Pro" src="song-rider/index.html?embedded=1" scrolling="no"></iframe>
-  </section>
+
+  <!-- Song Rider Pro now opens as a native same-origin workspace page (no iframe). -->
+
 
   <main class="app-shell">
     

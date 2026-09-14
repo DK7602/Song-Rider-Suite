@@ -1196,21 +1196,39 @@
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
+  const SRP_HANDOFF_KEY='crp-srp-handoff-v2';
+  function openSongRiderWorkspace(){
+    try{
+      const payload=srpPayload();
+      const rec=payload?srpLinks()[payload.crpProjectId]||null:null;
+      localStorage.setItem(SRP_HANDOFF_KEY,JSON.stringify({payload,rec,ts:Date.now()}));
+      localStorage.setItem(WORKSPACE_MODE_KEY,'song-rider');
+    }catch{}
+    location.href='song-rider/index.html?crpMode=1';
+  }
   function applyWorkspaceMode(mode, persist=true){
     mode=['chord-rider','baby-daw','song-rider'].includes(mode)?mode:'chord-rider';
+    if(mode==='song-rider'){
+      if(persist) openSongRiderWorkspace();
+      return;
+    }
     document.body.classList.toggle('workspace-chord-rider',mode==='chord-rider');
     document.body.classList.toggle('workspace-baby-daw',mode==='baby-daw');
-    document.body.classList.toggle('workspace-song-rider',mode==='song-rider');
-    const srp=document.getElementById('songRiderWorkspace');if(srp)srp.hidden=mode!=='song-rider';
+    document.body.classList.remove('workspace-song-rider');
     document.querySelectorAll('[data-workspace-mode]').forEach(btn=>{
       const on=btn.dataset.workspaceMode===mode;btn.classList.toggle('active',on);btn.setAttribute('aria-pressed',String(on));
     });
     if(mode==='chord-rider') window.CRPParts?.focusChordPart?.();
-    if(mode==='song-rider'){setTimeout(()=>syncLinkedSrp(false),100);setTimeout(()=>{fitSongRiderFrame();watchSongRiderSize();},140);}
     if(persist){try{localStorage.setItem(WORKSPACE_MODE_KEY,mode)}catch{}}
   }
   function initWorkspaceMode(){
-    let mode='chord-rider';try{mode=localStorage.getItem(WORKSPACE_MODE_KEY)||mode}catch{}
+    let mode='chord-rider';
+    try{
+      const q=new URLSearchParams(location.search).get('workspace');
+      mode=q||localStorage.getItem(WORKSPACE_MODE_KEY)||mode;
+      if(q&&['chord-rider','baby-daw'].includes(q)) localStorage.setItem(WORKSPACE_MODE_KEY,q);
+      if(mode==='song-rider') mode='chord-rider';
+    }catch{}
     document.querySelectorAll('[data-workspace-mode]').forEach(btn=>btn.addEventListener('click',()=>applyWorkspaceMode(btn.dataset.workspaceMode,true)));
     applyWorkspaceMode(mode,false);
   }
@@ -1224,110 +1242,8 @@
     const live=projectPayload(p.id,p.archived);
     return {crpProjectId:p.id,name:live.name||p.name||'Untitled',bpm:+live.bpm||92,beats:+live.beats||4,key:live.key||'',rows:(live.rows||[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(row||[]).map(c=>({type:c.type||'chord',value:c.value||''}))}))};
   }
-  function updateSrpLinkUi(){
-    const p=currentCrpProject(), links=srpLinks(), rec=p?links[p.id]:null;
-    const st=document.getElementById('srpLinkStatus'), b=document.getElementById('srpLinkBtn'), u=document.getElementById('srpUnlinkBtn');
-    if(st)st.textContent=!p?'Save this CRP project first':rec?`Linked • ${rec.srpName||p.name||'Song Rider project'}`:'Not linked to this CRP project';
-    if(b){b.hidden=!!rec;b.disabled=!p} if(u)u.hidden=!rec;
-  }
-  function syncLinkedSrp(forceCreate){
-    const payload=srpPayload();updateSrpLinkUi();if(!payload)return;
-    const rec=srpLinks()[payload.crpProjectId]; if(!rec&&!forceCreate)return;
-    document.getElementById('songRiderFrame')?.contentWindow?.postMessage({type:'crp-srp-link-sync',payload,forceCreate:!!forceCreate,linkedSrpProjectId:rec?.srpProjectId||''},location.origin);
-  }
-  window.addEventListener('message',e=>{
-    if(e.origin!==location.origin||e.data?.type!=='srp-link-result')return;
-    const d=e.data||{}, p=currentCrpProject();if(!p||d.crpProjectId!==p.id)return;
-    const links=srpLinks();links[p.id]={srpProjectId:d.srpProjectId,srpName:d.srpName||p.name,linkedAt:Date.now()};setSrpLinks(links);updateSrpLinkUi();
-  });
-  document.getElementById('srpLinkBtn')?.addEventListener('click',()=>syncLinkedSrp(true));
-  document.getElementById('srpUnlinkBtn')?.addEventListener('click',()=>{const p=currentCrpProject();if(!p)return;const links=srpLinks();delete links[p.id];setSrpLinks(links);updateSrpLinkUi();document.getElementById('songRiderFrame')?.contentWindow?.postMessage({type:'crp-srp-unlinked',crpProjectId:p.id},location.origin);});
-  function fitSongRiderFrame(){
-    const frame=document.getElementById('songRiderFrame');if(!frame)return;
-    try{
-      const doc=frame.contentDocument;if(!doc)return;
-      const body=doc.body;
-      const header=doc.querySelector('header');
-      const main=doc.querySelector('main');
-      const sheetHeader=doc.querySelector('.sheetHeader');
-      const inner=doc.getElementById('sheetInner');
-      const bottoms=[];
-      [header,main,sheetHeader,inner].forEach(el=>{
-        if(!el)return;
-        const r=el.getBoundingClientRect();
-        if(Number.isFinite(r.bottom))bottoms.push(r.bottom);
-      });
-      // The embedded SRP document is intentionally non-scrolling.  Measure the
-      // actual rendered content, not document.scrollHeight (which includes SRP's
-      // standalone keyboard-safe/viewport spacers and caused the giant blank tail).
-      let h=bottoms.length?Math.max(...bottoms):0;
-      if(body){
-        for(const child of body.children){
-          const cs=doc.defaultView?.getComputedStyle?.(child);
-          if(cs && (cs.position==='fixed' || cs.display==='none'))continue;
-          const r=child.getBoundingClientRect();
-          if(Number.isFinite(r.bottom))h=Math.max(h,r.bottom);
-        }
-      }
-      h=Math.max(320,Math.min(Math.ceil(h+12),5000));
-      if(Math.abs((parseFloat(frame.style.height)||0)-h)>1)frame.style.height=`${h}px`;
-    }catch{}
-  }
-  function installSongRiderScrollBridge(){
-    const frame=document.getElementById('songRiderFrame');if(!frame)return;
-    try{
-      const doc=frame.contentDocument;if(!doc||doc._crpScrollBridge)return;
-      doc._crpScrollBridge=true;
-      let lastY=null;
-      doc.addEventListener('touchstart',e=>{
-        if(e.touches?.length===1)lastY=e.touches[0].clientY;
-        else lastY=null;
-      },{passive:true});
-      doc.addEventListener('touchmove',e=>{
-        if(lastY==null||e.touches?.length!==1)return;
-        const y=e.touches[0].clientY;
-        const dy=lastY-y;
-        lastY=y;
-        if(Math.abs(dy)<1)return;
-        window.scrollBy(0,dy);
-        if(e.cancelable)e.preventDefault();
-      },{passive:false});
-      const clear=()=>{lastY=null};
-      doc.addEventListener('touchend',clear,{passive:true});
-      doc.addEventListener('touchcancel',clear,{passive:true});
-      doc.addEventListener('wheel',e=>{
-        if(!e.deltaY)return;
-        window.scrollBy(0,e.deltaY);
-        if(e.cancelable)e.preventDefault();
-      },{passive:false});
-    }catch{}
-  }
-  function watchSongRiderSize(){
-    const frame=document.getElementById('songRiderFrame');if(!frame)return;
-    try{
-      frame._srpResizeObserver?.disconnect?.();
-      frame._srpMutationObserver?.disconnect?.();
-      const doc=frame.contentDocument;if(!doc)return;
-      if('ResizeObserver' in window){
-        const ro=new ResizeObserver(()=>requestAnimationFrame(fitSongRiderFrame));
-        const inner=doc.getElementById('sheetInner');
-        const header=doc.querySelector('header');
-        if(inner)ro.observe(inner);
-        if(header)ro.observe(header);
-        frame._srpResizeObserver=ro;
-      }
-      if('MutationObserver' in window&&doc.body){
-        let raf=0;
-        const mo=new MutationObserver(()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(fitSongRiderFrame)});
-        mo.observe(doc.body,{subtree:true,childList:true,attributes:true,characterData:true});
-        frame._srpMutationObserver=mo;
-      }
-    }catch{}
-    installSongRiderScrollBridge();
-    fitSongRiderFrame();
-    [80,220,500,1000].forEach(ms=>setTimeout(()=>{fitSongRiderFrame();installSongRiderScrollBridge()},ms));
-  }
-  document.getElementById('songRiderFrame')?.addEventListener('load',()=>{updateSrpLinkUi();syncLinkedSrp(false);watchSongRiderSize()});
+  // Song Rider now runs as a native same-origin workspace page.
+  // The shared link map and handoff snapshot above are consumed directly by song-rider/app.js.
 
   function coreSnapshot(){
     return JSON.parse(JSON.stringify({instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:state.rows,key:$('keyInput').value.trim()}));
