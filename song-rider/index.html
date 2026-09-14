@@ -2428,6 +2428,80 @@ html.crp-integrated input.songPartPill,html.crp-integrated input.headingPill,htm
   html.crp-integrated #topControlsRow .tinyField.key{width:54px!important;min-width:54px!important;}
 }
 </style>
+
+<style id="srpUiPolish223">
+/* v2.2.3 — header parity, compact transport metadata row, reliable gold section pills */
+html.crp-integrated .crp-srp-app-header{
+  position:relative!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:14px!important;
+  min-height:86px!important;padding:10px max(16px,env(safe-area-inset-left))!important;
+  background:rgba(13,15,18,.96)!important;border-bottom:1px solid #343a43!important;overflow:visible!important;
+}
+html.crp-integrated .crp-srp-brand-copy{min-width:0!important;flex:1 1 auto!important;text-align:center!important;overflow:visible!important;}
+html.crp-integrated .crp-srp-brand-copy h1{
+  display:inline-block!important;margin:0!important;padding:0 2px 2px!important;max-width:100%!important;
+  font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif!important;font-style:italic!important;font-weight:900!important;
+  font-size:clamp(1.55rem,4.6vw,2.5rem)!important;line-height:.95!important;letter-spacing:.025em!important;text-transform:uppercase!important;white-space:nowrap!important;
+  background:linear-gradient(180deg,#fff3bf 0%,#ffd968 20%,#e9a92f 47%,#9b5b08 72%,#ffd86a 100%)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;-webkit-text-fill-color:transparent!important;
+  -webkit-text-stroke:1px rgba(109,63,4,.7)!important;
+  filter:drop-shadow(0 2px 0 #4e2b00) drop-shadow(0 0 7px rgba(242,183,54,.38))!important;
+}
+html.crp-integrated .crp-srp-brand-copy .tagline{
+  position:relative!important;display:block!important;width:max-content!important;max-width:100%!important;margin:4px auto 0!important;
+  color:#fff!important;font-family:"Brush Script MT","Segoe Script","Snell Roundhand",cursive!important;
+  font-size:clamp(.72rem,3.15vw,.98rem)!important;font-weight:700!important;font-style:italic!important;line-height:1.05!important;white-space:nowrap!important;
+  text-shadow:0 1px 0 rgba(218,223,230,.95),0 2px 1px rgba(105,113,124,.72),0 3px 4px rgba(0,0,0,.62)!important;
+}
+html.crp-integrated .crp-srp-brand-mark{width:76px!important;height:58px!important;flex:0 0 76px!important;object-fit:contain!important;position:relative!important;align-self:flex-end!important;transform:scale(1.27)!important;transform-origin:center bottom!important;bottom:-10px!important;z-index:2!important;}
+html.crp-integrated .srp-link-status-only{display:none!important;}
+
+/* One compact metadata/control row: Save, Cloud, BPM, Capo/Step, Key, Link */
+html.crp-integrated #topControlsRow{
+  display:grid!important;grid-template-columns:38px 38px 58px 70px 48px minmax(72px,1fr)!important;
+  align-items:center!important;gap:5px!important;overflow:visible!important;padding:10px!important;
+}
+html.crp-integrated #topControlsRow #saveBtn,html.crp-integrated #topControlsRow #cloudSyncBtn{width:38px!important;min-width:38px!important;height:40px!important;}
+html.crp-integrated #topControlsRow .tinyCombo{width:58px!important;min-width:58px!important;height:40px!important;padding:0 3px!important;gap:2px!important;}
+html.crp-integrated #topControlsRow #bpmInput{width:31px!important;min-width:31px!important;max-width:31px!important;padding:4px 1px!important;}
+html.crp-integrated #capoStepWrap{display:grid!important;grid-template-columns:42px 23px!important;align-items:center!important;gap:4px!important;width:70px!important;min-width:70px!important;position:relative!important;}
+html.crp-integrated #capoInput{width:42px!important;min-width:42px!important;max-width:42px!important;height:40px!important;padding:5px 3px!important;}
+html.crp-integrated #capoStepToggle,html.crp-integrated #capoStepToggle.on{
+  position:static!important;width:23px!important;min-width:23px!important;height:40px!important;margin:0!important;padding:0!important;
+  background:#f5f6f8!important;color:#090a0c!important;-webkit-text-fill-color:#090a0c!important;border:1px solid #c5cad0!important;
+  border-radius:999px!important;writing-mode:vertical-rl!important;transform:rotate(180deg)!important;overflow:hidden!important;z-index:auto!important;
+}
+html.crp-integrated #topControlsRow .tinyField.key{width:48px!important;min-width:48px!important;height:40px!important;}
+html.crp-integrated #topControlsRow #keyOutput{width:48px!important;min-width:48px!important;max-width:48px!important;height:40px!important;padding:5px 2px!important;font-size:12px!important;}
+html.crp-integrated .srp-inline-link-btn{
+  min-width:0!important;width:100%!important;height:40px!important;padding:0 6px!important;border:1px solid #d8ae52!important;border-radius:10px!important;
+  background:#252b33!important;color:#f4d47d!important;font-size:11px!important;font-weight:900!important;line-height:1.05!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+}
+html.crp-integrated .srp-inline-link-btn:hover{border-color:#efc85d!important;}
+
+/* Force every editable section heading to CRP gold, even while focused/editing. */
+html.crp-integrated input.fullPerfPill,html.crp-integrated .fullPerfPill,
+html.crp-integrated input.songPartPill,html.crp-integrated input.headingPill,
+html.crp-integrated input.fullPerfPill:focus,html.crp-integrated input.songPartPill:focus,html.crp-integrated input.headingPill:focus{
+  appearance:none!important;-webkit-appearance:none!important;
+  background:#efc85d!important;background-color:#efc85d!important;background-image:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;
+  color:#111!important;-webkit-text-fill-color:#111!important;border:1px solid #d6aa3f!important;border-radius:999px!important;
+  font-weight:1000!important;text-shadow:none!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.25)!important;caret-color:#111!important;
+}
+@media(max-width:430px){
+  html.crp-integrated .crp-srp-app-header{gap:7px!important;padding:8px 8px 9px!important;min-height:76px!important;}
+  html.crp-integrated .crp-srp-brand-mark{width:53px!important;height:50px!important;flex-basis:53px!important;transform:scale(1.38)!important;bottom:-9px!important;}
+  html.crp-integrated .crp-srp-brand-copy h1{font-size:clamp(1.35rem,6.3vw,1.85rem)!important;letter-spacing:.018em!important;}
+  html.crp-integrated .crp-srp-brand-copy .tagline{font-size:clamp(.68rem,3vw,.86rem)!important;}
+  html.crp-integrated #topControlsRow{grid-template-columns:36px 36px 55px 66px 44px minmax(66px,1fr)!important;gap:4px!important;padding:9px 8px!important;}
+  html.crp-integrated #topControlsRow #saveBtn,html.crp-integrated #topControlsRow #cloudSyncBtn{width:36px!important;min-width:36px!important;height:38px!important;}
+  html.crp-integrated #topControlsRow .tinyCombo{width:55px!important;min-width:55px!important;height:38px!important;}
+  html.crp-integrated #capoStepWrap{grid-template-columns:39px 22px!important;width:66px!important;min-width:66px!important;gap:3px!important;}
+  html.crp-integrated #capoInput{width:39px!important;min-width:39px!important;max-width:39px!important;height:38px!important;}
+  html.crp-integrated #capoStepToggle,html.crp-integrated #capoStepToggle.on{width:22px!important;min-width:22px!important;height:38px!important;font-size:9px!important;}
+  html.crp-integrated #topControlsRow .tinyField.key,html.crp-integrated #topControlsRow #keyOutput{width:44px!important;min-width:44px!important;max-width:44px!important;height:38px!important;}
+  html.crp-integrated .srp-inline-link-btn{height:38px!important;font-size:10px!important;padding:0 4px!important;}
+}
+</style>
 </head>
 
 <body>
@@ -2435,9 +2509,9 @@ html.crp-integrated input.songPartPill,html.crp-integrated input.headingPill,htm
   <section id="crpSrpShell" class="crp-srp-shell" aria-label="Chord Rider Pro workspace navigation">
     <div class="crp-srp-app-header" aria-label="Chord Rider Pro">
       <img id="srpBrandLeft" src="../assets/rider-and-bones-right-still.png" class="crp-srp-brand-mark" alt="Rider and Bones" data-still="../assets/rider-and-bones-right-still.png" data-animated="../assets/rider-and-bones-right.gif" />
-      <div class="crp-srp-brand-copy">
-        <div class="crp-srp-title">CHORD RIDER PRO</div>
-        <div class="crp-srp-tagline">Ride the progression. See it. Hear it. Build it.</div>
+      <div class="crp-srp-brand-copy brand-copy">
+        <h1>CHORD RIDER PRO</h1>
+        <p class="crp-srp-tagline tagline">Ride the progression. See it. Hear it. Build it.</p>
       </div>
       <img id="srpBrandRight" src="../assets/rider-and-bones-left-still.png" class="crp-srp-brand-mark" alt="Rider and Bones" data-still="../assets/rider-and-bones-left-still.png" data-animated="../assets/rider-and-bones-left.gif" />
     </div>
@@ -2455,10 +2529,8 @@ html.crp-integrated input.songPartPill,html.crp-integrated input.headingPill,htm
         <span class="copy"><strong>Song Rider</strong><small>Lyrics + Flow</small></span>
       </a>
     </nav>
-    <div class="crp-srp-linkbar">
+    <div class="crp-srp-linkbar srp-link-status-only">
       <div class="status"><strong>Song Rider Pro</strong><span id="crpSrpLinkStatus">Not linked to this CRP project</span></div>
-      <button id="crpSrpLinkBtn" type="button">🔗 Link this project to SRP</button>
-      <button id="crpSrpUnlinkBtn" type="button" hidden>Unlink</button>
     </div>
   </section>
 
@@ -2550,6 +2622,8 @@ html.crp-integrated input.songPartPill,html.crp-integrated input.headingPill,htm
   <input id="capoInput" type="number" min="0" max="12" step="1" value="0"/>
 </div>
           <div class="tinyField key"><input id="keyOutput" type="text" readonly value="—"/></div>
+          <button id="crpSrpLinkBtn" class="srp-inline-link-btn" type="button" title="Link this project to Song Rider Pro">Link SRP</button>
+          <button id="crpSrpUnlinkBtn" class="srp-inline-link-btn" type="button" hidden>Unlink</button>
         </div>
 
         <div class="row nowrap controlSelectRow" style="border-top:1px solid rgba(0,0,0,.06);">
