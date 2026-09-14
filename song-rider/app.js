@@ -7850,18 +7850,54 @@ function clearAutoScrollArm(){
 }
 
 function runAutoScrollOnNextLinkedBeat(action){
-  const t=getLinkedPlaybackTiming();
-  if(!t || !t.playing){ action(); return; }
   clearAutoScrollArm();
-  const delay=Math.max(0, Math.min(Number(t.beatMs)||1000, Number(t.msUntilNextBeat)||0));
-  if(delay<=14){ action(); return; }
+  const first=getLinkedPlaybackTiming();
+  if(!first || !first.playing){ action(); return; }
+
+  // A linked Play press is asynchronous: samples/takes may still be loading for a
+  // moment before CRP/BD publishes its exact WebAudio beat clock. Stay armed until
+  // that clock is ready; never mistake "clock not ready" for a zero-delay beat.
   state.autoScrollArmed=true;
   updateAutoScrollButtons();
-  state.autoScrollArmTimer=setTimeout(()=>{
-    state.autoScrollArmTimer=0;
-    state.autoScrollArmed=false;
-    action();
-  }, delay);
+
+  const armStarted=performance.now();
+  const waitForClockAndBeat=()=>{
+    if(!state.autoScrollArmed) return;
+    const t=getLinkedPlaybackTiming();
+    if(!t || !t.playing){
+      state.autoScrollArmTimer=0;
+      state.autoScrollArmed=false;
+      updateAutoScrollButtons();
+      action();
+      return;
+    }
+    if(t.ready!==true || !Number.isFinite(Number(t.msUntilNextBeat))){
+      // Keep polling while playback is preparing. The timeout is only a safety net;
+      // normal startup should publish the clock within a fraction of a second.
+      if(performance.now()-armStarted>5000){
+        state.autoScrollArmTimer=0;
+        state.autoScrollArmed=false;
+        updateAutoScrollButtons();
+        action();
+        return;
+      }
+      state.autoScrollArmTimer=setTimeout(waitForClockAndBeat,20);
+      return;
+    }
+
+    const beatMs=Math.max(1,Number(t.beatMs)||1000);
+    // Strictly future next beat. Clamp only against bogus values, not to zero.
+    let delay=Number(t.msUntilNextBeat);
+    if(!Number.isFinite(delay) || delay<=0) delay=beatMs;
+    delay=Math.min(beatMs,Math.max(15,delay));
+    state.autoScrollArmTimer=setTimeout(()=>{
+      state.autoScrollArmTimer=0;
+      if(!state.autoScrollArmed) return;
+      state.autoScrollArmed=false;
+      action();
+    },delay);
+  };
+  waitForClockAndBeat();
 }
 
 function updateAutoScrollButtons(){
