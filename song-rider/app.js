@@ -16403,7 +16403,7 @@ KEEP RHYME UI ABOVE KEYBOARD
     const b=document.getElementById('crpSrpLinkBtn');
     const st=document.getElementById('crpSrpLinkStatus');
     if(!payload?.crpProjectId){
-      if(st)st.textContent='Save a CRP project first, then open Song Rider from that project.';
+      if(st)st.textContent='No saved CRP project was handed off. Return to Chord Rider, save it once, then open Song Rider again.';
       if(b){b.disabled=false;b.textContent='Link SRP'}
       return null;
     }
@@ -16412,9 +16412,18 @@ KEEP RHYME UI ABOVE KEYBOARD
     if(b){b.disabled=true;b.textContent='Linking…'}
     const linked=importCrpStructure(payload,forceCreate,rec?.srpProjectId||'');
     if(linked){
-      if(st)st.textContent=`Linked • ${linked.name||payload.name||'Song Rider project'}`;
-      if(b){b.textContent='Linked ✓';b.disabled=true}
-      setTimeout(refreshCrpLinkUi,450);
+      const all=links();
+      const recNow=all[payload.crpProjectId]||{
+        srpProjectId:linked.id,
+        srpName:linked.name||payload.name||'Song Rider project',
+        linkedAt:Date.now()
+      };
+      all[payload.crpProjectId]=recNow;
+      setLinks(all);
+      writeJson(HANDOFF_KEY,{payload,rec:recNow,ts:Date.now()});
+      if(st)st.textContent=`Linked • ${recNow.srpName}`;
+      if(b){b.hidden=false;b.textContent='Linked ✓';b.disabled=true;b.classList.add('is-linked')}
+      setTimeout(refreshCrpLinkUi,900);
     }else{
       if(st)st.textContent='Link failed — tap Link SRP to try again.';
       if(b){b.textContent='Link SRP';b.disabled=false}
@@ -16427,7 +16436,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
   if(integrated){
     window.CRP_SRP_importCrpStructure=importCrpStructure;
-    document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();syncFromHandoff(true);});
+    document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();const b=e.currentTarget;b.disabled=true;b.textContent='Linking…';const st=document.getElementById('crpSrpLinkStatus');if(st)st.textContent='Linking CRP project…';setTimeout(()=>syncFromHandoff(true),0);});
     document.getElementById('crpSrpUnlinkBtn')?.addEventListener('click',()=>{
       const payload=handoff().payload;if(!payload?.crpProjectId)return;
       const all=links();delete all[payload.crpProjectId];setLinks(all);refreshCrpLinkUi();
