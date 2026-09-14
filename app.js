@@ -940,7 +940,7 @@
       ? `“${p.name}” moved to Archive.`
       : `“${p.name}” restored to Projects.`;
   }
-  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;const shared=readSharedSrpMeta(id);if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));localStorage.setItem(SRP_ACTIVE_LINK_KEY,String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
+  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;const shared=readSharedSrpMeta(id);if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
   function renderProjects(){
     const w=$('projectList');
@@ -1258,13 +1258,16 @@
   const SRP_HARD_SYNC_KEY='crp-srp-hard-sync-v1';
   // v2.6.0: project-scoped canonical transport state. This is the ONLY authority for linked BPM/CAPO/STEP.
   const SRP_CANONICAL_PREFIX='crp-srp-canonical-v1:';
+  const SRP_LINK_SESSION_KEY='crp-srp-link-session-v2';
   const IS_PLAYBACK_BRIDGE=new URLSearchParams(location.search).get('playbackBridge')==='1';
   function srpMetaKey(projectId){return SRP_META_PREFIX+String(projectId||'')}
   function unifiedSrpMetaKey(projectId){return SRP_UNIFIED_META_PREFIX+String(projectId||'')}
   function canonicalSrpKey(projectId){return SRP_CANONICAL_PREFIX+String(projectId||'')}
+  function readSrpLinkSession(){try{const x=JSON.parse(localStorage.getItem(SRP_LINK_SESSION_KEY)||'null');return x&&x.linked===true?x:null}catch{return null}}
+  function currentProjectHasSrpLink(){const x=readSrpLinkSession();return !!(x&&state.currentProjectId&&String(x.crpProjectId||'')===String(state.currentProjectId))}
   function readCanonicalSrp(projectId){try{const id=String(projectId||activeSrpLinkId()||'');if(!id)return null;const m=JSON.parse(localStorage.getItem(canonicalSrpKey(id))||'null');return m&&String(m.projectId||'')===id?m:null}catch{return null}}
   function writeCanonicalSrp(projectId,meta,source='crp'){
-    if(IS_PLAYBACK_BRIDGE||!projectId)return null;
+    if(IS_PLAYBACK_BRIDGE||!projectId||!currentProjectHasSrpLink())return null;
     try{
       const id=String(projectId), prev=readCanonicalSrp(id)||{};
       const next={...prev,...meta,projectId:id,source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
@@ -1329,7 +1332,7 @@
     return m==='step'?'step':'capo';
   }
   function publishLiveSrpMeta(source='crp'){
-    if(IS_PLAYBACK_BRIDGE||!state.currentProjectId)return null;
+    if(IS_PLAYBACK_BRIDGE||!state.currentProjectId||!currentProjectHasSrpLink())return null;
     const id=String(state.currentProjectId);
     const bpm=Math.max(40,Math.min(240,Number($('bpmInput')?.value)||92));
     const capo=Math.max(0,Math.min(12,Number(state.capo)||0));
@@ -1347,7 +1350,7 @@
     try{return readCanonicalSrp(activeSrpLinkId())||JSON.parse(localStorage.getItem(SRP_HARD_SYNC_KEY)||'null')}catch{return null}
   }
   function writeHardSync(source='crp',modeOverride){
-    if(IS_PLAYBACK_BRIDGE)return null;
+    if(IS_PLAYBACK_BRIDGE||!currentProjectHasSrpLink())return null;
     try{
       const bpm=Math.max(40,Math.min(240,Number($('bpmInput')?.value)||92));
       const capo=Math.max(0,Math.min(12,Number(state.capo)||0));
@@ -1363,7 +1366,7 @@
   }
   let __hardSyncRev=-1;
   function applyHardSync(){
-    if(IS_PLAYBACK_BRIDGE)return false;
+    if(IS_PLAYBACK_BRIDGE||!currentProjectHasSrpLink())return false;
     try{
       const m=readHardSync();
       if(!m)return false;
@@ -1407,7 +1410,7 @@
       writeHardSync('crp');
       const payload=srpPayload();
       const rec=payload?srpLinks()[payload.crpProjectId]||null:null;
-      if(payload?.crpProjectId){localStorage.setItem('crp-active-project-id',String(payload.crpProjectId));localStorage.setItem(SRP_ACTIVE_LINK_KEY,String(payload.crpProjectId));}
+      if(payload?.crpProjectId){localStorage.setItem('crp-active-project-id',String(payload.crpProjectId));}
       localStorage.setItem(SRP_HANDOFF_KEY,JSON.stringify({payload,rec,ts:Date.now()}));
       localStorage.setItem(WORKSPACE_MODE_KEY,'song-rider');
     }catch(err){console.error('Could not hand CRP project to Song Rider',err)}
@@ -1462,7 +1465,7 @@
   function applyLinkedMetaFromSrpHandoff(){
     try{
       const activeId=String(state.currentProjectId||localStorage.getItem('crp-active-project-id')||'');
-      if(!activeId)return false;
+      if(!activeId||!currentProjectHasSrpLink())return false;
       const shared=readSharedSrpMeta(activeId);
       const h=JSON.parse(localStorage.getItem(SRP_HANDOFF_KEY)||'{}')||{};
       const payload=(shared ? {
@@ -1511,7 +1514,7 @@
   window.addEventListener('storage',e=>{if(e.key===SRP_LIVE_META_KEY||e.key===SRP_HANDOFF_KEY||String(e.key||'').startsWith(SRP_META_PREFIX))applyLinkedMetaFromSrpHandoff();});
   window.addEventListener('pageshow',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
   window.addEventListener('focus',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
-  window.addEventListener('storage',e=>{if(e.key===SRP_HARD_SYNC_KEY||String(e.key||'').startsWith(SRP_CANONICAL_PREFIX))setTimeout(applyHardSync,0);});
+  window.addEventListener('storage',e=>{if(e.key===SRP_HARD_SYNC_KEY||e.key===SRP_LINK_SESSION_KEY||String(e.key||'').startsWith(SRP_CANONICAL_PREFIX))setTimeout(applyHardSync,0);});
   window.addEventListener('pageshow',()=>setTimeout(applyHardSync,0));
   window.addEventListener('focus',()=>setTimeout(applyHardSync,0));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSync,0);});
