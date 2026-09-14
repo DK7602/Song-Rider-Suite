@@ -7002,9 +7002,27 @@ function updateRecordingPlayButtons(){
   }catch{}
 }
 
+function setIntegratedBrandRiding(on){
+  if(!document.documentElement.classList.contains("crp-integrated")) return;
+  ["srpBrandLeft","srpBrandRight"].forEach(id => {
+    const img = document.getElementById(id);
+    if(!img) return;
+    const next = on ? img.dataset.animated : img.dataset.still;
+    if(next && img.getAttribute("src") !== next) img.setAttribute("src", next);
+  });
+}
+
+function refreshIntegratedBrandRiding(){
+  const autoRunning = !!state.autoScrollOn && !state.autoScrollPaused;
+  const audio = state.audioSyncAudio;
+  const audioRunning = !!(state.audioSyncOn && audio && !audio.paused && !audio.ended);
+  setIntegratedBrandRiding(autoRunning || audioRunning);
+}
+
 function refreshAudioPlaybackUI(){
   updateAudioProgressUI();
   updateRecordingPlayButtons();
+  refreshIntegratedBrandRiding();
 }
 
 async function toggleAudioSyncFromRec(rec){
@@ -7819,6 +7837,7 @@ function updateAutoScrollButtons(){
 
   updateAudioButtonsUI();
   setRecordUI();
+  refreshIntegratedBrandRiding();
 }
 
 function pauseAutoScroll(){
