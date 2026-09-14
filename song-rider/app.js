@@ -7810,7 +7810,7 @@ function ensureCapoStepToggle(){
       refreshDisplayedNoteCells();
       updateKeyFromAllNotes();
       updateFullIfVisible?.();
-      if(state.project){ upsertProject(state.project); window.CRP_SRP_syncMetaToCrp?.(); }
+      if(state.project){ upsertProject(state.project); window.CRP_SRP_syncMetaToCrp?.(); writeHardSyncFromSrp(); }
     });
   }
 
@@ -16495,6 +16495,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   // single global live-meta record.
   const ACTIVE_LINK_KEY='crp-srp-active-link-id-v1';
   const UNIFIED_META_PREFIX='crp-srp-unified-meta-v1:';
+  const HARD_SYNC_KEY='crp-srp-hard-sync-v1';
   function sharedMetaKey(id){return SHARED_META_PREFIX+String(id||'')}
   function unifiedMetaKey(id){return UNIFIED_META_PREFIX+String(id||'')}
   function activeUnifiedCrpId(){
@@ -16517,6 +16518,40 @@ KEEP RHYME UI ABOVE KEYBOARD
     writeJson(LIVE_META_KEY,next);
     try{window.__CRP_SRP_META_CHANNEL?.postMessage(next)}catch{}
     return next;
+  }
+  function readHardSync(){return readJson(HARD_SYNC_KEY,null)}
+  function writeHardSyncFromSrp(){
+    try{
+      const prev=readHardSync()||{};
+      const mode=state.transposeMode==='step'?'step':'capo';
+      const raw=Number(el?.capoInput?.value);
+      const bpm=Math.max(40,Math.min(240,Number(el?.bpmInput?.value)||Number(state.bpm)||95));
+      let capo=Math.max(0,Math.min(12,Number(state.capo)||0));
+      let octave=Math.max(-2,Math.min(3,Number(state.steps)||0));
+      if(Number.isFinite(raw)){
+        if(mode==='capo')capo=Math.max(0,Math.min(12,Math.round(raw)));
+        else octave=Math.max(-2,Math.min(3,raw));
+      }
+      const next={bpm,capo,octave,pitchMode:mode,projectId:activeUnifiedCrpId(),source:'srp',rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
+      writeJson(HARD_SYNC_KEY,next);
+      return next;
+    }catch{return null}
+  }
+  let __hardSyncRev=-1;
+  function applyHardSyncToSrp(){
+    try{
+      const m=readHardSync();if(!m)return false;
+      const rev=Number(m.rev)||0;if(rev===__hardSyncRev)return false;__hardSyncRev=rev;
+      state.bpm=Math.max(40,Math.min(240,Number(m.bpm)||state.bpm||95));
+      state.capo=Math.max(0,Math.min(12,Number(m.capo)||0));
+      state.steps=Math.max(-2,Math.min(3,Number(m.octave)||0));
+      state.transposeMode=m.pitchMode==='step'?'step':'capo';
+      if(state.project){state.project.bpm=state.bpm;state.project.capo=state.capo;state.project.steps=state.steps;state.project.transposeMode=state.transposeMode;upsertProject(state.project);}
+      if(el?.bpmInput)el.bpmInput.value=String(state.bpm);
+      if(el?.capoInput)el.capoInput.value=String(state.transposeMode==='step'?state.steps:state.capo);
+      applyProjectSettingsToUI();renderAll();
+      return true;
+    }catch{return false}
   }
   function readSharedMeta(id){
     if(!id)return null;
@@ -16739,6 +16774,7 @@ KEEP RHYME UI ABOVE KEYBOARD
       // WRITE FIRST. This is the key v2.5.0 change: SRP no longer needs to find a local CRP
       // project record before BPM/capo/STEP can reach CRP/BD.
       const meta={bpm,capo,octave,transpose,key,pitchMode:mode,source:'srp'};
+      writeHardSyncFromSrp();
       writeLiveMeta(crpId,meta);
       writeSharedMeta(crpId,meta);
 
@@ -16764,6 +16800,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   [el?.bpmInput,el?.capoInput].filter(Boolean).forEach(node=>{
     ['input','change','blur'].forEach(type=>node.addEventListener(type,()=>{
       syncMetaToCrp();
+      writeHardSyncFromSrp();
     },true));
   });
 
@@ -16866,6 +16903,11 @@ KEEP RHYME UI ABOVE KEYBOARD
       const all=links();delete all[payload.crpProjectId];setLinks(all);refreshCrpLinkUi();
     });
     try{window.__CRP_SRP_META_CHANNEL=new BroadcastChannel('crp-srp-live-meta-v3');window.__CRP_SRP_META_CHANNEL.onmessage=()=>setTimeout(applyLiveMetaToSrp,0);}catch{}
+    window.addEventListener('storage',e=>{if(e.key===HARD_SYNC_KEY)setTimeout(applyHardSyncToSrp,0);});
+    window.addEventListener('pageshow',()=>setTimeout(applyHardSyncToSrp,0));
+    window.addEventListener('focus',()=>setTimeout(applyHardSyncToSrp,0));
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSyncToSrp,0);});
+    setInterval(applyHardSyncToSrp,250);
     window.addEventListener('storage',e=>{if(e.key===LIVE_META_KEY||String(e.key||'').startsWith(UNIFIED_META_PREFIX)){applyLiveMetaToSrp();return;}if(e.key===HANDOFF_KEY||e.key===LINKS_KEY||String(e.key||'').startsWith(SHARED_META_PREFIX)){refreshCrpLinkUi();syncFromHandoff(false);applyLiveMetaToSrp();}});
     const reconcileLinkedWorkspace=()=>{try{refreshCrpLinkUi();syncFromHandoff(false);applyLiveMetaToSrp();if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}}catch{}};
     // init() is async and used to overwrite the linked project after the early 80ms import.
