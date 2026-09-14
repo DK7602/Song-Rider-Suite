@@ -3824,9 +3824,12 @@ function findFirstVisibleFullPerfLineIndex(){
 
   // We want the line that is actually at the TOP of what the user can read.
   // If the very top row is partially clipped, start on the NEXT row (BSP feel).
-  const hostRect = host.getBoundingClientRect();
-  const viewTopScroll = host.scrollTop;
-  const viewBottomScroll = viewTopScroll + (host.clientHeight || (hostRect.bottom - hostRect.top) || 0);
+  const integrated = document.documentElement.classList.contains('crp-integrated');
+  const hostRect = integrated
+    ? {top:0,bottom:window.innerHeight,left:0,right:window.innerWidth,height:window.innerHeight,width:window.innerWidth}
+    : host.getBoundingClientRect();
+  const viewTopScroll = integrated ? (window.scrollY || document.documentElement.scrollTop || 0) : host.scrollTop;
+  const viewBottomScroll = viewTopScroll + (integrated ? window.innerHeight : (host.clientHeight || (hostRect.bottom - hostRect.top) || 0));
 
   const pad = 6; // small tolerance so we don't pick a barely-visible previous line
 
@@ -3903,12 +3906,15 @@ function scrollFullPerfRowIntoView(rowEl){
   if(!host || !rowEl) return;
 
   try{
-    const hr = host.getBoundingClientRect();
+    const integrated = document.documentElement.classList.contains("crp-integrated");
+    const hr = integrated
+      ? {top:0,bottom:window.innerHeight,left:0,right:window.innerWidth,height:window.innerHeight,width:window.innerWidth}
+      : host.getBoundingClientRect();
     const r  = rowEl.getBoundingClientRect();
 
     // Keep a safe margin so the highlighted text is never clipped
     // (especially in landscape).
-    const marginTop = 80;
+    const marginTop = integrated ? Math.max(72, getHeaderBottomY()+12) : 80;
     const marginBot = 120;
 
     let delta = 0;
@@ -3919,8 +3925,13 @@ function scrollFullPerfRowIntoView(rowEl){
     }
 
     if(Math.abs(delta) > 2){
-      state.fullPerfProgramScrollUntil = Date.now() + 650;
-      host.scrollTo({ top: Math.max(0, host.scrollTop + delta), behavior: "smooth" });
+      state.fullPerfProgramScrollUntil = Date.now() + 700;
+      if(integrated){
+        const top=Math.max(0,(window.scrollY||document.documentElement.scrollTop||0)+delta);
+        window.scrollTo({top,behavior:"smooth"});
+      }else{
+        host.scrollTo({ top: Math.max(0, host.scrollTop + delta), behavior: "smooth" });
+      }
     }
   }catch{
     try{ rowEl.scrollIntoView({ block:"center", behavior:"smooth" }); }catch{}
@@ -6438,7 +6449,19 @@ function getCardAtPlayLine(){
 function scrollCardIntoView(card){
   if(!card) return;
 
+  const integrated = document.documentElement.classList.contains("crp-integrated");
   const sb = el.sheetBody;
+
+  // In CRP integrated mode #sheetBody intentionally has overflow:visible, so it
+  // cannot consume scrollTop changes. Follow playback on the actual page scroller.
+  if(integrated){
+    const yLine = getHeaderBottomY();
+    const r = card.getBoundingClientRect();
+    const targetY = Math.max(0, Math.round(r.top + window.scrollY - yLine - 12));
+    try{ window.scrollTo({ top: targetY, behavior:"smooth" }); }
+    catch{ window.scrollTo(0, targetY); }
+    return;
+  }
 
   // If sheetBody is the scroller, scroll inside it (NOT window)
   if(sb){
@@ -7904,7 +7927,9 @@ function setAutoScroll(on){
       // ✅ Preserve current scroll position so enabling AutoScroll doesn't jump to the top
       const prevScrollHost =
         getFullPerfScrollHost();
-      const prevScrollTop = Number(prevScrollHost?.scrollTop) || 0;
+      const prevScrollTop = document.documentElement.classList.contains('crp-integrated')
+        ? (window.scrollY || document.documentElement.scrollTop || 0)
+        : (Number(prevScrollHost?.scrollTop) || 0);
 
       state.fullPerfMode = true;
       state.fullPerfInitPending = true;
@@ -7922,7 +7947,9 @@ function setAutoScroll(on){
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           const host = getFullPerfScrollHost();
-          if(host){
+          if(document.documentElement.classList.contains('crp-integrated')){
+            window.scrollTo(0, prevScrollTop);
+          }else if(host){
             host.scrollTop = prevScrollTop;
           }
           // Lock the start line strictly to what is visible at the top of the host right now.
