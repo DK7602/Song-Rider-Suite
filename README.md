@@ -83,3 +83,10 @@ Instrument playback uses the `soundfont-player` browser library and MusyngKite s
 - Undo/redo moved to the right side of the archive/action row.
 - Mobile top-control layout reserves space for the key window.
 - Section headers use the CRP/rhyme-button gold with bold black text.
+
+
+## v2.2.6 SRP fixes
+- Rebuilt Full Song View section title as a true CRP gold button.
+- Song Rider header now uses the exact CRP title/tagline treatment.
+- Repaired Link SRP with active-project recovery and visible link status.
+- Removed obsolete update/install text files from this package.
