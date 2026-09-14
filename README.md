@@ -63,3 +63,8 @@ Instrument playback uses the `soundfont-player` browser library and MusyngKite s
 - Cloud sync instead of device-only localStorage
 - User-selectable chord duration per card
 - Export progression as MIDI or audio
+
+
+## v2.1.1
+- Mobile Full Song typing now follows the caret above the soft keyboard in integrated SRP mode.
+- Keeps native single-page scrolling; no nested scroll containers reintroduced.
