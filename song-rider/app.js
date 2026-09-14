@@ -9247,6 +9247,13 @@ function renderSheetTitleBar(){
     titleInput.type = "text";
     titleInput.placeholder = "Title (optional)…";
     titleInput.className = "songPartPill headingPill";
+    titleInput.style.setProperty("background", "#efc85d", "important");
+    titleInput.style.setProperty("background-image", "linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)", "important");
+    titleInput.style.setProperty("color", "#111", "important");
+    titleInput.style.setProperty("-webkit-text-fill-color", "#111", "important");
+    titleInput.style.setProperty("border", "1px solid #d6aa3f", "important");
+    titleInput.style.setProperty("font-weight", "1000", "important");
+    titleInput.style.setProperty("text-shadow", "none", "important");
     titleInput.value = (state.project.sectionTitles && state.project.sectionTitles[state.currentSection]) ? String(state.project.sectionTitles[state.currentSection] || "") : "";
     titleInput.style.flex = "1 1 0";
     titleInput.style.minWidth = "90px";
@@ -10073,6 +10080,18 @@ ta.value = state.project.fullText || "";
       inp.type = "text";
       inp.className = "songPartPill";
       inp.placeholder = "Song Part";
+
+      // CRP: force the Full Song section title itself to the gold control style.
+      // Use inline !important so mobile Chromium/theme rules cannot turn it dark.
+      inp.style.setProperty("background", "#efc85d", "important");
+      inp.style.setProperty("background-image", "linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)", "important");
+      inp.style.setProperty("color", "#111", "important");
+      inp.style.setProperty("-webkit-text-fill-color", "#111", "important");
+      inp.style.setProperty("border", "1px solid #d6aa3f", "important");
+      inp.style.setProperty("font-weight", "1000", "important");
+      inp.style.setProperty("text-shadow", "none", "important");
+      inp.style.setProperty("caret-color", "#111", "important");
+      row.style.setProperty("background", "transparent", "important");
 
       // Two-way: prefer explicit project title, else derive from Full break line
       const stored = (state.project.sectionTitles && state.project.sectionTitles[sec])
