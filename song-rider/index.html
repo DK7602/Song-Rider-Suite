@@ -2007,7 +2007,7 @@
     }
 
 
-/* v2.8.6 — preserve approved SRP tri-color metallic wordmark */
+/* v2.8.7 — preserve approved SRP tri-color metallic wordmark */
 html.crp-integrated .panelTop .left .srp-pink{
  background:linear-gradient(180deg,#fff 0%,#ffd9ef 12%,#ff4fa7 28%,#ff9fd0 43%,#fff 51%,#d71d79 62%,#ff70b7 80%,#7a1748 100%)!important;
  -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;
@@ -2724,6 +2724,92 @@ html.crp-integrated .panelTop .left .srp-exact-wordmark{
 }
 </style>
 
+
+<style id="headerBabyFixV287">
+html.crp-integrated .crp-srp-app-header{
+  position:relative!important;
+  display:block!important;
+  min-height:92px!important;
+  padding:7px 0 8px!important;
+  overflow:hidden!important;
+}
+html.crp-integrated .crp-srp-brand-mark{
+  position:absolute!important;
+  top:9px!important;
+  width:82px!important;
+  height:72px!important;
+  object-fit:contain!important;
+  z-index:2!important;
+}
+html.crp-integrated #srpBrandLeft{left:7px!important;}
+html.crp-integrated #srpBrandRight{right:7px!important;}
+html.crp-integrated .crp-srp-brand-copy{
+  position:relative!important;
+  left:auto!important;
+  transform:none!important;
+  width:calc(100% - 168px)!important;
+  margin:0 auto!important;
+  min-width:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  z-index:1!important;
+}
+html.crp-integrated .crp-srp-brand-copy h1{
+  display:block!important;
+  margin:5px 0 0!important;
+  width:100%!important;
+  white-space:nowrap!important;
+  text-align:center!important;
+  font-family:Impact,Haettenschweiler,"Arial Black",sans-serif!important;
+  font-size:clamp(1.35rem,6.9vw,2.05rem)!important;
+  line-height:.96!important;
+  letter-spacing:.008em!important;
+  transform:scaleX(.88)!important;
+  transform-origin:center!important;
+  color:transparent!important;
+  background:linear-gradient(180deg,#fffbd2 0%,#ffe17a 9%,#ffbe20 25%,#fff0a3 39%,#d88a00 53%,#ffcf3d 66%,#9a5300 83%,#f0ae17 100%)!important;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  -webkit-text-stroke:1px #5d3100!important;
+  text-shadow:0 1px 0 #fff6c7,0 2px 0 #c47a05,0 4px 0 #663600,0 6px 10px rgba(0,0,0,.78),0 0 14px rgba(255,188,29,.52)!important;
+}
+html.crp-integrated .crp-srp-tagline{
+  display:block!important;
+  width:100%!important;
+  margin:7px 0 0!important;
+  text-align:center!important;
+  color:#f2f2f0!important;
+  font-family:"Brush Script MT","Segoe Script",cursive!important;
+  font-size:clamp(.61rem,2.72vw,.80rem)!important;
+  line-height:1!important;
+  letter-spacing:0!important;
+  white-space:nowrap!important;
+  text-shadow:0 2px 3px #000!important;
+}
+html.crp-integrated .crp-srp-mode:nth-child(2) img{
+  width:66px!important;
+  height:66px!important;
+  object-fit:contain!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  filter:drop-shadow(0 4px 5px rgba(0,0,0,.72))!important;
+}
+@media(max-width:520px){
+ html.crp-integrated .crp-srp-app-header{min-height:86px!important;}
+ html.crp-integrated .crp-srp-brand-mark{width:72px!important;height:66px!important;top:8px!important;}
+ html.crp-integrated .crp-srp-brand-copy{width:calc(100% - 150px)!important;}
+ html.crp-integrated .crp-srp-brand-copy h1{font-size:clamp(1.22rem,6.65vw,1.82rem)!important;transform:scaleX(.87)!important;}
+ html.crp-integrated .crp-srp-tagline{font-size:clamp(.58rem,2.62vw,.74rem)!important;margin-top:6px!important;}
+ html.crp-integrated .crp-srp-mode{min-height:91px!important;}
+ html.crp-integrated .crp-srp-mode:nth-child(2) img{width:62px!important;height:62px!important;}
+}
+</style>
+
 </head>
 
 <body>
@@ -2732,7 +2818,7 @@ html.crp-integrated .panelTop .left .srp-exact-wordmark{
     <div class="crp-srp-app-header" aria-label="Chord Rider Pro">
       <img id="srpBrandLeft" src="../assets/rider-and-bones-right-still.png" class="crp-srp-brand-mark" alt="Rider and Bones" data-still="../assets/rider-and-bones-right-still.png" data-animated="../assets/rider-and-bones-right.gif" />
       <div class="crp-srp-brand-copy brand-copy">
-        <img class="suite-wordmark" src="./assets/song-rider-suite-wordmark.png?v=2.8.6" alt="Song Rider Suite">
+        <h1>SONG RIDER SUITE</h1>
         <p class="crp-srp-tagline tagline">Ride the progression. See it. Hear it. Build it.</p>
       </div>
       <img id="srpBrandRight" src="../assets/rider-and-bones-left-still.png" class="crp-srp-brand-mark" alt="Rider and Bones" data-still="../assets/rider-and-bones-left-still.png" data-animated="../assets/rider-and-bones-left.gif" />
@@ -2743,7 +2829,7 @@ html.crp-integrated .panelTop .left .srp-exact-wordmark{
         <span class="copy"><strong>Chord Rider</strong><small>Chords + Beat</small></span>
       </a>
       <a class="crp-srp-mode" href="../index.html?workspace=baby-daw">
-        <img src="./assets/baby-daw-sticker.png?v=2.8.6" alt="" />
+        <img src="./baby-daw-sticker.png?v=2.8.7" alt="" />
         <span class="copy"><strong>Baby DAW</strong><small>Parts + Production</small></span>
       </a>
       <a class="crp-srp-mode active" href="./index.html?crpMode=1" aria-current="page">
@@ -2767,7 +2853,7 @@ html.crp-integrated .panelTop .left .srp-exact-wordmark{
       <div class="panelTop">
         <div style="display:flex; align-items:center; gap:10px;">
           <div class="left" aria-label="Song Rider Pro">
-            <img class="srp-exact-wordmark" src="./assets/song-rider-pro-wordmark.png?v=2.8.6" alt="Song Rider Pro">
+            <img class="srp-exact-wordmark" src="./song-rider-pro-wordmark.png?v=2.8.7" alt="Song Rider Pro">
           </div>
 
           <!-- ✅ Parked horse (size controlled by #horseParked CSS) -->
@@ -3201,7 +3287,7 @@ html.srp-lyrics-overlay-mode .sheetHeader{position:sticky!important;top:0!import
 
 
 <style id="srp282CardPageTransport">
-/* v2.8.6 — keep SRP card-page title + AutoScroll + Play/Pause + Stop on one mobile row. */
+/* v2.8.7 — keep SRP card-page title + AutoScroll + Play/Pause + Stop on one mobile row. */
 html.crp-integrated .sheetHeader > div:first-child{
   min-width:0!important;
   flex:1 1 auto!important;
