@@ -1,0 +1,7 @@
+Chord Rider Pro v2.2.4 — SRP section title fix
+
+- Rebuilt the Full Song View section-title styling at element creation time.
+- Gold/yellow gradient and bold black title text are now applied directly with inline !important rules.
+- Removed the overlay row background that could visually cover/conflict with the gold pill on mobile Chromium.
+- Applied the same hard styling to individual page heading title inputs.
+- Service-worker cache bumped to v2.2.4.
