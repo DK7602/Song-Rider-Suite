@@ -90,3 +90,8 @@ Instrument playback uses the `soundfont-player` browser library and MusyngKite s
 - Song Rider header now uses the exact CRP title/tagline treatment.
 - Repaired Link SRP with active-project recovery and visible link status.
 - Removed obsolete update/install text files from this package.
+
+
+## v2.2.7 SRP header/pill polish
+- Section title pill reduced slightly for better balance.
+- Song Rider top CHORD RIDER PRO wordmark now uses the same mobile title sizing/letter spacing as the CRP/Baby DAW header.
