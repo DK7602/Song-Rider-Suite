@@ -1,0 +1,8 @@
+Chord Rider Pro v2.2.3
+
+- Song Rider header now uses the exact CRP/Baby DAW gold title + script tagline treatment.
+- BPM, Capo/Step and Key are compactly grouped beside Save/Cloud.
+- Link SRP moved into that same utility row.
+- Capo/Step no longer overlaps the Key field.
+- Full Song View section title pills are hard-forced to CRP gold with bold black text, including focus/edit state.
+- Existing native scroll and typing-autoscroll behavior preserved.
