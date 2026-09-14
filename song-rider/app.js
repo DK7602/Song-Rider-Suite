@@ -16906,23 +16906,46 @@ KEEP RHYME UI ABOVE KEYBOARD
     }catch(err){console.warn('Could not apply live CRP/SRP metadata',err);return false;}
   }
 
+  function isCurrentCrpSrpLinked(){
+    const payload=recoverCrpPayload();
+    const x=readLinkSession();
+    return !!(payload?.crpProjectId&&x&&state.project&&String(x.crpProjectId||'')===String(payload.crpProjectId)&&String(x.srpProjectId||'')===String(state.project.id||'')&&String(state.project.linkedCrpProjectId||'')===String(payload.crpProjectId));
+  }
+
+  function unlinkCurrentCrpSrp(){
+    const x=readLinkSession();
+    const crpId=String(x?.crpProjectId||state.project?.linkedCrpProjectId||'');
+    if(crpId){const all=links();delete all[crpId];setLinks(all);}
+    if(state.project){
+      state.project.linkedCrpProjectId='';
+      state.project.linkedOctave=0;
+      state.project.linkedTranspose=false;
+      upsertProject(state.project);
+    }
+    clearLinkSession();
+    try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}
+    refreshCrpLinkUi();
+  }
+
   function refreshCrpLinkUi(){
     if(!integrated)return;
     const payload=recoverCrpPayload();
     const st=document.getElementById('crpSrpLinkStatus');
     const b=document.getElementById('crpSrpLinkBtn');
-    const u=document.getElementById('crpSrpUnlinkBtn');
     if(!payload?.crpProjectId){
       if(st)st.textContent='Save this CRP project first';
-      if(b){b.hidden=false;b.disabled=false;b.textContent='Link SRP';b.classList.remove('is-linked')}
-      if(u)u.hidden=true;
+      if(b){b.hidden=false;b.disabled=false;b.textContent='Link SRP';b.classList.remove('is-linked');b.title='Link this project to Song Rider Pro'}
       return;
     }
-    const x=readLinkSession();
-    const linked=!!(x&&state.project&&String(x.crpProjectId||'')===String(payload.crpProjectId)&&String(x.srpProjectId||'')===String(state.project.id||'')&&String(state.project.linkedCrpProjectId||'')===String(payload.crpProjectId));
+    const linked=isCurrentCrpSrpLinked();
     if(st)st.textContent=linked?`Linked • ${state.project.name||'Song Rider project'}`:'Not linked';
-    if(b){b.hidden=false;b.disabled=linked;b.textContent=linked?'Linked ✓':'Link SRP';b.classList.toggle('is-linked',linked)}
-    if(u){u.hidden=!linked;u.textContent='Unlink';}
+    if(b){
+      b.hidden=false;
+      b.disabled=false;
+      b.textContent=linked?'Unlink SRP':'Link SRP';
+      b.title=linked?'Unlink this Song Rider Pro project from Chord Rider Pro':'Link this project to Song Rider Pro';
+      b.classList.toggle('is-linked',linked);
+    }
   }
 
   function syncFromHandoff(forceCreate=false){
@@ -16956,7 +16979,7 @@ KEEP RHYME UI ABOVE KEYBOARD
       syncMetaToCrp();
       writeHardSyncFromSrp();
       if(st)st.textContent=`Linked • ${recNow.srpName}`;
-      if(b){b.hidden=false;b.textContent='Linked ✓';b.disabled=true;b.classList.add('is-linked')}
+      if(b){b.hidden=false;b.textContent='Unlink SRP';b.disabled=false;b.classList.add('is-linked');b.title='Unlink this Song Rider Pro project from Chord Rider Pro'}
       setTimeout(refreshCrpLinkUi,900);
     }else{
       if(st)st.textContent='Link failed — tap Link SRP to try again.';
@@ -16972,15 +16995,21 @@ KEEP RHYME UI ABOVE KEYBOARD
     if(!readLinkSession()){try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}}
     window.CRP_SRP_importCrpStructure=importCrpStructure;
     if(!lyricsOverlay && !(window.parent&&window.parent!==window)) setTimeout(ensureLinkedPlaybackBridge,0);
-    document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();const b=e.currentTarget;b.disabled=true;b.textContent='Linking…';const st=document.getElementById('crpSrpLinkStatus');if(st)st.textContent='Linking CRP project…';setTimeout(()=>syncFromHandoff(true),0);});
-    document.getElementById('crpSrpUnlinkBtn')?.addEventListener('click',()=>{
-      const x=readLinkSession();
-      const crpId=String(x?.crpProjectId||state.project?.linkedCrpProjectId||'');
-      if(crpId){const all=links();delete all[crpId];setLinks(all);}
-      if(state.project){state.project.linkedCrpProjectId='';state.project.linkedOctave=0;state.project.linkedTranspose=false;upsertProject(state.project);}
-      clearLinkSession();
-      try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}
-      refreshCrpLinkUi();
+    document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const b=e.currentTarget;
+      if(isCurrentCrpSrpLinked()){
+        b.disabled=true;
+        b.textContent='Unlinking…';
+        unlinkCurrentCrpSrp();
+        return;
+      }
+      b.disabled=true;
+      b.textContent='Linking…';
+      const st=document.getElementById('crpSrpLinkStatus');
+      if(st)st.textContent='Linking CRP project…';
+      setTimeout(()=>syncFromHandoff(true),0);
     });
     try{window.__CRP_SRP_META_CHANNEL=new BroadcastChannel('crp-srp-live-meta-v3');window.__CRP_SRP_META_CHANNEL.onmessage=()=>setTimeout(applyLiveMetaToSrp,0);}catch{}
     try{window.__CRP_SRP_CANONICAL_CHANNEL=new BroadcastChannel('crp-srp-canonical-v1');window.__CRP_SRP_CANONICAL_CHANNEL.onmessage=()=>setTimeout(applyHardSyncToSrp,0);}catch{}
@@ -17010,5 +17039,5 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
 })();
 
-// v2.8.0: close the main SRP application IIFE after the nested CRP/SRP bridge.
+// v2.8.1: single-button SRP link/unlink toggle; close the main SRP application IIFE after the nested CRP/SRP bridge.
 })();
