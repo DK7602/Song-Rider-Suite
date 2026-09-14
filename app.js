@@ -940,7 +940,7 @@
       ? `“${p.name}” moved to Archive.`
       : `“${p.name}” restored to Projects.`;
   }
-  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();const p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
+  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;const shared=readSharedSrpMeta(id);if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
   function renderProjects(){
     const w=$('projectList');
@@ -1172,10 +1172,10 @@
     $('keyInput').onkeydown=e=>{if(e.key==='Enter'){$('buildBtn').click();}};
     document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.onclick=()=>{state.instrument=b.dataset.instrument;localStorage.setItem('crp-last-instrument',state.instrument);state.sound=SOUNDS[state.instrument][0][0];state.player=null;renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();});
     document.querySelectorAll('#modeTabs .seg').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;localStorage.setItem('crp-last-mode',state.mode);renderAll();syncBuildInput();scheduleAutoSave();});
-    $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;window.CRPParts?.syncCoreLive?.();scheduleAutoSave();};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);renderAll();scheduleAutoSave();publishSrpHandoff();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);renderAll();scheduleAutoSave();publishSrpHandoff();};
+    $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;window.CRPParts?.syncCoreLive?.();scheduleAutoSave();};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:'step'});renderAll();scheduleAutoSave();publishSrpHandoff();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:'step'});renderAll();scheduleAutoSave();publishSrpHandoff();};
     $('sustainBtn').onclick=()=>{state.sustain=!state.sustain;localStorage.setItem('crp-sustain',state.sustain?'1':'0');updateSustainButton();};
     updateSustainButton();
-    $('capoSelect').onchange=e=>{state.capo=+e.target.value;renderAll();scheduleAutoSave();publishSrpHandoff();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();scheduleAutoSave();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;renderAll();scheduleAutoSave();publishSrpHandoff();};
+    $('capoSelect').onchange=e=>{state.capo=+e.target.value;if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:'capo'});renderAll();scheduleAutoSave();publishSrpHandoff();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();scheduleAutoSave();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;renderAll();scheduleAutoSave();publishSrpHandoff();};
     $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();scheduleAutoSave();};
     $('autoScrollBtn').onclick=()=>{state.autoScroll=!state.autoScroll;localStorage.setItem('crp-auto-scroll',state.autoScroll?'1':'0');updateAutoScrollButton();};
     updateAutoScrollButton();
@@ -1234,7 +1234,14 @@
   }
   function writeSharedSrpMeta(projectId,meta){
     if(!projectId)return;
-    try{localStorage.setItem(srpMetaKey(projectId),JSON.stringify({...meta,projectId:String(projectId),updatedAt:Date.now()}))}catch{}
+    try{
+      const prev=readSharedSrpMeta(projectId)||{};
+      localStorage.setItem(srpMetaKey(projectId),JSON.stringify({...prev,...meta,projectId:String(projectId),updatedAt:Date.now()}));
+    }catch{}
+  }
+  function linkedPitchMode(projectId){
+    const m=readSharedSrpMeta(projectId)?.pitchMode;
+    return m==='step'?'step':'capo';
   }
   function openSongRiderWorkspace(){
     try{
@@ -1288,7 +1295,7 @@
   function srpPayload(){
     const p=currentCrpProject(); if(!p)return null;
     const live=capture(p.id,p.name||$('projectName').value.trim()||'Untitled');
-    return {crpProjectId:p.id,name:live.name||p.name||'Untitled',bpm:+live.bpm||92,beats:+live.beats||4,key:live.key||'',capo:Number(live.capo)||0,octave:Number(live.octave)||0,transpose:!!live.transpose,rows:(live.rows||[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(row||[]).map(c=>({type:c.type||'chord',value:c.value||''}))}))};
+    return {crpProjectId:p.id,name:live.name||p.name||'Untitled',bpm:+live.bpm||92,beats:+live.beats||4,key:live.key||'',capo:Number(live.capo)||0,octave:Number(live.octave)||0,transpose:!!live.transpose,pitchMode:linkedPitchMode(p.id),rows:(live.rows||[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(row||[]).map(c=>({type:c.type||'chord',value:c.value||''}))}))};
   }
   function publishSrpHandoff(){
     try{
@@ -1296,34 +1303,56 @@
       if(!payload?.crpProjectId)return;
       const rec=srpLinks()[payload.crpProjectId]||null;
       localStorage.setItem(SRP_HANDOFF_KEY,JSON.stringify({payload,rec,ts:Date.now()}));
-      writeSharedSrpMeta(payload.crpProjectId,{bpm:payload.bpm,capo:payload.capo,octave:payload.octave,transpose:payload.transpose,key:payload.key,source:'crp'});
+      writeSharedSrpMeta(payload.crpProjectId,{bpm:payload.bpm,capo:payload.capo,octave:payload.octave,transpose:payload.transpose,key:payload.key,pitchMode:payload.pitchMode||linkedPitchMode(payload.crpProjectId),source:'crp'});
     }catch(err){console.warn('Could not publish linked SRP state',err)}
   }
 
   function applyLinkedMetaFromSrpHandoff(){
     try{
-      const h=JSON.parse(localStorage.getItem(SRP_HANDOFF_KEY)||'{}')||{};let payload=h.payload;
-      const activeId=String(state.currentProjectId||'');
-      if(!activeId)return;
+      const activeId=String(state.currentProjectId||localStorage.getItem('crp-active-project-id')||'');
+      if(!activeId)return false;
       const shared=readSharedSrpMeta(activeId);
-      // v2.4.8: this record is the canonical live metadata for the linked project.
-      // Do NOT let a newer handoff timestamp win if that handoff merely re-saved stale CRP values.
-      // Both CRP/BD and SRP publish here on every edit, so when it exists it always wins.
-      if(shared){
-        payload={...(payload||{}),crpProjectId:activeId,bpm:shared.bpm,capo:shared.capo,octave:shared.octave,transpose:shared.transpose,key:shared.key};
-      }
-      if(!payload?.crpProjectId||String(payload.crpProjectId)!==activeId)return;
+      const h=JSON.parse(localStorage.getItem(SRP_HANDOFF_KEY)||'{}')||{};
+      const payload=(shared ? {
+        ...(h.payload||{}),crpProjectId:activeId,
+        bpm:shared.bpm,capo:shared.capo,octave:shared.octave,transpose:shared.transpose,key:shared.key,
+        pitchMode:shared.pitchMode
+      } : h.payload);
+      if(!payload?.crpProjectId||String(payload.crpProjectId)!==activeId)return false;
+
       const bpm=Math.max(40,Math.min(240,Number(payload.bpm)||92));
+      const capo=Math.max(0,Math.min(12,Number(payload.capo)||0));
+      const octave=Math.max(-2,Math.min(3,Number(payload.octave)||0));
+      const transpose=!!payload.transpose;
+      const key=String(payload.key||'');
+
+      const before={bpm:+$('bpmInput')?.value||92,capo:state.capo,octave:state.octave,transpose:state.transpose,key:$('keyInput')?.value||''};
       if($('bpmInput'))$('bpmInput').value=String(bpm);
-      state.capo=Math.max(0,Math.min(12,Number(payload.capo)||0));if($('capoSelect'))$('capoSelect').value=String(state.capo);
-      state.octave=Math.max(-2,Math.min(3,Number(payload.octave)||0));
-      state.transpose=!!payload.transpose;
-      if($('keyInput')){$('keyInput').value=String(payload.key||'');$('keyInput').dataset.autoKey=payload.key?'0':'1';}
-      // Persist the linked SRP edits back into the CRP/BD project immediately so all three views reopen identically.
-      const projects=localProjects();const i=projects.findIndex(x=>String(x?.id||'')===String(state.currentProjectId||''));
-      if(i>=0){projects[i]={...projects[i],bpm,capo:state.capo,octave:state.octave,transpose:state.transpose,key:String(payload.key||projects[i].key||''),updatedAt:Date.now()};localStorage.setItem('crp-projects',JSON.stringify(projects));}
+      state.capo=capo;if($('capoSelect'))$('capoSelect').value=String(capo);
+      state.octave=octave;
+      state.transpose=transpose;
+      if($('keyInput')){$('keyInput').value=key;$('keyInput').dataset.autoKey=key?'0':'1';}
+
+      // Update every CRP representation, not only localStorage. This is essential when signed in,
+      // because projectSource() may be the in-memory cloudProjects array.
+      const projects=localProjects();
+      const i=projects.findIndex(x=>String(x?.id||'')===activeId);
+      let merged=null;
+      if(i>=0){
+        merged={...projects[i],bpm,capo,octave,transpose,key:key||projects[i].key||'',updatedAt:Date.now()};
+        projects[i]=merged;saveLocalProjects(projects);
+      }
+      if(merged)updateCloudSnapshot(merged);
+
       renderAll();syncBuildInput();window.CRPParts?.syncCoreLive?.();
-    }catch(err){console.warn('Could not apply linked SRP metadata',err)}
+      const changed=before.bpm!==bpm||before.capo!==capo||before.octave!==octave||before.transpose!==transpose||String(before.key)!==key;
+      if(changed && state.currentProjectId===activeId){
+        // Persist the SRP-originated values through the normal CRP autosave/cloud path.
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer=setTimeout(()=>runAutoSave(),120);
+      }
+      return true;
+    }catch(err){console.warn('Could not apply linked SRP metadata',err);return false}
   }
   window.addEventListener('storage',e=>{if(e.key===SRP_HANDOFF_KEY||String(e.key||'').startsWith(SRP_META_PREFIX))applyLinkedMetaFromSrpHandoff();});
   window.addEventListener('pageshow',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
