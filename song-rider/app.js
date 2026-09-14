@@ -1417,7 +1417,21 @@
       localStorage.setItem(SRP_HANDOFF_KEY,JSON.stringify({payload,rec,ts:Date.now()}));
       localStorage.setItem(WORKSPACE_MODE_KEY,'song-rider');
     }catch(err){console.error('Could not hand CRP project to Song Rider',err)}
-    location.href='song-rider/index.html?crpMode=1';
+    {
+      const path=location.pathname||'/';
+      const marker='/song-rider/';
+      let appRoot='/';
+      if(path.includes(marker)){
+        appRoot=path.slice(0,path.indexOf(marker)+1);
+      }else if(path.endsWith('/index.html')){
+        appRoot=path.slice(0,-'index.html'.length);
+      }else if(path.endsWith('/')){
+        appRoot=path;
+      }else{
+        appRoot=path.slice(0,path.lastIndexOf('/')+1);
+      }
+      location.href=new URL(appRoot+'song-rider/index.html?crpMode=1',location.origin).href;
+    }
   }
   function applyWorkspaceMode(mode, persist=true){
     mode=['chord-rider','baby-daw','song-rider'].includes(mode)?mode:'chord-rider';

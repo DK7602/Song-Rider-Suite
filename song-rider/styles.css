@@ -2024,7 +2024,7 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
 .srp-record-float{gap:10px!important;}
 .srp-record-float #srpLyricsCloseBtn{display:inline-flex;align-items:center;justify-content:center;font-size:28px;line-height:1;background:#252b33;color:#f4f6f8;border:1px solid #46505b;}
 
-/* v2.9.1 — Song Rider Suite visual polish only */
+/* v2.9.2 — Song Rider Suite visual polish only */
 .app-header .brand-copy h1{
   font-family:Impact,Haettenschweiler,"Arial Black",sans-serif;
   font-weight:900;
@@ -2045,7 +2045,7 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .app-header .brand-copy h1{font-size:clamp(1.55rem,7.5vw,2.15rem)!important;white-space:nowrap;}
 }
 
-/* v2.9.1 — visual cleanup from mobile review */
+/* v2.9.2 — visual cleanup from mobile review */
 .app-header .brand-copy{
   min-width:0!important;
   flex:1 1 auto!important;
@@ -2080,7 +2080,7 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .app-header .tagline{font-size:clamp(.62rem,2.65vw,.84rem)!important;white-space:nowrap!important;}
 }
 
-/* v2.9.1 — Exact shared Song Rider Suite branding shell */
+/* v2.9.2 — Exact shared Song Rider Suite branding shell */
 .app-header{
   position:relative!important;
   top:auto!important;
@@ -2189,7 +2189,7 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .mode-art.baby-mode-art img{width:52px!important;height:52px!important;}
 }
 
-/* v2.9.1 exact image branding — same files duplicated in /assets and /song-rider/assets */
+/* v2.9.2 exact image branding — same files duplicated in /assets and /song-rider/assets */
 .app-header{position:relative!important;}
 .app-header .brand-copy{display:flex!important;align-items:center!important;justify-content:center!important;min-width:0!important;}
 .app-header .suite-wordmark{
@@ -2206,7 +2206,7 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
  .app-header .suite-wordmark{width:min(100%,360px)!important;max-height:50px!important;}
 }
 
-/* v2.9.1 — Final header/tagline + full-jaw Baby DAW sticker */
+/* v2.9.2 — Final header/tagline + full-jaw Baby DAW sticker */
 .app-header{
   position:relative!important;
   display:block!important;
@@ -2303,7 +2303,7 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .mode-art.baby-mode-art,.mode-art.baby-mode-art img{width:62px!important;height:62px!important;flex-basis:62px!important;}
 }
 
-/* v2.9.1 Baby DAW clean sticker */
+/* v2.9.2 Baby DAW clean sticker */
 .mode-art.baby-mode-art{
   width:68px!important;height:68px!important;flex:0 0 68px!important;
   overflow:visible!important;background:none!important;background-image:none!important;border:0!important;
