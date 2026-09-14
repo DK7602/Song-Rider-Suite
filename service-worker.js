@@ -1,5 +1,7 @@
-const CACHE = 'song-rider-suite-v2.8.7-header-baby-fix';
+const CACHE = 'song-rider-suite-v2.8.8-header-match';
 const ASSETS = [
+  './song-rider/suite-header.css',
+  './suite-header.css',
   './song-rider/song-rider-pro-wordmark.png',
   './song-rider/baby-daw-sticker.png',
   './song-rider/assets/baby-daw-sticker.png',
