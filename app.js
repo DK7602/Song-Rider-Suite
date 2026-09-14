@@ -1306,7 +1306,10 @@
       const activeId=String(state.currentProjectId||'');
       if(!activeId)return;
       const shared=readSharedSrpMeta(activeId);
-      if(shared && (!payload || String(payload.crpProjectId||'')!==activeId || Number(shared.updatedAt||0)>=Number(h.ts||0))){
+      // v2.4.8: this record is the canonical live metadata for the linked project.
+      // Do NOT let a newer handoff timestamp win if that handoff merely re-saved stale CRP values.
+      // Both CRP/BD and SRP publish here on every edit, so when it exists it always wins.
+      if(shared){
         payload={...(payload||{}),crpProjectId:activeId,bpm:shared.bpm,capo:shared.capo,octave:shared.octave,transpose:shared.transpose,key:shared.key};
       }
       if(!payload?.crpProjectId||String(payload.crpProjectId)!==activeId)return;
