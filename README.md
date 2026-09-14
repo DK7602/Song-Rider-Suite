@@ -95,3 +95,11 @@ Instrument playback uses the `soundfont-player` browser library and MusyngKite s
 ## v2.2.7 SRP header/pill polish
 - Section title pill reduced slightly for better balance.
 - Song Rider top CHORD RIDER PRO wordmark now uses the same mobile title sizing/letter spacing as the CRP/Baby DAW header.
+
+
+## v2.2.8 — CRP/SRP link + active-project persistence
+- Removed stale calls to retired SRP iframe helpers that could throw while loading a CRP project.
+- CRP now always remembers the active saved project ID.
+- Opening Song Rider writes a fresh local project snapshot and handoff before navigation.
+- Returning to CRP restores the same saved project instead of presenting it as a blank/new project.
+- Link SRP now shows Linking/Linked feedback and explicitly persists the link record.

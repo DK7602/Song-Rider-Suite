@@ -762,6 +762,7 @@
 
     // Start a fresh project instead of adding another line to the current one.
     state.currentProjectId=null;
+    try{localStorage.removeItem('crp-active-project-id');}catch{}
     state.rows=[[]];
     state.selectedRow=0;
     state.capo=0;
@@ -866,7 +867,7 @@
   async function saveProject(){
     clearTimeout(autoSaveTimer);autoSaveTimer=null;
     const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);
-    state.currentProjectId=p.id;$('projectName').value=name;upsertLocal(p);
+    state.currentProjectId=p.id;try{localStorage.setItem('crp-active-project-id',String(p.id));}catch{}$('projectName').value=name;upsertLocal(p);
     if(accountUser){
       try{
         const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
@@ -916,7 +917,7 @@
       ? `“${p.name}” moved to Archive.`
       : `“${p.name}” restored to Projects.`;
   }
-  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();const p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);updateSrpLinkUi();syncLinkedSrp(false);}
+  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();const p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
   function renderProjects(){
     const w=$('projectList');
@@ -1199,12 +1200,20 @@
   const SRP_HANDOFF_KEY='crp-srp-handoff-v2';
   function openSongRiderWorkspace(){
     try{
+      // Persist the exact active project snapshot before leaving CRP.
+      // This prevents SRP from seeing stale data and lets CRP restore the same project on return.
+      if(state.currentProjectId){
+        const existing=localProjects().find(x=>x.id===state.currentProjectId);
+        const nm=$('projectName').value.trim()||existing?.name||`Chord Project ${new Date().toLocaleDateString()}`;
+        upsertLocal(capture(state.currentProjectId,nm));
+        localStorage.setItem('crp-active-project-id',String(state.currentProjectId));
+      }
       const payload=srpPayload();
       const rec=payload?srpLinks()[payload.crpProjectId]||null:null;
       if(payload?.crpProjectId)localStorage.setItem('crp-active-project-id',String(payload.crpProjectId));
       localStorage.setItem(SRP_HANDOFF_KEY,JSON.stringify({payload,rec,ts:Date.now()}));
       localStorage.setItem(WORKSPACE_MODE_KEY,'song-rider');
-    }catch{}
+    }catch(err){console.error('Could not hand CRP project to Song Rider',err)}
     location.href='song-rider/index.html?crpMode=1';
   }
   function applyWorkspaceMode(mode, persist=true){
