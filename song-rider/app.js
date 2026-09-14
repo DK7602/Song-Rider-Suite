@@ -9435,7 +9435,10 @@ function renderSheetTitleBar(){
     right.appendChild(autoStop);
   }
 
-  if(state.currentSection === "Full"){
+  // v2.8.2: linked transport belongs on every SRP page, not only Full Song View.
+  // The same proven linked CRP/BD playback bridge is reused so card-page playback
+  // cannot drift into a second audio/sync implementation.
+  {
     const playBtn=document.createElement('button'); playBtn.id='srpLinkedPlayBtn'; playBtn.type='button';
     const ext=!!window.__SRP_LINKED_PLAYING; playBtn.textContent=ext?'Ⅱ':'▶'; playBtn.title=ext?'Pause linked song':'Play linked song';
     playBtn.addEventListener('click',(e)=>{
@@ -17039,5 +17042,5 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
 })();
 
-// v2.8.1: single-button SRP link/unlink toggle; close the main SRP application IIFE after the nested CRP/SRP bridge.
+// v2.8.2: SRP card-page linked transport + single-button link/unlink toggle; close the main SRP application IIFE after the nested CRP/SRP bridge.
 })();

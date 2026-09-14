@@ -2977,7 +2977,7 @@ html.crp-integrated .crpSectionTitlePill{
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <!-- cache-buster -->
-<script src="./app.js?v=CRPSRPLINK281"></script>
+<script src="./app.js?v=CRPSRPLINK282"></script>
 
 
 <script>
@@ -3064,4 +3064,48 @@ html.srp-lyrics-overlay-mode .crp-srp-app-header,html.srp-lyrics-overlay-mode he
 html.srp-lyrics-overlay-mode main{padding:0 0 86px!important;}
 html.srp-lyrics-overlay-mode .sheet{border:0!important;border-radius:0!important;margin:0!important;}
 html.srp-lyrics-overlay-mode .sheetHeader{position:sticky!important;top:0!important;z-index:20!important;background:#151a21!important;}
+</style>
+
+
+<style id="srp282CardPageTransport">
+/* v2.8.2 — keep SRP card-page title + AutoScroll + Play/Pause + Stop on one mobile row. */
+html.crp-integrated .sheetHeader > div:first-child{
+  min-width:0!important;
+  flex:1 1 auto!important;
+}
+html.crp-integrated .sheetHeader input.headingPill{
+  flex:0 1 210px!important;
+  width:min(210px,100%)!important;
+  max-width:210px!important;
+  min-width:105px!important;
+}
+@media(max-width:430px){
+  html.crp-integrated .sheetHeader input.headingPill{
+    flex:0 1 145px!important;
+    width:145px!important;
+    max-width:145px!important;
+    min-width:105px!important;
+    padding-left:12px!important;
+    padding-right:12px!important;
+  }
+  html.crp-integrated .sheetHeader > div:last-child{
+    gap:5px!important;
+  }
+  html.crp-integrated #srpHeaderAutoScroll,
+  html.crp-integrated #srpHeaderAutoStop,
+  html.crp-integrated #srpLinkedPlayBtn,
+  html.crp-integrated #srpLinkedStopBtn{
+    width:38px!important;
+    min-width:38px!important;
+    height:38px!important;
+    flex:0 0 38px!important;
+  }
+  html.crp-integrated .sheetHeader .sheetAddBtn,
+  html.crp-integrated .sheetHeader .sheetDeleteBtn{
+    width:36px!important;
+    min-width:36px!important;
+    height:38px!important;
+    flex:0 0 36px!important;
+  }
+}
 </style>
