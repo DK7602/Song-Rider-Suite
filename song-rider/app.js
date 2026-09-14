@@ -3769,10 +3769,8 @@ function stopFullPerfDriver(){
 }
 
 function getFullPerfScrollHost(){
-  // In SRP, the main scroll container is #sheetBody.
-  // Full Perf should scroll in the same container (BSP-style),
-  // so we can preserve position when toggling AutoScroll and
-  // avoid landscape clipping issues.
+  // CRP integrated mode uses the browser page itself as the ONLY vertical scroller.
+  if(document.documentElement.classList.contains('crp-integrated')) return document.scrollingElement || document.documentElement;
   return el?.sheetBody || document.getElementById("sheetBody") || document.scrollingElement || document.documentElement;
 }
 
@@ -6209,6 +6207,7 @@ ACTIVE CARD selection (scroll-container aware)
 ***********************/
 // ✅ Scroll container support (sheetBody scrolls, not window)
 function getScrollContainer(){
+  if(document.documentElement.classList.contains('crp-integrated')) return document.scrollingElement || document.documentElement;
   return el.sheetBody || document.scrollingElement || document.documentElement;
 }
 
@@ -6221,11 +6220,12 @@ function getPlayLineY(){
 }
 
 function scrollToTopOfSheet(){
-  const sb = el.sheetBody;
-  if(sb){
-    sb.scrollTop = 0;
+  if(document.documentElement.classList.contains('crp-integrated')){
+    try{ window.scrollTo({ top:0, behavior:"auto" }); }catch{ window.scrollTo(0,0); }
     return;
   }
+  const sb = el.sheetBody;
+  if(sb){ sb.scrollTop = 0; return; }
   try{ window.scrollTo({ top:0, behavior:"auto" }); }
   catch{ window.scrollTo(0,0); }
 }
@@ -6244,6 +6244,7 @@ function getPlaybackCard(){
 
 // Returns the scrolling viewport element for cards (your #sheetBody)
 function getScrollViewport(){
+  if(document.documentElement.classList.contains('crp-integrated')) return null;
   // #sheetBody is now the scroll container (overflow:auto)
   if(el.sheetBody){
     try{
@@ -16187,32 +16188,110 @@ KEEP RHYME UI ABOVE KEYBOARD
 
 })();
 
-/* CRP v2 embedded bridge: SRP keeps lyrics/flow; CRP owns music structure. */
+/* CRP / SRP integration bridge. In v2.1 the CRP-integrated Song Rider runs as a real page,
+   not inside an iframe. This eliminates Android/iOS nested-scroll gesture conflicts. */
 (function(){
-  if(new URLSearchParams(location.search).get('embedded')!=='1') return;
+  const q=new URLSearchParams(location.search);
+  const embedded=q.get('embedded')==='1';
+  const integrated=q.get('crpMode')==='1';
+  if(!embedded && !integrated) return;
+  const HANDOFF_KEY='crp-srp-handoff-v2';
+  const LINKS_KEY='crp-srp-links-v1';
+
+  function readJson(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'')||fallback}catch{return fallback}}
+  function writeJson(key,v){try{localStorage.setItem(key,JSON.stringify(v))}catch{}}
+  function handoff(){return readJson(HANDOFF_KEY,{})||{}}
+  function links(){return readJson(LINKS_KEY,{})||{}}
+  function setLinks(v){writeJson(LINKS_KEY,v||{})}
+
+  function reportLink(payload,p){
+    if(!payload?.crpProjectId||!p)return;
+    if(integrated){
+      const all=links();
+      all[payload.crpProjectId]={srpProjectId:p.id,srpName:p.name||payload.name||'Song Rider project',linkedAt:Date.now()};
+      setLinks(all);
+      refreshCrpLinkUi();
+    }else{
+      try{parent.postMessage({type:'srp-link-result',crpProjectId:payload.crpProjectId,srpProjectId:p.id,srpName:p.name},location.origin)}catch{}
+    }
+  }
+
   function importCrpStructure(payload, forceCreate, requestedId){
-    if(!payload?.crpProjectId) return;
+    if(!payload?.crpProjectId) return null;
     try{
       persistActiveProjectState?.();
       let all=loadAllProjects().map(normalizeProject).filter(Boolean);
       let p=all.find(x=>String(x.linkedCrpProjectId||'')===String(payload.crpProjectId));
       if(!p&&requestedId)p=all.find(x=>String(x.id)===String(requestedId));
       if(!p&&forceCreate){p=defaultProject(payload.name||'Linked Song');p.linkedCrpProjectId=payload.crpProjectId;}
-      if(!p)return;
-      p.linkedCrpProjectId=payload.crpProjectId;p.name=payload.name||p.name;p.bpm=Number(payload.bpm)||p.bpm||95;
-      p.crpKey=String(payload.key||'');p.crpBeatsPerChord=Number(payload.beats)||4;p.crpChordRows=payload.rows||[];
-      const sec='PAGE 1'; const old=Array.isArray(p.sections?.[sec])?p.sections[sec]:[];
+      if(!p)return null;
+      p.linkedCrpProjectId=payload.crpProjectId;
+      p.name=payload.name||p.name;
+      p.bpm=Number(payload.bpm)||p.bpm||95;
+      p.crpKey=String(payload.key||'');
+      p.crpBeatsPerChord=Number(payload.beats)||4;
+      p.crpChordRows=payload.rows||[];
+      const sec='PAGE 1';
+      const old=Array.isArray(p.sections?.[sec])?p.sections[sec]:[];
       const rows=Array.isArray(payload.rows)?payload.rows:[];
       p.sections=p.sections||{};
       p.sections[sec]=rows.length?rows.map((r,i)=>{
-        const prev=old[i]||newLine(); const chords=(r.cards||[]).filter(c=>c.type==='chord').map(c=>String(c.value||'')).filter(Boolean);
+        const prev=old[i]||newLine();
+        const chords=(r.cards||[]).filter(c=>c.type==='chord').map(c=>String(c.value||'')).filter(Boolean);
         const slots=Array(8).fill('');
-        if(chords.length){chords.forEach((ch,j)=>{slots[Math.min(7,Math.floor(j*8/chords.length))]=ch})}
+        if(chords.length)chords.forEach((ch,j)=>{slots[Math.min(7,Math.floor(j*8/chords.length))]=ch});
         return {...prev,id:prev.id||String(r.lineId||uuid()),notes:slots,lyrics:String(prev.lyrics||''),beats:Array.isArray(prev.beats)?prev.beats:Array(4).fill('')};
       }):[old[0]||newLine()];
-      p.enabledSections=Array.from(new Set(['PAGE 1',...(p.enabledSections||[])]));p.updatedAt=now();upsertProject(p);state.project=normalizeProject(p);state.bpm=p.bpm;setCurrentProjectIdForScope(getStorageScope(),p.id);applyProjectSettingsToUI();renderAll();
-      parent.postMessage({type:'srp-link-result',crpProjectId:payload.crpProjectId,srpProjectId:p.id,srpName:p.name},location.origin);
-    }catch(err){console.error('CRP/SRP link sync failed',err)}
+      p.enabledSections=Array.from(new Set(['PAGE 1',...(p.enabledSections||[])]));
+      p.updatedAt=now();
+      upsertProject(p);
+      state.project=normalizeProject(p);
+      state.bpm=p.bpm;
+      setCurrentProjectIdForScope(getStorageScope(),p.id);
+      applyProjectSettingsToUI();
+      renderAll();
+      reportLink(payload,p);
+      return p;
+    }catch(err){console.error('CRP/SRP link sync failed',err);return null}
   }
-  window.addEventListener('message',e=>{if(e.origin!==location.origin)return;const d=e.data||{};if(d.type==='crp-srp-link-sync')importCrpStructure(d.payload,!!d.forceCreate,d.linkedSrpProjectId||'');});
+
+  function refreshCrpLinkUi(){
+    if(!integrated)return;
+    const h=handoff(); const payload=h.payload;
+    const st=document.getElementById('crpSrpLinkStatus');
+    const b=document.getElementById('crpSrpLinkBtn');
+    const u=document.getElementById('crpSrpUnlinkBtn');
+    if(!payload?.crpProjectId){
+      if(st)st.textContent='Save this CRP project first';
+      if(b){b.hidden=false;b.disabled=true} if(u)u.hidden=true;
+      return;
+    }
+    const rec=links()[payload.crpProjectId];
+    if(st)st.textContent=rec?`Linked • ${rec.srpName||payload.name||'Song Rider project'}`:'Not linked to this CRP project';
+    if(b){b.hidden=!!rec;b.disabled=false} if(u)u.hidden=!rec;
+  }
+
+  function syncFromHandoff(forceCreate=false){
+    const h=handoff(); const payload=h.payload;
+    if(!payload?.crpProjectId){refreshCrpLinkUi();return}
+    const rec=links()[payload.crpProjectId]||h.rec||null;
+    if(!rec&&!forceCreate){refreshCrpLinkUi();return}
+    importCrpStructure(payload,forceCreate,rec?.srpProjectId||'');
+    refreshCrpLinkUi();
+  }
+
+  if(embedded){
+    window.addEventListener('message',e=>{if(e.origin!==location.origin)return;const d=e.data||{};if(d.type==='crp-srp-link-sync')importCrpStructure(d.payload,!!d.forceCreate,d.linkedSrpProjectId||'');});
+  }
+  if(integrated){
+    window.CRP_SRP_importCrpStructure=importCrpStructure;
+    document.getElementById('crpSrpLinkBtn')?.addEventListener('click',()=>syncFromHandoff(true));
+    document.getElementById('crpSrpUnlinkBtn')?.addEventListener('click',()=>{
+      const payload=handoff().payload;if(!payload?.crpProjectId)return;
+      const all=links();delete all[payload.crpProjectId];setLinks(all);refreshCrpLinkUi();
+    });
+    window.addEventListener('storage',e=>{if(e.key===HANDOFF_KEY||e.key===LINKS_KEY){refreshCrpLinkUi();syncFromHandoff(false)}});
+    setTimeout(()=>{refreshCrpLinkUi();syncFromHandoff(false)},80);
+  }
 })();
+
