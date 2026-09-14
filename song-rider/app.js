@@ -9435,7 +9435,7 @@ function renderSheetTitleBar(){
     right.appendChild(autoStop);
   }
 
-  // v2.8.9: linked transport belongs on every SRP page, not only Full Song View.
+  // v2.9.0: linked transport belongs on every SRP page, not only Full Song View.
   // The same proven linked CRP/BD playback bridge is reused so card-page playback
   // cannot drift into a second audio/sync implementation.
   {
@@ -17035,12 +17035,12 @@ KEEP RHYME UI ABOVE KEYBOARD
     setInterval(applyLiveMetaToSrp,500);
     if(window.__SRP_INIT_DONE)setTimeout(reconcileLinkedWorkspace,0);
     // Flush the live number fields before leaving SRP for CRP/BD.
-    document.querySelectorAll('.crp-srp-mode[href^="../index.html"]').forEach(a=>a.addEventListener('pointerdown',()=>syncMetaToCrp(),true));
+    document.querySelectorAll('.workspace-mode-btn[href^="../index.html"]').forEach(a=>a.addEventListener('pointerdown',()=>syncMetaToCrp(),true));
     window.addEventListener('pagehide',()=>syncMetaToCrp());
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')syncMetaToCrp();});
     window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='srp-show-full-song'){try{goToSection('Full');}catch{}}if(e.data?.type==='crp-playback-state'){window.__SRP_LINKED_PLAYING=!!e.data.playing;try{renderSheetTitleBar();}catch{}}});
   }
 })();
 
-// v2.8.9: SRP card-page linked transport + single-button link/unlink toggle; close the main SRP application IIFE after the nested CRP/SRP bridge.
+// v2.9.0: SRP card-page linked transport + single-button link/unlink toggle; close the main SRP application IIFE after the nested CRP/SRP bridge.
 })();
