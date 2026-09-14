@@ -7810,6 +7810,7 @@ function ensureCapoStepToggle(){
       refreshDisplayedNoteCells();
       updateKeyFromAllNotes();
       updateFullIfVisible?.();
+      if(state.project){ upsertProject(state.project); window.CRP_SRP_syncMetaToCrp?.(); }
     });
   }
 
@@ -16488,7 +16489,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   const SHARED_META_PREFIX='crp-srp-meta-v1:';
   function sharedMetaKey(id){return SHARED_META_PREFIX+String(id||'')}
   function readSharedMeta(id){return id?readJson(sharedMetaKey(id),null):null;}
-  function writeSharedMeta(id,meta){if(!id)return;writeJson(sharedMetaKey(id),{...meta,projectId:String(id),updatedAt:Date.now()});}
+  function writeSharedMeta(id,meta){if(!id)return;const prev=readSharedMeta(id)||{};writeJson(sharedMetaKey(id),{...prev,...meta,projectId:String(id),updatedAt:Date.now()});}
 
   // Native SRP is a separate page, so the original CRP/BD audio engine would otherwise
   // be gone after navigation. Keep a tiny hidden same-origin copy of the main workspace
@@ -16597,7 +16598,7 @@ KEEP RHYME UI ABOVE KEYBOARD
         }
         const payload={
           crpProjectId:p.id,name:p.name||'Untitled',bpm:Number(p.bpm)||92,beats:Number(p.beats)||4,
-          key:String(p.key||''),capo:Number(p.capo)||0,octave:Number(p.octave)||0,transpose:!!p.transpose,
+          key:String(p.key||''),capo:Number(p.capo)||0,octave:Number(p.octave)||0,transpose:!!p.transpose,pitchMode:(shared?.pitchMode==='step'?'step':'capo'),
           rows:(Array.isArray(p.rows)?p.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))
         };
         writeJson(HANDOFF_KEY,{payload,rec:links()[p.id]||h?.rec||null,ts:Date.now()});
@@ -16634,6 +16635,7 @@ KEEP RHYME UI ABOVE KEYBOARD
       p.bpm=Number(payload.bpm)||p.bpm||95;
       p.crpKey=String(payload.key||'');
       p.capo=Math.max(0,Math.min(12,Number(payload.capo)||0));
+      p.transposeMode=payload.pitchMode==='step'?'step':'capo';
       p.steps=Math.max(-2,Math.min(3,Number(payload.octave)||0));
       p.linkedOctave=p.steps;
       p.linkedTranspose=!!payload.transpose;
@@ -16685,7 +16687,8 @@ KEEP RHYME UI ABOVE KEYBOARD
       // Read the controls at the instant of the edit; mobile input/change/blur order varies.
       const liveBpm=Number(el?.bpmInput?.value);
       const rawAmount=Number(el?.capoInput?.value);
-      const mode=state.transposeMode||p.transposeMode||'capo';
+      const mode=(state.transposeMode==='step'?'step':'capo');
+      p.transposeMode=mode;
       if(Number.isFinite(liveBpm)){state.bpm=Math.max(40,Math.min(220,liveBpm));p.bpm=state.bpm;}
       if(Number.isFinite(rawAmount)){
         if(mode==='capo'){state.capo=Math.max(0,Math.min(12,Math.round(rawAmount)));p.capo=state.capo;}
@@ -16701,10 +16704,10 @@ KEEP RHYME UI ABOVE KEYBOARD
       cp.transpose=!!p.linkedTranspose;
       const key=String(p.crpKey||el?.keyOutput?.value||'').trim();if(key)cp.key=key;
       cp.updatedAt=Date.now();projects[i]=cp;writeJson('crp-projects',projects);
-      const payload={crpProjectId:cp.id,name:cp.name||p.name||'Untitled',bpm:cp.bpm,beats:Number(cp.beats)||4,key:String(cp.key||''),capo:cp.capo,octave:cp.octave,transpose:cp.transpose,rows:(Array.isArray(cp.rows)?cp.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))};
+      const payload={crpProjectId:cp.id,name:cp.name||p.name||'Untitled',bpm:cp.bpm,beats:Number(cp.beats)||4,key:String(cp.key||''),capo:cp.capo,octave:cp.octave,transpose:cp.transpose,pitchMode:mode,rows:(Array.isArray(cp.rows)?cp.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))};
       const recNow=links()[cp.id]||null;
       // Write canonical meta first, then the snapshot. The canonical record always wins on reload.
-      writeSharedMeta(cp.id,{bpm:cp.bpm,capo:cp.capo,octave:cp.octave,transpose:cp.transpose,key:cp.key||'',source:'srp'});
+      writeSharedMeta(cp.id,{bpm:cp.bpm,capo:cp.capo,octave:cp.octave,transpose:cp.transpose,key:cp.key||'',pitchMode:mode,source:'srp'});
       writeJson(HANDOFF_KEY,{payload,rec:recNow,ts:Date.now()});
     }catch(err){console.warn('Could not sync SRP metadata back to CRP',err)}
   }
