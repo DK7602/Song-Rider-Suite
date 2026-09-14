@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v2.8.9-master-branding';
+const CACHE = 'song-rider-suite-v2.9.0-srp-parity';
 const ASSETS = [
   './song-rider/suite-header-master.png',
   './song-rider/branding-shell.css',
