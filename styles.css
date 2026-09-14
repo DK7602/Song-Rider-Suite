@@ -2018,3 +2018,8 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
 #srpFloatPause{background:#f0c65a;color:#111}
 #srpFloatStop{background:#262c34;color:#fff}
 .srp-record-float button:disabled{opacity:.4}
+
+/* v2.4.1 SRP lyrics overlay transport */
+.srp-lyrics-overlay-head{justify-content:flex-start!important;}
+.srp-record-float{gap:10px!important;}
+.srp-record-float #srpLyricsCloseBtn{display:inline-flex;align-items:center;justify-content:center;font-size:28px;line-height:1;background:#252b33;color:#f4f6f8;border:1px solid #46505b;}
