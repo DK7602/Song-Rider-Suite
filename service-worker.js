@@ -1,4 +1,4 @@
-const CACHE = 'chord-rider-pro-v2.8.1-single-link-toggle';
+const CACHE = 'chord-rider-pro-v2.8.2-srp-card-transport';
 const ASSETS = [
   './',
   './index.html',
