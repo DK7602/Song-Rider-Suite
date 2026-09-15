@@ -2024,7 +2024,7 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
 .srp-record-float{gap:10px!important;}
 .srp-record-float #srpLyricsCloseBtn{display:inline-flex;align-items:center;justify-content:center;font-size:28px;line-height:1;background:#252b33;color:#f4f6f8;border:1px solid #46505b;}
 
-/* v2.9.1 — Song Rider Suite visual polish only */
+/* v2.9.3 — Song Rider Suite visual polish only */
 .app-header .brand-copy h1{
   font-family:Impact,Haettenschweiler,"Arial Black",sans-serif;
   font-weight:900;
@@ -2045,7 +2045,7 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .app-header .brand-copy h1{font-size:clamp(1.55rem,7.5vw,2.15rem)!important;white-space:nowrap;}
 }
 
-/* v2.9.1 — visual cleanup from mobile review */
+/* v2.9.3 — visual cleanup from mobile review */
 .app-header .brand-copy{
   min-width:0!important;
   flex:1 1 auto!important;
@@ -2080,7 +2080,7 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .app-header .tagline{font-size:clamp(.62rem,2.65vw,.84rem)!important;white-space:nowrap!important;}
 }
 
-/* v2.9.1 — Exact shared Song Rider Suite branding shell */
+/* v2.9.3 — Exact shared Song Rider Suite branding shell */
 .app-header{
   position:relative!important;
   top:auto!important;
@@ -2189,7 +2189,7 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .mode-art.baby-mode-art img{width:52px!important;height:52px!important;}
 }
 
-/* v2.9.1 exact image branding — same files duplicated in /assets and /song-rider/assets */
+/* v2.9.3 exact image branding — same files duplicated in /assets and /song-rider/assets */
 .app-header{position:relative!important;}
 .app-header .brand-copy{display:flex!important;align-items:center!important;justify-content:center!important;min-width:0!important;}
 .app-header .suite-wordmark{
@@ -2206,7 +2206,7 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
  .app-header .suite-wordmark{width:min(100%,360px)!important;max-height:50px!important;}
 }
 
-/* v2.9.1 — Final header/tagline + full-jaw Baby DAW sticker */
+/* v2.9.3 — Final header/tagline + full-jaw Baby DAW sticker */
 .app-header{
   position:relative!important;
   display:block!important;
@@ -2303,7 +2303,7 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .mode-art.baby-mode-art,.mode-art.baby-mode-art img{width:62px!important;height:62px!important;flex-basis:62px!important;}
 }
 
-/* v2.9.1 Baby DAW clean sticker */
+/* v2.9.3 Baby DAW clean sticker */
 .mode-art.baby-mode-art{
   width:68px!important;height:68px!important;flex:0 0 68px!important;
   overflow:visible!important;background:none!important;background-image:none!important;border:0!important;
@@ -2315,4 +2315,70 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
 }
 @media(max-width:520px){
   .mode-art.baby-mode-art,.mode-art.baby-mode-art img{width:64px!important;height:64px!important;flex-basis:64px!important;}
+}
+
+/* v2.9.3 — Chord Rider Pro title + collapsible setup controls */
+.crp-pro-titlebar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:-2px 0 14px;
+  padding:0 0 12px;
+  border-bottom:1px solid #343d48;
+}
+.crp-pro-wordmark{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:.18em;
+  white-space:nowrap;
+  font-family:Impact,Haettenschweiler,"Arial Black",sans-serif;
+  font-weight:900;
+  font-size:clamp(1.75rem,7.2vw,3.15rem);
+  line-height:.94;
+  letter-spacing:-.035em;
+  filter:drop-shadow(0 4px 3px rgba(0,0,0,.72));
+}
+.crp-pro-wordmark span{
+  display:inline-block;
+  color:transparent;
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-stroke:1px rgba(15,15,20,.88);
+  text-shadow:
+    0 1px 0 rgba(255,255,255,.85),
+    0 3px 0 rgba(20,20,25,.92),
+    0 0 9px currentColor;
+}
+.crp-word-pink{
+  color:#ff4c9c!important;
+  background-image:linear-gradient(180deg,#fff 0%,#ffb9df 10%,#ff3b99 28%,#fff 43%,#d90068 59%,#ff7fbd 73%,#710034 100%)!important;
+}
+.crp-word-blue{
+  color:#24bfff!important;
+  background-image:linear-gradient(180deg,#fff 0%,#b8f3ff 10%,#1fc5ff 28%,#fff 43%,#0085d9 59%,#62ddff 73%,#004f8f 100%)!important;
+}
+.crp-word-green{
+  color:#35e970!important;
+  background-image:linear-gradient(180deg,#fff 0%,#c9ffd7 10%,#2ce96b 28%,#fff 43%,#00a93d 59%,#79ff9f 73%,#006b27 100%)!important;
+}
+.crp-controls-toggle{
+  flex:0 0 auto;
+  min-width:82px;
+  min-height:52px;
+  padding:0 18px;
+  border:1px solid #46505d;
+  border-radius:15px;
+  background:#171c23;
+  color:#f1f3f5;
+  font:700 1rem/1 system-ui,-apple-system,"Segoe UI",sans-serif;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+.primary-toolbar.crp-controls-hidden{display:none!important;}
+
+@media(max-width:520px){
+  .crp-pro-titlebar{gap:8px;margin-bottom:12px;padding-bottom:10px}
+  .crp-pro-wordmark{font-size:clamp(1.42rem,7.05vw,2.25rem);gap:.13em}
+  .crp-controls-toggle{min-width:72px;min-height:48px;padding:0 14px;font-size:.92rem}
 }

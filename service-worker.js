@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v2.9.1-exact-header-equal-stickers';
+const CACHE = 'song-rider-suite-v2.9.3-crp-title-hide';
 const ASSETS = [
   './song-rider/suite-header-master.png',
   './song-rider/branding-shell.css',
