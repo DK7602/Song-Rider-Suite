@@ -1278,29 +1278,29 @@
   // v2.6.0: project-scoped canonical transport state. This is the ONLY authority for linked BPM/CAPO/STEP.
   const SRP_CANONICAL_PREFIX='crp-srp-canonical-v1:';
   const SRP_LINK_SESSION_KEY='crp-srp-link-session-v3';
-  // v3.0.0: ONE transport record per linked CRP project. BPM/CAPO/STEP live here.
-  // The older handoff/live/canonical records are now mirrors only; they may not override this record.
-  const SRS_TRANSPORT_PREFIX='song-rider-suite-transport-v5:';
-  function suiteTransportKey(projectId){return SRS_TRANSPORT_PREFIX+String(projectId||'')}
-  function readSuiteTransport(projectId){
+  // v3.1.0 TRANSPORT REBUILD: CRP, Baby DAW and SRP now share ONE global transport record.
+  // Project/link metadata is still used for chords, lyrics and project pairing, but it is no longer
+  // allowed to gate or choose BPM / CAPO / STEP. That project-id gate was the source of the drift.
+  const SRS_TRANSPORT_KEY='song-rider-suite-transport-v6';
+  function readSuiteTransport(){
     try{
-      const id=String(projectId||''); if(!id)return null;
-      const m=JSON.parse(localStorage.getItem(suiteTransportKey(id))||'null');
-      return m&&String(m.projectId||'')===id?m:null;
+      const m=JSON.parse(localStorage.getItem(SRS_TRANSPORT_KEY)||'null');
+      return m&&typeof m==='object'?m:null;
     }catch{return null}
   }
   function writeSuiteTransport(projectId,meta,source='crp'){
-    if(IS_PLAYBACK_BRIDGE||!projectId)return null;
+    if(IS_PLAYBACK_BRIDGE)return null;
     try{
-      const id=String(projectId),prev=readSuiteTransport(id)||{};
+      const prev=readSuiteTransport()||{};
       const next={
         bpm:Math.max(40,Math.min(240,Number(meta?.bpm ?? prev.bpm ?? $('bpmInput')?.value)||92)),
         capo:Math.max(0,Math.min(12,Number(meta?.capo ?? prev.capo ?? state.capo)||0)),
         octave:Math.max(-2,Math.min(3,Number(meta?.octave ?? prev.octave ?? state.octave)||0)),
         pitchMode:(meta?.pitchMode==='step'||meta?.pitchMode==='capo')?meta.pitchMode:(prev.pitchMode==='step'?'step':'capo'),
-        projectId:id,source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()
+        crpProjectId:String(projectId||state.currentProjectId||localStorage.getItem('crp-active-project-id')||prev.crpProjectId||''),
+        source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()
       };
-      localStorage.setItem(suiteTransportKey(id),JSON.stringify(next));
+      localStorage.setItem(SRS_TRANSPORT_KEY,JSON.stringify(next));
       try{window.__SRS_TRANSPORT_CHANNEL?.postMessage(next)}catch{}
       return next;
     }catch{return null}
@@ -1363,7 +1363,7 @@
       const session=readSrpLinkSession();
       const explicitlyLinked=!!(session&&String(session.crpProjectId||'')===id);
       if(!explicitlyLinked)return base;
-      const suite=readSuiteTransport(id);
+      const suite=readSuiteTransport();
       const canonical=readCanonicalSrp(id);
       const live=readLiveSrpMeta();
       const legacy=(canonical?{...(base||{}),...canonical,crpProjectId:id}:(live&&String(live.crpProjectId||'')===id?{...(base||{}),...live}:base));
@@ -1401,7 +1401,7 @@
   function readHardSync(){
     try{
       const id=activeSrpLinkId();
-      return readSuiteTransport(id)||readCanonicalSrp(id)||JSON.parse(localStorage.getItem(SRP_HARD_SYNC_KEY)||'null');
+      return readSuiteTransport()||readCanonicalSrp(id)||JSON.parse(localStorage.getItem(SRP_HARD_SYNC_KEY)||'null');
     }catch{return null}
   }
   function writeHardSync(source='crp',modeOverride){
@@ -1413,7 +1413,7 @@
       const bpm=Math.max(40,Math.min(240,Number($('bpmInput')?.value)||92));
       const capo=Math.max(0,Math.min(12,Number(state.capo)||0));
       const octave=Math.max(-2,Math.min(3,Number(state.octave)||0));
-      const prev=readSuiteTransport(id)||readHardSync()||{};
+      const prev=readSuiteTransport()||readHardSync()||{};
       const pitchMode=modeOverride==='step'||modeOverride==='capo'?modeOverride:(prev.pitchMode==='step'?'step':'capo');
       const next=writeSuiteTransport(id,{bpm,capo,octave,pitchMode},source);
       // Mirror for older non-transport bridge code, but never use it ahead of v5.
@@ -1441,6 +1441,8 @@
       if($('bpmInput'))$('bpmInput').value=String(bpm);
       state.capo=capo;if($('capoSelect'))$('capoSelect').value=String(capo);
       state.octave=octave;
+      // Preserve which control was last authoritative so SRP paints CAPO vs STEP correctly.
+      try{if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:m.pitchMode==='step'?'step':'capo'});}catch{}
       renderAll();
       window.CRPParts?.syncCoreLive?.();
       if(state.currentProjectId){
@@ -1629,11 +1631,11 @@
   }
   try{window.__CRP_SRP_META_CHANNEL=new BroadcastChannel('crp-srp-live-meta-v3');window.__CRP_SRP_META_CHANNEL.onmessage=()=>setTimeout(applyLinkedMetaFromSrpHandoff,0);}catch{}
   try{window.__CRP_SRP_CANONICAL_CHANNEL=new BroadcastChannel('crp-srp-canonical-v1');window.__CRP_SRP_CANONICAL_CHANNEL.onmessage=()=>setTimeout(applyHardSync,0);}catch{}
-  try{window.__SRS_TRANSPORT_CHANNEL=new BroadcastChannel('song-rider-suite-transport-v5');window.__SRS_TRANSPORT_CHANNEL.onmessage=()=>setTimeout(applyHardSync,0);}catch{}
+  try{window.__SRS_TRANSPORT_CHANNEL=new BroadcastChannel('song-rider-suite-transport-v6');window.__SRS_TRANSPORT_CHANNEL.onmessage=()=>setTimeout(applyHardSync,0);}catch{}
   window.addEventListener('storage',e=>{if(e.key===SRP_LIVE_META_KEY||e.key===SRP_HANDOFF_KEY||String(e.key||'').startsWith(SRP_META_PREFIX))applyLinkedMetaFromSrpHandoff();});
   window.addEventListener('pageshow',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
   window.addEventListener('focus',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
-  window.addEventListener('storage',e=>{if(e.key===SRP_HARD_SYNC_KEY||e.key===SRP_LINK_SESSION_KEY||String(e.key||'').startsWith(SRP_CANONICAL_PREFIX)||String(e.key||'').startsWith(SRS_TRANSPORT_PREFIX))setTimeout(applyHardSync,0);});
+  window.addEventListener('storage',e=>{if(e.key===SRP_HARD_SYNC_KEY||e.key===SRP_LINK_SESSION_KEY||String(e.key||'').startsWith(SRP_CANONICAL_PREFIX)||e.key===SRS_TRANSPORT_KEY)setTimeout(applyHardSync,0);});
   window.addEventListener('pageshow',()=>setTimeout(applyHardSync,0));
   if(!IS_PLAYBACK_BRIDGE)window.addEventListener('pagehide',()=>{try{writeNavigationSnapshot();}catch{}});
   window.addEventListener('focus',()=>setTimeout(applyHardSync,0));
