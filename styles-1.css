@@ -2718,3 +2718,38 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
     column-gap:4px!important;
   }
 }
+
+
+/* v2.9.16 — clean CRP title rebuild.
+   Use the untouched original CRP artwork on a transparent padded canvas (no fabricated O edge).
+   Scale the CRP artwork to the same visual letter height as SRP, whose source wordmark is wider
+   at the same 132px source height. Keep Show/Hide in its own fixed column. */
+.workspace-chord-rider .crp-pro-titlebar{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 56px!important;
+  align-items:center!important;
+  column-gap:6px!important;
+  overflow:visible!important;
+}
+.workspace-chord-rider .crp-pro-wordmark-img{
+  display:block!important;
+  width:84.8%!important;
+  max-width:84.8%!important;
+  height:auto!important;
+  max-height:64px!important;
+  min-width:0!important;
+  justify-self:start!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+  transform:none!important;
+  margin:0!important;
+  padding:0!important;
+}
+.workspace-chord-rider .crp-controls-toggle{
+  width:56px!important;min-width:56px!important;max-width:56px!important;
+  height:38px!important;min-height:38px!important;margin:0!important;padding:0 6px!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{grid-template-columns:minmax(0,1fr) 56px!important;column-gap:4px!important;}
+  .workspace-chord-rider .crp-pro-wordmark-img{width:84.8%!important;max-width:84.8%!important;max-height:64px!important;}
+}
