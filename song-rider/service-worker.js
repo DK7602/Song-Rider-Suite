@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v2.9.2-route-fix';
+const CACHE = 'song-rider-suite-v2.9.9-deep-parts-fix';
 const ASSETS = [
   './song-rider/suite-header-master.png',
   './song-rider/branding-shell.css',
