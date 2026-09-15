@@ -2485,3 +2485,47 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
 .crp-pro-wordmark-img{display:block!important;flex:1 1 auto!important;min-width:0!important;width:auto!important;height:auto!important;max-width:calc(100% - 42px)!important;max-height:76px!important;object-fit:contain!important;object-position:left center!important;margin:0!important;padding:0!important;}
 .crp-controls-toggle{flex:0 0 auto!important;width:auto!important;min-width:0!important;height:28px!important;min-height:28px!important;padding:0 4px!important;margin:0!important;border-radius:8px!important;font-size:.64rem!important;line-height:1!important;}
 @media(max-width:520px){.crp-pro-titlebar{gap:1px!important}.crp-pro-wordmark-img{max-width:calc(100% - 39px)!important;max-height:70px!important}.crp-controls-toggle{height:27px!important;min-height:27px!important;padding:0 3px!important;font-size:.62rem!important}}
+
+/* v2.9.10 — CRP header mirrors the approved SRP title row.
+   The title owns only its grid cell; Hide is the exact SRP 56x38 control. */
+.workspace-chord-rider .crp-pro-titlebar{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 56px!important;
+  align-items:center!important;
+  gap:10px!important;
+  overflow:visible!important;
+}
+.workspace-baby-daw .crp-pro-titlebar{display:none!important;}
+.crp-pro-wordmark-img{
+  display:block!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  height:auto!important;
+  max-height:64px!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+  margin:0!important;
+  padding:0!important;
+}
+.crp-controls-toggle{
+  box-sizing:border-box!important;
+  width:56px!important;
+  min-width:56px!important;
+  max-width:56px!important;
+  height:38px!important;
+  min-height:38px!important;
+  padding:0 9px!important;
+  margin:0!important;
+  border-radius:12px!important;
+  font-size:.78rem!important;
+  line-height:1!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{grid-template-columns:minmax(0,1fr) 56px!important;gap:8px!important;}
+  .crp-pro-wordmark-img{width:100%!important;max-width:100%!important;max-height:64px!important;}
+  .crp-controls-toggle{width:56px!important;min-width:56px!important;max-width:56px!important;height:38px!important;min-height:38px!important;padding:0 9px!important;border-radius:12px!important;font-size:.78rem!important;}
+}
