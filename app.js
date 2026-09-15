@@ -1278,6 +1278,33 @@
   // v2.6.0: project-scoped canonical transport state. This is the ONLY authority for linked BPM/CAPO/STEP.
   const SRP_CANONICAL_PREFIX='crp-srp-canonical-v1:';
   const SRP_LINK_SESSION_KEY='crp-srp-link-session-v3';
+  // v3.0.0: ONE transport record per linked CRP project. BPM/CAPO/STEP live here.
+  // The older handoff/live/canonical records are now mirrors only; they may not override this record.
+  const SRS_TRANSPORT_PREFIX='song-rider-suite-transport-v5:';
+  function suiteTransportKey(projectId){return SRS_TRANSPORT_PREFIX+String(projectId||'')}
+  function readSuiteTransport(projectId){
+    try{
+      const id=String(projectId||''); if(!id)return null;
+      const m=JSON.parse(localStorage.getItem(suiteTransportKey(id))||'null');
+      return m&&String(m.projectId||'')===id?m:null;
+    }catch{return null}
+  }
+  function writeSuiteTransport(projectId,meta,source='crp'){
+    if(IS_PLAYBACK_BRIDGE||!projectId)return null;
+    try{
+      const id=String(projectId),prev=readSuiteTransport(id)||{};
+      const next={
+        bpm:Math.max(40,Math.min(240,Number(meta?.bpm ?? prev.bpm ?? $('bpmInput')?.value)||92)),
+        capo:Math.max(0,Math.min(12,Number(meta?.capo ?? prev.capo ?? state.capo)||0)),
+        octave:Math.max(-2,Math.min(3,Number(meta?.octave ?? prev.octave ?? state.octave)||0)),
+        pitchMode:(meta?.pitchMode==='step'||meta?.pitchMode==='capo')?meta.pitchMode:(prev.pitchMode==='step'?'step':'capo'),
+        projectId:id,source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()
+      };
+      localStorage.setItem(suiteTransportKey(id),JSON.stringify(next));
+      try{window.__SRS_TRANSPORT_CHANNEL?.postMessage(next)}catch{}
+      return next;
+    }catch{return null}
+  }
   const IS_PLAYBACK_BRIDGE=new URLSearchParams(location.search).get('playbackBridge')==='1';
   function srpMetaKey(projectId){return SRP_META_PREFIX+String(projectId||'')}
   function unifiedSrpMetaKey(projectId){return SRP_UNIFIED_META_PREFIX+String(projectId||'')}
@@ -1336,10 +1363,12 @@
       const session=readSrpLinkSession();
       const explicitlyLinked=!!(session&&String(session.crpProjectId||'')===id);
       if(!explicitlyLinked)return base;
+      const suite=readSuiteTransport(id);
       const canonical=readCanonicalSrp(id);
-      if(canonical)return {...(base||{}),...canonical,crpProjectId:id};
       const live=readLiveSrpMeta();
-      return live&&String(live.crpProjectId||'')===id?{...(base||{}),...live}:base;
+      const legacy=(canonical?{...(base||{}),...canonical,crpProjectId:id}:(live&&String(live.crpProjectId||'')===id?{...(base||{}),...live}:base));
+      // Suite transport wins for BPM/CAPO/STEP. Legacy metadata may still contribute key/transpose.
+      return suite?{...(legacy||{}),...suite,crpProjectId:id}:legacy;
     }catch{return null}
   }
   function writeSharedSrpMeta(projectId,meta){
@@ -1360,6 +1389,7 @@
     const capo=Math.max(0,Math.min(12,Number(state.capo)||0));
     const octave=Math.max(-2,Math.min(3,Number(state.octave)||0));
     const meta={bpm,capo,octave,transpose:!!state.transpose,key:String($('keyInput')?.value||'').trim(),pitchMode:linkedPitchMode(id),source};
+    writeSuiteTransport(id,meta,source);
     const live=writeLiveSrpMeta(id,meta);
     // Keep the older per-project record current too, but never use it as a competing clock.
     try{
@@ -1369,26 +1399,32 @@
     return live;
   }
   function readHardSync(){
-    try{return readCanonicalSrp(activeSrpLinkId())||JSON.parse(localStorage.getItem(SRP_HARD_SYNC_KEY)||'null')}catch{return null}
+    try{
+      const id=activeSrpLinkId();
+      return readSuiteTransport(id)||readCanonicalSrp(id)||JSON.parse(localStorage.getItem(SRP_HARD_SYNC_KEY)||'null');
+    }catch{return null}
   }
   function writeHardSync(source='crp',modeOverride){
-    if(IS_PLAYBACK_BRIDGE||!currentProjectHasSrpLink())return null;
+    if(IS_PLAYBACK_BRIDGE)return null;
     try{
+      const session=readSrpLinkSession();
+      const id=String(state.currentProjectId||session?.crpProjectId||localStorage.getItem('crp-active-project-id')||'');
+      if(!id)return null;
       const bpm=Math.max(40,Math.min(240,Number($('bpmInput')?.value)||92));
       const capo=Math.max(0,Math.min(12,Number(state.capo)||0));
       const octave=Math.max(-2,Math.min(3,Number(state.octave)||0));
-      const id=String(state.currentProjectId||localStorage.getItem('crp-active-project-id')||'');
-      const prev=readHardSync()||{};
+      const prev=readSuiteTransport(id)||readHardSync()||{};
       const pitchMode=modeOverride==='step'||modeOverride==='capo'?modeOverride:(prev.pitchMode==='step'?'step':'capo');
-      const next={bpm,capo,octave,pitchMode,projectId:id,source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
+      const next=writeSuiteTransport(id,{bpm,capo,octave,pitchMode},source);
+      // Mirror for older non-transport bridge code, but never use it ahead of v5.
       writeCanonicalSrp(id,{bpm,capo,octave,pitchMode},source);
-      localStorage.setItem(SRP_HARD_SYNC_KEY,JSON.stringify(next));
+      localStorage.setItem(SRP_HARD_SYNC_KEY,JSON.stringify(next||{bpm,capo,octave,pitchMode,projectId:id,source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()}));
       return next;
     }catch{return null}
   }
   let __hardSyncRev=-1;
   function applyHardSync(){
-    if(IS_PLAYBACK_BRIDGE||!currentProjectHasSrpLink())return false;
+    if(IS_PLAYBACK_BRIDGE)return false;
     try{
       const m=readHardSync();
       if(!m)return false;
@@ -1593,10 +1629,11 @@
   }
   try{window.__CRP_SRP_META_CHANNEL=new BroadcastChannel('crp-srp-live-meta-v3');window.__CRP_SRP_META_CHANNEL.onmessage=()=>setTimeout(applyLinkedMetaFromSrpHandoff,0);}catch{}
   try{window.__CRP_SRP_CANONICAL_CHANNEL=new BroadcastChannel('crp-srp-canonical-v1');window.__CRP_SRP_CANONICAL_CHANNEL.onmessage=()=>setTimeout(applyHardSync,0);}catch{}
+  try{window.__SRS_TRANSPORT_CHANNEL=new BroadcastChannel('song-rider-suite-transport-v5');window.__SRS_TRANSPORT_CHANNEL.onmessage=()=>setTimeout(applyHardSync,0);}catch{}
   window.addEventListener('storage',e=>{if(e.key===SRP_LIVE_META_KEY||e.key===SRP_HANDOFF_KEY||String(e.key||'').startsWith(SRP_META_PREFIX))applyLinkedMetaFromSrpHandoff();});
   window.addEventListener('pageshow',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
   window.addEventListener('focus',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
-  window.addEventListener('storage',e=>{if(e.key===SRP_HARD_SYNC_KEY||e.key===SRP_LINK_SESSION_KEY||String(e.key||'').startsWith(SRP_CANONICAL_PREFIX))setTimeout(applyHardSync,0);});
+  window.addEventListener('storage',e=>{if(e.key===SRP_HARD_SYNC_KEY||e.key===SRP_LINK_SESSION_KEY||String(e.key||'').startsWith(SRP_CANONICAL_PREFIX)||String(e.key||'').startsWith(SRS_TRANSPORT_PREFIX))setTimeout(applyHardSync,0);});
   window.addEventListener('pageshow',()=>setTimeout(applyHardSync,0));
   if(!IS_PLAYBACK_BRIDGE)window.addEventListener('pagehide',()=>{try{writeNavigationSnapshot();}catch{}});
   window.addEventListener('focus',()=>setTimeout(applyHardSync,0));
@@ -1670,58 +1707,4 @@
 
   init();
 })();
-/* Song Rider Suite transport bridge v3.0.0
-   One workspace-wide source of truth for BPM / CAPO / STEP.
-   Deliberately independent of the older CRP<->SRP project-link metadata. */
-(function(){
-  const KEY='song-rider-suite-transport-v1';
-  let applying=false,lastStamp=0;
-  const $=id=>document.getElementById(id);
-  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
-  const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch{return null}};
-  function publish(mode){
-    if(applying || new URLSearchParams(location.search).get('playbackBridge')==='1') return;
-    const prev=read()||{};
-    const next={
-      bpm:clamp(Number($('bpmInput')?.value)||92,40,240),
-      capo:clamp(Number(state.capo)||0,0,12),
-      step:clamp(Number(state.octave)||0,-2,3),
-      mode:(mode==='step'||mode==='capo')?mode:(prev.mode==='step'?'step':'capo'),
-      stamp:Date.now(),source:'crp'
-    };
-    try{localStorage.setItem(KEY,JSON.stringify(next));lastStamp=next.stamp;window.__SRS_TRANSPORT_CH?.postMessage(next)}catch{}
-  }
-  function apply(){
-    if(new URLSearchParams(location.search).get('playbackBridge')==='1') return;
-    const m=read(); if(!m||Number(m.stamp)<=lastStamp)return;
-    const active=document.activeElement;if(active===$('bpmInput')||active===$('capoSelect'))return;
-    applying=true;
-    try{
-      lastStamp=Number(m.stamp)||0;
-      const bpm=clamp(Number(m.bpm)||92,40,240),capo=clamp(Number(m.capo)||0,0,12),step=clamp(Number(m.step)||0,-2,3);
-      if($('bpmInput'))$('bpmInput').value=String(bpm);
-      state.capo=capo;if($('capoSelect'))$('capoSelect').value=String(capo);
-      state.octave=step;
-      renderAll();window.CRPParts?.syncCoreLive?.();
-      if(state.currentProjectId){
-        const ps=localProjects(),i=ps.findIndex(p=>String(p?.id||'')===String(state.currentProjectId));
-        if(i>=0){ps[i]={...ps[i],bpm,capo,octave:step,updatedAt:Date.now()};saveLocalProjects(ps);updateCloudSnapshot(ps[i]);}
-      }
-    }finally{applying=false}
-  }
-  function bind(){
-    $('bpmInput')?.addEventListener('change',()=>setTimeout(()=>publish(),0));
-    $('bpmInput')?.addEventListener('blur',()=>setTimeout(()=>publish(),0));
-    $('capoSelect')?.addEventListener('change',()=>setTimeout(()=>publish('capo'),0));
-    $('octaveDown')?.addEventListener('click',()=>setTimeout(()=>publish('step'),0));
-    $('octaveUp')?.addEventListener('click',()=>setTimeout(()=>publish('step'),0));
-    try{window.__SRS_TRANSPORT_CH=new BroadcastChannel(KEY);window.__SRS_TRANSPORT_CH.onmessage=()=>setTimeout(apply,0)}catch{}
-    window.addEventListener('storage',e=>{if(e.key===KEY)setTimeout(apply,0)});
-    window.addEventListener('pageshow',()=>setTimeout(apply,0));window.addEventListener('focus',()=>setTimeout(apply,0));
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(apply,0)});
-    setInterval(apply,300);
-    // Seed only if no suite record exists; never overwrite a value from SRP on navigation.
-    if(!read())publish('capo'); else setTimeout(apply,0);
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
-})();
+
