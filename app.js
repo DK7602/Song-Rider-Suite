@@ -1668,25 +1668,60 @@
     noteAtMidi
   };
 
-  // Song Rider Suite transport adapter. Lives INSIDE the CRP closure so it can access real state.
-  window.SRS_TRANSPORT_ADAPTER={
-    get(){return {bpm:Math.max(40,Math.min(240,Number($("bpmInput")?.value)||92)),capo:Math.max(0,Math.min(12,Number(state.capo)||0)),step:Math.max(-2,Math.min(3,Number(state.octave)||0)),mode:linkedPitchMode(state.currentProjectId)}},
-    set(m){
-      const bpm=Math.max(40,Math.min(240,Number(m?.bpm)||92)),capo=Math.max(0,Math.min(12,Number(m?.capo)||0)),step=Math.max(-2,Math.min(3,Number(m?.step)||0));
-      if($("bpmInput"))$("bpmInput").value=String(bpm); state.capo=capo; if($("capoSelect"))$("capoSelect").value=String(capo); state.octave=step;
-      if(state.currentProjectId){const ps=localProjects(),i=ps.findIndex(x=>String(x?.id||'')===String(state.currentProjectId));if(i>=0){ps[i]={...ps[i],bpm,capo,octave:step,updatedAt:Date.now()};saveLocalProjects(ps);updateCloudSnapshot(ps[i]);}}
-      renderAll(); window.CRPParts?.syncCoreLive?.();
-    }
-  };
   init();
 })();
-
-/* Song Rider Suite transport bus v4.0.0 - shared by CRP, Baby DAW and SRP. */
+/* Song Rider Suite transport bridge v3.0.0
+   One workspace-wide source of truth for BPM / CAPO / STEP.
+   Deliberately independent of the older CRP<->SRP project-link metadata. */
 (function(){
- const KEY='song-rider-suite-transport-v2', A=()=>window.SRS_TRANSPORT_ADAPTER, clamp=(n,a,b)=>Math.max(a,Math.min(b,n)); let applying=false,last=0;
- const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch{return null}};
- function pub(mode){if(applying||new URLSearchParams(location.search).get('playbackBridge')==='1'||!A())return;const v=A().get(),old=read()||{};const x={bpm:v.bpm,capo:v.capo,step:v.step,mode:mode||v.mode||old.mode||'capo',stamp:Date.now()};localStorage.setItem(KEY,JSON.stringify(x));last=x.stamp;try{window.__SRS4?.postMessage(x)}catch{}}
- function apply(){if(!A())return;const x=read();if(!x||Number(x.stamp)<=last)return;last=Number(x.stamp);applying=true;try{A().set(x)}finally{applying=false}}
- function bind(){const bpm=document.getElementById('bpmInput'),capo=document.getElementById('capoSelect');bpm?.addEventListener('change',()=>setTimeout(pub,0));bpm?.addEventListener('blur',()=>setTimeout(pub,0));capo?.addEventListener('change',()=>setTimeout(()=>pub('capo'),0));document.getElementById('octaveDown')?.addEventListener('click',()=>setTimeout(()=>pub('step'),0));document.getElementById('octaveUp')?.addEventListener('click',()=>setTimeout(()=>pub('step'),0));try{window.__SRS4=new BroadcastChannel(KEY);window.__SRS4.onmessage=apply}catch{}window.addEventListener('storage',e=>{if(e.key===KEY)apply()});window.addEventListener('pageshow',apply);window.addEventListener('focus',apply);setInterval(apply,250);if(read())apply();else pub('capo')}
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
+  const KEY='song-rider-suite-transport-v1';
+  let applying=false,lastStamp=0;
+  const $=id=>document.getElementById(id);
+  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+  const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch{return null}};
+  function publish(mode){
+    if(applying || new URLSearchParams(location.search).get('playbackBridge')==='1') return;
+    const prev=read()||{};
+    const next={
+      bpm:clamp(Number($('bpmInput')?.value)||92,40,240),
+      capo:clamp(Number(state.capo)||0,0,12),
+      step:clamp(Number(state.octave)||0,-2,3),
+      mode:(mode==='step'||mode==='capo')?mode:(prev.mode==='step'?'step':'capo'),
+      stamp:Date.now(),source:'crp'
+    };
+    try{localStorage.setItem(KEY,JSON.stringify(next));lastStamp=next.stamp;window.__SRS_TRANSPORT_CH?.postMessage(next)}catch{}
+  }
+  function apply(){
+    if(new URLSearchParams(location.search).get('playbackBridge')==='1') return;
+    const m=read(); if(!m||Number(m.stamp)<=lastStamp)return;
+    const active=document.activeElement;if(active===$('bpmInput')||active===$('capoSelect'))return;
+    applying=true;
+    try{
+      lastStamp=Number(m.stamp)||0;
+      const bpm=clamp(Number(m.bpm)||92,40,240),capo=clamp(Number(m.capo)||0,0,12),step=clamp(Number(m.step)||0,-2,3);
+      if($('bpmInput'))$('bpmInput').value=String(bpm);
+      state.capo=capo;if($('capoSelect'))$('capoSelect').value=String(capo);
+      state.octave=step;
+      renderAll();window.CRPParts?.syncCoreLive?.();
+      if(state.currentProjectId){
+        const ps=localProjects(),i=ps.findIndex(p=>String(p?.id||'')===String(state.currentProjectId));
+        if(i>=0){ps[i]={...ps[i],bpm,capo,octave:step,updatedAt:Date.now()};saveLocalProjects(ps);updateCloudSnapshot(ps[i]);}
+      }
+    }finally{applying=false}
+  }
+  function bind(){
+    $('bpmInput')?.addEventListener('change',()=>setTimeout(()=>publish(),0));
+    $('bpmInput')?.addEventListener('blur',()=>setTimeout(()=>publish(),0));
+    $('capoSelect')?.addEventListener('change',()=>setTimeout(()=>publish('capo'),0));
+    $('octaveDown')?.addEventListener('click',()=>setTimeout(()=>publish('step'),0));
+    $('octaveUp')?.addEventListener('click',()=>setTimeout(()=>publish('step'),0));
+    try{window.__SRS_TRANSPORT_CH=new BroadcastChannel(KEY);window.__SRS_TRANSPORT_CH.onmessage=()=>setTimeout(apply,0)}catch{}
+    window.addEventListener('storage',e=>{if(e.key===KEY)setTimeout(apply,0)});
+    window.addEventListener('pageshow',()=>setTimeout(apply,0));window.addEventListener('focus',()=>setTimeout(apply,0));
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(apply,0)});
+    setInterval(apply,300);
+    // Seed only if no suite record exists; never overwrite a value from SRP on navigation.
+    if(!read())publish('capo'); else setTimeout(apply,0);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
 })();
