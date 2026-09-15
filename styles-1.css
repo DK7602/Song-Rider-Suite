@@ -2753,3 +2753,70 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .workspace-chord-rider .crp-pro-titlebar{grid-template-columns:minmax(0,1fr) 56px!important;column-gap:4px!important;}
   .workspace-chord-rider .crp-pro-wordmark-img{width:84.8%!important;max-width:84.8%!important;max-height:64px!important;}
 }
+
+/* v2.9.17 — final CRP wordmark correction.
+   Complete the source O on a real transparent canvas and size by height,
+   exactly like SRP (64px max), rather than enlarging by available width. */
+.workspace-chord-rider .crp-pro-titlebar{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 56px!important;
+  align-items:center!important;
+  column-gap:8px!important;
+  overflow:visible!important;
+}
+.workspace-chord-rider .crp-pro-wordmark-img{
+  display:block!important;
+  width:auto!important;
+  height:auto!important;
+  max-width:100%!important;
+  max-height:64px!important;
+  min-width:0!important;
+  justify-self:start!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+  transform:none!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:visible!important;
+}
+.workspace-chord-rider .crp-controls-toggle{
+  width:56px!important;min-width:56px!important;max-width:56px!important;
+  height:38px!important;min-height:38px!important;margin:0!important;padding:0 6px!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{grid-template-columns:minmax(0,1fr) 56px!important;column-gap:8px!important;}
+  .workspace-chord-rider .crp-pro-wordmark-img{width:auto!important;max-width:100%!important;max-height:64px!important;}
+}
+
+/* v2.9.18 — use the user-supplied complete CRP title artwork verbatim.
+   The source has a complete final O plus extra right-side canvas.
+   Match SRP by the same 64px title height and keep the toggle in its own grid cell. */
+.workspace-chord-rider .crp-pro-titlebar{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 56px!important;
+  align-items:center!important;
+  column-gap:8px!important;
+  overflow:visible!important;
+}
+.workspace-chord-rider .crp-pro-wordmark-img{
+  display:block!important;
+  width:auto!important;
+  height:64px!important;
+  max-height:64px!important;
+  max-width:100%!important;
+  min-width:0!important;
+  justify-self:start!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+  transform:none!important;
+  margin:0!important;
+  padding:0!important;
+}
+.workspace-chord-rider .crp-controls-toggle{
+  width:56px!important;min-width:56px!important;max-width:56px!important;
+  height:38px!important;min-height:38px!important;margin:0!important;padding:0 6px!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{grid-template-columns:minmax(0,1fr) 56px!important;column-gap:8px!important;}
+  .workspace-chord-rider .crp-pro-wordmark-img{height:64px!important;max-height:64px!important;max-width:100%!important;}
+}
