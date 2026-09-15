@@ -2704,3 +2704,41 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
     column-gap:10px!important;
   }
 }
+
+/* v2.9.20 — larger CRP title, toggle locked in final/right position.
+   Uses the complete-O artwork; no clipping/overflow tricks. */
+.workspace-chord-rider .crp-pro-titlebar{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 56px!important;
+  align-items:center!important;
+  column-gap:4px!important;
+  overflow:visible!important;
+}
+.workspace-chord-rider .crp-pro-wordmark-img{
+  display:block!important;
+  order:1!important;
+  width:100%!important;
+  max-width:100%!important;
+  height:auto!important;
+  max-height:none!important;
+  min-width:0!important;
+  justify-self:stretch!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+  transform:none!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:visible!important;
+}
+.workspace-chord-rider .crp-controls-toggle{
+  order:2!important;
+  grid-column:2!important;
+  justify-self:end!important;
+  width:56px!important;min-width:56px!important;max-width:56px!important;
+  height:38px!important;min-height:38px!important;
+  margin:0!important;padding:0 6px!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{grid-template-columns:minmax(0,1fr) 56px!important;column-gap:4px!important;}
+  .workspace-chord-rider .crp-pro-wordmark-img{width:100%!important;max-width:100%!important;padding:0!important;}
+}
