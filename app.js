@@ -940,7 +940,7 @@
       ? `“${p.name}” moved to Archive.`
       : `“${p.name}” restored to Projects.`;
   }
-  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;const __srpSession=readSrpLinkSession();const shared=(__srpSession&&String(__srpSession.crpProjectId||'')===String(id))?readSharedSrpMeta(id):null;if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
+  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;p=recoverNavigationSnapshot(p);upsertLocal(p);const __srpSession=readSrpLinkSession();const shared=(__srpSession&&String(__srpSession.crpProjectId||'')===String(id))?readSharedSrpMeta(id):null;if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
   function renderProjects(){
     const w=$('projectList');
@@ -1137,7 +1137,7 @@
   function downloadDataUrl(dataUrl,name){const a=document.createElement('a');a.href=dataUrl;a.download=name;document.body.appendChild(a);a.click();a.remove();}
   async function exportPng(){
     closeExportMenu();$('status').textContent='Creating PNG chord sheet…';
-    try{const {canvas}=await captureExportSheet();downloadDataUrl(canvas.toDataURL('image/png'),exportFileName('png'));$('status').textContent='PNG chord sheet exported.';}
+    try{const {canvas}=await captureExportSheet(false,{drums:true,notes:false});downloadDataUrl(canvas.toDataURL('image/png'),exportFileName('png'));$('status').textContent='PNG chord sheet exported.';}
     catch(e){$('status').textContent=e.message||'Could not export PNG.';}
   }
   function closePdfExport(){document.getElementById('pdfExportModal')?.remove();}
@@ -1399,16 +1399,42 @@
       return true;
     }catch{return false}
   }
+  // v2.9.5: emergency project snapshot used across workspace navigation.
+  // It is written synchronously before leaving CRP/Baby DAW so newly-added parts
+  // cannot be lost to an older project payload during the SRP handoff.
+  const CRP_NAV_SNAPSHOT_PREFIX='crp-nav-snapshot-v1:';
+  function writeNavigationSnapshot(){
+    if(!state.currentProjectId)return null;
+    try{
+      window.CRPParts?.syncActiveChord?.();
+      const existing=localProjects().find(x=>String(x?.id||'')===String(state.currentProjectId));
+      const nm=$('projectName').value.trim()||existing?.name||`Chord Project ${new Date().toLocaleDateString()}`;
+      const snap=capture(state.currentProjectId,nm);
+      upsertLocal(snap);
+      localStorage.setItem(CRP_NAV_SNAPSHOT_PREFIX+String(state.currentProjectId),JSON.stringify(snap));
+      localStorage.setItem('crp-active-project-id',String(state.currentProjectId));
+      return snap;
+    }catch(err){console.warn('Could not write navigation snapshot',err);return null;}
+  }
+  function recoverNavigationSnapshot(project){
+    if(!project?.id)return project;
+    try{
+      const raw=localStorage.getItem(CRP_NAV_SNAPSHOT_PREFIX+String(project.id));
+      if(!raw)return project;
+      const snap=JSON.parse(raw);
+      if(!snap||String(snap.id||'')!==String(project.id))return project;
+      const projectParts=project.parts?.items?.length||0,snapParts=snap.parts?.items?.length||0;
+      // Prefer the navigation snapshot when it contains newer/more complete Baby DAW data.
+      if(snapParts>projectParts || Number(snap.updatedAt||0)>=Number(project.updatedAt||0))return {...project,...snap};
+    }catch(err){console.warn('Could not recover navigation snapshot',err);}
+    return project;
+  }
+
   function openSongRiderWorkspace(){
     try{
       // Persist the exact active project snapshot before leaving CRP.
       // This prevents SRP from seeing stale data and lets CRP restore the same project on return.
-      if(state.currentProjectId){
-        const existing=localProjects().find(x=>x.id===state.currentProjectId);
-        const nm=$('projectName').value.trim()||existing?.name||`Chord Project ${new Date().toLocaleDateString()}`;
-        upsertLocal(capture(state.currentProjectId,nm));
-        localStorage.setItem('crp-active-project-id',String(state.currentProjectId));
-      }
+      writeNavigationSnapshot();
       publishLiveSrpMeta('crp');
       writeHardSync('crp');
       const payload=srpPayload();
@@ -1550,6 +1576,7 @@
   window.addEventListener('focus',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
   window.addEventListener('storage',e=>{if(e.key===SRP_HARD_SYNC_KEY||e.key===SRP_LINK_SESSION_KEY||String(e.key||'').startsWith(SRP_CANONICAL_PREFIX))setTimeout(applyHardSync,0);});
   window.addEventListener('pageshow',()=>setTimeout(applyHardSync,0));
+  window.addEventListener('pagehide',()=>{try{writeNavigationSnapshot();}catch{}});
   window.addEventListener('focus',()=>setTimeout(applyHardSync,0));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSync,0);});
   setInterval(applyHardSync,250);

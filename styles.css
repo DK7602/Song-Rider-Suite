@@ -2405,3 +2405,8 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
     max-height:62px!important;
   }
 }
+
+/* v2.9.5 — match CRP title prominence to SRP and make Hide/Show compact */
+.crp-controls-toggle{min-width:60px!important;min-height:40px!important;padding:0 11px!important;border-radius:12px!important;font-size:.82rem!important;}
+.crp-pro-wordmark-img{max-width:calc(100% - 68px)!important;max-height:82px!important;}
+@media(max-width:520px){.crp-controls-toggle{min-width:56px!important;min-height:38px!important;padding:0 9px!important;font-size:.78rem!important}.crp-pro-wordmark-img{max-width:calc(100% - 62px)!important;max-height:72px!important;}}

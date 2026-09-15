@@ -1,0 +1,9 @@
+Song Rider Suite v2.9.5 workday fixes
+
+- SRP Hide/Show state now persists across workspace changes, reloads, and reopening SRP.
+- Baby DAW parts get a synchronous navigation snapshot before entering SRP and are recovered on return, protecting newly added parts from stale project payloads.
+- Existing BPM / capo / step canonical sync logic is preserved.
+- PDF export now loads a known-stable jsPDF UMD release (2.5.1) instead of the broken 2.5.3 CDN reference.
+- PNG export now includes the full enabled Baby DAW arrangement plus drums by default.
+- CRP title is larger and the CRP Hide/Show button is smaller; SRP Hide/Show sizing is matched.
+- Service-worker cache version bumped so deployed devices fetch these updates.
