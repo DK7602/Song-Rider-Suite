@@ -2437,3 +2437,42 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .crp-pro-wordmark-img{max-width:calc(100% - 52px)!important;max-height:74px!important;}
   .crp-controls-toggle{min-width:46px!important;min-height:32px!important;padding:0 6px!important;font-size:.70rem!important;}
 }
+
+/* v2.9.8 — authoritative CRP header layout. Full PRO must fit; Hide gets no surplus box. */
+.crp-pro-titlebar{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:center!important;
+  column-gap:4px!important;
+}
+.workspace-baby-daw .crp-pro-titlebar{display:none!important;}
+.workspace-chord-rider .crp-pro-titlebar{display:grid!important;}
+.crp-pro-wordmark-img{
+  display:block!important;
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+  height:auto!important;
+  max-height:82px!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+}
+.crp-controls-toggle{
+  box-sizing:border-box!important;
+  flex:none!important;
+  width:auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  min-height:32px!important;
+  height:32px!important;
+  padding:0 6px!important;
+  margin:0!important;
+  border-radius:10px!important;
+  font-size:.70rem!important;
+  line-height:1!important;
+}
+@media(max-width:520px){
+  .crp-pro-titlebar{column-gap:3px!important;}
+  .crp-pro-wordmark-img{width:100%!important;max-width:none!important;max-height:72px!important;}
+  .crp-controls-toggle{height:30px!important;min-height:30px!important;padding:0 5px!important;font-size:.68rem!important;}
+}
