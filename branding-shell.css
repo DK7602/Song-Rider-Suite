@@ -241,49 +241,67 @@
   }
 }
 
-/* v3.0.0 — user-approved Song Rider Suite header + workspace button redesign */
-.suite-master-header>img{width:100%!important;height:auto!important;display:block!important;}
+/* v3.1.0 — rebuilt to match the supplied Song Rider Suite reference proportions */
+.suite-master-header>img{display:block!important;width:100%!important;height:auto!important;}
 .workspace-mode-switch,.crp-srp-modes.workspace-mode-switch{
-  max-width:none!important;grid-template-columns:minmax(0,.92fr) minmax(0,1.12fr) minmax(0,.92fr)!important;
-  gap:24px!important;padding:26px 42px 36px!important;background:#10141a!important;
+  width:100%!important;max-width:none!important;
+  display:grid!important;grid-template-columns:29.2fr 36.4fr 29.2fr!important;
+  align-items:stretch!important;gap:1.25vw!important;
+  padding:2.25vw 2.65vw 2.55vw!important;
+  margin:0!important;box-sizing:border-box!important;
+  background:#10141a!important;border-bottom:1px solid #2d3540!important;
 }
 .workspace-mode-btn,.crp-srp-mode.workspace-mode-btn{
-  min-height:336px!important;border:3px solid #46505d!important;border-radius:48px!important;
-  gap:18px!important;padding:24px 22px!important;background:#11161d!important;
+  width:100%!important;min-width:0!important;max-width:none!important;
+  min-height:0!important;height:auto!important;aspect-ratio:1.30/1!important;
+  display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;
+  gap:1.0vw!important;padding:1.55vw 1.25vw!important;box-sizing:border-box!important;
+  border:.20vw solid #46505d!important;border-radius:3.0vw!important;
+  background:#11161d!important;color:#c8ced6!important;overflow:hidden!important;text-decoration:none!important;
 }
+.workspace-mode-btn:nth-child(2),.crp-srp-mode.workspace-mode-btn:nth-child(2){aspect-ratio:1.61/1!important;}
 .workspace-mode-btn.active,.crp-srp-mode.workspace-mode-btn.active{
-  border-color:#f2c44d!important;box-shadow:0 0 0 3px rgba(255,217,104,.38),0 0 30px rgba(238,183,48,.48),inset 0 0 30px rgba(231,178,43,.10)!important;
+  border-color:#f2c44d!important;color:#fff5cf!important;
+  background:radial-gradient(circle at 48% 40%,rgba(111,76,13,.30),transparent 68%),linear-gradient(145deg,#2b2413,#14181e)!important;
+  box-shadow:0 0 0 .13vw rgba(255,217,104,.48),0 0 1.55vw rgba(238,183,48,.55),inset 0 0 1.5vw rgba(231,178,43,.10)!important;
 }
 .workspace-mode-btn .mode-art,.crp-srp-mode.workspace-mode-btn .mode-art{
-  flex:0 0 48%!important;width:48%!important;height:auto!important;min-height:190px!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  flex:0 0 56%!important;width:56%!important;height:100%!important;min-height:0!important;
+  border:0!important;background:transparent!important;overflow:visible!important;
 }
 .workspace-mode-btn .mode-art img,.crp-srp-mode.workspace-mode-btn .mode-art img{
-  width:100%!important;height:auto!important;max-height:250px!important;object-fit:contain!important;
+  display:block!important;width:100%!important;height:100%!important;max-height:none!important;
+  object-fit:contain!important;border:0!important;background:transparent!important;box-shadow:none!important;
+}
+.workspace-mode-btn .mode-copy,.crp-srp-mode.workspace-mode-btn .mode-copy{
+  flex:1 1 44%!important;min-width:0!important;display:flex!important;flex-direction:column!important;
+  align-items:flex-start!important;justify-content:center!important;text-align:left!important;line-height:1.05!important;
 }
 .workspace-mode-btn .mode-copy strong,.crp-srp-mode.workspace-mode-btn .mode-copy strong{
-  font-size:clamp(1.45rem,3vw,2.55rem)!important;line-height:1.08!important;font-weight:800!important;
+  font-size:clamp(.72rem,3.05vw,2.55rem)!important;line-height:1.04!important;font-weight:800!important;white-space:normal!important;
 }
 .workspace-mode-btn .mode-copy small,.crp-srp-mode.workspace-mode-btn .mode-copy small{
-  margin-top:20px!important;font-size:clamp(1rem,2vw,1.75rem)!important;line-height:1.22!important;
+  margin-top:1.35vw!important;font-size:clamp(.50rem,1.82vw,1.48rem)!important;line-height:1.20!important;
+  color:#9ba4b0!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;
 }
-.workspace-mode-btn:nth-child(2),.crp-srp-mode.workspace-mode-btn:nth-child(2){position:relative!important;}
+.workspace-mode-btn.active .mode-copy small,.crp-srp-mode.workspace-mode-btn.active .mode-copy small{color:#e6d29a!important;}
 .workspace-mode-btn .baby-mode-art,.crp-srp-mode.workspace-mode-btn .baby-mode-art{
-  position:relative!important;flex:0 0 52%!important;width:52%!important;height:250px!important;min-height:250px!important;
+  position:relative!important;flex:0 0 56%!important;width:56%!important;height:100%!important;min-height:0!important;
 }
 .workspace-mode-btn .baby-mode-art .baby-skull,.crp-srp-mode.workspace-mode-btn .baby-mode-art .baby-skull{
-  position:absolute!important;left:0!important;top:0!important;width:82%!important;height:100%!important;object-fit:contain!important;
+  position:absolute!important;left:0!important;top:4%!important;width:82%!important;height:92%!important;object-fit:contain!important;
 }
 .workspace-mode-btn .baby-mode-art .baby-mic,.crp-srp-mode.workspace-mode-btn .baby-mode-art .baby-mic{
-  position:absolute!important;right:-8%!important;top:-7%!important;width:35%!important;height:92%!important;object-fit:contain!important;filter:drop-shadow(0 4px 5px rgba(0,0,0,.72))!important;
+  position:absolute!important;right:-1%!important;top:2%!important;width:31%!important;height:86%!important;object-fit:contain!important;
+  filter:drop-shadow(0 .25vw .3vw rgba(0,0,0,.72))!important;
 }
-.workspace-mode-btn:nth-child(2) .mode-copy small,.crp-srp-mode.workspace-mode-btn:nth-child(2) .mode-copy small{font-size:clamp(.9rem,1.65vw,1.45rem)!important;}
+.workspace-mode-btn:nth-child(2) .mode-copy small,.crp-srp-mode.workspace-mode-btn:nth-child(2) .mode-copy small{
+  font-size:clamp(.46rem,1.55vw,1.30rem)!important;
+}
 @media(max-width:700px){
-  .workspace-mode-switch,.crp-srp-modes.workspace-mode-switch{gap:8px!important;padding:12px 10px 18px!important;}
-  .workspace-mode-btn,.crp-srp-mode.workspace-mode-btn{min-height:168px!important;border-width:2px!important;border-radius:24px!important;gap:4px!important;padding:10px 7px!important;}
-  .workspace-mode-btn .mode-art,.crp-srp-mode.workspace-mode-btn .mode-art{flex-basis:48%!important;width:48%!important;min-height:94px!important;}
-  .workspace-mode-btn .mode-art img,.crp-srp-mode.workspace-mode-btn .mode-art img{max-height:120px!important;}
-  .workspace-mode-btn .baby-mode-art,.crp-srp-mode.workspace-mode-btn .baby-mode-art{height:116px!important;min-height:116px!important;flex-basis:52%!important;width:52%!important;}
-  .workspace-mode-btn .mode-copy strong,.crp-srp-mode.workspace-mode-btn .mode-copy strong{font-size:clamp(.82rem,4vw,1.25rem)!important;}
-  .workspace-mode-btn .mode-copy small,.crp-srp-mode.workspace-mode-btn .mode-copy small{margin-top:8px!important;font-size:clamp(.58rem,2.7vw,.88rem)!important;}
-  .workspace-mode-btn:nth-child(2) .mode-copy small,.crp-srp-mode.workspace-mode-btn:nth-child(2) .mode-copy small{font-size:clamp(.52rem,2.25vw,.76rem)!important;}
+  .workspace-mode-switch,.crp-srp-modes.workspace-mode-switch{gap:6px!important;padding:9px 10px 11px!important;}
+  .workspace-mode-btn,.crp-srp-mode.workspace-mode-btn{gap:4px!important;padding:7px 5px!important;border-width:1.5px!important;border-radius:13px!important;}
+  .workspace-mode-btn.active,.crp-srp-mode.workspace-mode-btn.active{box-shadow:0 0 0 1px rgba(255,217,104,.45),0 0 8px rgba(238,183,48,.5),inset 0 0 8px rgba(231,178,43,.10)!important;}
+  .workspace-mode-btn .mode-copy small,.crp-srp-mode.workspace-mode-btn .mode-copy small{margin-top:5px!important;}
 }
