@@ -16586,8 +16586,17 @@ KEEP RHYME UI ABOVE KEYBOARD
   function activeUnifiedCrpId(){
     try{
       const x=readLinkSession();
-      if(!x||!state.project||String(x.srpProjectId||'')!==String(state.project.id||''))return '';
-      return String(x.crpProjectId||'');
+      if(!x)return '';
+      // The explicit link session is the transport authority. During page navigation/init,
+      // state.project can briefly be null or a stale SRP project; do not let that timing gap
+      // disconnect BPM/CAPO/STEP from CRP + Baby DAW.
+      const crpId=String(x.crpProjectId||'');
+      if(!crpId)return '';
+      if(!state.project)return crpId;
+      const sid=String(state.project.id||'');
+      const linkedId=String(state.project.linkedCrpProjectId||'');
+      if(sid===String(x.srpProjectId||'') || linkedId===crpId)return crpId;
+      return '';
     }catch{return ''}
   }
   function readLiveMeta(){
@@ -16845,10 +16854,14 @@ KEEP RHYME UI ABOVE KEYBOARD
 
   function activeLinkedCrpId(){
     const x=readLinkSession();
-    if(!x||!state.project)return '';
-    if(String(x.srpProjectId||'')!==String(state.project.id||''))return '';
-    if(String(state.project.linkedCrpProjectId||'')!==String(x.crpProjectId||''))return '';
-    return String(x.crpProjectId||'');
+    if(!x)return '';
+    const crpId=String(x.crpProjectId||'');
+    if(!crpId)return '';
+    // Same rule as activeUnifiedCrpId(): the saved explicit pair remains linked while the
+    // SRP page is initializing/leaving. This is especially important on Android navigation.
+    if(!state.project)return crpId;
+    if(String(state.project.id||'')===String(x.srpProjectId||'') || String(state.project.linkedCrpProjectId||'')===crpId)return crpId;
+    return '';
   }
   function syncMetaToCrp(){
     try{
@@ -17077,7 +17090,7 @@ KEEP RHYME UI ABOVE KEYBOARD
     setInterval(applyLiveMetaToSrp,500);
     if(window.__SRP_INIT_DONE)setTimeout(reconcileLinkedWorkspace,0);
     // Flush the live number fields before leaving SRP for CRP/BD.
-    document.querySelectorAll('.workspace-mode-btn[href^="../index.html"]').forEach(a=>a.addEventListener('pointerdown',()=>syncMetaToCrp(),true));
+    document.querySelectorAll('.workspace-mode-btn[href^="../index.html"]').forEach(a=>a.addEventListener('pointerdown',()=>{syncMetaToCrp();writeHardSyncFromSrp();},true));
     window.addEventListener('pagehide',()=>syncMetaToCrp());
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')syncMetaToCrp();});
     window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='srp-show-full-song'){try{goToSection('Full');}catch{}}if(e.data?.type==='crp-playback-state'){window.__SRP_LINKED_PLAYING=!!e.data.playing;try{renderSheetTitleBar();}catch{}}});
