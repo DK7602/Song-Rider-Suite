@@ -15954,6 +15954,7 @@ if(el.capoInput){
     if(state.drumsOn) startDrums();
     restartClockIfRunning();
     window.CRP_SRP_syncMetaToCrp?.();
+    window.CRP_SRP_writeHardSyncFromSrp?.();
   }
 
   if(el.bpmInput) el.bpmInput.addEventListener("input", () => {
@@ -15988,24 +15989,13 @@ if(el.bpmInput){
     el.bpmInput.addEventListener("blur", commitBpm);
   }
 
-  // ===== CAPO (legacy; kept for compatibility) =====
+  // ===== CAPO / STEP =====
+  // One commit path for both modes. The old handler always wrote CAPO, even while STEP was active.
   function commitCapo(){
     if(!el.capoInput) return;
-    let n = parseInt(el.capoInput.value, 10);
-    if(!Number.isFinite(n)) n = 0;
-    n = clamp(n, 0, 12);
-
-    state.capo = n;
-    el.capoInput.value = String(n);
-
-    if(state.project){
-      state.project.capo = n;
-      upsertProject(state.project);
-    }
-
-    updateKeyFromAllNotes();
-    updateFullIfVisible();
-    refreshDisplayedNoteCells();
+    commitCapoStepFromInput();
+    window.CRP_SRP_syncMetaToCrp?.();
+    window.CRP_SRP_writeHardSyncFromSrp?.();
   }
 
  if(el.capoInput) el.capoInput.addEventListener("input", () => {
@@ -16571,6 +16561,28 @@ KEEP RHYME UI ABOVE KEYBOARD
   const CANONICAL_PREFIX='crp-srp-canonical-v1:';
   // v2.7.0: explicit pair link. Merely opening SRP is never a link.
   const LINK_SESSION_KEY='crp-srp-link-session-v3';
+  // v3.0.0: ONE authoritative transport record per linked CRP project.
+  const SRS_TRANSPORT_PREFIX='song-rider-suite-transport-v5:';
+  function suiteTransportKey(id){return SRS_TRANSPORT_PREFIX+String(id||'')}
+  function readSuiteTransport(id){
+    try{const sid=String(id||'');if(!sid)return null;const m=readJson(suiteTransportKey(sid),null);return m&&String(m.projectId||'')===sid?m:null}catch{return null}
+  }
+  function writeSuiteTransport(id,meta,source='srp'){
+    if(!id)return null;
+    try{
+      const sid=String(id),prev=readSuiteTransport(sid)||{};
+      const next={
+        bpm:Math.max(40,Math.min(240,Number(meta?.bpm ?? prev.bpm ?? state.bpm)||95)),
+        capo:Math.max(0,Math.min(12,Number(meta?.capo ?? prev.capo ?? state.capo)||0)),
+        octave:Math.max(-2,Math.min(3,Number(meta?.octave ?? prev.octave ?? state.steps)||0)),
+        pitchMode:(meta?.pitchMode==='step'||meta?.pitchMode==='capo')?meta.pitchMode:(prev.pitchMode==='step'?'step':'capo'),
+        projectId:sid,source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()
+      };
+      writeJson(suiteTransportKey(sid),next);
+      try{window.__SRS_TRANSPORT_CHANNEL?.postMessage(next)}catch{}
+      return next;
+    }catch{return null}
+  }
   function sharedMetaKey(id){return SHARED_META_PREFIX+String(id||'')}
   function unifiedMetaKey(id){return UNIFIED_META_PREFIX+String(id||'')}
   function canonicalMetaKey(id){return CANONICAL_PREFIX+String(id||'')}
@@ -16586,25 +16598,18 @@ KEEP RHYME UI ABOVE KEYBOARD
   function activeUnifiedCrpId(){
     try{
       const x=readLinkSession();
-      if(!x)return '';
-      // The explicit link session is the transport authority. During page navigation/init,
-      // state.project can briefly be null or a stale SRP project; do not let that timing gap
-      // disconnect BPM/CAPO/STEP from CRP + Baby DAW.
-      const crpId=String(x.crpProjectId||'');
-      if(!crpId)return '';
-      if(!state.project)return crpId;
-      const sid=String(state.project.id||'');
-      const linkedId=String(state.project.linkedCrpProjectId||'');
-      if(sid===String(x.srpProjectId||'') || linkedId===crpId)return crpId;
-      return '';
-    }catch{return ''}
+      // The explicit link session IS the authority. Do not gate transport on whichever SRP
+      // project happens to be in memory during startup/navigation. That gate was dropping sync.
+      return x?.crpProjectId?String(x.crpProjectId):String(state.project?.linkedCrpProjectId||'');
+    }catch{return String(state.project?.linkedCrpProjectId||'')}
   }
   function readLiveMeta(){
     const id=activeUnifiedCrpId();
     const canonical=readCanonicalMeta(id);
-    if(canonical)return {...canonical,crpProjectId:id};
-    if(id){const unified=readJson(unifiedMetaKey(id),null);if(unified&&String(unified.crpProjectId||'')===id)return unified;}
-    return readJson(LIVE_META_KEY,null);
+    const unified=id?readJson(unifiedMetaKey(id),null):null;
+    const legacy=(canonical?{...canonical,crpProjectId:id}:(unified&&String(unified.crpProjectId||'')===id?unified:readJson(LIVE_META_KEY,null)));
+    const suite=readSuiteTransport(id);
+    return suite?{...(legacy||{}),...suite,crpProjectId:id}:legacy;
   }
   function writeLiveMeta(id,meta){
     if(!id)return null;
@@ -16620,23 +16625,26 @@ KEEP RHYME UI ABOVE KEYBOARD
     try{window.__CRP_SRP_META_CHANNEL?.postMessage(next)}catch{}
     return next;
   }
-  function readHardSync(){return readCanonicalMeta(activeUnifiedCrpId())||readJson(HARD_SYNC_KEY,null)}
+  function readHardSync(){const id=activeUnifiedCrpId();return readSuiteTransport(id)||readCanonicalMeta(id)||readJson(HARD_SYNC_KEY,null)}
   function writeHardSyncFromSrp(){
     try{
-      const prev=readHardSync()||{};
+      const session=readLinkSession();
+      const projectId=String(session?.crpProjectId||state.project?.linkedCrpProjectId||'');
+      if(!projectId)return null;
       const mode=state.transposeMode==='step'?'step':'capo';
       const raw=Number(el?.capoInput?.value);
       const bpm=Math.max(40,Math.min(240,Number(el?.bpmInput?.value)||Number(state.bpm)||95));
       let capo=Math.max(0,Math.min(12,Number(state.capo)||0));
       let octave=Math.max(-2,Math.min(3,Number(state.steps)||0));
       if(Number.isFinite(raw)){
-        if(mode==='capo')capo=Math.max(0,Math.min(12,Math.round(raw)));
-        else octave=Math.max(-2,Math.min(3,raw));
+        if(mode==='capo'){capo=Math.max(0,Math.min(12,Math.round(raw)));state.capo=capo;if(state.project)state.project.capo=capo;}
+        else{octave=Math.max(-2,Math.min(3,raw));state.steps=octave;if(state.project){state.project.steps=octave;state.project.linkedOctave=octave;}}
       }
-      const projectId=activeUnifiedCrpId();
-      const next={bpm,capo,octave,pitchMode:mode,projectId,source:'srp',rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
+      state.bpm=bpm;if(state.project){state.project.bpm=bpm;state.project.transposeMode=mode;}
+      const next=writeSuiteTransport(projectId,{bpm,capo,octave,pitchMode:mode},'srp');
+      // Legacy records are mirrors only, retained for key/chord-link compatibility.
       writeCanonicalMeta(projectId,{bpm,capo,octave,pitchMode:mode},'srp');
-      writeJson(HARD_SYNC_KEY,next);
+      writeJson(HARD_SYNC_KEY,next||{bpm,capo,octave,pitchMode:mode,projectId,source:'srp',rev:1,updatedAt:Date.now()});
       return next;
     }catch{return null}
   }
@@ -16669,9 +16677,10 @@ KEEP RHYME UI ABOVE KEYBOARD
     const explicitlyLinked=!!(session&&String(session.crpProjectId||'')===sid);
     if(!explicitlyLinked)return base;
     const canonical=readCanonicalMeta(sid);
-    if(canonical)return {...(base||{}),...canonical,crpProjectId:sid};
     const live=readLiveMeta();
-    return live&&String(live.crpProjectId||'')===sid?{...(base||{}),...live}:base;
+    const legacy=(canonical?{...(base||{}),...canonical,crpProjectId:sid}:(live&&String(live.crpProjectId||'')===sid?{...(base||{}),...live}:base));
+    const suite=readSuiteTransport(sid);
+    return suite?{...(legacy||{}),...suite,crpProjectId:sid}:legacy;
   }
   function writeSharedMeta(id,meta){if(!id)return;const base=readJson(sharedMetaKey(id),{})||{};writeJson(sharedMetaKey(id),{...base,...meta,projectId:String(id),updatedAt:Date.now()});}
 
@@ -16855,14 +16864,7 @@ KEEP RHYME UI ABOVE KEYBOARD
 
   function activeLinkedCrpId(){
     const x=readLinkSession();
-    if(!x)return '';
-    const crpId=String(x.crpProjectId||'');
-    if(!crpId)return '';
-    // Same rule as activeUnifiedCrpId(): the saved explicit pair remains linked while the
-    // SRP page is initializing/leaving. This is especially important on Android navigation.
-    if(!state.project)return crpId;
-    if(String(state.project.id||'')===String(x.srpProjectId||'') || String(state.project.linkedCrpProjectId||'')===crpId)return crpId;
-    return '';
+    return x?.crpProjectId?String(x.crpProjectId):String(state.project?.linkedCrpProjectId||'');
   }
   function syncMetaToCrp(){
     try{
@@ -17075,7 +17077,8 @@ KEEP RHYME UI ABOVE KEYBOARD
     });
     try{window.__CRP_SRP_META_CHANNEL=new BroadcastChannel('crp-srp-live-meta-v3');window.__CRP_SRP_META_CHANNEL.onmessage=()=>setTimeout(applyLiveMetaToSrp,0);}catch{}
     try{window.__CRP_SRP_CANONICAL_CHANNEL=new BroadcastChannel('crp-srp-canonical-v1');window.__CRP_SRP_CANONICAL_CHANNEL.onmessage=()=>setTimeout(applyHardSyncToSrp,0);}catch{}
-    window.addEventListener('storage',e=>{if(e.key===HARD_SYNC_KEY||String(e.key||'').startsWith(CANONICAL_PREFIX))setTimeout(applyHardSyncToSrp,0);});
+    try{window.__SRS_TRANSPORT_CHANNEL=new BroadcastChannel('song-rider-suite-transport-v5');window.__SRS_TRANSPORT_CHANNEL.onmessage=()=>setTimeout(applyHardSyncToSrp,0);}catch{}
+    window.addEventListener('storage',e=>{if(e.key===HARD_SYNC_KEY||String(e.key||'').startsWith(CANONICAL_PREFIX)||String(e.key||'').startsWith(SRS_TRANSPORT_PREFIX))setTimeout(applyHardSyncToSrp,0);});
     window.addEventListener('pageshow',()=>setTimeout(applyHardSyncToSrp,0));
     window.addEventListener('focus',()=>setTimeout(applyHardSyncToSrp,0));
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSyncToSrp,0);});
@@ -17094,32 +17097,26 @@ KEEP RHYME UI ABOVE KEYBOARD
     // event can be skipped during page navigation. It does nothing unless the live revision changed.
     setInterval(applyLiveMetaToSrp,500);
     if(window.__SRP_INIT_DONE)setTimeout(reconcileLinkedWorkspace,0);
-    // Flush the live number fields before leaving SRP for CRP/BD.
-    document.querySelectorAll('.workspace-mode-btn[href^="../index.html"]').forEach(a=>a.addEventListener('pointerdown',()=>{syncMetaToCrp();writeHardSyncFromSrp();},true));
-    window.addEventListener('pagehide',()=>syncMetaToCrp());
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')syncMetaToCrp();});
+    // Flush the live number fields SYNCHRONOUSLY before leaving SRP for CRP/BD.
+    // The actual header uses absolute /index.html links; the old ../index.html selector matched nothing.
+    const flushSrpTransport=()=>{
+      try{
+        if(el?.bpmInput)commitBpm();
+        if(el?.capoInput)commitCapoStepFromInput();
+        syncMetaToCrp();
+        writeHardSyncFromSrp();
+      }catch{}
+    };
+    document.querySelectorAll('a.workspace-mode-btn').forEach(a=>{
+      if(!String(a.getAttribute('href')||'').includes('/song-rider/'))a.addEventListener('pointerdown',flushSrpTransport,true);
+    });
+    window.addEventListener('pagehide',flushSrpTransport);
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSrpTransport();});
     window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='srp-show-full-song'){try{goToSection('Full');}catch{}}if(e.data?.type==='crp-playback-state'){window.__SRP_LINKED_PLAYING=!!e.data.playing;try{renderSheetTitleBar();}catch{}}});
   }
 })();
 
-// v2.9.3: SRP card-page linked transport + single-button link/unlink toggle; close the main SRP application IIFE after the nested CRP/SRP bridge.
-// Suite adapter MUST live inside this closure; prior external patches could not access `state` and therefore never synchronized.
-window.SRS_TRANSPORT_ADAPTER={
- get(){return {bpm:Math.max(40,Math.min(240,Number(el?.bpmInput?.value)||Number(state.bpm)||95)),capo:Math.max(0,Math.min(12,Number(state.capo)||0)),step:Math.max(-2,Math.min(3,Number(state.steps)||0)),mode:state.transposeMode==='step'?'step':'capo'}},
- set(m){
-  state.bpm=Math.max(40,Math.min(240,Number(m?.bpm)||95));state.capo=Math.max(0,Math.min(12,Number(m?.capo)||0));state.steps=Math.max(-2,Math.min(3,Number(m?.step)||0));state.transposeMode=m?.mode==='step'?'step':'capo';
-  if(state.project){state.project.bpm=state.bpm;state.project.capo=state.capo;state.project.steps=state.steps;state.project.linkedOctave=state.steps;state.project.transposeMode=state.transposeMode;upsertProject(state.project);}
-  if(el?.bpmInput)el.bpmInput.value=String(state.bpm);if(el?.capoInput)el.capoInput.value=String(state.transposeMode==='step'?state.steps:state.capo);applyProjectSettingsToUI();renderAll();
- }
-};
+// v3.0.0: end Song Rider Pro main application IIFE. Transport sync is owned by the bridge above.
 })();
 
 
-/* Song Rider Suite transport bus v4.0.0 */
-(function(){
- const KEY='song-rider-suite-transport-v2',A=()=>window.SRS_TRANSPORT_ADAPTER;let applying=false,last=0;const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch{return null}};
- function pub(){if(applying||!A())return;const v=A().get(),x={...v,stamp:Date.now()};localStorage.setItem(KEY,JSON.stringify(x));last=x.stamp;try{window.__SRS4?.postMessage(x)}catch{}}
- function apply(){if(!A())return;const x=read();if(!x||Number(x.stamp)<=last)return;const active=document.activeElement;if(active===document.getElementById('bpmInput')||active===document.getElementById('capoInput'))return;last=Number(x.stamp);applying=true;try{A().set(x)}finally{applying=false}}
- function bind(){const b=document.getElementById('bpmInput'),p=document.getElementById('capoInput');[b,p].filter(Boolean).forEach(n=>{n.addEventListener('change',()=>setTimeout(pub,0));n.addEventListener('blur',()=>setTimeout(pub,0));});document.addEventListener('click',e=>{if(e.target?.closest?.('#capoStepToggle'))setTimeout(pub,0)},true);try{window.__SRS4=new BroadcastChannel(KEY);window.__SRS4.onmessage=apply}catch{}window.addEventListener('storage',e=>{if(e.key===KEY)apply()});window.addEventListener('pageshow',apply);window.addEventListener('focus',apply);setInterval(apply,250);if(read())apply();else pub()}
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
-})();
