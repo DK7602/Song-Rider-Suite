@@ -7833,7 +7833,9 @@ function ensureCapoStepToggle(){
       refreshDisplayedNoteCells();
       updateKeyFromAllNotes();
       updateFullIfVisible?.();
-      if(state.project){ upsertProject(state.project); window.CRP_SRP_syncMetaToCrp?.(); window.CRP_SRP_writeHardSyncFromSrp?.(); }
+      if(state.project) upsertProject(state.project);
+      window.CRP_SRP_syncMetaToCrp?.();
+      window.CRP_SRP_writeHardSyncFromSrp?.();
     });
   }
 
@@ -16561,24 +16563,25 @@ KEEP RHYME UI ABOVE KEYBOARD
   const CANONICAL_PREFIX='crp-srp-canonical-v1:';
   // v2.7.0: explicit pair link. Merely opening SRP is never a link.
   const LINK_SESSION_KEY='crp-srp-link-session-v3';
-  // v3.0.0: ONE authoritative transport record per linked CRP project.
-  const SRS_TRANSPORT_PREFIX='song-rider-suite-transport-v5:';
-  function suiteTransportKey(id){return SRS_TRANSPORT_PREFIX+String(id||'')}
-  function readSuiteTransport(id){
-    try{const sid=String(id||'');if(!sid)return null;const m=readJson(suiteTransportKey(sid),null);return m&&String(m.projectId||'')===sid?m:null}catch{return null}
+  // v3.1.0 TRANSPORT REBUILD: one global same-origin record for BPM / CAPO / STEP.
+  // It intentionally does NOT depend on SRP link-session ids; project links remain for song data only.
+  const SRS_TRANSPORT_KEY='song-rider-suite-transport-v6';
+  function readSuiteTransport(){
+    try{const m=readJson(SRS_TRANSPORT_KEY,null);return m&&typeof m==='object'?m:null}catch{return null}
   }
   function writeSuiteTransport(id,meta,source='srp'){
-    if(!id)return null;
     try{
-      const sid=String(id),prev=readSuiteTransport(sid)||{};
+      const prev=readSuiteTransport()||{};
+      const session=readLinkSession?.();
       const next={
         bpm:Math.max(40,Math.min(240,Number(meta?.bpm ?? prev.bpm ?? state.bpm)||95)),
         capo:Math.max(0,Math.min(12,Number(meta?.capo ?? prev.capo ?? state.capo)||0)),
         octave:Math.max(-2,Math.min(3,Number(meta?.octave ?? prev.octave ?? state.steps)||0)),
         pitchMode:(meta?.pitchMode==='step'||meta?.pitchMode==='capo')?meta.pitchMode:(prev.pitchMode==='step'?'step':'capo'),
-        projectId:sid,source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()
+        crpProjectId:String(id||session?.crpProjectId||state.project?.linkedCrpProjectId||prev.crpProjectId||''),
+        source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()
       };
-      writeJson(suiteTransportKey(sid),next);
+      writeJson(SRS_TRANSPORT_KEY,next);
       try{window.__SRS_TRANSPORT_CHANNEL?.postMessage(next)}catch{}
       return next;
     }catch{return null}
@@ -16608,8 +16611,8 @@ KEEP RHYME UI ABOVE KEYBOARD
     const canonical=readCanonicalMeta(id);
     const unified=id?readJson(unifiedMetaKey(id),null):null;
     const legacy=(canonical?{...canonical,crpProjectId:id}:(unified&&String(unified.crpProjectId||'')===id?unified:readJson(LIVE_META_KEY,null)));
-    const suite=readSuiteTransport(id);
-    return suite?{...(legacy||{}),...suite,crpProjectId:id}:legacy;
+    const suite=readSuiteTransport();
+    return suite?{...(legacy||{}),...suite,crpProjectId:String(suite.crpProjectId||id||'')}:legacy;
   }
   function writeLiveMeta(id,meta){
     if(!id)return null;
@@ -16625,12 +16628,11 @@ KEEP RHYME UI ABOVE KEYBOARD
     try{window.__CRP_SRP_META_CHANNEL?.postMessage(next)}catch{}
     return next;
   }
-  function readHardSync(){const id=activeUnifiedCrpId();return readSuiteTransport(id)||readCanonicalMeta(id)||readJson(HARD_SYNC_KEY,null)}
+  function readHardSync(){const id=activeUnifiedCrpId();return readSuiteTransport()||readCanonicalMeta(id)||readJson(HARD_SYNC_KEY,null)}
   function writeHardSyncFromSrp(){
     try{
       const session=readLinkSession();
       const projectId=String(session?.crpProjectId||state.project?.linkedCrpProjectId||'');
-      if(!projectId)return null;
       const mode=state.transposeMode==='step'?'step':'capo';
       const raw=Number(el?.capoInput?.value);
       const bpm=Math.max(40,Math.min(240,Number(el?.bpmInput?.value)||Number(state.bpm)||95));
@@ -16652,7 +16654,6 @@ KEEP RHYME UI ABOVE KEYBOARD
   let __hardSyncRev=-1;
   function applyHardSyncToSrp(){
     try{
-      if(!exactLinkForCurrentProject())return false;
       const m=readHardSync();if(!m)return false;
       // Do not let the background sync poll fight the user's active BPM/CAPO/STEP edit.
       // Crucially, do not mark this revision applied until the field is no longer focused.
@@ -16679,7 +16680,7 @@ KEEP RHYME UI ABOVE KEYBOARD
     const canonical=readCanonicalMeta(sid);
     const live=readLiveMeta();
     const legacy=(canonical?{...(base||{}),...canonical,crpProjectId:sid}:(live&&String(live.crpProjectId||'')===sid?{...(base||{}),...live}:base));
-    const suite=readSuiteTransport(sid);
+    const suite=readSuiteTransport();
     return suite?{...(legacy||{}),...suite,crpProjectId:sid}:legacy;
   }
   function writeSharedMeta(id,meta){if(!id)return;const base=readJson(sharedMetaKey(id),{})||{};writeJson(sharedMetaKey(id),{...base,...meta,projectId:String(id),updatedAt:Date.now()});}
@@ -17077,8 +17078,8 @@ KEEP RHYME UI ABOVE KEYBOARD
     });
     try{window.__CRP_SRP_META_CHANNEL=new BroadcastChannel('crp-srp-live-meta-v3');window.__CRP_SRP_META_CHANNEL.onmessage=()=>setTimeout(applyLiveMetaToSrp,0);}catch{}
     try{window.__CRP_SRP_CANONICAL_CHANNEL=new BroadcastChannel('crp-srp-canonical-v1');window.__CRP_SRP_CANONICAL_CHANNEL.onmessage=()=>setTimeout(applyHardSyncToSrp,0);}catch{}
-    try{window.__SRS_TRANSPORT_CHANNEL=new BroadcastChannel('song-rider-suite-transport-v5');window.__SRS_TRANSPORT_CHANNEL.onmessage=()=>setTimeout(applyHardSyncToSrp,0);}catch{}
-    window.addEventListener('storage',e=>{if(e.key===HARD_SYNC_KEY||String(e.key||'').startsWith(CANONICAL_PREFIX)||String(e.key||'').startsWith(SRS_TRANSPORT_PREFIX))setTimeout(applyHardSyncToSrp,0);});
+    try{window.__SRS_TRANSPORT_CHANNEL=new BroadcastChannel('song-rider-suite-transport-v6');window.__SRS_TRANSPORT_CHANNEL.onmessage=()=>setTimeout(applyHardSyncToSrp,0);}catch{}
+    window.addEventListener('storage',e=>{if(e.key===HARD_SYNC_KEY||String(e.key||'').startsWith(CANONICAL_PREFIX)||e.key===SRS_TRANSPORT_KEY)setTimeout(applyHardSyncToSrp,0);});
     window.addEventListener('pageshow',()=>setTimeout(applyHardSyncToSrp,0));
     window.addEventListener('focus',()=>setTimeout(applyHardSyncToSrp,0));
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSyncToSrp,0);});

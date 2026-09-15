@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.0.0-syncroot';
+const CACHE = 'song-rider-suite-v3.1.0-transport-rebuild';
 const ASSETS = [
   './song-rider/suite-header-master.png',
   './song-rider/branding-shell.css',
