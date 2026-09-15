@@ -8150,6 +8150,11 @@ function restorePanelHiddenState(){
   setPanelHidden(hidden);
 }
 
+// Re-apply the saved preference when SRP is restored from browser navigation/BFCache.
+window.addEventListener("pageshow", () => {
+  try{ restorePanelHiddenState(); }catch{}
+});
+
 function setRecordUI(){
   if(el.mRecordBtn){
     el.mRecordBtn.classList.add("iconCircle","recCircle");
@@ -16240,7 +16245,9 @@ async function init(){
 
   applyProjectSettingsToUI();
 
-  setPanelHidden(false);
+  // Restore the user's SRP setup Show/Hide preference instead of forcing it open.
+  // Forcing false here also overwrote localStorage before wire() could restore it.
+  restorePanelHiddenState();
   setAutoScroll(false);
 
   state.instrumentOn = false;
