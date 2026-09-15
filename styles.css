@@ -2553,3 +2553,41 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
 @media(max-width:520px){
   .workspace-chord-rider .crp-pro-titlebar{column-gap:2px!important;}
 }
+
+/* v2.9.12 — final CRP header micro-alignment.
+   Keep the approved Hide height/font, shave only 2px from its width,
+   and move the CRP artwork 4px left so PRO clears the button cleanly. */
+.workspace-chord-rider .crp-pro-titlebar{
+  grid-template-columns:minmax(0,1fr) 54px!important;
+  column-gap:2px!important;
+}
+.workspace-chord-rider .crp-pro-wordmark-img{
+  transform:translateX(-4px)!important;
+}
+.workspace-chord-rider .crp-controls-toggle{
+  width:54px!important;
+  min-width:54px!important;
+  max-width:54px!important;
+  height:38px!important;
+  min-height:38px!important;
+  padding:0 8px!important;
+  font-size:.78rem!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{
+    grid-template-columns:minmax(0,1fr) 54px!important;
+    column-gap:2px!important;
+  }
+  .workspace-chord-rider .crp-pro-wordmark-img{
+    transform:translateX(-4px)!important;
+  }
+  .workspace-chord-rider .crp-controls-toggle{
+    width:54px!important;
+    min-width:54px!important;
+    max-width:54px!important;
+    height:38px!important;
+    min-height:38px!important;
+    padding:0 8px!important;
+    font-size:.78rem!important;
+  }
+}
