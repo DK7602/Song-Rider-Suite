@@ -1,0 +1,2639 @@
+* { box-sizing: border-box; }
+:root {
+  --bg: #0d0f12;
+  --panel: #171a1f;
+  --panel2: #20242b;
+  --text: #f3f4f6;
+  --muted: #9aa3ad;
+  --accent: #e9c46a;
+  --accent2: #f4a261;
+  --line: #343a43;
+  --danger: #e76f51;
+  --good: #72c98a;
+  --shadow: 0 10px 30px rgba(0,0,0,.25);
+}
+html, body { margin: 0; min-height: 100%; background: radial-gradient(circle at top, #171b22, var(--bg) 45%); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+.app-header {
+  position: sticky; top: 0; z-index: 10;
+  display:flex; align-items:center; gap:14px;
+  padding: 10px max(16px, env(safe-area-inset-left));
+  background: rgba(13,15,18,.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.brand-mark { width: 76px; height: 58px; object-fit: contain; }
+h1 { margin:0; font-size: clamp(1.4rem, 4vw, 2.1rem); letter-spacing:.02em; }
+.tagline { margin:2px 0 0; color:var(--muted); font-size:.9rem; }
+.app-shell { width:min(1180px, 100%); margin:0 auto; padding:16px; display:grid; gap:16px; }
+.panel { background:linear-gradient(180deg, rgba(32,36,43,.96), rgba(23,26,31,.98)); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); padding:16px; }
+.toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:end; }
+label { display:grid; gap:6px; color:var(--muted); font-size:.82rem; }
+select, input {
+  color:var(--text); background:#0e1115; border:1px solid #39414b;
+  border-radius:10px; padding:10px 12px; outline:none;
+}
+input:focus, select:focus, .notes-editor:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(233,196,106,.12); }
+.segmented { display:flex; background:#0e1115; border:1px solid #39414b; border-radius:12px; padding:3px; }
+.seg { border:0; color:var(--muted); background:transparent; padding:8px 12px; border-radius:9px; }
+.seg.active { background:var(--accent); color:#17130a; font-weight:800; }
+.stepper { display:flex; align-items:center; border:1px solid #39414b; border-radius:10px; overflow:hidden; background:#0e1115; }
+.stepper button { width:38px; height:40px; border:0; color:var(--text); background:transparent; font-size:1.1rem; }
+.stepper span { width:34px; text-align:center; color:var(--text); font-weight:700; }
+.entry-row, .save-row, .play-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; }
+.entry-row input, .save-row input { flex:1; min-width:220px; font-size:1rem; }
+button { border:1px solid #3d444f; background:#252b33; color:var(--text); border-radius:10px; padding:9px 12px; }
+button:hover { filter:brightness(1.08); }
+button.accent { background:var(--accent); color:#17130a; border-color:#d7b654; font-weight:800; }
+button.big { padding:11px 18px; }
+.status { min-height:22px; margin:8px 0 0; color:var(--accent2); }
+.section-heading-row { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-top:12px; }
+h2 { margin:0; font-size:1rem; }
+.subtle { color:var(--muted); font-size:.8rem; }
+.chip-row { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+.chip { background:#11151a; border:1px solid #3d4652; border-radius:999px; padding:7px 10px; font-size:.88rem; }
+.chip:hover { border-color:var(--accent); color:var(--accent); }
+.play-row label { display:flex; align-items:center; gap:7px; }
+.play-row input[type=number] { width:78px; }
+.check-label { grid-template-columns:auto auto; }
+.drag-tip { color:var(--muted); font-size:.82rem; margin:14px 0 8px; }
+.progression { display:flex; flex-wrap:wrap; gap:12px; align-items:stretch; min-height:120px; }
+.chord-card {
+  width:min(240px, calc(50% - 6px)); min-width:180px;
+  background:#11151a; border:1px solid #414a55; border-radius:16px; padding:12px;
+  user-select:none; -webkit-user-select:none; touch-action:manipulation; position:relative;
+}
+.chord-card.dragging { opacity:.55; outline:2px dashed var(--accent); }
+.chord-card .card-top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.chord-card .chord-name { font-size:1.2rem; font-weight:900; color:var(--accent); }
+.chord-card .remove { padding:3px 7px; border-radius:8px; color:#f0a291; background:#271718; border-color:#593334; }
+.diagram { width:100%; overflow:hidden; }
+.diagram svg { width:100%; height:auto; display:block; }
+.chord-card .hint { color:var(--muted); font-size:.72rem; margin-top:7px; text-align:center; }
+.row-break { flex-basis:100%; height:0; border-top:1px dashed #3a414b; position:relative; margin:1px 0; }
+.row-break::after { content:"new line"; position:absolute; top:-10px; right:0; color:#68727f; background:var(--panel); padding-left:6px; font-size:.65rem; }
+.new-line-drop { width:100%; margin-top:10px; border-style:dashed; color:var(--muted); background:#11151a; }
+.new-line-drop.drop-active { border-color:var(--accent); color:var(--accent); }
+.project-list { display:grid; gap:8px; margin-top:12px; }
+.project-item { display:flex; gap:8px; align-items:center; background:#11151a; border:1px solid #343c46; border-radius:12px; padding:10px; }
+.project-item .name { flex:1; font-weight:700; }
+.project-item .meta { color:var(--muted); font-size:.76rem; }
+.project-item button { padding:7px 9px; }
+.project-item .delete { color:#f6a28f; }
+.notes-toolbar { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 8px; }
+.notes-editor { min-height:190px; background:#0e1115; border:1px solid #39414b; border-radius:12px; padding:12px; outline:none; line-height:1.5; }
+.notes-editor:empty::before { content:attr(data-placeholder); color:#69737f; pointer-events:none; }
+footer { display:flex; justify-content:space-between; color:#68727f; font-size:.78rem; width:min(1180px,100%); margin:0 auto; padding:0 18px 24px; }
+
+@media (max-width: 700px) {
+  .app-header { position:static; }
+  .brand-mark { width:64px; }
+  .app-shell { padding:10px; }
+  .panel { border-radius:14px; padding:12px; }
+  .toolbar > label { flex:1 1 44%; }
+  .toolbar .segmented { width:100%; }
+  .toolbar .seg { flex:1; }
+  .chord-card { width:100%; min-width:0; }
+  .project-item { flex-wrap:wrap; }
+  .project-item .name { flex-basis:60%; }
+}
+
+
+/* v1.3 multi-line card workflow */
+.toggle-btn { min-width:132px; }
+.toggle-btn.on { background:var(--accent); color:#17130a; border-color:#d7b654; font-weight:800; }
+.line-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:14px 0 8px; }
+.progression { display:grid; gap:12px; min-height:0; }
+.progression-line {
+  position:relative; display:flex; flex-wrap:wrap; gap:12px;
+  min-height:92px; padding:12px; border:1px dashed #3d4652;
+  border-radius:16px; background:#0e1115;
+  transition:border-color .15s, box-shadow .15s, background .15s;
+}
+.progression-line.selected {
+  border-color:var(--accent); box-shadow:0 0 0 3px rgba(233,196,106,.10); background:#12161b;
+}
+.progression-line.drop-target { border-color:var(--accent2); }
+.line-badge {
+  position:absolute; top:-10px; left:14px; background:var(--panel); color:var(--muted);
+  font-size:.68rem; padding:1px 7px; border-radius:999px;
+}
+.progression-line.selected .line-badge { color:var(--accent); }
+.empty-line {
+  width:100%; min-height:64px; display:flex; align-items:center; justify-content:center;
+  color:#65707c; font-size:.8rem; pointer-events:none;
+}
+.chord-card { flex:0 0 min(240px, calc(50% - 6px)); }
+.chord-card.note-card .chord-name::before { content:"♪ "; }
+.card-subtitle { color:var(--muted); font-size:.72rem; margin:-4px 0 7px; }
+@media (max-width:700px) {
+  .chord-card { flex-basis:100%; width:100%; }
+  .progression-line { padding:10px; }
+}
+
+/* v1.4 private accounts + cloud sync */
+.account-panel { padding-top:12px; padding-bottom:12px; }
+.account-heading { margin-top:0; align-items:center; }
+.account-heading > div { display:grid; gap:3px; }
+.auth-wrap { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+.auth-box { display:grid; gap:8px; background:#11151a; border:1px solid #343c46; border-radius:12px; padding:12px; }
+.auth-box h3 { margin:0 0 2px; font-size:.92rem; color:var(--accent); }
+.account-tools { margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+@media(max-width:700px){.auth-wrap{grid-template-columns:1fr}.account-panel{padding:12px}}
+
+
+/* v1.4.2 — compact cloud account bar after sign-in */
+.account-summary-btn {
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  min-height:44px;
+  padding:10px 14px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:var(--panel-2);
+  color:var(--text);
+  font-weight:800;
+  text-align:left;
+}
+.account-summary-btn .cloud-state {
+  color:var(--accent);
+  font-weight:800;
+}
+.account-panel.is-logged-in.is-collapsed {
+  padding:8px;
+}
+.account-panel.is-logged-in.is-collapsed .account-heading,
+.account-panel.is-logged-in.is-collapsed #authForms,
+.account-panel.is-logged-in.is-collapsed #accountTools,
+.account-panel.is-logged-in.is-collapsed #authMessage {
+  display:none !important;
+}
+.account-panel.is-logged-in:not(.is-collapsed) .account-summary-btn {
+  margin-bottom:10px;
+}
+
+
+/* v2.0 — compact line instructions on mobile */
+@media(max-width:700px){
+  .line-help-select,
+  .line-help-drag{
+    font-size:0; /* replace the long desktop copy with a compact mobile hint */
+  }
+  .line-help-select::after{
+    content:"Tap line to select • Hold & drag cards";
+    font-size:12px;
+    line-height:1.2;
+    white-space:nowrap;
+  }
+  .line-help-drag{
+    display:none;
+  }
+}
+
+
+/* v2.1 — restore ONLY "Chords that fit" as a horizontal mobile scroller */
+@media (max-width:700px) {
+  html, body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  #compatibleChords {
+    display: flex !important;
+    flex-flow: row nowrap !important;
+    justify-content: flex-start !important;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    gap: 8px;
+    padding: 2px 0 10px;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+  }
+
+  #compatibleChords::-webkit-scrollbar {
+    display: none;
+  }
+
+  #compatibleChords .chip {
+    flex: 0 0 auto !important;
+    white-space: nowrap;
+  }
+}
+
+
+/* v2.2 — hard-contained mobile Chords-that-fit scroller */
+@media (max-width:700px) {
+  #compatibleChords {
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    width:calc(100vw - 44px) !important;
+    max-width:calc(100vw - 44px) !important;
+    min-width:0 !important;
+    overflow-x:scroll !important;
+    overflow-y:hidden !important;
+    gap:8px !important;
+    padding:2px 0 10px !important;
+    margin-top:9px;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-x;
+  }
+  #compatibleChords::-webkit-scrollbar { display:none; }
+  #compatibleChords > .chip {
+    flex:0 0 auto !important;
+    width:auto !important;
+    white-space:nowrap !important;
+  }
+}
+
+
+/* v2.3 — compact mobile build + transport controls */
+@media (max-width:700px) {
+
+  /* Pull the chord suggestions closer to the Build row. */
+  .build-row,
+  .builder-row,
+  .input-row {
+    margin-bottom: 6px !important;
+  }
+
+  #compatibleChords {
+    margin-top: 0 !important;
+  }
+
+  /* Keep Play + Repeat + BPM + Beats/chord on one mobile row. */
+  .transport,
+  .transport-row,
+  .playback-row,
+  .play-row {
+    display:grid !important;
+    grid-template-columns: auto auto minmax(78px,1fr) minmax(86px,1fr) !important;
+    align-items:center !important;
+    gap:6px !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    overflow:visible !important;
+  }
+
+  #playBtn {
+    width:auto !important;
+    min-width:0 !important;
+    padding:11px 12px !important;
+    white-space:nowrap !important;
+  }
+
+  label[for="repeatToggle"],
+  .repeat-label,
+  .repeat-control,
+  .repeat-wrap {
+    width:auto !important;
+    min-width:0 !important;
+    margin:0 !important;
+    padding:0 !important;
+    display:flex !important;
+    align-items:center !important;
+    gap:4px !important;
+    white-space:nowrap !important;
+    font-size:.7rem !important;
+  }
+
+  #repeatToggle {
+    margin:0 !important;
+  }
+
+  .bpm-control,
+  .beats-control,
+  .beats-per-chord-control {
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  #bpmInput,
+  #beatsSelect,
+  #beatsPerChord {
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  /* Shorter mobile label so the final control fits cleanly. */
+  .beats-label,
+  label[for="beatsSelect"],
+  label[for="beatsPerChord"] {
+    font-size:0 !important;
+  }
+
+  .beats-label::after,
+  label[for="beatsSelect"]::after,
+  label[for="beatsPerChord"]::after {
+    content:"Beats";
+    font-size:.7rem;
+  }
+}
+
+
+/* v2.4 — corrected mobile transport order and sizing */
+@media (max-width:700px) {
+  .play-row {
+    display:grid !important;
+    grid-template-columns: 86px 72px minmax(72px,1fr) minmax(70px,.9fr) !important;
+    align-items:center !important;
+    gap:5px !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    margin-top:12px !important;
+    overflow:visible !important;
+  }
+
+  #playAllBtn {
+    width:86px !important;
+    min-width:86px !important;
+    padding:11px 8px !important;
+    font-size:.83rem !important;
+    white-space:nowrap !important;
+  }
+
+  .play-row .repeat-control {
+    order:2;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-start !important;
+    gap:4px !important;
+    width:72px !important;
+    min-width:0 !important;
+    margin:0 !important;
+    padding:0 !important;
+    font-size:.69rem !important;
+    white-space:nowrap !important;
+  }
+
+  .play-row .repeat-control input {
+    margin:0 !important;
+    width:18px !important;
+    height:18px !important;
+    flex:0 0 18px !important;
+  }
+
+  .play-row .bpm-control {
+    order:3;
+    display:flex !important;
+    align-items:center !important;
+    gap:4px !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+    font-size:.68rem !important;
+    white-space:nowrap !important;
+  }
+
+  .play-row .bpm-control #bpmInput {
+    width:48px !important;
+    min-width:48px !important;
+    max-width:48px !important;
+    padding:8px 5px !important;
+    text-align:center !important;
+  }
+
+  .play-row .beats-control {
+    order:4;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+    gap:3px !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+    font-size:.66rem !important;
+  }
+
+  .play-row .beats-label {
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:flex-start !important;
+    justify-content:center !important;
+    gap:0 !important;
+    line-height:.92 !important;
+    font-size:.66rem !important;
+    width:auto !important;
+    min-width:29px !important;
+  }
+
+  .play-row .beats-label::after {
+    content:none !important;
+  }
+
+  .play-row #beatsSelect {
+    display:block !important;
+    width:46px !important;
+    min-width:46px !important;
+    max-width:46px !important;
+    height:40px !important;
+    padding:7px 18px 7px 7px !important;
+    font-size:.8rem !important;
+    text-align:center !important;
+    color:var(--text) !important;
+    opacity:1 !important;
+  }
+}
+
+
+/* v2.5 — widen Beats/chord selector so selected number is always visible */
+@media (max-width:700px) {
+  .play-row {
+    grid-template-columns: 86px 72px minmax(72px,1fr) 112px !important;
+  }
+
+  .play-row .beats-control {
+    display:grid !important;
+    grid-template-columns: 40px 64px !important;
+    gap:5px !important;
+    justify-content:end !important;
+    align-items:center !important;
+    min-width:109px !important;
+  }
+
+  .play-row #beatsSelect {
+    width:64px !important;
+    min-width:64px !important;
+    max-width:64px !important;
+    padding:7px 22px 7px 10px !important;
+    text-align:left !important;
+    text-align-last:left !important;
+    color:var(--text) !important;
+    -webkit-text-fill-color:var(--text) !important;
+    opacity:1 !important;
+  }
+}
+
+
+/* v2.4 — key override beside the chord-family hint */
+.fit-key-row { display:flex; align-items:center; justify-content:flex-end; gap:8px; min-width:0; }
+.key-input { width:128px; min-width:108px; padding:7px 9px; font-size:.82rem; }
+@media(max-width:700px){
+  .section-heading-row { align-items:center; gap:8px; }
+  .fit-key-row { flex:1; min-width:0; gap:6px; }
+  .key-input { width:112px; min-width:92px; padding:7px 8px; }
+  #keyHint { min-width:0; font-size:.68rem; line-height:1.15; text-align:right; }
+}
+
+
+/* v2.5.1 — compact key-family row + remove empty status gap */
+.status:empty {
+  min-height: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.status:not(:empty) {
+  min-height: 0;
+  margin: 6px 0 0;
+}
+.section-heading-row {
+  margin-top: 6px;
+}
+.fit-key-row {
+  flex-wrap: nowrap;
+}
+.key-input {
+  width: 82px;
+  min-width: 72px;
+  max-width: 82px;
+}
+#fitHeading,
+#keyHint {
+  white-space: nowrap;
+}
+
+@media (max-width:700px) {
+  .section-heading-row {
+    gap: 6px;
+    margin-top: 4px;
+    flex-wrap: nowrap;
+  }
+  #fitHeading {
+    flex: 0 0 auto;
+    font-size: .98rem;
+  }
+  .fit-key-row {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .key-input {
+    flex: 0 0 70px;
+    width: 70px;
+    min-width: 70px;
+    max-width: 70px;
+    padding: 7px 8px;
+  }
+  #keyHint {
+    flex: 0 1 auto;
+    font-size: .66rem;
+    line-height: 1;
+    text-align: right;
+  }
+}
+
+/* v2.6 — compact project export + printable CRP chord sheet */
+.project-save-row { flex-wrap:nowrap; position:relative; }
+.project-save-row #projectName { min-width:0; }
+.export-wrap { position:relative; flex:0 0 auto; }
+.export-btn {
+  padding:9px 10px;
+  font-size:.78rem;
+  line-height:1;
+  white-space:nowrap;
+  background:#171b20;
+  border-color:#59616c;
+  color:var(--accent);
+  font-weight:800;
+}
+.export-menu {
+  position:absolute;
+  right:0;
+  top:calc(100% + 6px);
+  z-index:30;
+  width:164px;
+  padding:6px;
+  border:1px solid #454d58;
+  border-radius:11px;
+  background:#101318;
+  box-shadow:0 12px 28px rgba(0,0,0,.38);
+}
+.export-menu button { width:100%; text-align:left; padding:9px 10px; border:0; background:transparent; }
+.export-menu button:hover { background:#20262e; color:var(--accent); }
+.export-stage {
+  position:fixed;
+  left:-20000px;
+  top:0;
+  width:1200px;
+  pointer-events:none;
+  z-index:-1;
+}
+.export-sheet {
+  width:1120px;
+  padding:42px 44px 30px;
+  background:#f7f5ef;
+  color:#171a1f;
+  font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+.export-sheet * { box-sizing:border-box; }
+.export-sheet-header { border-bottom:3px solid #e9c46a; padding-bottom:18px; margin-bottom:20px; }
+.export-sheet-title-row { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; }
+.export-sheet h1 { color:#15181d; font-size:32px; line-height:1.08; }
+.export-sheet-subtitle { color:#65707c; font-size:13px; margin-top:5px; }
+.export-sheet-key {
+  flex:0 0 auto;
+  min-width:110px;
+  padding:9px 14px;
+  border-radius:14px;
+  background:#171a1f;
+  color:#e9c46a;
+  text-align:center;
+  font-weight:900;
+  font-size:22px;
+}
+.export-meta-grid { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.export-meta-chip {
+  padding:6px 10px;
+  border:1px solid #c9c3b4;
+  border-radius:999px;
+  background:#fffdf8;
+  color:#383d45;
+  font-size:12px;
+  font-weight:700;
+}
+.export-summary { margin-top:14px; padding:11px 13px; background:#fffdf8; border:1px solid #d9d3c5; border-radius:12px; }
+.export-summary strong { color:#171a1f; }
+.export-summary-line { margin-top:4px; color:#555e69; font-size:13px; line-height:1.35; overflow-wrap:anywhere; }
+.export-line { margin:20px 0 0; break-inside:avoid; }
+.export-line-heading { display:flex; align-items:baseline; gap:10px; margin:0 0 9px; }
+.export-line-heading strong { font-size:14px; color:#171a1f; }
+.export-line-heading span { color:#747d87; font-size:12px; overflow-wrap:anywhere; }
+.export-card-row { display:flex; flex-wrap:wrap; gap:10px; align-items:stretch; }
+.export-card {
+  flex:0 0 246px;
+  width:246px;
+  min-height:190px;
+  padding:10px;
+  border:1px solid #414a55;
+  border-radius:14px;
+  background:#11151a;
+  color:#f3f4f6;
+  overflow:hidden;
+}
+.export-card-name { color:#e9c46a; font-size:20px; line-height:1.1; font-weight:900; margin-bottom:5px; }
+.export-card-subtitle { color:#a8b0b9; font-size:10px; margin-bottom:5px; min-height:12px; }
+.export-card .diagram { width:100%; overflow:hidden; }
+.export-card .diagram svg { width:100%; height:auto; display:block; }
+.export-notes { margin-top:22px; padding:14px 16px; border:1px solid #d9d3c5; border-radius:12px; background:#fffdf8; color:#474e57; }
+.export-notes h3 { margin:0 0 6px; color:#171a1f; font-size:14px; }
+.export-notes-body { font-size:12px; line-height:1.45; }
+.export-sheet-footer {
+  margin-top:26px;
+  padding-top:13px;
+  border-top:1px solid #cbc5b8;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  color:#66707a;
+  font-size:11px;
+  font-weight:700;
+}
+.export-sheet-footer img { width:58px; height:44px; object-fit:contain; }
+@media(max-width:700px){
+  .project-save-row { gap:6px; }
+  .project-save-row #projectName { flex:1 1 auto; min-width:0; padding-left:10px; padding-right:10px; }
+  .project-save-row .export-btn { padding:9px 8px; font-size:.72rem; }
+  .project-save-row #saveProjectBtn { padding:9px 10px; }
+}
+
+
+/* v2.7 — line delete control + ink-saving PDF export */
+.delete-line {
+  position:absolute; top:-11px; right:12px; width:22px; height:22px; padding:0;
+  display:grid; place-items:center; border-radius:50%; border:1px solid #4b5561;
+  background:var(--panel); color:#aab2bc; font-size:15px; font-weight:900; line-height:1; z-index:2;
+}
+.delete-line:hover, .delete-line:focus-visible { color:#fff; border-color:#e76f51; background:#3a2020; }
+.export-sheet.pdf-print { background:#fff; }
+.export-sheet.pdf-print .export-card { background:#fff; color:#111; border:0; border-radius:0; }
+.export-sheet.pdf-print .export-card-name { color:#111; font-weight:900; }
+.export-sheet.pdf-print .export-card-subtitle { color:#555; }
+.export-sheet.pdf-print .export-summary,
+.export-sheet.pdf-print .export-notes,
+.export-sheet.pdf-print .export-meta-chip { background:#fff; }
+.export-sheet.pdf-print .export-sheet-key { background:#fff; color:#111; border:2px solid #111; }
+
+
+/* v2.8 — whole-line long-press reordering */
+.line-badge { cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
+.progression-line.line-moving { opacity:.72; box-shadow:0 0 0 2px rgba(233,196,106,.28); }
+.progression-line.line-drop-before::before,
+.progression-line.line-drop-after::after {
+  content:""; position:absolute; left:8px; right:8px; height:4px; border-radius:999px;
+  background:var(--accent); z-index:5; pointer-events:none;
+}
+.progression-line.line-drop-before::before { top:-8px; }
+.progression-line.line-drop-after::after { bottom:-8px; }
+body.moving-line { user-select:none; -webkit-user-select:none; }
+.export-sheet-footer img { width:62px; height:56px; object-fit:contain; }
+
+
+/* v1.5.2 — compact playback auto-scroll control beside Add blank line */
+.auto-scroll-btn{
+  flex:0 0 auto;
+  padding:7px 10px;
+  min-height:34px;
+  border-radius:9px;
+  font-size:.78rem;
+  line-height:1;
+  white-space:nowrap;
+}
+.auto-scroll-btn.on{
+  background:var(--accent);
+  color:#17130a;
+  border-color:#d7b654;
+  font-weight:800;
+}
+@media(max-width:700px){
+  .line-actions{
+    gap:7px;
+  }
+  #addLineBtn{
+    flex:0 1 auto;
+  }
+  .auto-scroll-btn{
+    padding:6px 8px;
+    min-height:32px;
+    font-size:.72rem;
+  }
+}
+
+
+/* v1.5.3 — CRP gold title + riding-script tagline */
+.brand-copy{
+  min-width:0;
+  flex:1 1 auto;
+  text-align:center;
+  overflow:visible;
+}
+
+/* 24-karat-inspired polished gold block lettering */
+.brand-copy h1{
+  display:inline-block;
+  margin:0;
+  padding:0 2px 2px;
+  max-width:100%;
+  font-family:Impact, Haettenschweiler, "Arial Black", "Franklin Gothic Heavy", sans-serif;
+  font-size:clamp(1.55rem, 4.6vw, 2.5rem);
+  font-weight:900;
+  line-height:.96;
+  letter-spacing:.035em;
+  text-transform:none;
+  white-space:nowrap;
+
+  background:
+    linear-gradient(180deg,
+      #fff6ae 0%,
+      #ffe776 16%,
+      #f8c83d 34%,
+      #d99a12 54%,
+      #ffd95b 70%,
+      #fff0a0 84%,
+      #b97608 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+  color:#f4c542;
+
+  -webkit-text-stroke:.45px rgba(92,53,0,.75);
+  filter:
+    drop-shadow(0 1px 0 #8c5709)
+    drop-shadow(0 2px 0 #654006)
+    drop-shadow(0 3px 1px rgba(0,0,0,.72));
+  text-shadow:
+    0 0 8px rgba(255,207,65,.17);
+}
+
+/* Flowing raised white script — visually "rides" underneath the title */
+.brand-copy .tagline{
+  position:relative;
+  z-index:1;
+  display:block;
+  width:max-content;
+  max-width:100%;
+  margin:5px auto 0;
+  color:#fff;
+  font-family:"Brush Script MT","Segoe Script","Snell Roundhand","URW Chancery L",cursive;
+  font-size:clamp(.92rem, 2.65vw, 1.28rem);
+  font-weight:700;
+  font-style:italic;
+  line-height:1.05;
+  letter-spacing:.015em;
+  white-space:nowrap;
+  transform:rotate(-1deg);
+  text-shadow:
+    0 1px 0 #d8dde4,
+    0 2px 0 #aeb6c0,
+    0 3px 0 #7f8995,
+    0 4px 5px rgba(0,0,0,.72),
+    0 0 8px rgba(255,255,255,.18);
+}
+
+/* Add a very subtle swoop under the riding-script line */
+.brand-copy .tagline::after{
+  content:"";
+  position:absolute;
+  left:7%;
+  right:5%;
+  bottom:-5px;
+  height:6px;
+  border-bottom:2px solid rgba(255,255,255,.58);
+  border-radius:50%;
+  transform:rotate(.6deg);
+  opacity:.65;
+  pointer-events:none;
+}
+
+@media(max-width:700px){
+  .app-header{
+    gap:7px;
+    padding-top:8px;
+    padding-bottom:9px;
+  }
+  .brand-mark{
+    width:53px;
+    height:50px;
+    flex:0 0 53px;
+  }
+  .brand-copy h1{
+    font-size:clamp(1.35rem, 6.3vw, 1.85rem);
+    letter-spacing:.018em;
+  }
+  .brand-copy .tagline{
+    margin-top:4px;
+    font-size:clamp(.72rem, 3.15vw, .98rem);
+    letter-spacing:0;
+  }
+}
+
+@media(max-width:390px){
+  .app-header{ gap:4px; }
+  .brand-mark{
+    width:45px;
+    height:45px;
+    flex-basis:45px;
+  }
+  .brand-copy h1{
+    font-size:clamp(1.22rem, 6vw, 1.55rem);
+  }
+  .brand-copy .tagline{
+    font-size:clamp(.66rem, 3vw, .84rem);
+  }
+}
+
+
+/* v1.5.4 — cleaner tagline + larger Rider/Bones without taller header */
+
+/* Reduce the "echo" while keeping a raised white 3D look. */
+.brand-copy .tagline{
+  text-shadow:
+    0 1px 0 rgba(218,223,230,.95),
+    0 2px 1px rgba(105,113,124,.72),
+    0 3px 4px rgba(0,0,0,.62);
+}
+
+/* Enlarge both still PNGs and animated GIFs visually, but retain their
+   existing layout box so the header itself does not become taller. */
+.brand-mark{
+  position:relative;
+  align-self:flex-end;
+  transform:scale(1.27);
+  transform-origin:center bottom;
+  bottom:-10px;
+  z-index:2;
+}
+
+/* The art has a little transparent padding under the hooves. Moving the
+   image box to the border makes the visible hooves appear to stand on it. */
+@media(max-width:700px){
+  .brand-mark{
+    transform:scale(1.38);
+    transform-origin:center bottom;
+    bottom:-9px;
+  }
+}
+
+@media(max-width:390px){
+  .brand-mark{
+    transform:scale(1.42);
+    transform-origin:center bottom;
+    bottom:-9px;
+  }
+}
+
+
+/* v1.5.5 — tiny auto-scroll icon + inline helper text */
+.line-actions{
+  display:flex;
+  align-items:center;
+  flex-wrap:nowrap;
+  gap:7px;
+}
+
+.auto-scroll-btn{
+  flex:0 0 30px;
+  width:30px;
+  min-width:30px;
+  height:30px;
+  min-height:30px;
+  padding:0;
+  border-radius:8px;
+  font-size:1rem;
+  line-height:1;
+  font-weight:800;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.line-help-inline{
+  flex:1 1 auto;
+  min-width:0;
+  margin:0;
+}
+
+.line-help-inline .line-help{
+  display:block;
+  margin:0;
+  line-height:1.15;
+}
+
+@media(max-width:700px){
+  .line-actions{
+    gap:5px;
+  }
+  #addLineBtn{
+    flex:0 0 auto;
+  }
+  .auto-scroll-btn{
+    flex-basis:28px;
+    width:28px;
+    min-width:28px;
+    height:28px;
+    min-height:28px;
+    padding:0;
+    font-size:.95rem;
+  }
+  .line-help-inline{
+    font-size:.69rem;
+  }
+}
+
+@media(max-width:390px){
+  .line-help-inline{
+    font-size:.64rem;
+  }
+}
+
+
+/* v1.5.6 — adaptive mobile layout for narrow and wide phones
+   The app now responds to the actual available content width instead of
+   assuming every phone is roughly the same size. */
+@media(max-width:700px){
+  html,body,.app-shell,.panel{
+    min-width:0;
+    max-width:100%;
+  }
+
+  .app-shell{
+    width:100%;
+    padding-inline:clamp(6px,2.5vw,10px);
+  }
+
+  .panel{
+    width:100%;
+    min-width:0;
+    padding-inline:clamp(8px,3vw,12px);
+    overflow:hidden;
+  }
+
+  /* Build row must never force the panel wider than the viewport. */
+  .entry-row{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:7px;
+    width:100%;
+    min-width:0;
+  }
+  .entry-row input{
+    min-width:0 !important;
+    width:100%;
+  }
+  #buildBtn{
+    min-width:0;
+    padding-inline:clamp(9px,3vw,14px);
+  }
+
+  /* Key/family line shrinks naturally. Family copy may use two short lines
+     instead of disappearing off the right edge. */
+  .section-heading-row{
+    width:100%;
+    min-width:0;
+  }
+  #fitHeading{
+    flex:0 1 auto;
+    min-width:0;
+  }
+  .fit-key-row{
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr);
+    flex:1 1 auto;
+    min-width:0;
+  }
+  .key-input{
+    width:clamp(54px,18vw,70px) !important;
+    min-width:54px !important;
+    max-width:70px !important;
+  }
+  #keyHint{
+    min-width:0;
+    white-space:normal !important;
+    overflow-wrap:anywhere;
+    line-height:1.05 !important;
+    text-align:right;
+  }
+
+  /* Transport controls use flexible columns rather than old fixed widths. */
+  .play-row{
+    display:grid !important;
+    grid-template-columns:
+      minmax(68px,.9fr)
+      minmax(52px,.72fr)
+      minmax(72px,.95fr)
+      minmax(72px,1fr) !important;
+    gap:clamp(3px,1.3vw,5px) !important;
+    min-width:0 !important;
+  }
+
+  #playAllBtn{
+    width:100% !important;
+    min-width:0 !important;
+    padding:10px 5px !important;
+    font-size:clamp(.70rem,2.8vw,.83rem) !important;
+  }
+
+  .play-row .repeat-control{
+    width:100% !important;
+    min-width:0 !important;
+    gap:3px !important;
+    font-size:clamp(.60rem,2.45vw,.69rem) !important;
+  }
+  .play-row .repeat-control input{
+    width:clamp(16px,4.5vw,18px) !important;
+    height:clamp(16px,4.5vw,18px) !important;
+    flex-basis:clamp(16px,4.5vw,18px) !important;
+  }
+
+  .play-row .bpm-control{
+    display:grid !important;
+    grid-template-columns:auto minmax(0,1fr);
+    width:100% !important;
+    min-width:0 !important;
+    gap:3px !important;
+    font-size:clamp(.59rem,2.4vw,.68rem) !important;
+  }
+  .play-row .bpm-control #bpmInput{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    padding:8px 3px !important;
+  }
+
+  .play-row .beats-control{
+    display:grid !important;
+    grid-template-columns:auto minmax(40px,1fr) !important;
+    width:100% !important;
+    min-width:0 !important;
+    gap:3px !important;
+  }
+  .play-row .beats-label{
+    min-width:0 !important;
+    width:auto !important;
+    font-size:clamp(.56rem,2.25vw,.66rem) !important;
+  }
+  .play-row #beatsSelect{
+    width:100% !important;
+    min-width:40px !important;
+    max-width:none !important;
+    height:40px !important;
+    padding:7px 18px 7px 6px !important;
+  }
+
+  /* Inline line controls may wrap only their helper copy, never the buttons. */
+  .line-actions{
+    display:grid !important;
+    grid-template-columns:auto 28px minmax(0,1fr);
+    align-items:center;
+    gap:5px;
+    width:100%;
+    min-width:0;
+  }
+  #addLineBtn{
+    min-width:0;
+    padding-inline:clamp(8px,2.4vw,12px);
+    font-size:clamp(.72rem,2.8vw,.88rem);
+    white-space:nowrap;
+  }
+  .line-help-inline{
+    min-width:0;
+    overflow:hidden;
+  }
+  .line-help-inline .line-help{
+    white-space:normal !important;
+    overflow-wrap:anywhere;
+  }
+  .line-help-select::after{
+    white-space:normal !important;
+    font-size:clamp(9px,2.55vw,12px) !important;
+    line-height:1.08 !important;
+  }
+
+  /* Project save row is allowed to shrink instead of being clipped. */
+  .project-save-row{
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto auto;
+    gap:6px !important;
+    width:100%;
+    min-width:0;
+  }
+  .project-save-row #projectName{
+    width:100%;
+    min-width:0 !important;
+  }
+  .project-save-row button{
+    min-width:0;
+    padding-inline:clamp(7px,2.1vw,10px);
+  }
+}
+
+/* Extra-small phones: preserve one-row transport, but shorten text and
+   squeeze secondary controls before ever allowing horizontal clipping. */
+@media(max-width:380px){
+  .app-shell{
+    padding-inline:5px;
+  }
+  .panel{
+    padding-inline:8px;
+  }
+
+  .brand-copy h1{
+    font-size:clamp(1.15rem,6vw,1.45rem) !important;
+  }
+  .brand-copy .tagline{
+    font-size:clamp(.61rem,2.9vw,.79rem) !important;
+  }
+
+  #fitHeading{
+    font-size:.86rem !important;
+  }
+  #keyHint{
+    font-size:.58rem !important;
+  }
+
+  .play-row{
+    grid-template-columns:minmax(62px,.86fr) minmax(48px,.66fr) minmax(66px,.9fr) minmax(66px,.95fr) !important;
+    gap:3px !important;
+  }
+  #playAllBtn{
+    font-size:.68rem !important;
+    padding-inline:3px !important;
+  }
+  .play-row .repeat-control span{
+    font-size:0;
+  }
+  .play-row .repeat-control span::after{
+    content:"Rpt";
+    font-size:.61rem;
+  }
+  .play-row .transport-label{
+    font-size:0;
+  }
+  .play-row .transport-label::after{
+    content:"BPM";
+    font-size:.58rem;
+  }
+  .play-row .beats-label span:first-child{
+    font-size:0;
+  }
+  .play-row .beats-label span:first-child::after{
+    content:"Beat";
+    font-size:.55rem;
+  }
+  .play-row .beats-label span:last-child{
+    font-size:.55rem;
+  }
+
+  #addLineBtn{
+    font-size:0;
+    padding-inline:8px;
+  }
+  #addLineBtn::after{
+    content:"+ Blank line";
+    font-size:.72rem;
+  }
+
+  .line-actions{
+    grid-template-columns:auto 27px minmax(0,1fr);
+    gap:4px;
+  }
+  .auto-scroll-btn{
+    width:27px !important;
+    min-width:27px !important;
+    height:27px !important;
+    min-height:27px !important;
+  }
+  .line-help-select::after{
+    content:"Tap line • Hold & drag cards";
+    font-size:9px !important;
+  }
+
+  .project-save-row{
+    grid-template-columns:minmax(0,1fr) auto auto;
+    gap:4px !important;
+  }
+  .export-btn,
+  #saveProjectBtn{
+    font-size:.68rem !important;
+    padding-inline:7px !important;
+  }
+}
+
+
+/* v1.5.7 — compact Octave + Sustain controls */
+.octave-control{
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:0 !important;
+}
+
+.octave-control .stepper{
+  width:104px;
+  min-width:104px;
+  max-width:104px;
+}
+
+.octave-control .stepper button{
+  flex:0 0 34px;
+  width:34px;
+  min-width:34px;
+  height:40px;
+  padding:0;
+}
+
+.octave-control .stepper #octaveValue{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 36px;
+  width:36px;
+  min-width:36px;
+  color:#fff;
+  font-size:1rem;
+  font-weight:900;
+  line-height:1;
+  text-align:center;
+  visibility:visible;
+  opacity:1;
+}
+
+.sustain-control{
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:0 !important;
+}
+
+.sustain-btn{
+  min-width:72px;
+  width:72px;
+  height:40px;
+  padding:0 8px;
+  font-size:.78rem;
+  font-weight:800;
+}
+
+.sustain-btn.on{
+  background:var(--accent);
+  color:#17130a;
+  border-color:#d7b654;
+}
+
+@media(max-width:700px){
+  /* Override the old rule that makes every toolbar label take ~half a row. */
+  .toolbar > .octave-control,
+  .toolbar > .sustain-control{
+    flex:0 0 auto !important;
+  }
+
+  .octave-control .stepper{
+    width:96px;
+    min-width:96px;
+    max-width:96px;
+  }
+
+  .octave-control .stepper button{
+    flex-basis:31px;
+    width:31px;
+    min-width:31px;
+  }
+
+  .octave-control .stepper #octaveValue{
+    flex-basis:34px;
+    width:34px;
+    min-width:34px;
+    font-size:1rem;
+  }
+
+  .sustain-btn{
+    width:68px;
+    min-width:68px;
+  }
+}
+
+@media(max-width:380px){
+  .octave-control .stepper{
+    width:92px;
+    min-width:92px;
+    max-width:92px;
+  }
+  .octave-control .stepper button{
+    flex-basis:29px;
+    width:29px;
+    min-width:29px;
+  }
+  .octave-control .stepper #octaveValue{
+    flex-basis:34px;
+    width:34px;
+    min-width:34px;
+  }
+  .sustain-btn{
+    width:62px;
+    min-width:62px;
+    font-size:.72rem;
+  }
+}
+
+
+/* v1.5.8 — Project title | New | Save | Export */
+.project-save-row{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) auto auto auto !important;
+  align-items:center;
+  gap:6px !important;
+  width:100%;
+  min-width:0;
+}
+
+.project-save-row #projectName{
+  width:100%;
+  min-width:0 !important;
+}
+
+.project-save-row #newProjectBtn,
+.project-save-row #saveProjectBtn,
+.project-save-row .export-btn{
+  white-space:nowrap;
+  min-width:0;
+}
+
+@media(max-width:700px){
+  .project-save-row{
+    grid-template-columns:minmax(0,1fr) auto auto auto !important;
+    gap:4px !important;
+  }
+
+  .project-save-row #projectName{
+    padding-inline:9px;
+  }
+
+  .project-save-row #newProjectBtn,
+  .project-save-row #saveProjectBtn,
+  .project-save-row .export-btn{
+    padding-inline:clamp(6px,1.9vw,9px) !important;
+    font-size:clamp(.65rem,2.45vw,.76rem) !important;
+  }
+}
+
+@media(max-width:380px){
+  .project-save-row{
+    grid-template-columns:minmax(0,1fr) auto auto auto !important;
+    gap:3px !important;
+  }
+  .project-save-row #projectName{
+    padding-inline:7px;
+    font-size:.76rem;
+  }
+  .project-save-row #newProjectBtn,
+  .project-save-row #saveProjectBtn,
+  .project-save-row .export-btn{
+    padding-inline:5px !important;
+    font-size:.64rem !important;
+  }
+}
+
+
+/* v1.5.9 — mobile horizontal looping line carousel */
+.mobile-line-indicator{display:none;}
+.progression.edit-locked .line-badge{cursor:default;opacity:.72;}
+.progression.edit-locked .chord-card{cursor:default;}
+
+@media(max-width:700px){
+  .progression.mobile-carousel{
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    align-items:flex-start;
+    gap:10px !important;
+    width:100%;
+    min-width:0;
+    overflow-x:auto;
+    overflow-y:visible;
+    scroll-snap-type:x mandatory;
+    scroll-behavior:smooth;
+    overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    padding:4px 0 5px;
+  }
+  .progression.mobile-carousel::-webkit-scrollbar{display:none;}
+  .progression.mobile-carousel > .progression-line{
+    flex:0 0 100% !important;
+    width:100% !important;
+    min-width:100% !important;
+    max-width:100% !important;
+    scroll-snap-align:start;
+    scroll-snap-stop:always;
+    box-sizing:border-box;
+  }
+  .progression.mobile-carousel > .carousel-clone{
+    pointer-events:none;
+  }
+  .mobile-line-indicator{
+    display:block;
+    width:max-content;
+    max-width:100%;
+    margin:2px auto 7px;
+    padding:2px 9px;
+    border:1px solid #39414b;
+    border-radius:999px;
+    background:#0e1115;
+    color:var(--muted);
+    font-size:.68rem;
+    font-weight:700;
+    line-height:1.35;
+  }
+  .mobile-line-indicator[hidden]{display:none !important;}
+
+  /* Whole-line reorder changes from vertical insertion to horizontal insertion. */
+  .progression.mobile-carousel .progression-line.line-drop-before::before,
+  .progression.mobile-carousel .progression-line.line-drop-after::after{
+    top:8px !important;
+    bottom:8px !important;
+    width:4px !important;
+    height:auto !important;
+    border-radius:999px;
+  }
+  .progression.mobile-carousel .progression-line.line-drop-before::before{
+    left:-7px !important;
+    right:auto !important;
+  }
+  .progression.mobile-carousel .progression-line.line-drop-after::after{
+    right:-7px !important;
+    left:auto !important;
+  }
+  .progression.mobile-carousel .line-badge{touch-action:none;}
+}
+
+
+/* v1.6.0 — keep mobile carousel line controls fully inside the scroll viewport */
+@media(max-width:700px){
+  .progression.mobile-carousel > .progression-line{
+    padding-top:34px !important;
+  }
+
+  .progression.mobile-carousel .line-badge{
+    top:7px !important;
+    left:10px !important;
+    z-index:6;
+  }
+
+  .progression.mobile-carousel .delete-line{
+    top:6px !important;
+    right:8px !important;
+    z-index:6;
+  }
+}
+
+
+/* v1.6.3 — duplicate whole progression line */
+.duplicate-line{
+  position:absolute;
+  top:-11px;
+  right:40px;
+  width:22px;
+  height:22px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  border:1px solid #4b5561;
+  background:var(--panel);
+  color:#aab2bc;
+  font-size:14px;
+  font-weight:900;
+  line-height:1;
+  z-index:2;
+}
+.duplicate-line:hover,
+.duplicate-line:focus-visible{
+  color:#fff;
+  border-color:var(--accent);
+  background:#34301f;
+}
+
+@media(max-width:700px){
+  .progression.mobile-carousel .duplicate-line{
+    top:6px !important;
+    right:42px !important;
+    z-index:6;
+  }
+}
+
+
+/* v1.6.5 — compact Projects / Archive browser */
+.save-panel{
+  overflow:visible;
+}
+.project-controls-fixed{
+  position:relative;
+  z-index:12;
+}
+.project-browser-tabs{
+  display:flex;
+  gap:8px;
+  margin-top:12px;
+  padding-bottom:8px;
+  border-bottom:1px solid #343c46;
+}
+.project-browser-tab{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-width:112px;
+  padding:8px 12px;
+  border-radius:10px;
+  color:var(--muted);
+  font-weight:800;
+}
+.project-browser-tab.active{
+  background:var(--accent);
+  border-color:#d7b654;
+  color:#17130a;
+}
+.project-tab-count{
+  min-width:22px;
+  height:20px;
+  padding:0 6px;
+  display:inline-grid;
+  place-items:center;
+  border-radius:999px;
+  background:rgba(255,255,255,.10);
+  font-size:.72rem;
+  line-height:1;
+}
+.project-browser-tab.active .project-tab-count{
+  background:rgba(23,19,10,.14);
+}
+.project-browser-window{
+  margin-top:10px;
+  max-height:132px; /* roughly two compact desktop cards */
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+  padding-right:4px;
+}
+.project-browser-window .project-list{
+  margin-top:0;
+}
+.project-item.current{
+  border-color:rgba(233,196,106,.72);
+  box-shadow:0 0 0 1px rgba(233,196,106,.12);
+}
+.project-item .archive-toggle{
+  color:var(--accent);
+}
+.project-empty{
+  min-height:108px;
+  display:grid;
+  place-items:center;
+  text-align:center;
+}
+
+@media(max-width:700px){
+  .project-browser-tabs{
+    position:relative;
+    z-index:11;
+  }
+  .project-browser-tab{
+    flex:1 1 0;
+    min-width:0;
+  }
+  .project-browser-window{
+    max-height:272px; /* two compact phone project cards */
+    padding-right:3px;
+  }
+  .project-item{
+    min-height:0;
+    padding:10px;
+    row-gap:10px;
+    column-gap:8px;
+    align-content:flex-start;
+  }
+  .project-item button{
+    padding:8px 10px;
+  }
+  .project-item .archive-toggle{
+    min-width:84px;
+  }
+}
+
+
+/* ===== Parts / mini-DAW foundation ===== */
+.part-manager{margin:14px 0 10px}.part-manager-top{display:flex;gap:10px;align-items:center}.part-strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;flex:1;padding:2px}.part-strip::-webkit-scrollbar{display:none}.part-pill{display:flex;align-items:center;gap:6px;min-width:max-content;border:1px solid #3b4653;border-radius:14px;padding:5px 8px;background:#11161e}.part-pill.active{border-color:var(--accent);box-shadow:0 0 0 1px rgba(233,196,106,.2)}.part-pill input{width:19px;height:19px;accent-color:var(--accent)}.part-open{border:0;background:transparent;color:inherit;padding:5px 2px;font-weight:750}.part-mini-vol{font-size:.72rem;color:#9aa3ad}.part-delete{border:0;background:transparent;color:#8f9aa7;padding:2px 5px;font-size:1.1rem}.add-part-btn{min-width:max-content;border-color:var(--accent)!important;color:#171717!important;background:var(--accent)!important;font-weight:800}.part-modal[hidden]{display:none}.part-modal{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px}.part-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72)}.part-modal-card{position:relative;width:min(520px,100%);background:#161c25;border:1px solid #46515e;border-radius:22px;padding:18px;box-shadow:0 24px 80px rgba(0,0,0,.55)}.part-modal-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.part-modal-heading h2{margin:0}.part-modal-heading button{font-size:1.5rem;border:0;background:transparent}.part-choice{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:9px 0;padding:16px;border:1px solid #3f4a58;border-radius:15px;background:#10151c;text-align:left}.part-choice strong{font-size:1.05rem;color:#f2c75c}.part-choice span{color:#aab2bd}.lead-part-editor,.vocal-part-editor{margin:12px 0 8px;border:1px solid #394452;border-radius:18px;background:#10151c;padding:14px}.lead-editor-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.lead-editor-head h3,.vocal-editor-card h3{margin:0 0 4px}.part-volume-label{display:flex;align-items:center;gap:8px;white-space:nowrap}.part-volume-label input{width:120px}.lead-controls{display:grid;grid-template-columns:1.2fr 1.5fr 1fr 1fr .8fr;gap:10px;margin:12px 0}.lead-controls label{display:flex;flex-direction:column;gap:5px}.compact-segmented{min-width:0}.lead-bar-nav{display:flex;align-items:center;gap:8px;margin-bottom:8px}.lead-bar-nav strong{min-width:90px;text-align:center}.lead-bar-nav #leadClearBar{margin-left:auto}.lead-grid-wrap{overflow:auto;border:1px solid #303946;border-radius:12px;background:#0a0e14;max-height:62vh}.lead-grid{display:grid;min-width:max-content}.lead-grid-corner,.lead-grid-step,.lead-grid-note{position:sticky;z-index:3;background:#141a22}.lead-grid-corner{left:0;top:0;z-index:5}.lead-grid-step{top:0;height:32px;display:grid;place-items:center;font-size:.68rem;color:#8f99a7;border-right:1px solid #252d37;border-bottom:1px solid #303946}.lead-grid-note{left:0;width:56px;height:29px;display:grid;place-items:center;font-size:.78rem;font-weight:700;border-bottom:1px solid #252d37;border-right:1px solid #303946}.lead-cell{width:26px;height:29px;border:0;border-right:1px solid #202833;border-bottom:1px solid #202833;border-radius:0;background:#0e131a;padding:0}.lead-cell.beat-edge{border-left:2px solid #465361}.lead-cell.on{background:var(--accent);box-shadow:inset 0 0 0 2px #141414}.lead-cell.playing{outline:2px solid #fff;outline-offset:-2px}.vocal-editor-card p{line-height:1.45}.chord-part-controls.part-hidden > .toolbar,.chord-part-controls.part-hidden > .entry-row,.chord-part-controls.part-hidden > div:not(.status),#chordPartRows.part-hidden{display:none!important}
+@media(max-width:720px){.part-manager-top{align-items:stretch}.part-strip{max-width:calc(100vw - 145px)}.lead-editor-head{flex-direction:column}.lead-controls{grid-template-columns:1fr 1fr}.part-volume-label{width:100%}.part-volume-label input{flex:1}.lead-grid-wrap{max-height:58vh}.part-modal{padding:12px}.part-modal-card{border-radius:18px}}
+\n/* Parts + studio vocal recorder */\n.add-part-btn{display:flex!important;flex-direction:column;align-items:center;justify-content:center;line-height:1.02;min-width:68px!important;padding:8px 12px!important}\n.active-part-volume-row{display:grid;grid-template-columns:max-content minmax(0,1fr) 48px;align-items:center;gap:10px;margin-top:10px}\n.active-part-volume-row input,.part-volume-label input,.vocal-playback-level input{width:100%;min-width:0}\n.active-part-volume-row input[type=range],.part-volume-label input[type=range],.vocal-playback-level input[type=range]{appearance:none;-webkit-appearance:none;height:22px;background:transparent;padding:0;margin:0}\n.active-part-volume-row input[type=range]::-webkit-slider-runnable-track,.part-volume-label input[type=range]::-webkit-slider-runnable-track,.vocal-playback-level input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:999px;background:#485463}\n.active-part-volume-row input[type=range]::-webkit-slider-thumb,.part-volume-label input[type=range]::-webkit-slider-thumb,.vocal-playback-level input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);border:2px solid #1a2029;margin-top:-7px}\n.active-part-volume-row input[type=range]::-moz-range-track,.part-volume-label input[type=range]::-moz-range-track,.vocal-playback-level input[type=range]::-moz-range-track{height:6px;border-radius:999px;background:#485463}\n.active-part-volume-row input[type=range]::-moz-range-thumb,.part-volume-label input[type=range]::-moz-range-thumb,.vocal-playback-level input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent);border:2px solid #1a2029}\n.vocal-editor-card{display:flex;flex-direction:column;gap:12px}.vocal-title-row,.vocal-panel-heading,.mic-meter-labels{display:flex;align-items:center;justify-content:space-between;gap:12px}.vocal-title-row .part-volume-label{min-width:min(300px,48%)}\n.vocal-recorder-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.vocal-panel{border:1px solid #33404f;border-radius:14px;background:#0c1118;padding:12px}.vocal-panel h4{margin:0 0 10px}.vocal-backing-list{display:grid;gap:7px;margin-bottom:7px}.vocal-backing-item{display:flex;align-items:center;gap:8px}.vocal-backing-item input,.vocal-drum-check input{width:19px;height:19px;accent-color:var(--accent)}.vocal-playback-level{display:grid;grid-template-columns:max-content 1fr 44px;align-items:center;gap:8px;margin-top:10px}.tiny{font-size:.76rem}.mic-meter{height:14px;background:#1c2630;border:1px solid #3a4654;border-radius:999px;overflow:hidden}.mic-meter span{display:block;width:0;height:100%;background:linear-gradient(90deg,#47d47b 0%,#e9c46a 72%,#e76f51 100%);transition:width .06s linear}.mic-meter-labels{margin:6px 0 10px}.vocal-transport{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:center}.vocal-record-btn{font-weight:800}.record-dot{display:inline-block;width:14px;height:14px;border-radius:50%;background:#ff5252;margin-right:7px;vertical-align:-2px}.vocal-record-btn.recording{border-color:#ff6464!important;box-shadow:0 0 0 2px rgba(255,82,82,.18)}.vocal-effects-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.vocal-effects-grid label{display:flex;flex-direction:column;gap:5px}.vocal-takes{display:grid;gap:8px}.vocal-take{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:7px;align-items:center;border:1px solid #293441;border-radius:11px;padding:8px}.vocal-take.active{border-color:var(--accent)}.vocal-take-main{min-width:0}.vocal-take-name{font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.vocal-take-meta{font-size:.72rem;color:#939eaa}.vocal-empty{padding:18px;text-align:center;color:#8d98a5}.vocal-take button{padding:7px 9px}.vocal-take .take-use{color:#171717;background:var(--accent);border-color:var(--accent)}\n@media(max-width:720px){.active-part-volume-row{grid-template-columns:1fr minmax(130px,1.8fr) 46px}.vocal-title-row{align-items:flex-start;flex-direction:column}.vocal-title-row .part-volume-label{width:100%;min-width:0}.vocal-recorder-grid{grid-template-columns:1fr}.vocal-effects-grid{grid-template-columns:1fr 1fr}.vocal-transport{grid-template-columns:1fr 1fr}.vocal-transport #vocalTimer{grid-column:1/-1;text-align:center}.vocal-take{grid-template-columns:minmax(0,1fr) auto auto}.vocal-take .take-download{grid-column:2}.vocal-take .take-delete{grid-column:3}.part-manager-top{gap:7px}.add-part-btn{min-width:62px!important}}\n
+/* one part-volume control per page; the manager row is the visible control */
+.lead-editor-head .part-volume-label,.vocal-title-row .part-volume-label{display:none!important}
+
+
+/* Parts/Vocal Studio mobile tightening + overflow guard */
+.add-part-btn{white-space:normal!important;min-width:76px!important;max-width:84px;line-height:1.02!important;text-align:center!important}
+.add-part-btn span{display:block!important;width:100%}
+.vocal-drum-check{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;width:max-content!important}
+.vocal-drum-check span{display:inline-block!important}
+.vocal-effects,.vocal-effects-grid,.vocal-effects-grid label{min-width:0!important;max-width:100%!important}
+.vocal-effects-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;overflow:hidden}
+.vocal-effects-grid select{display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;text-overflow:ellipsis}
+.vocal-panel-heading{min-width:0;flex-wrap:wrap}
+.vocal-panel-heading .subtle{min-width:0}
+@media(max-width:900px){
+  .vocal-effects-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .vocal-recorder-grid{grid-template-columns:1fr!important}
+}
+@media(max-width:430px){
+  .vocal-effects-grid{grid-template-columns:1fr!important}
+  .active-part-volume-row{grid-template-columns:1fr 46px!important}
+  .active-part-volume-row>span{grid-column:1/-1}
+}
+
+
+/* v1.8.0 — lead copy/paste, mic toggle, studio export */
+.lead-bar-nav{flex-wrap:wrap}.lead-bar-tools{margin-left:auto;display:flex;gap:6px}.lead-bar-tools button{padding:7px 10px}.lead-bar-tools button:disabled{opacity:.42}
+#vocalArmMic[aria-pressed="true"]{background:var(--accent);color:#151515;border-color:var(--accent);font-weight:800}
+.studio-export-modal[hidden]{display:none}.studio-export-modal{position:fixed;inset:0;z-index:1400;display:grid;place-items:center;padding:18px}.studio-export-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.76)}.studio-export-card{position:relative;width:min(560px,100%);max-height:86vh;overflow:auto;background:#151b24;border:1px solid #46515e;border-radius:20px;padding:18px;box-shadow:0 24px 80px rgba(0,0,0,.6)}.studio-export-card h2{margin:0 0 6px}.studio-export-list{display:grid;gap:8px;margin:14px 0}.studio-export-row{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid #313c49;border-radius:12px;background:#0e131a}.studio-export-row input{width:20px;height:20px;accent-color:var(--accent)}.studio-export-actions{display:flex;justify-content:flex-end;gap:8px;position:sticky;bottom:-18px;background:#151b24;padding:12px 0 2px}.cloud-badge{font-size:.68rem;color:#9fd6ff;margin-left:6px}.cloud-badge.pending{color:#e9c46a}
+@media(max-width:520px){.lead-bar-nav strong{min-width:72px}.lead-bar-tools{width:100%;margin-left:0;display:grid;grid-template-columns:1fr 1fr 1fr}.lead-bar-tools button{width:100%}.studio-export-actions{display:grid;grid-template-columns:1fr 1fr}}
+
+/* v1.9 volume visual cleanup: use the browser's filled native range so 100% truly ends at 100%. */
+.active-part-volume-row input[type=range],.vocal-playback-level input[type=range]{appearance:auto!important;-webkit-appearance:auto!important;height:auto!important;background:transparent!important;accent-color:var(--accent);}
+.vocal-transcript-panel textarea{width:100%;box-sizing:border-box;resize:vertical;min-height:96px;background:#0a0f16;color:#eef2f6;border:1px solid #3b4755;border-radius:10px;padding:10px;font:inherit;line-height:1.4}
+.export-pattern{margin:14px 0;padding:12px;border:1px solid #c8c2b6;border-radius:10px;background:#fff;color:#111;break-inside:avoid}.export-pattern h3{margin:0 0 8px}.export-pattern table{width:100%;border-collapse:collapse;font-size:11px}.export-pattern th,.export-pattern td{border:1px solid #aaa;padding:3px;text-align:center}.export-pattern .hit{background:#222;color:#fff;font-weight:700}.export-lyrics{white-space:pre-wrap;line-height:1.45}
+
+/* v1.9.1 — line-first PDF song blueprint */
+.export-song-line{padding:12px 0 18px;border-bottom:2px solid #d6b44f;break-inside:avoid-page}
+.export-part-label{font-size:12px;font-weight:800;color:#20242a;margin:7px 0 5px}
+.export-grid-block,.export-vocal-block,.export-chord-block{margin:8px 0 10px;break-inside:avoid}
+.export-grid-wrap{width:100%;overflow:hidden}
+.export-seq-grid{width:100%;table-layout:fixed;border-collapse:collapse;font-size:8px;background:#fff}
+.export-seq-grid th,.export-seq-grid td{border:1px solid #aeb4ba;text-align:center;height:18px;padding:0;color:#222}
+.export-seq-grid th.row-label{width:82px;text-align:left;padding:0 4px;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.export-seq-grid td.hit{background:#e9c46a;color:#111;font-weight:900}
+.export-chord-names{font-weight:800;font-size:12px;margin-bottom:5px}
+.export-card-row.compact{gap:6px}.export-card-row.compact .export-card{min-width:145px;flex:1 1 22%;padding:6px}
+.export-card-row.compact .diagram svg{max-height:112px}
+
+/* v1.9.2 repeat + exact range fill + PDF grid alignment */
+.part-repeat-toggle{display:flex!important;flex-direction:row!important;align-items:center;gap:7px;margin-top:7px;color:var(--muted);font-size:.82rem}.part-repeat-toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.active-part-volume-row input[type=range]{-webkit-appearance:none!important;appearance:none!important;height:22px!important;background:transparent!important;accent-color:var(--accent)}
+.active-part-volume-row input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:999px;background:linear-gradient(to right,var(--accent) 0,var(--accent) var(--range-fill,100%),#485463 var(--range-fill,100%),#485463 100%)}
+.active-part-volume-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);border:2px solid #1a2029;margin-top:-7px}
+.export-seq-grid col.label-col{width:82px}.export-seq-grid col.step-col{width:auto}.export-seq-grid th.row-label{width:auto!important}.export-seq-grid th.beat-key{font-weight:900;background:#eee}.export-seq-grid th.sub-key{font-size:7px;color:#666}.export-seq-grid th,.export-seq-grid td{box-sizing:border-box}
+
+.vocal-transcribe-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 8px}.vocal-transcribe-row button{white-space:nowrap}
+
+
+/* v1.9.4 — PDF bar-axis alignment: drums, lead/bass and chords share one timeline */
+.export-chord-lane{display:grid;grid-template-columns:82px minmax(0,1fr);width:100%;align-items:start}
+.export-chord-gutter{width:82px;min-width:82px}
+.export-chord-slots{display:grid;grid-template-columns:repeat(var(--slot-count,4),minmax(0,1fr));width:100%;min-width:0}
+.export-chord-slot{min-width:0;padding:4px 5px 2px;border-left:1px solid #aeb4ba;box-sizing:border-box;overflow:hidden}
+.export-chord-slot:last-child{border-right:1px solid #aeb4ba}
+.export-chord-slot .export-card-name{font-size:12px;margin:0 0 2px;color:#111}
+.export-chord-slot .export-card-subtitle{font-size:7px;min-height:8px;margin:0 0 2px;color:#555}
+.export-chord-slot .diagram{width:100%;overflow:hidden}
+.export-chord-slot .diagram svg{display:block;width:100%;height:auto;max-height:112px}
+.export-sheet.pdf-print .export-chord-slot{background:#fff}
+
+/* v1.9.7 Lead/Bass sustain */
+.lead-play-options{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}.lead-play-options .part-repeat-toggle{margin:0}
+@media(max-width:520px){.lead-play-options{gap:10px}}
+
+
+/* v1.9.8 — two synchronized workspace views */
+.workspace-mode-switch{display:flex;justify-content:center;gap:10px;max-width:760px;margin:8px auto 2px;padding:0 14px}
+.workspace-mode-btn{display:flex;align-items:center;gap:9px;min-width:0;flex:1;max-width:310px;padding:7px 12px;border:1px solid #46505d;border-radius:16px;background:#11161d;color:#c8ced6;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease,transform .12s ease}
+.workspace-mode-btn:active{transform:scale(.985)}
+.workspace-mode-btn.active{border-color:var(--accent);background:#18170f;color:#fff3c5;box-shadow:0 0 0 1px rgba(233,196,106,.42),0 0 18px rgba(233,196,106,.42),inset 0 0 18px rgba(233,196,106,.08)}
+.mode-art{display:block;flex:0 0 48px;width:48px;height:48px;border-radius:12px;overflow:hidden;background:#080b0f;border:1px solid #343d49}
+.rider-mode-art img{width:100%;height:100%;object-fit:contain}
+/* Generated Baby DAW artwork is used as a sprite so the doll head stays compact in the mode toggle. */
+.baby-mode-art{background-image:url('assets/baby-daw-generated-source.png');background-repeat:no-repeat;background-size:768px 512px;background-position:-420px -13px}
+.mode-copy{display:flex;flex-direction:column;align-items:flex-start;min-width:0;line-height:1.05}.mode-copy strong{font-size:1rem}.mode-copy small{margin-top:4px;color:#909aa6;font-size:.72rem}.workspace-mode-btn.active .mode-copy small{color:#d9c98f}
+body.workspace-chord-rider #partManager,body.workspace-chord-rider #leadPartEditor,body.workspace-chord-rider #vocalPartEditor,body.workspace-chord-rider .baby-daw-only{display:none!important}
+body.workspace-chord-rider #chordPartControls.part-hidden > .toolbar,body.workspace-chord-rider #chordPartControls.part-hidden > .entry-row,body.workspace-chord-rider #chordPartControls.part-hidden > div:not(.status),body.workspace-chord-rider #chordPartRows.part-hidden{display:revert!important}
+@media(max-width:520px){.workspace-mode-switch{gap:7px;padding:0 8px}.workspace-mode-btn{padding:6px 8px;gap:6px;border-radius:13px}.mode-art{flex-basis:40px;width:40px;height:40px}.baby-mode-art{background-size:640px 427px;background-position:-350px -11px}.mode-copy strong{font-size:.88rem}.mode-copy small{font-size:.64rem}}
+\n/* v1.9.9 — sticker-style mode art + metallic CRP wordmark */
+.brand-copy h1{
+  font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif;
+  font-style:italic;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.025em;
+  line-height:.95;
+  background:linear-gradient(180deg,#fff3bf 0%,#ffd968 20%,#e9a92f 47%,#9b5b08 72%,#ffd86a 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-text-stroke:1px rgba(109,63,4,.7);
+  filter:drop-shadow(0 2px 0 #4e2b00) drop-shadow(0 0 7px rgba(242,183,54,.38));
+}
+.mode-art{
+  flex:0 0 64px;width:64px;height:56px;
+  border:0;border-radius:0;overflow:visible;background:transparent;
+  display:flex;align-items:center;justify-content:center;
+}
+.mode-art img{display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(0,0,0,.55));}
+.rider-mode-art{flex-basis:76px;width:76px;height:56px;}
+.baby-mode-art{background:none!important;flex-basis:58px;width:58px;height:58px;}
+.baby-mode-art img{width:54px;height:58px;}
+@media(max-width:520px){
+  .brand-copy h1{font-size:clamp(1.55rem,7vw,2rem);letter-spacing:.015em;}
+  .mode-art{border:0;background:transparent;border-radius:0;overflow:visible;}
+  .rider-mode-art{flex-basis:64px;width:64px;height:48px;}
+  .baby-mode-art{flex-basis:48px;width:48px;height:50px;background:none!important;}
+  .baby-mode-art img{width:46px;height:50px;}
+}
+
+/* v2.0.0 — three-workspace shell + optional SRP link */
+.workspace-mode-switch{grid-template-columns:repeat(3,minmax(0,1fr));}
+.song-mode-art img{object-fit:contain;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55));}
+.song-rider-workspace{max-width:1180px;margin:0 auto 18px;padding:0 14px;}
+.song-rider-workspace[hidden]{display:none!important;}
+.srp-linkbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:10px 12px;border:1px solid rgba(216,174,82,.45);border-radius:14px;background:#15181d;}
+.srp-linkbar>div{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 220px}.srp-linkbar span{font-size:.78rem;color:#aeb4bf}
+.srp-linkbar button{border:1px solid #d8ae52;border-radius:10px;background:#20242b;color:#f4d47d;padding:9px 12px;font-weight:800}
+#songRiderFrame{display:block;width:100%;min-height:1050px;border:0;border-radius:16px;background:#fff;}
+body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:none!important;}
+@media(max-width:640px){.workspace-mode-switch{gap:7px}.workspace-mode-btn{padding:8px 6px}.workspace-mode-btn .mode-copy strong{font-size:.92rem}.workspace-mode-btn .mode-copy small{font-size:.66rem}.mode-art{width:48px;min-width:48px}.song-rider-workspace{padding:0 5px}#songRiderFrame{min-height:1200px;border-radius:10px}}
+
+/* v2.0.2 — SRP embedded polish */
+.song-mode-art{flex:0 0 76px!important;width:76px!important;height:58px!important;overflow:visible!important;background:transparent!important;border:0!important;}
+.song-mode-art img{display:block!important;width:76px!important;height:58px!important;object-fit:contain!important;transform:none!important;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55));}
+#songRiderFrame{display:block;width:100%;height:900px;min-height:0!important;border:0;border-radius:16px;background:#fff;overflow:hidden;}
+@media(max-width:640px){
+  .song-mode-art{flex-basis:64px!important;width:64px!important;height:50px!important;}
+  .song-mode-art img{width:64px!important;height:50px!important;}
+  #songRiderFrame{height:900px;min-height:0!important;border-radius:10px;}
+}
+
+/* v2.0.3 — SRP height + mode icon hard fix */
+.song-mode-art{flex:0 0 72px!important;width:72px!important;height:56px!important;}
+.song-mode-art img{width:72px!important;height:56px!important;object-fit:contain!important;}
+#songRiderFrame{height:640px;min-height:0!important;overflow:hidden!important;}
+@media(max-width:640px){
+  .song-mode-art{flex-basis:66px!important;width:66px!important;height:52px!important;}
+  .song-mode-art img{width:66px!important;height:52px!important;}
+  #songRiderFrame{height:640px;}
+}
+
+
+/* v2.0.4 — SRP single-scroll integration */
+#songRiderFrame{height:640px;min-height:0!important;overflow:hidden!important;touch-action:pan-y;}
+@media(max-width:640px){#songRiderFrame{height:640px;min-height:0!important;}}
+
+/* v2.3.1 transport flow: Add Line lives with setup controls; playback controls sit directly above lines. */
+.transport-line-actions{gap:10px;align-items:center;}
+.transport-line-actions .repeat-control{display:flex;align-items:center;gap:6px;margin:0;}
+.transport-line-actions #playAllBtn{margin:0;}
+@media (max-width:640px){
+  .transport-line-actions{flex-wrap:nowrap;width:100%;}
+  .transport-line-actions #playAllBtn{flex:0 0 auto;}
+  .transport-line-actions .repeat-control{flex:0 0 auto;white-space:nowrap;}
+  .transport-line-actions #autoScrollBtn{flex:0 0 auto;margin-left:0;}
+  .play-row #addLineBtn{flex:0 0 auto;}
+}
+
+/* v2.3.2 — transport row must not inherit the generic 3-column .line-actions grid.
+   That grid reserves the middle column for the old 28px auto-scroll button and
+   was crushing the Repeat label after the transport controls were moved. */
+.transport-line-actions{
+  display:flex !important;
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:14px !important;
+  width:100% !important;
+  min-width:0 !important;
+}
+.transport-line-actions #playAllBtn{
+  flex:0 0 auto !important;
+}
+.transport-line-actions .repeat-control{
+  display:flex !important;
+  align-items:center !important;
+  gap:6px !important;
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:max-content !important;
+  margin:0 !important;
+  white-space:nowrap !important;
+}
+.transport-line-actions .repeat-control input{
+  flex:0 0 auto !important;
+}
+.transport-line-actions #autoScrollBtn{
+  flex:0 0 34px !important;
+  width:34px !important;
+  min-width:34px !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:0 !important;
+}
+@media(max-width:390px){
+  .transport-line-actions{
+    gap:10px !important;
+  }
+  .transport-line-actions #playAllBtn{
+    width:auto !important;
+    min-width:0 !important;
+    padding:10px 12px !important;
+    font-size:.78rem !important;
+  }
+  .transport-line-actions .repeat-control span{
+    font-size:.72rem !important;
+  }
+}
+
+/* v2.3.3 — mobile setup + playback transport cleanup after control re-order.
+   Setup row has exactly 3 controls now: Add line | BPM | Beats/chord.
+   Playback row has exactly 3 controls: Play | Repeat | Auto-scroll. */
+@media (max-width:700px){
+  /* Setup row: prevent the old 4-column transport grid from squeezing/overlapping. */
+  .play-row{
+    display:grid !important;
+    grid-template-columns:minmax(0,1.35fr) minmax(0,.82fr) minmax(0,1fr) !important;
+    align-items:center !important;
+    column-gap:7px !important;
+    row-gap:0 !important;
+    width:100% !important;
+    min-width:0 !important;
+    overflow:visible !important;
+  }
+  .play-row #addLineBtn{
+    grid-column:1 !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    margin:0 !important;
+    padding:10px 8px !important;
+    font-size:clamp(.67rem,2.65vw,.82rem) !important;
+    line-height:1.05 !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:clip !important;
+  }
+  .play-row .bpm-control{
+    grid-column:2 !important;
+    display:grid !important;
+    grid-template-columns:auto minmax(0,1fr) !important;
+    align-items:center !important;
+    gap:3px !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+    white-space:nowrap !important;
+  }
+  .play-row .bpm-control #bpmInput{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    box-sizing:border-box !important;
+    padding:8px 3px !important;
+    text-align:center !important;
+  }
+  .play-row .beats-control{
+    grid-column:3 !important;
+    display:grid !important;
+    grid-template-columns:auto minmax(44px,1fr) !important;
+    align-items:center !important;
+    justify-content:stretch !important;
+    gap:4px !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+  }
+  .play-row .beats-label{
+    min-width:0 !important;
+    width:auto !important;
+    line-height:.92 !important;
+    font-size:clamp(.56rem,2.2vw,.66rem) !important;
+  }
+  .play-row #beatsSelect{
+    width:100% !important;
+    min-width:44px !important;
+    max-width:none !important;
+    box-sizing:border-box !important;
+  }
+
+  /* Playback row: keep all three controls visible and comfortably spaced. */
+  .transport-line-actions{
+    display:grid !important;
+    grid-template-columns:minmax(96px,128px) auto 40px !important;
+    align-items:center !important;
+    justify-content:start !important;
+    gap:10px !important;
+    width:100% !important;
+    min-width:0 !important;
+    margin:14px 0 8px !important;
+    overflow:visible !important;
+  }
+  .transport-line-actions #playAllBtn{
+    grid-column:1 !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:128px !important;
+    margin:0 !important;
+    padding:11px 12px !important;
+    font-size:.82rem !important;
+    line-height:1 !important;
+    white-space:nowrap !important;
+  }
+  .transport-line-actions .repeat-control{
+    grid-column:2 !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-start !important;
+    gap:5px !important;
+    width:auto !important;
+    min-width:0 !important;
+    margin:0 !important;
+    padding:0 !important;
+    white-space:nowrap !important;
+    font-size:.76rem !important;
+  }
+  .transport-line-actions .repeat-control input{
+    width:20px !important;
+    height:20px !important;
+    flex:0 0 20px !important;
+    margin:0 !important;
+  }
+  .transport-line-actions #autoScrollBtn{
+    grid-column:3 !important;
+    width:40px !important;
+    min-width:40px !important;
+    height:40px !important;
+    min-height:40px !important;
+    margin:0 !important;
+    padding:0 !important;
+    justify-self:start !important;
+    font-size:1rem !important;
+  }
+}
+
+@media (max-width:380px){
+  .play-row{
+    grid-template-columns:minmax(0,1.25fr) minmax(0,.84fr) minmax(0,1fr) !important;
+    column-gap:5px !important;
+  }
+  .play-row #addLineBtn{
+    font-size:0 !important;
+  }
+  .play-row #addLineBtn::after{
+    content:"+ Blank line" !important;
+    font-size:.70rem !important;
+  }
+  .transport-line-actions{
+    grid-template-columns:minmax(90px,116px) auto 38px !important;
+    gap:8px !important;
+  }
+  .transport-line-actions #playAllBtn{
+    max-width:116px !important;
+    padding-inline:9px !important;
+    font-size:.76rem !important;
+  }
+  .transport-line-actions .repeat-control span{
+    font-size:.70rem !important;
+  }
+  .transport-line-actions #autoScrollBtn{
+    width:38px !important;
+    min-width:38px !important;
+    height:38px !important;
+    min-height:38px !important;
+  }
+}
+
+
+/* v2.4.0 SRP linked lyrics recorder overlay */
+.vocal-transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#vocalLyricsBtn{min-width:86px}
+.srp-lyrics-overlay{position:fixed;inset:0;z-index:9999;background:#0d1117;display:flex;flex-direction:column}
+.srp-lyrics-overlay[hidden]{display:none!important}
+.srp-lyrics-overlay-head{height:48px;flex:0 0 48px;padding:6px 10px;display:flex;align-items:center;justify-content:space-between;background:#151a21;border-bottom:1px solid #333;color:#f2ca65}
+.srp-lyrics-overlay-head button{width:38px;height:38px;border-radius:10px;font-size:24px;padding:0}
+#srpLyricsFrame{border:0;flex:1 1 auto;width:100%;min-height:0;background:#101318}
+.srp-record-float{position:fixed;z-index:10001;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:12px;padding:10px 14px;border-radius:999px;background:rgba(17,21,27,.94);border:1px solid #d7ad4a;box-shadow:0 8px 26px rgba(0,0,0,.45)}
+.srp-record-float button{width:52px;height:52px;border-radius:50%;font-size:20px;font-weight:900;padding:0}
+#srpFloatRecord{background:#ef5a4c;color:#fff;border-color:#ff7d71}
+#srpFloatPause{background:#f0c65a;color:#111}
+#srpFloatStop{background:#262c34;color:#fff}
+.srp-record-float button:disabled{opacity:.4}
+
+/* v2.4.1 SRP lyrics overlay transport */
+.srp-lyrics-overlay-head{justify-content:flex-start!important;}
+.srp-record-float{gap:10px!important;}
+.srp-record-float #srpLyricsCloseBtn{display:inline-flex;align-items:center;justify-content:center;font-size:28px;line-height:1;background:#252b33;color:#f4f6f8;border:1px solid #46505b;}
+
+/* v2.9.4 — Song Rider Suite visual polish only */
+.app-header .brand-copy h1{
+  font-family:Impact,Haettenschweiler,"Arial Black",sans-serif;
+  font-weight:900;
+  letter-spacing:.025em;
+  color:transparent;
+  background:linear-gradient(180deg,#fff8bd 0%,#ffd85a 12%,#ffbd16 28%,#fff0a1 43%,#d98b00 58%,#ffc62c 74%,#8a4a00 100%);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-stroke:1px #6f3b00;
+  text-shadow:0 1px 0 #fff1a6,0 2px 0 #b46a00,0 4px 0 #6d3700,0 7px 12px rgba(0,0,0,.75),0 0 18px rgba(255,184,0,.48);
+  filter:drop-shadow(0 0 4px rgba(255,194,42,.38));
+}
+.baby-mode-art img{
+  width:100%!important;height:100%!important;object-fit:contain!important;
+  border-radius:18px;
+  filter:drop-shadow(0 4px 6px rgba(0,0,0,.6)) drop-shadow(0 0 6px rgba(255,190,32,.22));
+}
+@media(max-width:700px){
+  .app-header .brand-copy h1{font-size:clamp(1.55rem,7.5vw,2.15rem)!important;white-space:nowrap;}
+}
+
+/* v2.9.4 — visual cleanup from mobile review */
+.app-header .brand-copy{
+  min-width:0!important;
+  flex:1 1 auto!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+.app-header .brand-copy h1{
+  width:auto!important;
+  max-width:100%!important;
+  white-space:nowrap!important;
+  line-height:1!important;
+}
+.baby-mode-art{
+  overflow:visible!important;
+}
+.baby-mode-art img{
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+@media(max-width:700px){
+  .app-header{gap:3px!important;padding-left:8px!important;padding-right:8px!important;}
+  .app-header .brand-mark{width:64px!important;flex:0 0 64px!important;}
+  .app-header .brand-copy h1{
+    font-size:clamp(1.15rem,5.35vw,1.72rem)!important;
+    letter-spacing:.005em!important;
+    transform:scaleX(.90);
+    transform-origin:center;
+  }
+  .app-header .tagline{font-size:clamp(.62rem,2.65vw,.84rem)!important;white-space:nowrap!important;}
+}
+
+/* v2.9.4 — Exact shared Song Rider Suite branding shell */
+.app-header{
+  position:relative!important;
+  top:auto!important;
+  z-index:10!important;
+  display:grid!important;
+  grid-template-columns:82px minmax(0,1fr) 82px!important;
+  align-items:center!important;
+  gap:4px!important;
+  min-height:92px!important;
+  padding:7px 8px 8px!important;
+  background:
+    radial-gradient(ellipse at 50% 0%,rgba(91,57,5,.22),transparent 58%),
+    linear-gradient(180deg,#090a0c,#0c0f13)!important;
+  border-top:2px solid #d8a62a!important;
+  border-bottom:2px solid #c99724!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,242,174,.36),
+    inset 0 -1px 0 rgba(255,215,87,.22),
+    0 4px 12px rgba(0,0,0,.45)!important;
+  backdrop-filter:none!important;
+  overflow:hidden!important;
+}
+.app-header .brand-mark{
+  width:82px!important;height:72px!important;object-fit:contain!important;
+  filter:drop-shadow(0 4px 4px rgba(0,0,0,.72))!important;
+}
+.app-header .brand-copy{
+  min-width:0!important;text-align:center!important;
+  display:flex!important;flex-direction:column!important;align-items:center!important;
+}
+.app-header .brand-copy h1{
+  margin:0!important;
+  width:auto!important;max-width:100%!important;
+  white-space:nowrap!important;
+  font-family:Impact,Haettenschweiler,"Arial Black",sans-serif!important;
+  font-size:clamp(1.45rem,7.3vw,2.25rem)!important;
+  line-height:.96!important;
+  letter-spacing:.012em!important;
+  transform:scaleX(.88)!important;
+  transform-origin:center!important;
+  color:transparent!important;
+  background:linear-gradient(180deg,
+    #fffbd2 0%,#ffe17a 9%,#ffbe20 25%,#fff0a3 39%,
+    #d88a00 53%,#ffcf3d 66%,#9a5300 83%,#f0ae17 100%)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;
+  -webkit-text-stroke:1px #5d3100!important;
+  text-shadow:
+    0 1px 0 #fff6c7,
+    0 2px 0 #c47a05,
+    0 4px 0 #663600,
+    0 6px 10px rgba(0,0,0,.78),
+    0 0 14px rgba(255,188,29,.52)!important;
+  filter:drop-shadow(0 0 3px rgba(255,196,45,.28))!important;
+}
+.app-header .tagline{
+  margin:5px 0 0!important;
+  color:#f2f2f0!important;
+  font-family:"Brush Script MT","Segoe Script",cursive!important;
+  font-size:clamp(.66rem,2.85vw,.9rem)!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+  text-shadow:0 2px 3px #000!important;
+}
+
+/* exact Baby DAW sticker — kill every old sprite/background rule */
+.mode-art.baby-mode-art{
+  background:none!important;background-image:none!important;
+  border:0!important;overflow:visible!important;
+}
+.mode-art.baby-mode-art img{
+  display:block!important;
+  width:58px!important;height:58px!important;
+  max-width:none!important;object-fit:contain!important;
+  border:0!important;border-radius:0!important;
+  background:transparent!important;box-shadow:none!important;
+  filter:drop-shadow(0 4px 5px rgba(0,0,0,.75))!important;
+}
+
+/* all three workspace selections use the same unmistakable gold active state */
+.workspace-mode-btn.active{
+  border-color:#f2c44d!important;
+  color:#fff5cf!important;
+  background:
+    radial-gradient(circle at 50% 35%,rgba(111,76,13,.30),transparent 66%),
+    linear-gradient(145deg,#2b2413,#14181e)!important;
+  box-shadow:
+    0 0 0 1px rgba(255,217,104,.55),
+    0 0 18px rgba(238,183,48,.55),
+    inset 0 0 22px rgba(231,178,43,.10)!important;
+}
+.workspace-mode-btn.active .mode-copy small{color:#e6d29a!important;}
+
+@media(max-width:520px){
+  .app-header{
+    grid-template-columns:72px minmax(0,1fr) 72px!important;
+    min-height:86px!important;
+    padding:6px 6px 7px!important;
+  }
+  .app-header .brand-mark{width:72px!important;height:66px!important;}
+  .app-header .brand-copy h1{
+    font-size:clamp(1.36rem,7.35vw,1.95rem)!important;
+    letter-spacing:.004em!important;
+    transform:scaleX(.87)!important;
+  }
+  .app-header .tagline{font-size:clamp(.60rem,2.7vw,.78rem)!important;margin-top:4px!important;}
+  .mode-art.baby-mode-art img{width:52px!important;height:52px!important;}
+}
+
+/* v2.9.4 exact image branding — same files duplicated in /assets and /song-rider/assets */
+.app-header{position:relative!important;}
+.app-header .brand-copy{display:flex!important;align-items:center!important;justify-content:center!important;min-width:0!important;}
+.app-header .suite-wordmark{
+ display:block!important;width:min(100%,520px)!important;height:auto!important;max-height:62px!important;
+ object-fit:contain!important;margin:0 auto!important;transform:none!important;filter:none!important;
+}
+.mode-art.baby-mode-art{background:none!important;background-image:none!important;overflow:visible!important;border:0!important;}
+.mode-art.baby-mode-art img{
+ display:block!important;width:100%!important;height:100%!important;object-fit:contain!important;
+ background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;
+ filter:drop-shadow(0 3px 4px rgba(0,0,0,.72))!important;
+}
+@media(max-width:520px){
+ .app-header .suite-wordmark{width:min(100%,360px)!important;max-height:50px!important;}
+}
+
+/* v2.9.4 — Final header/tagline + full-jaw Baby DAW sticker */
+.app-header{
+  position:relative!important;
+  display:block!important;
+  min-height:92px!important;
+  padding:7px 0 8px!important;
+  overflow:hidden!important;
+}
+.app-header .brand-mark{
+  position:absolute!important;
+  top:9px!important;
+  width:82px!important;
+  height:72px!important;
+  object-fit:contain!important;
+  z-index:2!important;
+}
+.app-header .brand-left{left:7px!important;}
+.app-header .brand-right{right:7px!important;}
+.app-header .brand-copy{
+  position:relative!important;
+  left:auto!important;
+  transform:none!important;
+  width:calc(100% - 168px)!important;
+  min-width:0!important;
+  margin:0 auto!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  z-index:1!important;
+}
+.app-header .brand-copy h1{
+  display:block!important;
+  margin:5px 0 0!important;
+  width:100%!important;
+  max-width:none!important;
+  white-space:nowrap!important;
+  text-align:center!important;
+  font-family:Impact,Haettenschweiler,"Arial Black",sans-serif!important;
+  font-size:clamp(1.35rem,6.9vw,2.05rem)!important;
+  line-height:.96!important;
+  letter-spacing:.008em!important;
+  transform:scaleX(.88)!important;
+  transform-origin:center!important;
+  color:transparent!important;
+  background:linear-gradient(180deg,#fffbd2 0%,#ffe17a 9%,#ffbe20 25%,#fff0a3 39%,#d88a00 53%,#ffcf3d 66%,#9a5300 83%,#f0ae17 100%)!important;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  -webkit-text-stroke:1px #5d3100!important;
+  text-shadow:0 1px 0 #fff6c7,0 2px 0 #c47a05,0 4px 0 #663600,0 6px 10px rgba(0,0,0,.78),0 0 14px rgba(255,188,29,.52)!important;
+  filter:none!important;
+}
+.app-header .tagline{
+  display:block!important;
+  width:100%!important;
+  margin:7px 0 0!important;
+  text-align:center!important;
+  color:#f2f2f0!important;
+  font-family:"Brush Script MT","Segoe Script",cursive!important;
+  font-size:clamp(.61rem,2.72vw,.80rem)!important;
+  line-height:1!important;
+  letter-spacing:0!important;
+  white-space:nowrap!important;
+  text-shadow:0 2px 3px #000!important;
+}
+.mode-art.baby-mode-art{
+  width:66px!important;
+  height:66px!important;
+  flex:0 0 66px!important;
+  overflow:visible!important;
+  background:none!important;
+  background-image:none!important;
+  border:0!important;
+}
+.mode-art.baby-mode-art img{
+  display:block!important;
+  width:66px!important;
+  height:66px!important;
+  max-width:none!important;
+  object-fit:contain!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  filter:drop-shadow(0 4px 5px rgba(0,0,0,.72))!important;
+}
+@media(max-width:520px){
+  .app-header{min-height:86px!important;}
+  .app-header .brand-mark{width:72px!important;height:66px!important;top:8px!important;}
+  .app-header .brand-copy{width:calc(100% - 150px)!important;}
+  .app-header .brand-copy h1{font-size:clamp(1.22rem,6.65vw,1.82rem)!important;transform:scaleX(.87)!important;}
+  .app-header .tagline{font-size:clamp(.58rem,2.62vw,.74rem)!important;margin-top:6px!important;}
+  .workspace-mode-btn{min-height:91px!important;}
+  .mode-art.baby-mode-art,.mode-art.baby-mode-art img{width:62px!important;height:62px!important;flex-basis:62px!important;}
+}
+
+/* v2.9.4 Baby DAW clean sticker */
+.mode-art.baby-mode-art{
+  width:68px!important;height:68px!important;flex:0 0 68px!important;
+  overflow:visible!important;background:none!important;background-image:none!important;border:0!important;
+}
+.mode-art.baby-mode-art img{
+  display:block!important;width:68px!important;height:68px!important;max-width:none!important;
+  object-fit:contain!important;background:transparent!important;border:0!important;border-radius:0!important;
+  box-shadow:none!important;filter:drop-shadow(0 4px 5px rgba(0,0,0,.72))!important;
+}
+@media(max-width:520px){
+  .mode-art.baby-mode-art,.mode-art.baby-mode-art img{width:64px!important;height:64px!important;flex-basis:64px!important;}
+}
+
+/* v2.9.4 — Chord Rider Pro title + collapsible setup controls */
+.crp-pro-titlebar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:-2px 0 14px;
+  padding:0 0 12px;
+  border-bottom:1px solid #343d48;
+}
+.crp-pro-wordmark{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:.18em;
+  white-space:nowrap;
+  font-family:Impact,Haettenschweiler,"Arial Black",sans-serif;
+  font-weight:900;
+  font-size:clamp(1.75rem,7.2vw,3.15rem);
+  line-height:.94;
+  letter-spacing:-.035em;
+  filter:drop-shadow(0 4px 3px rgba(0,0,0,.72));
+}
+.crp-pro-wordmark span{
+  display:inline-block;
+  color:transparent;
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-stroke:1px rgba(15,15,20,.88);
+  text-shadow:
+    0 1px 0 rgba(255,255,255,.85),
+    0 3px 0 rgba(20,20,25,.92),
+    0 0 9px currentColor;
+}
+.crp-word-pink{
+  color:#ff4c9c!important;
+  background-image:linear-gradient(180deg,#fff 0%,#ffb9df 10%,#ff3b99 28%,#fff 43%,#d90068 59%,#ff7fbd 73%,#710034 100%)!important;
+}
+.crp-word-blue{
+  color:#24bfff!important;
+  background-image:linear-gradient(180deg,#fff 0%,#b8f3ff 10%,#1fc5ff 28%,#fff 43%,#0085d9 59%,#62ddff 73%,#004f8f 100%)!important;
+}
+.crp-word-green{
+  color:#35e970!important;
+  background-image:linear-gradient(180deg,#fff 0%,#c9ffd7 10%,#2ce96b 28%,#fff 43%,#00a93d 59%,#79ff9f 73%,#006b27 100%)!important;
+}
+.crp-controls-toggle{
+  flex:0 0 auto;
+  min-width:82px;
+  min-height:52px;
+  padding:0 18px;
+  border:1px solid #46505d;
+  border-radius:15px;
+  background:#171c23;
+  color:#f1f3f5;
+  font:700 1rem/1 system-ui,-apple-system,"Segoe UI",sans-serif;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+.primary-toolbar.crp-controls-hidden{display:none!important;}
+
+@media(max-width:520px){
+  .crp-pro-titlebar{gap:8px;margin-bottom:12px;padding-bottom:10px}
+  .crp-pro-wordmark{font-size:clamp(1.42rem,7.05vw,2.25rem);gap:.13em}
+  .crp-controls-toggle{min-width:72px;min-height:48px;padding:0 14px;font-size:.92rem}
+}
+
+/* v2.9.4 — CRP title uses the same image-wordmark treatment as SRP */
+.crp-pro-wordmark{display:none!important;}
+.crp-pro-wordmark-img{
+  display:block!important;
+  flex:1 1 auto!important;
+  min-width:0!important;
+  width:auto!important;
+  max-width:calc(100% - 94px)!important;
+  height:auto!important;
+  max-height:74px!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+  margin:0!important;
+  padding:0!important;
+  filter:none!important;
+}
+@media(max-width:520px){
+  .crp-pro-wordmark-img{
+    max-width:calc(100% - 80px)!important;
+    max-height:62px!important;
+  }
+}
+
+/* v2.9.5 — match CRP title prominence to SRP and make Hide/Show compact */
+.crp-controls-toggle{min-width:60px!important;min-height:40px!important;padding:0 11px!important;border-radius:12px!important;font-size:.82rem!important;}
+.crp-pro-wordmark-img{max-width:calc(100% - 68px)!important;max-height:82px!important;}
+@media(max-width:520px){.crp-controls-toggle{min-width:56px!important;min-height:38px!important;padding:0 9px!important;font-size:.78rem!important}.crp-pro-wordmark-img{max-width:calc(100% - 62px)!important;max-height:72px!important;}}
+
+/* v2.9.6 — uncropped CRP title. The old PNG asset itself clipped the final O. */
+.crp-pro-wordmark{display:flex!important;flex:1 1 auto!important;min-width:0!important;font-size:clamp(1.55rem,6.55vw,3rem)!important;gap:.14em!important;overflow:visible!important;}
+.crp-pro-wordmark-img{display:none!important;}
+.crp-controls-toggle{min-width:52px!important;min-height:36px!important;padding:0 8px!important;font-size:.76rem!important;}
+@media(max-width:520px){.crp-pro-wordmark{font-size:clamp(1.38rem,6.45vw,2.15rem)!important;gap:.11em!important}.crp-controls-toggle{min-width:50px!important;min-height:34px!important;padding:0 7px!important;font-size:.73rem!important}}
+
+/* v2.9.7 — restore the real CRP art, keep it exclusive to Chord Rider, compact Hide. */
+.crp-pro-wordmark{display:none!important;}
+.crp-pro-wordmark-img{
+  display:block!important;
+  flex:1 1 auto!important;
+  min-width:0!important;
+  width:auto!important;
+  max-width:calc(100% - 58px)!important;
+  height:auto!important;
+  max-height:82px!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+}
+.workspace-baby-daw .crp-pro-titlebar{display:none!important;}
+.workspace-chord-rider .crp-pro-titlebar{display:flex!important;}
+.crp-controls-toggle{min-width:48px!important;min-height:34px!important;padding:0 7px!important;font-size:.72rem!important;}
+@media(max-width:520px){
+  .crp-pro-wordmark-img{max-width:calc(100% - 52px)!important;max-height:74px!important;}
+  .crp-controls-toggle{min-width:46px!important;min-height:32px!important;padding:0 6px!important;font-size:.70rem!important;}
+}
+
+/* v2.9.8 — authoritative CRP header layout. Full PRO must fit; Hide gets no surplus box. */
+.crp-pro-titlebar{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:center!important;
+  column-gap:4px!important;
+}
+.workspace-baby-daw .crp-pro-titlebar{display:none!important;}
+.workspace-chord-rider .crp-pro-titlebar{display:grid!important;}
+.crp-pro-wordmark-img{
+  display:block!important;
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+  height:auto!important;
+  max-height:82px!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+}
+.crp-controls-toggle{
+  box-sizing:border-box!important;
+  flex:none!important;
+  width:auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  min-height:32px!important;
+  height:32px!important;
+  padding:0 6px!important;
+  margin:0!important;
+  border-radius:10px!important;
+  font-size:.70rem!important;
+  line-height:1!important;
+}
+@media(max-width:520px){
+  .crp-pro-titlebar{column-gap:3px!important;}
+  .crp-pro-wordmark-img{width:100%!important;max-width:none!important;max-height:72px!important;}
+  .crp-controls-toggle{height:30px!important;min-height:30px!important;padding:0 5px!important;font-size:.68rem!important;}
+}
+
+
+/* v2.9.9 — final mobile CRP title fit: preserve the real art and give Hide only its text width. */
+.crp-pro-titlebar{display:flex!important;align-items:center!important;gap:2px!important;overflow:hidden!important;}
+.workspace-baby-daw .crp-pro-titlebar{display:none!important;}
+.workspace-chord-rider .crp-pro-titlebar{display:flex!important;}
+.crp-pro-wordmark-img{display:block!important;flex:1 1 auto!important;min-width:0!important;width:auto!important;height:auto!important;max-width:calc(100% - 42px)!important;max-height:76px!important;object-fit:contain!important;object-position:left center!important;margin:0!important;padding:0!important;}
+.crp-controls-toggle{flex:0 0 auto!important;width:auto!important;min-width:0!important;height:28px!important;min-height:28px!important;padding:0 4px!important;margin:0!important;border-radius:8px!important;font-size:.64rem!important;line-height:1!important;}
+@media(max-width:520px){.crp-pro-titlebar{gap:1px!important}.crp-pro-wordmark-img{max-width:calc(100% - 39px)!important;max-height:70px!important}.crp-controls-toggle{height:27px!important;min-height:27px!important;padding:0 3px!important;font-size:.62rem!important}}
+
+/* v2.9.10 — CRP header mirrors the approved SRP title row.
+   The title owns only its grid cell; Hide is the exact SRP 56x38 control. */
+.workspace-chord-rider .crp-pro-titlebar{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 56px!important;
+  align-items:center!important;
+  gap:10px!important;
+  overflow:visible!important;
+}
+.workspace-baby-daw .crp-pro-titlebar{display:none!important;}
+.crp-pro-wordmark-img{
+  display:block!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  height:auto!important;
+  max-height:64px!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+  margin:0!important;
+  padding:0!important;
+}
+.crp-controls-toggle{
+  box-sizing:border-box!important;
+  width:56px!important;
+  min-width:56px!important;
+  max-width:56px!important;
+  height:38px!important;
+  min-height:38px!important;
+  padding:0 9px!important;
+  margin:0!important;
+  border-radius:12px!important;
+  font-size:.78rem!important;
+  line-height:1!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{grid-template-columns:minmax(0,1fr) 56px!important;gap:8px!important;}
+  .crp-pro-wordmark-img{width:100%!important;max-width:100%!important;max-height:64px!important;}
+  .crp-controls-toggle{width:56px!important;min-width:56px!important;max-width:56px!important;height:38px!important;min-height:38px!important;padding:0 9px!important;border-radius:12px!important;font-size:.78rem!important;}
+}
+
+/* v2.9.11 — final CRP header spacing fix.
+   Keep the approved SRP-sized Hide button, but remove the wasted space
+   between the wordmark and button. The PNG itself also has its transparent
+   right-edge margin trimmed, so the visible PRO gets the full title cell. */
+.workspace-chord-rider .crp-pro-titlebar{
+  grid-template-columns:minmax(0,1fr) 56px!important;
+  column-gap:2px!important;
+}
+.crp-controls-toggle{
+  width:56px!important;
+  min-width:56px!important;
+  max-width:56px!important;
+  height:38px!important;
+  min-height:38px!important;
+  margin:0!important;
+  padding:0 9px!important;
+  box-sizing:border-box!important;
+  font-size:.78rem!important;
+  border-radius:12px!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{column-gap:2px!important;}
+}
+
+/* v2.9.12 — final CRP header micro-alignment.
+   Keep the approved Hide height/font, shave only 2px from its width,
+   and move the CRP artwork 4px left so PRO clears the button cleanly. */
+.workspace-chord-rider .crp-pro-titlebar{
+  grid-template-columns:minmax(0,1fr) 54px!important;
+  column-gap:2px!important;
+}
+.workspace-chord-rider .crp-pro-wordmark-img{
+  transform:translateX(-4px)!important;
+}
+.workspace-chord-rider .crp-controls-toggle{
+  width:54px!important;
+  min-width:54px!important;
+  max-width:54px!important;
+  height:38px!important;
+  min-height:38px!important;
+  padding:0 8px!important;
+  font-size:.78rem!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{
+    grid-template-columns:minmax(0,1fr) 54px!important;
+    column-gap:2px!important;
+  }
+  .workspace-chord-rider .crp-pro-wordmark-img{
+    transform:translateX(-4px)!important;
+  }
+  .workspace-chord-rider .crp-controls-toggle{
+    width:54px!important;
+    min-width:54px!important;
+    max-width:54px!important;
+    height:38px!important;
+    min-height:38px!important;
+    padding:0 8px!important;
+    font-size:.78rem!important;
+  }
+}
+
+/* v2.9.13 — CRP title/button clearance only.
+   Preserve the approved Hide button's visible size while eliminating extra
+   layout footprint and pulling the wordmark farther away from it. */
+.workspace-chord-rider .crp-pro-titlebar{
+  grid-template-columns:minmax(0,1fr) 52px!important;
+  column-gap:0!important;
+}
+.workspace-chord-rider .crp-pro-wordmark-img{
+  transform:translateX(-10px)!important;
+  width:calc(100% - 6px)!important;
+  max-width:calc(100% - 6px)!important;
+}
+.workspace-chord-rider .crp-controls-toggle{
+  width:52px!important;
+  min-width:52px!important;
+  max-width:52px!important;
+  height:38px!important;
+  min-height:38px!important;
+  margin:0!important;
+  padding:0 5px!important;
+  box-sizing:border-box!important;
+  font-size:.78rem!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{
+    grid-template-columns:minmax(0,1fr) 52px!important;
+    column-gap:0!important;
+  }
+  .workspace-chord-rider .crp-pro-wordmark-img{
+    transform:translateX(-10px)!important;
+    width:calc(100% - 6px)!important;
+    max-width:calc(100% - 6px)!important;
+  }
+  .workspace-chord-rider .crp-controls-toggle{
+    width:52px!important;
+    min-width:52px!important;
+    max-width:52px!important;
+    height:38px!important;
+    min-height:38px!important;
+    margin:0!important;
+    padding:0 5px!important;
+    box-sizing:border-box!important;
+    font-size:.78rem!important;
+  }
+}
