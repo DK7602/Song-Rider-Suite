@@ -1670,3 +1670,58 @@
 
   init();
 })();
+/* Song Rider Suite transport bridge v3.0.0
+   One workspace-wide source of truth for BPM / CAPO / STEP.
+   Deliberately independent of the older CRP<->SRP project-link metadata. */
+(function(){
+  const KEY='song-rider-suite-transport-v1';
+  let applying=false,lastStamp=0;
+  const $=id=>document.getElementById(id);
+  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+  const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch{return null}};
+  function publish(mode){
+    if(applying || new URLSearchParams(location.search).get('playbackBridge')==='1') return;
+    const prev=read()||{};
+    const next={
+      bpm:clamp(Number($('bpmInput')?.value)||92,40,240),
+      capo:clamp(Number(state.capo)||0,0,12),
+      step:clamp(Number(state.octave)||0,-2,3),
+      mode:(mode==='step'||mode==='capo')?mode:(prev.mode==='step'?'step':'capo'),
+      stamp:Date.now(),source:'crp'
+    };
+    try{localStorage.setItem(KEY,JSON.stringify(next));lastStamp=next.stamp;window.__SRS_TRANSPORT_CH?.postMessage(next)}catch{}
+  }
+  function apply(){
+    if(new URLSearchParams(location.search).get('playbackBridge')==='1') return;
+    const m=read(); if(!m||Number(m.stamp)<=lastStamp)return;
+    const active=document.activeElement;if(active===$('bpmInput')||active===$('capoSelect'))return;
+    applying=true;
+    try{
+      lastStamp=Number(m.stamp)||0;
+      const bpm=clamp(Number(m.bpm)||92,40,240),capo=clamp(Number(m.capo)||0,0,12),step=clamp(Number(m.step)||0,-2,3);
+      if($('bpmInput'))$('bpmInput').value=String(bpm);
+      state.capo=capo;if($('capoSelect'))$('capoSelect').value=String(capo);
+      state.octave=step;
+      renderAll();window.CRPParts?.syncCoreLive?.();
+      if(state.currentProjectId){
+        const ps=localProjects(),i=ps.findIndex(p=>String(p?.id||'')===String(state.currentProjectId));
+        if(i>=0){ps[i]={...ps[i],bpm,capo,octave:step,updatedAt:Date.now()};saveLocalProjects(ps);updateCloudSnapshot(ps[i]);}
+      }
+    }finally{applying=false}
+  }
+  function bind(){
+    $('bpmInput')?.addEventListener('change',()=>setTimeout(()=>publish(),0));
+    $('bpmInput')?.addEventListener('blur',()=>setTimeout(()=>publish(),0));
+    $('capoSelect')?.addEventListener('change',()=>setTimeout(()=>publish('capo'),0));
+    $('octaveDown')?.addEventListener('click',()=>setTimeout(()=>publish('step'),0));
+    $('octaveUp')?.addEventListener('click',()=>setTimeout(()=>publish('step'),0));
+    try{window.__SRS_TRANSPORT_CH=new BroadcastChannel(KEY);window.__SRS_TRANSPORT_CH.onmessage=()=>setTimeout(apply,0)}catch{}
+    window.addEventListener('storage',e=>{if(e.key===KEY)setTimeout(apply,0)});
+    window.addEventListener('pageshow',()=>setTimeout(apply,0));window.addEventListener('focus',()=>setTimeout(apply,0));
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(apply,0)});
+    setInterval(apply,300);
+    // Seed only if no suite record exists; never overwrite a value from SRP on navigation.
+    if(!read())publish('capo'); else setTimeout(apply,0);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
+})();
