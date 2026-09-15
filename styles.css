@@ -2658,3 +2658,49 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
     font-size:.78rem!important;
   }
 }
+
+/* v2.9.14 — CRP title/Hide hard clearance fix.
+   Use separate grid cells so the Hide hit box can never overlap the final O. */
+.workspace-chord-rider .crp-pro-titlebar{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 56px!important;
+  align-items:center!important;
+  column-gap:10px!important;
+  overflow:hidden!important;
+}
+.workspace-chord-rider .crp-pro-wordmark-img{
+  display:block!important;
+  grid-column:1!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  height:auto!important;
+  max-height:72px!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+  transform:none!important;
+  margin:0!important;
+  padding:0!important;
+  pointer-events:none!important;
+}
+.workspace-chord-rider .crp-controls-toggle{
+  grid-column:2!important;
+  justify-self:end!important;
+  width:56px!important;
+  min-width:56px!important;
+  max-width:56px!important;
+  height:38px!important;
+  min-height:38px!important;
+  max-height:38px!important;
+  margin:0!important;
+  padding:0 9px!important;
+  box-sizing:border-box!important;
+  position:relative!important;
+  z-index:2!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{
+    grid-template-columns:minmax(0,1fr) 56px!important;
+    column-gap:10px!important;
+  }
+}
