@@ -17104,3 +17104,44 @@ KEEP RHYME UI ABOVE KEYBOARD
 
 // v2.9.3: SRP card-page linked transport + single-button link/unlink toggle; close the main SRP application IIFE after the nested CRP/SRP bridge.
 })();
+
+/* Song Rider Suite transport bridge v3.0.0
+   Direct CRP / Baby DAW / SRP synchronization for BPM / CAPO / STEP. */
+(function(){
+  const KEY='song-rider-suite-transport-v1';
+  let applying=false,lastStamp=0;
+  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+  const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch{return null}};
+  function nodes(){return {bpm:document.getElementById('bpmInput'),pitch:document.getElementById('capoInput')}}
+  function publish(){
+    if(applying)return;
+    const n=nodes(),mode=state.transposeMode==='step'?'step':'capo',raw=Number(n.pitch?.value);
+    if(mode==='capo'&&Number.isFinite(raw))state.capo=clamp(Math.round(raw),0,12);
+    if(mode==='step'&&Number.isFinite(raw))state.steps=clamp(raw,-2,3);
+    const next={bpm:clamp(Number(n.bpm?.value)||Number(state.bpm)||95,40,240),capo:clamp(Number(state.capo)||0,0,12),step:clamp(Number(state.steps)||0,-2,3),mode,stamp:Date.now(),source:'srp'};
+    try{localStorage.setItem(KEY,JSON.stringify(next));lastStamp=next.stamp;window.__SRS_TRANSPORT_CH_SRP?.postMessage(next)}catch{}
+  }
+  function apply(){
+    const m=read();if(!m||Number(m.stamp)<=lastStamp)return;
+    const n=nodes(),active=document.activeElement;if(active===n.bpm||active===n.pitch)return;
+    applying=true;
+    try{
+      lastStamp=Number(m.stamp)||0;
+      state.bpm=clamp(Number(m.bpm)||95,40,240);state.capo=clamp(Number(m.capo)||0,0,12);state.steps=clamp(Number(m.step)||0,-2,3);state.transposeMode=m.mode==='step'?'step':'capo';
+      if(state.project){state.project.bpm=state.bpm;state.project.capo=state.capo;state.project.steps=state.steps;state.project.linkedOctave=state.steps;state.project.transposeMode=state.transposeMode;upsertProject(state.project)}
+      if(n.bpm)n.bpm.value=String(state.bpm);if(n.pitch)n.pitch.value=String(state.transposeMode==='step'?state.steps:state.capo);
+      applyProjectSettingsToUI();renderAll();
+    }finally{applying=false}
+  }
+  function bind(){
+    const n=nodes();
+    [n.bpm,n.pitch].filter(Boolean).forEach(x=>{x.addEventListener('change',()=>setTimeout(publish,0));x.addEventListener('blur',()=>setTimeout(publish,0));x.addEventListener('keydown',e=>{if(e.key==='Enter')setTimeout(publish,0)})});
+    // CAPO/STEP pill is created dynamically; capture clicks and publish after its existing handler changes mode.
+    document.addEventListener('click',e=>{if(e.target?.closest?.('#capoStepToggle, .capo-step-toggle, [data-capo-step-toggle]'))setTimeout(publish,0)},true);
+    try{window.__SRS_TRANSPORT_CH_SRP=new BroadcastChannel(KEY);window.__SRS_TRANSPORT_CH_SRP.onmessage=()=>setTimeout(apply,0)}catch{}
+    window.addEventListener('storage',e=>{if(e.key===KEY)setTimeout(apply,0)});window.addEventListener('pageshow',()=>setTimeout(apply,0));window.addEventListener('focus',()=>setTimeout(apply,0));
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(apply,0)});setInterval(apply,300);
+    if(read())setTimeout(apply,0);else setTimeout(publish,0);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
+})();
