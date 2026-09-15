@@ -8131,13 +8131,23 @@ function setAutoScroll(on){
 
 
 
+const SRP_PANEL_HIDDEN_KEY = "srp-setup-controls-hidden-v1";
 function setPanelHidden(hidden){
+  if(!el.panelBody || !el.togglePanelBtn || !el.miniBar) return;
   el.panelBody.classList.toggle("hidden", hidden);
   el.togglePanelBtn.textContent = hidden ? "Show" : "Hide";
+  el.togglePanelBtn.setAttribute("aria-expanded", String(!hidden));
   el.miniBar.classList.toggle("show", hidden);
+  try{ localStorage.setItem(SRP_PANEL_HIDDEN_KEY, hidden ? "1" : "0"); }catch{}
 
   updateAudioButtonsUI();
   setRecordUI();
+}
+function restorePanelHiddenState(){
+  if(!el.panelBody || !el.togglePanelBtn || !el.miniBar) return;
+  let hidden=false;
+  try{ hidden=localStorage.getItem(SRP_PANEL_HIDDEN_KEY)==="1"; }catch{}
+  setPanelHidden(hidden);
 }
 
 function setRecordUI(){
@@ -15460,6 +15470,7 @@ Wiring
 function wire(){
   // Guard: if any required element is missing in index.html, don't hard-crash the whole app.
   if(el.togglePanelBtn && el.panelBody){
+    restorePanelHiddenState();
     el.togglePanelBtn.addEventListener("click", () => {
       const hidden = !el.panelBody.classList.contains("hidden");
       setPanelHidden(hidden);
