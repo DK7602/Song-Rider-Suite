@@ -1,5 +1,6 @@
-const CACHE = 'song-rider-suite-v2.9.3-crp-title-hide';
+const CACHE = 'song-rider-suite-v2.9.4-crp-wordmark';
 const ASSETS = [
+  './assets/chord-rider-pro-wordmark.png',
   './song-rider/suite-header-master.png',
   './song-rider/branding-shell.css',
   './assets/suite-header-master.png',

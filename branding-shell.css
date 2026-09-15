@@ -1,5 +1,5 @@
 
-/* Song Rider Suite master branding shell — v2.9.3 */
+/* Song Rider Suite master branding shell — v2.9.4 */
 .suite-master-header{
   display:block!important;
   width:100%!important;
@@ -191,7 +191,7 @@
   }
 }
 
-/* v2.9.3 parity: generic classes only, identical across all three workspaces */
+/* v2.9.4 parity: generic classes only, identical across all three workspaces */
 .workspace-mode-switch{
   margin:0 auto!important;
 }
@@ -199,7 +199,7 @@
   box-sizing:border-box!important;
 }
 
-/* v2.9.3 — exact uploaded header + equal-size workspace stickers */
+/* v2.9.4 — exact uploaded header + equal-size workspace stickers */
 .workspace-mode-btn .mode-art,
 .crp-srp-mode.workspace-mode-btn .mode-art{
   flex:0 0 66px!important;
