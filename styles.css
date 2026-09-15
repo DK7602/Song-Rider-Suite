@@ -2476,3 +2476,12 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .crp-pro-wordmark-img{width:100%!important;max-width:none!important;max-height:72px!important;}
   .crp-controls-toggle{height:30px!important;min-height:30px!important;padding:0 5px!important;font-size:.68rem!important;}
 }
+
+
+/* v2.9.9 — final mobile CRP title fit: preserve the real art and give Hide only its text width. */
+.crp-pro-titlebar{display:flex!important;align-items:center!important;gap:2px!important;overflow:hidden!important;}
+.workspace-baby-daw .crp-pro-titlebar{display:none!important;}
+.workspace-chord-rider .crp-pro-titlebar{display:flex!important;}
+.crp-pro-wordmark-img{display:block!important;flex:1 1 auto!important;min-width:0!important;width:auto!important;height:auto!important;max-width:calc(100% - 42px)!important;max-height:76px!important;object-fit:contain!important;object-position:left center!important;margin:0!important;padding:0!important;}
+.crp-controls-toggle{flex:0 0 auto!important;width:auto!important;min-width:0!important;height:28px!important;min-height:28px!important;padding:0 4px!important;margin:0!important;border-radius:8px!important;font-size:.64rem!important;line-height:1!important;}
+@media(max-width:520px){.crp-pro-titlebar{gap:1px!important}.crp-pro-wordmark-img{max-width:calc(100% - 39px)!important;max-height:70px!important}.crp-controls-toggle{height:27px!important;min-height:27px!important;padding:0 3px!important;font-size:.62rem!important}}

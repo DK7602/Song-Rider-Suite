@@ -1245,7 +1245,14 @@
     // therefore restore the core project before CRPParts exists. Restore once more after the
     // parts module announces it is ready; otherwise it starts with only Chords 1 and a trip to
     // SRP can snapshot that one-part placeholder over the real Baby DAW arrangement.
-    window.addEventListener('crp-parts-ready',()=>restoreActiveProjectFromStorage(),{once:true});
+    window.addEventListener('crp-parts-ready',()=>{
+      // parts.js starts after the core project was restored. Force-load the SAME saved
+      // project now that CRPParts exists; restoreActiveProjectFromStorage() intentionally
+      // short-circuits when currentProjectId is already set, which was leaving Baby DAW
+      // at its one-part placeholder on every return from SRP.
+      const id=state.currentProjectId||String(localStorage.getItem('crp-active-project-id')||'');
+      if(id) loadProject(id);
+    },{once:true});
     setTimeout(applyLinkedMetaFromSrpHandoff,0);
     // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
     // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.

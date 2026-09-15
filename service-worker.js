@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v2.9.8-deep-parts-fix';
+const CACHE = 'song-rider-suite-v2.9.9-deep-parts-fix';
 const ASSETS = [
   './assets/chord-rider-pro-wordmark.png',
   './song-rider/suite-header-master.png',
