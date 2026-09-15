@@ -8,7 +8,7 @@
   <title>Song Rider Suite</title>
   <link rel="icon" href="assets/rider-and-bones-icon.png" type="image/png" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=2.9.20" />
+  <link rel="stylesheet" href="styles.css?v=3.2.0" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.4" />
 <link rel="stylesheet" href="branding-shell.css?v=3.1.0">
 </head>
@@ -167,6 +167,16 @@
           <button id="leadPrevBar" type="button">‹</button>
           <strong id="leadBarLabel">Bar 1 / 4</strong>
           <button id="leadNextBar" type="button">›</button>
+          <div id="leadHarmonyHelper" class="lead-harmony-helper" aria-live="polite">
+            <div class="lead-harmony-row">
+              <span class="lead-harmony-label">Chords Used</span>
+              <div id="leadChordsUsed" class="lead-harmony-chips"><span class="lead-harmony-empty">—</span></div>
+            </div>
+            <div class="lead-harmony-row">
+              <span class="lead-harmony-label">Notes that fit</span>
+              <div id="leadNotesFit" class="lead-harmony-chips lead-note-fit-chips"><span class="lead-harmony-empty">—</span></div>
+            </div>
+          </div>
           <div class="lead-bar-tools"><button id="leadCopyBar" type="button">Copy</button><button id="leadPasteBar" type="button" disabled>Paste</button><button id="leadClearBar" type="button">Clear</button></div>
         </div>
         <div id="leadGridWrap" class="lead-grid-wrap"><div id="leadGrid" class="lead-grid"></div></div>
@@ -364,7 +374,7 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="app.js?v=3.1.0-TRANSPORT-REBUILD"></script>
-  <script src="parts.js?v=2.9.9"></script>
+  <script src="parts.js?v=3.2.0-LEAD-HARMONY"></script>
   <script src="beat-maker.js?v=2.4.3"></script>
 </body>
 </html>

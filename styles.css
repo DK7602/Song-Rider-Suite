@@ -2742,3 +2742,84 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .workspace-chord-rider .crp-pro-titlebar{grid-template-columns:minmax(0,1fr) 56px!important;column-gap:4px!important;}
   .workspace-chord-rider .crp-pro-wordmark-img{width:100%!important;max-width:100%!important;padding:0!important;}
 }
+
+/* v3.2.0 — Baby DAW Lead/Bass harmony helper */
+.lead-harmony-helper{
+  flex:1 1 240px;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  padding:2px 4px 2px 8px;
+}
+.lead-harmony-row{
+  display:grid;
+  grid-template-columns:max-content minmax(0,1fr);
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.lead-harmony-label{
+  color:#aab3bf;
+  font-size:.72rem;
+  font-weight:800;
+  line-height:1;
+  white-space:nowrap;
+}
+.lead-harmony-chips{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  min-width:0;
+  overflow-x:auto;
+  scrollbar-width:none;
+  padding:1px 0;
+}
+.lead-harmony-chips::-webkit-scrollbar{display:none}
+.lead-harmony-chip{
+  flex:0 0 auto;
+  display:inline-grid;
+  place-items:center;
+  min-height:25px;
+  padding:3px 8px;
+  border:1px solid #46515e;
+  border-radius:999px;
+  background:#151b23;
+  color:#e7ebef;
+  font-size:.78rem;
+  font-weight:800;
+  line-height:1;
+}
+.lead-harmony-chip.chord{
+  border-color:#a9893d;
+  color:#f4cf67;
+  background:rgba(233,196,106,.08);
+}
+.lead-harmony-chip.note.chord-tone{
+  border-color:#9f874b;
+  color:#f0cd70;
+}
+.lead-harmony-chip.note.root-tone{
+  background:var(--accent);
+  border-color:var(--accent);
+  color:#17130a;
+  font-weight:900;
+}
+.lead-harmony-empty{
+  color:#687481;
+  font-weight:800;
+  letter-spacing:.08em;
+}
+@media(max-width:720px){
+  .lead-harmony-helper{flex:1 1 220px;padding-left:6px;}
+  .lead-harmony-label{font-size:.68rem;}
+  .lead-harmony-chip{font-size:.74rem;padding:3px 7px;}
+}
+@media(max-width:520px){
+  .lead-bar-nav{align-items:flex-start;}
+  .lead-harmony-helper{flex:1 1 calc(100% - 205px);min-width:150px;padding-top:1px;}
+  .lead-harmony-row{grid-template-columns:1fr;gap:3px;}
+  .lead-harmony-label{font-size:.64rem;}
+  .lead-harmony-chip{min-height:23px;font-size:.71rem;padding:3px 6px;}
+  .lead-bar-tools{order:10;}
+}

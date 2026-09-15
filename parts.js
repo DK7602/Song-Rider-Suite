@@ -126,6 +126,72 @@
     if(!options.some(x=>x[0]===p.sound))p.sound=options[0][0];select.value=p.sound;
   }
   function midiName(m){return NOTE_NAMES[(m%12+12)%12]+(Math.floor(m/12)-1);}
+  const HARMONY_NOTE_INDEX={C:0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A:9,'A#':10,Bb:10,B:11};
+  function harmonyPitchClass(raw){
+    const m=String(raw||'').trim().replace(/♭/g,'b').replace(/♯/g,'#').match(/^([A-Ga-g])([#b]?)/);
+    if(!m)return null;const n=m[1].toUpperCase()+m[2];const i=HARMONY_NOTE_INDEX[n];return Number.isFinite(i)?i:null;
+  }
+  function transposeHarmonyLabel(raw,semi){
+    const txt=String(raw||'').trim().replace(/♭/g,'b').replace(/♯/g,'#');
+    const m=txt.match(/^([A-Ga-g])([#b]?)(.*)$/);if(!m)return txt;
+    const root=m[1].toUpperCase()+m[2],i=HARMONY_NOTE_INDEX[root];if(!Number.isFinite(i))return txt;
+    return NOTE_NAMES[(i+(Number(semi)||0)+120)%12]+m[3];
+  }
+  function harmonyDisplayCard(card,data){
+    const raw=String(card?.value||'').trim();if(!raw)return '';
+    if(data?.instrument==='guitar'&&data?.transpose&&Number(data?.capo))return transposeHarmonyLabel(raw,Number(data.capo)||0);
+    return raw;
+  }
+  function harmonyKey(data,cards){
+    const raw=String(data?.key||'').trim().replace(/♭/g,'b').replace(/♯/g,'#');
+    let root=null,minor=false;
+    let m=raw.match(/^([A-Ga-g])([#b]?)(?:\s*(m|minor|maj|major))?$/i);
+    if(m){root=m[1].toUpperCase()+m[2];minor=/^(m|minor)$/i.test(m[3]||'');}
+    if(root==null){
+      const first=cards.find(c=>c?.type==='chord');
+      if(first){m=String(first.value||'').trim().match(/^([A-Ga-g])([#b]?)(.*)$/);if(m){root=m[1].toUpperCase()+m[2];const q=(m[3]||'').toLowerCase();minor=q.startsWith('m')&&!q.startsWith('maj');}}
+    }
+    let i=root==null?null:HARMONY_NOTE_INDEX[root];if(!Number.isFinite(i))return null;
+    if(data?.instrument==='guitar'&&Number(data?.capo))i=(i+Number(data.capo)+120)%12;
+    return {rootIndex:i,minor};
+  }
+  function uniquePitchClasses(items){const out=[];for(const i of items){const n=Number(i);if(Number.isFinite(n)&&!out.includes((n+120)%12))out.push((n+120)%12);}return out;}
+  function harmonyContextForLeadBar(){
+    const chord=loadedChord()||parts.find(x=>x.type==='chord')||null;
+    const data=chord?.data||core.snapshot();
+    const cards=(data?.rows||[]).flat().filter(Boolean);
+    const beatsPerCard=Math.max(.25,Number(core.beats)||4),barStart=leadBarPage*4,barEnd=barStart+4;
+    const current=cards.filter((card,i)=>{const a=i*beatsPerCard,b=a+beatsPerCard;return b>barStart&&a<barEnd;});
+    const chordCards=current.filter(c=>c?.type==='chord');
+    const chordLabels=[];
+    for(const c of chordCards){const label=harmonyDisplayCard(c,data);if(label&&!chordLabels.includes(label))chordLabels.push(label);}
+    const chordTonePcs=[],rootPcs=[];
+    for(const c of chordCards){
+      const label=harmonyDisplayCard(c,data),root=harmonyPitchClass(label);if(root!=null&&!rootPcs.includes(root))rootPcs.push(root);
+      for(const n of core.notesFor(c,data)||[]){const pc=harmonyPitchClass(n);if(pc!=null&&!chordTonePcs.includes(pc))chordTonePcs.push(pc);}
+    }
+    const key=harmonyKey(data,cards);
+    let notePcs=[];
+    if(key){
+      const ints=key.minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
+      notePcs=ints.map(i=>(key.rootIndex+i)%12);
+      for(const pc of chordTonePcs)if(!notePcs.includes(pc))notePcs.push(pc);
+    }else if(chordTonePcs.length){
+      const start=rootPcs[0]??chordTonePcs[0];
+      notePcs=[...chordTonePcs].sort((a,b)=>((a-start+12)%12)-((b-start+12)%12));
+    }
+    return {chordName:chord?.name||'Chords',chordLabels,notePcs:uniquePitchClasses(notePcs),chordTonePcs:uniquePitchClasses(chordTonePcs),rootPcs:uniquePitchClasses(rootPcs)};
+  }
+  function renderLeadHarmony(){
+    const chordsBox=$('leadChordsUsed'),notesBox=$('leadNotesFit');if(!chordsBox||!notesBox)return;
+    const ctx=harmonyContextForLeadBar();chordsBox.innerHTML='';notesBox.innerHTML='';
+    if(!ctx.chordLabels.length){const e=document.createElement('span');e.className='lead-harmony-empty';e.textContent='—';chordsBox.appendChild(e);}else{
+      for(const name of ctx.chordLabels){const chip=document.createElement('span');chip.className='lead-harmony-chip chord';chip.textContent=name;chip.title=`${ctx.chordName} • Bar ${leadBarPage+1}`;chordsBox.appendChild(chip);}
+    }
+    if(!ctx.notePcs.length){const e=document.createElement('span');e.className='lead-harmony-empty';e.textContent='—';notesBox.appendChild(e);}else{
+      for(const pc of ctx.notePcs){const chip=document.createElement('span');chip.className='lead-harmony-chip note';if(ctx.chordTonePcs.includes(pc))chip.classList.add('chord-tone');if(ctx.rootPcs.includes(pc))chip.classList.add('root-tone');chip.textContent=NOTE_NAMES[pc];chip.title=ctx.rootPcs.includes(pc)?'Chord root':ctx.chordTonePcs.includes(pc)?'Chord tone':'In-key note';notesBox.appendChild(chip);}
+    }
+  }
   function renderLeadEditor(p=active()){
     if(!p||p.type!=='lead')return;
     $('leadPartTitle').textContent=p.name;if($('leadRepeat'))$('leadRepeat').checked=p.repeat!==false;if($('leadSustain'))$('leadSustain').checked=p.sustain===true;
@@ -133,6 +199,7 @@
     document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.classList.toggle('active',b.dataset.leadInstrument===p.instrument));
     leadSoundOptions(p);$('leadGridOctave').value=String(p.gridOctave);$('leadResolution').value=String(p.resolution);$('leadBars').value=String(p.bars);
     leadBarPage=Math.max(0,Math.min(p.bars-1,leadBarPage));$('leadBarLabel').textContent=`Bar ${leadBarPage+1} / ${p.bars}`;$('leadPrevBar').disabled=leadBarPage===0;$('leadNextBar').disabled=leadBarPage>=p.bars-1;
+    renderLeadHarmony();
     renderLeadGrid(p);
   }
   function renderLeadGrid(p){
@@ -292,6 +359,7 @@
     syncLoadedChord();
     const p=loadedChord();
     if(p){invalidatePartPlayers(p);warmLivePlayer(p);busFor(p);}
+    if(active()?.type==='lead')renderLeadHarmony();
   }
   async function auditionLeadNote(p,midi){
     if(!p||p.type!=='lead')return;
@@ -534,6 +602,7 @@
     $('leadResolution').onchange=e=>{const p=active();if(p?.type!=='lead')return;const old=p.resolution,neu=+e.target.value;if(old!==neu&&p.events.length&&!confirm('Changing resolution keeps notes at their step numbers, so their timing may shift. Continue?')){e.target.value=String(old);return;}p.resolution=neu;renderLeadEditor(p);core.scheduleAutoSave();};
     $('leadBars').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.bars=+e.target.value;const maxSteps=p.bars*(p.resolution/4)*4;p.events=p.events.filter(x=>x.step<maxSteps);leadBarPage=Math.min(leadBarPage,p.bars-1);renderLeadEditor(p);core.scheduleAutoSave();};
     $('leadPrevBar').onclick=()=>{leadBarPage=Math.max(0,leadBarPage-1);renderLeadEditor();};$('leadNextBar').onclick=()=>{const p=active();if(p?.type!=='lead')return;leadBarPage=Math.min(p.bars-1,leadBarPage+1);renderLeadEditor(p);};
+    $('beatsSelect')?.addEventListener('change',()=>{if(active()?.type==='lead')renderLeadHarmony();});
     $('leadCopyBar').onclick=copyLeadBar;$('leadPasteBar').onclick=pasteLeadBar;
     $('leadClearBar').onclick=()=>{const p=active();if(p?.type!=='lead')return;const spb=(p.resolution/4)*4,start=leadBarPage*spb,end=start+spb;if(confirm(`Clear bar ${leadBarPage+1}?`)){p.events=p.events.filter(e=>e.step<start||e.step>=end);renderLeadGrid(p);core.scheduleAutoSave();}};
     $('leadVolume').oninput=e=>{const p=active();if(p?.type!=='lead')return;p.volume=+e.target.value/100;$('leadVolumeValue').textContent=`${e.target.value}%`;renderParts();core.scheduleAutoSave();};
