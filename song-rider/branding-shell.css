@@ -287,3 +287,8 @@
   .workspace-mode-btn .mode-copy small,.crp-srp-mode.workspace-mode-btn .mode-copy small{margin-top:8px!important;font-size:clamp(.58rem,2.7vw,.88rem)!important;}
   .workspace-mode-btn:nth-child(2) .mode-copy small,.crp-srp-mode.workspace-mode-btn:nth-child(2) .mode-copy small{font-size:clamp(.52rem,2.25vw,.76rem)!important;}
 }
+
+/* v3.2.0 exact Baby DAW supplied artwork + corrected directional CRP/SRP stickers */
+.workspace-mode-btn .baby-exact-art,.crp-srp-mode.workspace-mode-btn .baby-exact-art{position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;overflow:hidden!important;border-radius:inherit!important;}
+.workspace-mode-btn .baby-exact-art img,.crp-srp-mode.workspace-mode-btn .baby-exact-art img{display:block!important;width:100%!important;height:100%!important;object-fit:fill!important;}
+.workspace-mode-btn:nth-child(2),.crp-srp-mode.workspace-mode-btn:nth-child(2){position:relative!important;padding:0!important;}
