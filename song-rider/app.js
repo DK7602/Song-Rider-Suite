@@ -7833,7 +7833,7 @@ function ensureCapoStepToggle(){
       refreshDisplayedNoteCells();
       updateKeyFromAllNotes();
       updateFullIfVisible?.();
-      if(state.project){ upsertProject(state.project); window.CRP_SRP_syncMetaToCrp?.(); writeHardSyncFromSrp(); }
+      if(state.project){ upsertProject(state.project); window.CRP_SRP_syncMetaToCrp?.(); window.CRP_SRP_writeHardSyncFromSrp?.(); }
     });
   }
 
@@ -15565,7 +15565,7 @@ if(el.capoInput){
 
     // Commit once, after editing is complete, to the same hard sync bus used by CRP + BD.
     window.CRP_SRP_syncMetaToCrp?.();
-    try{ writeHardSyncFromSrp(); }catch{}
+    window.CRP_SRP_writeHardSyncFromSrp?.()
   };
 
   el.capoInput.addEventListener("input", previewCapoStep_CAPTURE, true);
@@ -16577,7 +16577,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   function readLinkSession(){try{const x=readJson(LINK_SESSION_KEY,null);return x&&x.linked===true?x:null}catch{return null}}
   function writeLinkSession(crpProjectId,srpProjectId){const prev=readJson(LINK_SESSION_KEY,{})||{};const next={linked:true,crpProjectId:String(crpProjectId||''),srpProjectId:String(srpProjectId||''),rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};writeJson(LINK_SESSION_KEY,next);return next}
   function clearLinkSession(){try{localStorage.removeItem(LINK_SESSION_KEY)}catch{}}
-  function exactLinkForCurrentProject(){const x=readLinkSession();return !!(x&&state.project&&String(x.srpProjectId||'')===String(state.project.id||'')&&String(x.crpProjectId||'')===String(state.project.linkedCrpProjectId||''))}
+  function exactLinkForCurrentProject(){const x=readLinkSession();return !!(x&&x.crpProjectId&&x.srpProjectId)}
   function readCanonicalMeta(id){try{const sid=String(id||activeUnifiedCrpId()||'');if(!sid)return null;const m=readJson(canonicalMetaKey(sid),null);return m&&String(m.projectId||'')===sid?m:null}catch{return null}}
   function writeCanonicalMeta(id,meta,source='srp'){
     if(!id)return null;
@@ -16640,6 +16640,7 @@ KEEP RHYME UI ABOVE KEYBOARD
       return next;
     }catch{return null}
   }
+  window.CRP_SRP_writeHardSyncFromSrp=writeHardSyncFromSrp;
   let __hardSyncRev=-1;
   function applyHardSyncToSrp(){
     try{
@@ -16870,8 +16871,10 @@ KEEP RHYME UI ABOVE KEYBOARD
       // If startup briefly selected another SRP project, switch to the linked project BUT DO NOT
       // return. Returning here used to discard the exact BPM/capo edit that triggered this sync.
       const rec=links()[crpId];
-      if(rec?.srpProjectId && String(p.id||'')!==String(rec.srpProjectId)){
-        const linked=loadAllProjects().map(normalizeProject).filter(Boolean).find(x=>String(x.id)===String(rec.srpProjectId));
+      const session=readLinkSession();
+      const targetSrpId=String(session?.srpProjectId||rec?.srpProjectId||'');
+      if(targetSrpId && String(p.id||'')!==targetSrpId){
+        const linked=loadAllProjects().map(normalizeProject).filter(Boolean).find(x=>String(x.id)===targetSrpId);
         if(linked){p=linked;state.project=linked;setCurrentProjectIdForScope(getStorageScope(),linked.id);}
       }
       p.linkedCrpProjectId=crpId;
@@ -16939,9 +16942,11 @@ KEEP RHYME UI ABOVE KEYBOARD
       __lastAppliedLiveRev=rev;
 
       const rec=links()[crpId];
+      const session=readLinkSession();
+      const targetSrpId=String(session?.srpProjectId||rec?.srpProjectId||'');
       let p=state.project;
-      if(rec?.srpProjectId && String(p?.id||'')!==String(rec.srpProjectId)){
-        const linked=loadAllProjects().map(normalizeProject).filter(Boolean).find(x=>String(x.id)===String(rec.srpProjectId));
+      if(targetSrpId && String(p?.id||'')!==targetSrpId){
+        const linked=loadAllProjects().map(normalizeProject).filter(Boolean).find(x=>String(x.id)===targetSrpId);
         if(linked)p=linked;
       }
       if(!p)return false;
