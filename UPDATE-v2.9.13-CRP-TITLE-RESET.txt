@@ -1,0 +1,6 @@
+v2.9.13 CRP title reset
+- Rebuilt CRP title row geometry to mirror Song Rider Pro.
+- 56x38 Hide button, same font sizing/radius/padding as SRP.
+- Real 10px gap between title and button; title cannot enter button space.
+- Removed prior title transforms/overlap behavior via final CSS override.
+- Baby DAW title suppression and working Baby DAW -> SRP parts persistence preserved.

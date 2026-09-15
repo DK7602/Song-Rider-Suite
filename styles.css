@@ -2591,3 +2591,70 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
     font-size:.78rem!important;
   }
 }
+
+/* v2.9.13 — definitive CRP title row reset.
+   Mirror Song Rider Pro's proven panelTop geometry exactly: a flexible
+   wordmark area + fixed 56x38 Hide button with a real 10px gap.
+   This intentionally overrides all earlier CRP title experiments. */
+.workspace-chord-rider .crp-pro-titlebar{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:10px!important;
+  width:100%!important;
+  min-width:0!important;
+  overflow:hidden!important;
+}
+.workspace-baby-daw .crp-pro-titlebar{display:none!important;}
+.workspace-chord-rider .crp-pro-wordmark-img{
+  display:block!important;
+  flex:0 1 auto!important;
+  width:auto!important;
+  height:auto!important;
+  min-width:0!important;
+  max-width:calc(100% - 66px)!important;
+  max-height:72px!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+  transform:none!important;
+  margin:0!important;
+  padding:0!important;
+}
+.workspace-chord-rider .crp-controls-toggle{
+  flex:0 0 56px!important;
+  box-sizing:border-box!important;
+  width:56px!important;
+  min-width:56px!important;
+  max-width:56px!important;
+  height:38px!important;
+  min-height:38px!important;
+  max-height:38px!important;
+  margin:0!important;
+  padding:0 9px!important;
+  border-radius:12px!important;
+  font-size:.78rem!important;
+  line-height:1!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{gap:10px!important;}
+  .workspace-chord-rider .crp-pro-wordmark-img{
+    max-width:calc(100% - 66px)!important;
+    max-height:72px!important;
+    transform:none!important;
+  }
+  .workspace-chord-rider .crp-controls-toggle{
+    flex-basis:56px!important;
+    width:56px!important;
+    min-width:56px!important;
+    max-width:56px!important;
+    height:38px!important;
+    min-height:38px!important;
+    max-height:38px!important;
+    padding:0 9px!important;
+    border-radius:12px!important;
+    font-size:.78rem!important;
+  }
+}

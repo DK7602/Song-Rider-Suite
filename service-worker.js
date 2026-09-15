@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v2.9.10-header-match';
+const CACHE = 'song-rider-suite-v2.9.13-crp-title-reset';
 const ASSETS = [
   './assets/chord-rider-pro-wordmark.png',
   './song-rider/suite-header-master.png',
