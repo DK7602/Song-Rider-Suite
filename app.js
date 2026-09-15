@@ -808,6 +808,9 @@
   }
 
   function scheduleAutoSave(){
+    // The hidden SRP playback bridge is strictly read-only. It must never persist its
+    // in-memory playback copy over the real Baby DAW project.
+    if(IS_PLAYBACK_BRIDGE)return;
     window.CRPParts?.syncActiveChord?.();
     publishSrpHandoff();
     // Brand-new/unnamed projects wait for the first manual Save.
@@ -823,6 +826,7 @@
   }
 
   async function runAutoSave(){
+    if(IS_PLAYBACK_BRIDGE){clearTimeout(autoSaveTimer);autoSaveTimer=null;autoSaveQueued=false;return;}
     clearTimeout(autoSaveTimer);
     autoSaveTimer=null;
     if(!state.currentProjectId)return;
@@ -1407,6 +1411,9 @@
   // cannot be lost to an older project payload during the SRP handoff.
   const CRP_NAV_SNAPSHOT_PREFIX='crp-nav-snapshot-v1:';
   function writeNavigationSnapshot(){
+    // Never let the hidden SRP playback iframe write a navigation snapshot. Its pagehide
+    // used to be able to replace the real Baby DAW snapshot when SRP was closed.
+    if(IS_PLAYBACK_BRIDGE)return null;
     if(!state.currentProjectId)return null;
     try{
       window.CRPParts?.syncActiveChord?.();
@@ -1564,7 +1571,7 @@
 
       renderAll();syncBuildInput();window.CRPParts?.syncCoreLive?.();
       const changed=before.bpm!==bpm||before.capo!==capo||before.octave!==octave||before.transpose!==transpose||String(before.key)!==key;
-      if(changed && state.currentProjectId===activeId){
+      if(changed && state.currentProjectId===activeId && !IS_PLAYBACK_BRIDGE){
         // Persist the SRP-originated values through the normal CRP autosave/cloud path.
         clearTimeout(autoSaveTimer);
         autoSaveTimer=setTimeout(()=>runAutoSave(),120);
@@ -1579,7 +1586,7 @@
   window.addEventListener('focus',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
   window.addEventListener('storage',e=>{if(e.key===SRP_HARD_SYNC_KEY||e.key===SRP_LINK_SESSION_KEY||String(e.key||'').startsWith(SRP_CANONICAL_PREFIX))setTimeout(applyHardSync,0);});
   window.addEventListener('pageshow',()=>setTimeout(applyHardSync,0));
-  window.addEventListener('pagehide',()=>{try{writeNavigationSnapshot();}catch{}});
+  if(!IS_PLAYBACK_BRIDGE)window.addEventListener('pagehide',()=>{try{writeNavigationSnapshot();}catch{}});
   window.addEventListener('focus',()=>setTimeout(applyHardSync,0));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSync,0);});
   setInterval(applyHardSync,250);

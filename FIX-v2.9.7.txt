@@ -1,0 +1,6 @@
+Song Rider Suite v2.9.7
+- Restores the real CHORD RIDER PRO image wordmark.
+- CHORD RIDER PRO title bar is shown only in Chord Rider, never Baby DAW.
+- Makes the hidden SRP playback bridge fully read-only: no autosave, no navigation snapshot writes, no cloud refresh writes.
+- Prevents the SRP playback bridge from overwriting Baby DAW parts during SRP navigation/return.
+- Preserves existing BPM/capo/step linked sync behavior.

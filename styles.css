@@ -2416,3 +2416,24 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
 .crp-pro-wordmark-img{display:none!important;}
 .crp-controls-toggle{min-width:52px!important;min-height:36px!important;padding:0 8px!important;font-size:.76rem!important;}
 @media(max-width:520px){.crp-pro-wordmark{font-size:clamp(1.38rem,6.45vw,2.15rem)!important;gap:.11em!important}.crp-controls-toggle{min-width:50px!important;min-height:34px!important;padding:0 7px!important;font-size:.73rem!important}}
+
+/* v2.9.7 — restore the real CRP art, keep it exclusive to Chord Rider, compact Hide. */
+.crp-pro-wordmark{display:none!important;}
+.crp-pro-wordmark-img{
+  display:block!important;
+  flex:1 1 auto!important;
+  min-width:0!important;
+  width:auto!important;
+  max-width:calc(100% - 58px)!important;
+  height:auto!important;
+  max-height:82px!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+}
+.workspace-baby-daw .crp-pro-titlebar{display:none!important;}
+.workspace-chord-rider .crp-pro-titlebar{display:flex!important;}
+.crp-controls-toggle{min-width:48px!important;min-height:34px!important;padding:0 7px!important;font-size:.72rem!important;}
+@media(max-width:520px){
+  .crp-pro-wordmark-img{max-width:calc(100% - 52px)!important;max-height:74px!important;}
+  .crp-controls-toggle{min-width:46px!important;min-height:32px!important;padding:0 6px!important;font-size:.70rem!important;}
+}
