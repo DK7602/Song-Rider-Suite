@@ -797,7 +797,7 @@
     return{id:id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())),name,updatedAt:Date.now(),archived:!!existing?.archived,instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:state.rows,bpm:+$('bpmInput').value||92,beats:+$('beatsSelect').value||4,loop:$('loopToggle').checked,notes:$('notesEditor').innerHTML,key:$('keyInput').value.trim(),beatMaker:liveBeat||existing?.beatMaker,parts:window.CRPParts?.capture?.()||existing?.parts};
   }
   function upsertLocal(p){const ps=localProjects(),i=ps.findIndex(x=>x.id===p.id);if(i>=0)ps[i]=p;else ps.unshift(p);saveLocalProjects(ps);}
-  async function refreshCloudProjects(){if(!accountUser){cloudProjects=null;cloudSyncState='idle';renderProjects();return;}cloudSyncState='syncing';updateAccountSummary();try{const d=await api('/api/projects');cloudProjects=d.projects||[];cloudProjects.forEach(upsertLocal);cloudSyncState='ready';updateAccountSummary();renderProjects();}catch(e){cloudSyncState='error';updateAccountSummary();$('status').textContent='Cloud sync unavailable — using local backup.';renderProjects();}}
+  async function refreshCloudProjects(){if(!accountUser){cloudProjects=null;cloudSyncState='idle';renderProjects();return;}cloudSyncState='syncing';updateAccountSummary();try{const d=await api('/api/projects');const incoming=d.projects||[];const locals=localProjects();const localById=new Map(locals.map(p=>[String(p?.id||''),p]));cloudProjects=incoming.map(remote=>{const local=localById.get(String(remote?.id||''));if(!local)return remote;const localParts=local?.parts?.items?.length||0,remoteParts=remote?.parts?.items?.length||0;const localNewer=Number(local?.updatedAt||0)>Number(remote?.updatedAt||0);const localRicher=localParts>remoteParts;return (localNewer||localRicher)?{...remote,...local}:remote;});cloudProjects.forEach(p=>{const local=localById.get(String(p?.id||''));const localParts=local?.parts?.items?.length||0,pParts=p?.parts?.items?.length||0;if(local&&(Number(local?.updatedAt||0)>Number(p?.updatedAt||0)||localParts>pParts))return;upsertLocal(p);});cloudSyncState='ready';updateAccountSummary();renderProjects();}catch(e){cloudSyncState='error';updateAccountSummary();$('status').textContent='Cloud sync unavailable — using local backup.';renderProjects();}}
   let autoSaveTimer=null, autoSaveRunning=false, autoSaveQueued=false;
 
   function updateCloudSnapshot(p){
@@ -1238,7 +1238,10 @@
     // Restore the exact project the user was working on before switching to SRP/Baby DAW.
     restoreActiveProjectFromStorage();
     setTimeout(applyLinkedMetaFromSrpHandoff,0);
-    checkAccount();if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+    // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
+    // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.
+    if(!IS_PLAYBACK_BRIDGE) checkAccount();
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';

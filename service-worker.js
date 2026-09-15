@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v2.9.5-workday-fixes';
+const CACHE = 'song-rider-suite-v2.9.6-parts-title-hotfix';
 const ASSETS = [
   './assets/chord-rider-pro-wordmark.png',
   './song-rider/suite-header-master.png',

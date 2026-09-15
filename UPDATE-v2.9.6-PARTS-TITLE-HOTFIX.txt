@@ -1,0 +1,10 @@
+Chord Rider Pro v2.9.6 hotfix
+
+1. Baby DAW parts are protected when entering SRP.
+   - The hidden SRP playback bridge no longer performs a cloud-project refresh.
+   - Cloud refresh now preserves a newer/richer local Baby DAW project instead of replacing it with a stale server copy.
+   - Existing navigation snapshot protection remains in place.
+2. CRP title no longer uses the cropped PNG wordmark (the source PNG itself cut off the final O).
+   - Uses the scalable chrome text wordmark already built into the app.
+   - Hide/Show button is slightly smaller to leave the title more room on mobile.
+3. Service-worker cache bumped so deployed phones pull this hotfix.
