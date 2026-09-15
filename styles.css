@@ -2529,3 +2529,27 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .crp-pro-wordmark-img{width:100%!important;max-width:100%!important;max-height:64px!important;}
   .crp-controls-toggle{width:56px!important;min-width:56px!important;max-width:56px!important;height:38px!important;min-height:38px!important;padding:0 9px!important;border-radius:12px!important;font-size:.78rem!important;}
 }
+
+/* v2.9.11 — final CRP header spacing fix.
+   Keep the approved SRP-sized Hide button, but remove the wasted space
+   between the wordmark and button. The PNG itself also has its transparent
+   right-edge margin trimmed, so the visible PRO gets the full title cell. */
+.workspace-chord-rider .crp-pro-titlebar{
+  grid-template-columns:minmax(0,1fr) 56px!important;
+  column-gap:2px!important;
+}
+.crp-controls-toggle{
+  width:56px!important;
+  min-width:56px!important;
+  max-width:56px!important;
+  height:38px!important;
+  min-height:38px!important;
+  margin:0!important;
+  padding:0 9px!important;
+  box-sizing:border-box!important;
+  font-size:.78rem!important;
+  border-radius:12px!important;
+}
+@media(max-width:520px){
+  .workspace-chord-rider .crp-pro-titlebar{column-gap:2px!important;}
+}
