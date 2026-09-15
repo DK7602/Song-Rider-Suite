@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Song Rider Suite — Force Refresh</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#111;color:#fff;
+      min-height:100vh;margin:0;display:grid;place-items:center;text-align:center}
+    .box{padding:28px;max-width:520px}
+    h1{font-size:24px;margin:0 0 10px}
+    p{opacity:.8;line-height:1.45}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Refreshing Song Rider Suite…</h1>
+    <p id="status">Clearing old app caches and loading the newest CRP / Baby DAW / SRP code.</p>
+  </div>
+
+<script>
+(async () => {
+  const status = document.getElementById("status");
+  const stamp = Date.now();
+
+  try {
+    // Remove any service workers that may still be serving an older build.
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.allSettled(regs.map(r => r.unregister()));
+    }
+
+    // Clear Cache Storage only. DO NOT clear localStorage / IndexedDB,
+    // because those may contain Song Rider Suite projects and settings.
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.allSettled(keys.map(k => caches.delete(k)));
+    }
+
+    // Force the browser/network to retrieve the files most likely to be stale.
+    const files = [
+      "./index.html",
+      "./app.js",
+      "./service-worker.js",
+      "./song-rider/index.html",
+      "./song-rider/app.js",
+      "./song-rider/service-worker.js"
+    ];
+
+    await Promise.allSettled(
+      files.map(url => fetch(url + "?force=" + stamp, {
+        cache: "reload",
+        credentials: "same-origin"
+      }))
+    );
+
+    status.textContent = "Fresh files loaded. Opening Song Rider Suite…";
+  } catch (err) {
+    status.textContent = "Cache cleanup finished. Opening Song Rider Suite…";
+  }
+
+  // Cache-bust the top-level navigation too.
+  setTimeout(() => {
+    location.replace("./index.html?forceRefresh=" + stamp);
+  }, 450);
+})();
+</script>
+</body>
+</html>
