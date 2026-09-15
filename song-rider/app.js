@@ -1,6 +1,6 @@
 /* app.js (FULL REPLACE MAIN v47_audio_player_follows_recording) */
 (() => {
-  // v2.9.2 — canonical workspace routes.
+  // v2.9.3 — canonical workspace routes.
   function canonicalSuiteRoot(){
     try{
       const path=location.pathname||'/';
@@ -9458,7 +9458,7 @@ function renderSheetTitleBar(){
     right.appendChild(autoStop);
   }
 
-  // v2.9.2: linked transport belongs on every SRP page, not only Full Song View.
+  // v2.9.3: linked transport belongs on every SRP page, not only Full Song View.
   // The same proven linked CRP/BD playback bridge is reused so card-page playback
   // cannot drift into a second audio/sync implementation.
   {
@@ -17066,5 +17066,5 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
 })();
 
-// v2.9.2: SRP card-page linked transport + single-button link/unlink toggle; close the main SRP application IIFE after the nested CRP/SRP bridge.
+// v2.9.3: SRP card-page linked transport + single-button link/unlink toggle; close the main SRP application IIFE after the nested CRP/SRP bridge.
 })();
