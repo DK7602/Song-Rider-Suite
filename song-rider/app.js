@@ -1003,6 +1003,22 @@ function isSectionHeadingLine(line){
 return null;
 }
 
+// Common song-sheet headings used by PDF/web copy imports (Ultimate Guitar, chord sheets, etc.).
+// This is intentionally separate from the app's PAGE 1/PAGE 2 navigation labels.
+function importHeadingTitleFromLine(line){
+  let raw = String(line || "").trim();
+  if(!raw) return null;
+  raw = raw.replace(/^[\[\(\{]+/,"").replace(/[\]\)\}]+$/,"").trim();
+  raw = raw.replace(/(?:\b[A-Za-z]\s){2,}[A-Za-z]\b/g, (m)=>m.replace(/\s+/g,""));
+  raw = raw.replace(/\s*:\s*$/,"").replace(/\s+/g," ").trim();
+  const t = raw.toUpperCase();
+  if(/^(VERSE|CHORUS)\s*[0-9]*$/.test(t)) return raw;
+  if(t === "INTRO" || t === "INTRODUCTION") return raw;
+  if(t === "BRIDGE" || t === "OUTRO" || t === "CODA" || t === "INTERLUDE" || t === "TAG") return raw;
+  if(t === "PRECHORUS" || t === "PRE-CHORUS" || t === "PRE CHORUS") return raw;
+  return null;
+}
+
 // Parse fullText -> { sections: { "VERSE 1":[{lyrics,chords?}...], ... } }
 // ✅ chord-aware:
 //   - supports "chords line above lyric line" blocks
@@ -1203,6 +1219,50 @@ function parseFullTextToSectionCards(fullText){
     return slots;
   }
 
+  // Browser/PDF copies can wrap one visual chord row onto 2+ text lines, e.g.
+  //   C/E        F6
+  //   C
+  //   Who else would rocks cry out to worship
+  // Treat those consecutive chord-only fragments as ONE row and spread the
+  // combined chords across the 8 SRP slots instead of creating blank chord cards.
+  function buildSlotsFromPendingChordLines(chordLinesRaw, lyricLineRaw){
+    const raw = normalizeLineBreaks(String(chordLinesRaw || ""));
+    const fragments = raw.split("\n").map(x=>String(x||"").trim()).filter(Boolean);
+    if(fragments.length <= 1) return buildSlotsFromAlignedChordLine(raw, lyricLineRaw);
+
+    const tokens = [];
+    const explicit = Array(8).fill("");
+    for(const frag of fragments){
+      const parts = String(frag||"").split(/[\s|,]+/).map(x=>x.trim()).filter(Boolean);
+      for(let tok of parts){
+        tok = tok
+          .replace(/^[\[\(\{]+/,"").replace(/[\]\)\}]+$/,"")
+          .replace(/^[^A-Za-z0-9#b\/.]+/,"")
+          .replace(/[^A-Za-z0-9#b\/.]+$/,"")
+          .replace(/[\.,;:]+$/,"")
+          .replace(/♯/g,"#").replace(/♭/g,"b")
+          .trim().replace(/\s+/g,"");
+        if(!tok) continue;
+        const pos = parsePositionalChordToken(tok);
+        if(pos){ explicit[pos.slot] = explicit[pos.slot] ? `${explicit[pos.slot]} ${pos.chord}` : pos.chord; continue; }
+        if(isChordToken(tok)) tokens.push(tok);
+      }
+    }
+
+    const slots = explicit.slice();
+    if(tokens.length === 1){
+      if(!slots[0]) slots[0]=tokens[0];
+      else if(!slots[7]) slots[7]=tokens[0];
+      return slots;
+    }
+    tokens.forEach((tok, i) => {
+      const slot = clamp(Math.round((i / Math.max(1, tokens.length - 1)) * 7), 0, 7);
+      if(!slots[slot]) slots[slot]=tok;
+      else slots[slot]=`${slots[slot]} ${tok}`.trim();
+    });
+    return slots;
+  }
+
   function pushCard(sec, lyricsRaw, slots){
     const lyrics = String(lyricsRaw || "").replace(/\s+/g," ").trim();
     if(!lyrics && (!slots || !slots.some(x=>String(x||"").trim()))) return;
@@ -1216,32 +1276,7 @@ function parseFullTextToSectionCards(fullText){
 
   // Recognize common headings in pasted/uploaded text
   function headingTitleFromLine(line){
-    let raw = String(line || "").trim();
-    if(!raw) return null;
-
-    raw = raw.replace(/^[\[\(\{]+/,"").replace(/[\]\)\}]+$/,"").trim();
-    raw = raw.replace(/(?:\b[A-Za-z]\s){2,}[A-Za-z]\b/g, (m)=>m.replace(/\s+/g,""));
-    raw = raw.replace(/\s*:\s*$/,"").trim();
-
-    const t = raw.toUpperCase()
-      .replace(/[^\w\s\/-]+/g," ")
-      .replace(/\s+/g," ")
-      .trim();
-
-    // Basic buckets we care about:
-    // INTRO, VERSE 1/2/3..., CHORUS 1/2/3..., BRIDGE, OUTRO, INTERLUDE, PRE-CHORUS, TAG
-    const mVC = t.match(/^(VERSE|CHORUS)\s*([0-9]+)?$/);
-    if(mVC){
-      const num = mVC[2] ? String(mVC[2]) : "";
-      return num ? `${mVC[1]} ${num}` : mVC[1];
-    }
-    if(t === "INTRO" || t === "INTRODUCTION") return "INTRO";
-    if(t === "BRIDGE") return "BRIDGE";
-    if(t === "OUTRO" || t === "CODA") return "OUTRO";
-    if(t === "INTERLUDE") return "INTERLUDE";
-    if(t === "PRECHORUS" || t === "PRE-CHORUS" || t === "PRE CHORUS") return "PRE-CHORUS";
-    if(t === "TAG") return "TAG";
-    return null;
+    return importHeadingTitleFromLine(line);
   }
 
   // Allocate a section in order (PAGE 1..PAGE 10 then extras)
@@ -1303,7 +1338,7 @@ function parseFullTextToSectionCards(fullText){
       if(_br){
         // flush any dangling chord line
         if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-          pushCard(cur, "", buildSlotsFromAlignedChordLine(pendingChordLine, ""));
+          pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""));
         }
         pendingChordLine = null;
 
@@ -1333,13 +1368,15 @@ function parseFullTextToSectionCards(fullText){
           let k = i + 1;
           while(k < lines.length && String(lines[k] || "").trim() === "") k++;
           const nxt = k < lines.length ? String(lines[k] || "") : "";
-          if(nxt && !_parseBreakLine(nxt) && !lineIsMostlyChords(nxt)){
+          if(nxt && !_parseBreakLine(nxt)){
+            // Keep the pending row alive across clipboard/PDF blank lines. The next
+            // non-empty line may be another wrapped chord fragment or its lyric line.
             continue;
           }
         }
 
         if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-          pushCard(cur, "", buildSlotsFromAlignedChordLine(pendingChordLine, ""));
+          pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""));
         }
         pendingChordLine = null;
         continue;
@@ -1347,9 +1384,12 @@ function parseFullTextToSectionCards(fullText){
 
       if(lineIsMostlyChords(line)){
         if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-          pushCard(cur, "", buildSlotsFromAlignedChordLine(pendingChordLine, ""));
+          // Wrapped chord row: keep collecting until the following lyric line.
+          pendingChordLine = `${pendingChordLine}
+${line}`;
+        }else{
+          pendingChordLine = line;
         }
-        pendingChordLine = line;
         continue;
       }
 
@@ -1357,7 +1397,7 @@ function parseFullTextToSectionCards(fullText){
 
       let slots = Array(8).fill("");
       if(pendingChordLine){
-        slots = buildSlotsFromAlignedChordLine(pendingChordLine, cleaned);
+        slots = buildSlotsFromPendingChordLines(pendingChordLine, cleaned);
         pendingChordLine = null;
       }else if(inlineChords.length){
         const n = inlineChords.length;
@@ -1372,7 +1412,7 @@ function parseFullTextToSectionCards(fullText){
     }
 
     if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-      pushCard(cur, "", buildSlotsFromAlignedChordLine(pendingChordLine, ""));
+      pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""));
     }
   }else{
     // Heading-driven parsing
@@ -1388,12 +1428,19 @@ function parseFullTextToSectionCards(fullText){
       if(heading){
         // flush any dangling chord line
         if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-          pushCard(cur, "", buildSlotsFromAlignedChordLine(pendingChordLine, ""));
+          pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""));
         }
         pendingChordLine = null;
 
-         cur = allocateNextSection(heading, { enable:true });
-        ensureBucket(cur);
+        // If the song starts with a heading, PAGE 1 is that section. The old parser
+        // pre-allocated PAGE 1 and then advanced again here, leaving PAGE 1 blank.
+        const curHasContent = !!(buckets[cur] && buckets[cur].length);
+        if(!curHasContent && explicitSections.size===0 && !String(titles[cur]||'').trim()){
+          titles[cur]=String(heading||'').trim();
+        }else{
+          cur = allocateNextSection(heading, { enable:true });
+          ensureBucket(cur);
+        }
         explicitSections.add(cur);
         continue;
       }
@@ -1404,13 +1451,13 @@ function parseFullTextToSectionCards(fullText){
           while(k < lines.length && String(lines[k] || "").trim() === "") k++;
           const nxt = k < lines.length ? String(lines[k] || "") : "";
           const nxtHeading = headingTitleFromLine(nxt);
-          if(nxt && !nxtHeading && !lineIsMostlyChords(nxt)){
+          if(nxt && !nxtHeading){
             continue;
           }
         }
 
         if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-          pushCard(cur, "", buildSlotsFromAlignedChordLine(pendingChordLine, ""));
+          pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""));
         }
         pendingChordLine = null;
         continue;
@@ -1418,9 +1465,12 @@ function parseFullTextToSectionCards(fullText){
 
       if(lineIsMostlyChords(line)){
         if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-          pushCard(cur, "", buildSlotsFromAlignedChordLine(pendingChordLine, ""));
+          // Wrapped chord row: keep collecting until the following lyric line.
+          pendingChordLine = `${pendingChordLine}
+${line}`;
+        }else{
+          pendingChordLine = line;
         }
-        pendingChordLine = line;
         continue;
       }
 
@@ -1428,7 +1478,7 @@ function parseFullTextToSectionCards(fullText){
 
       let slots = Array(8).fill("");
       if(pendingChordLine){
-        slots = buildSlotsFromAlignedChordLine(pendingChordLine, cleaned);
+        slots = buildSlotsFromPendingChordLines(pendingChordLine, cleaned);
         pendingChordLine = null;
       }else if(inlineChords.length){
         const n = inlineChords.length;
@@ -1443,7 +1493,7 @@ function parseFullTextToSectionCards(fullText){
     }
 
     if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-      pushCard(cur, "", buildSlotsFromAlignedChordLine(pendingChordLine, ""));
+      pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""));
     }
   }
 
@@ -9475,35 +9525,60 @@ function renderSheetTitleBar(){
     right.appendChild(autoStop);
   }
 
-  // v2.9.3: linked transport belongs on every SRP page, not only Full Song View.
-  // The same proven linked CRP/BD playback bridge is reused so card-page playback
-  // cannot drift into a second audio/sync implementation.
+  // Context-aware SRP Play:
+  // - exact linked pair -> play that CRP/Baby DAW arrangement
+  // - unlinked SRP project -> play the chords currently loaded in SRP itself
   {
+    const linkedNow = (typeof window.CRP_SRP_isCurrentProjectLinked === 'function')
+      ? !!window.CRP_SRP_isCurrentProjectLinked()
+      : false;
+    const ext = linkedNow ? !!window.__SRP_LINKED_PLAYING : !!state.instrumentOn;
     const playBtn=document.createElement('button'); playBtn.id='srpLinkedPlayBtn'; playBtn.type='button';
-    const ext=!!window.__SRP_LINKED_PLAYING; playBtn.textContent=ext?'Ⅱ':'▶'; playBtn.title=ext?'Pause linked song':'Play linked song';
+    playBtn.textContent=ext?'Ⅱ':'▶';
+    playBtn.title=ext ? (linkedNow?'Pause linked song':'Pause SRP chords') : (linkedNow?'Play linked song':'Play SRP chords');
     playBtn.addEventListener('click',(e)=>{
       e.preventDefault();e.stopPropagation();
-      const isPlaying=!!window.__SRP_LINKED_PLAYING;
-      if(window.parent && window.parent!==window){
-        window.parent.postMessage({type:'srp-playback-command',command:isPlaying?'pause':'play'},location.origin);
-        window.__SRP_LINKED_PLAYING=!isPlaying;
-      }else if(typeof window.CRP_SRP_linkedPlaybackCommand==='function'){
-        // Native SRP workspace: route playback into a hidden same-origin CRP/BD bridge
-        // so the exact linked Chord Rider + Baby DAW parts/drums are what the user hears.
-        const ok=window.CRP_SRP_linkedPlaybackCommand(isPlaying?'pause':'play');
-        window.__SRP_LINKED_PLAYING=ok ? !isPlaying : false;
+      const isLinked = (typeof window.CRP_SRP_isCurrentProjectLinked === 'function')
+        ? !!window.CRP_SRP_isCurrentProjectLinked()
+        : false;
+
+      if(isLinked){
+        const isPlaying=!!window.__SRP_LINKED_PLAYING;
+        if(window.parent && window.parent!==window){
+          window.parent.postMessage({type:'srp-playback-command',command:isPlaying?'pause':'play'},location.origin);
+          window.__SRP_LINKED_PLAYING=!isPlaying;
+        }else if(typeof window.CRP_SRP_linkedPlaybackCommand==='function'){
+          const ok=window.CRP_SRP_linkedPlaybackCommand(isPlaying?'pause':'play');
+          window.__SRP_LINKED_PLAYING=ok ? !isPlaying : false;
+        }
       }else{
-        // Emergency fallback only if the linked bridge is unavailable.
-        if(isPlaying){ stopBeatClock(); state.instrumentOn=false; }
-        else{ state.instrumentOn=true; startBeatClock(); }
-        window.__SRP_LINKED_PLAYING=!isPlaying;
+        // This project is independent of CRP/BD. Play the parsed SRP chord grid.
+        window.__SRP_LINKED_PLAYING=false;
+        if(state.instrumentOn) stopInstrument();
+        else startInstrument();
       }
+      renderInstrumentUI();
       renderSheetTitleBar();
     });
     right.appendChild(playBtn);
     if(ext){
-      const stopBtn=document.createElement('button');stopBtn.id='srpLinkedStopBtn';stopBtn.type='button';stopBtn.textContent='■';stopBtn.title='Stop linked song';
-      stopBtn.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();if(window.parent&&window.parent!==window)window.parent.postMessage({type:'srp-playback-command',command:'stop'},location.origin);else if(typeof window.CRP_SRP_linkedPlaybackCommand==='function')window.CRP_SRP_linkedPlaybackCommand('stop');else{stopBeatClock();state.instrumentOn=false;}window.__SRP_LINKED_PLAYING=false;renderSheetTitleBar();});
+      const stopBtn=document.createElement('button');stopBtn.id='srpLinkedStopBtn';stopBtn.type='button';stopBtn.textContent='■';stopBtn.title=linkedNow?'Stop linked song':'Stop SRP chords';
+      stopBtn.addEventListener('click',(e)=>{
+        e.preventDefault();e.stopPropagation();
+        const isLinked = (typeof window.CRP_SRP_isCurrentProjectLinked === 'function')
+          ? !!window.CRP_SRP_isCurrentProjectLinked()
+          : false;
+        if(isLinked){
+          if(window.parent&&window.parent!==window)window.parent.postMessage({type:'srp-playback-command',command:'stop'},location.origin);
+          else if(typeof window.CRP_SRP_linkedPlaybackCommand==='function')window.CRP_SRP_linkedPlaybackCommand('stop');
+          window.__SRP_LINKED_PLAYING=false;
+        }else{
+          stopInstrument();
+          state.lastChordRaw='';
+        }
+        renderInstrumentUI();
+        renderSheetTitleBar();
+      });
       right.appendChild(stopBtn);
     }
   }
@@ -10946,11 +11021,11 @@ async function importTextToFull(text){
     for(const ln of lines){
       const rawLn = String(ln ?? "");
       const t = rawLn.trim();
-      const sec = isSectionHeadingLine(t);
+      const sec = importHeadingTitleFromLine(t) || isSectionHeadingLine(t);
       if(sec){
         pushCur();
-        // Use the original trimmed heading as the block title (keeps "Verse 1" etc.)
-        cur = { title: t, body: [] };
+        // Keep the readable heading text as the Song Part title.
+        cur = { title: String(sec || t).trim(), body: [] };
         continue;
       }
       if(!cur) cur = { title: "", body: [] };
@@ -11002,8 +11077,8 @@ async function importPdfToFull(file){
       return;
     }
     await importTextToFull(text);
-    // ✅ After PDF import, jump straight to VERSE 1 cards
-    try{ goToSection("VERSE 1"); renderTabs(); renderSheet(); }catch{}
+    // ✅ After PDF import, jump straight to the first parsed song-part cards.
+    try{ goToSection("PAGE 1"); renderTabs(); renderSheet(); }catch{}
 }catch(err){
     console.error(err);
     const online = (typeof navigator !== "undefined" && "onLine" in navigator) ? navigator.onLine : "unknown";
@@ -11028,15 +11103,13 @@ async function importPdfToFull(file){
 
 
 function fixPdfLetterSpacing(text){
-  // Fix common PDF extraction artifact: letters separated by spaces, e.g. "T u r n" -> "Turn"
-  // Only merges when it looks like a "spelled out" word (3+ spaced letters in a row).
+  // Fix common PDF extraction artifact: letters separated by spaces, e.g. "T u r n" -> "Turn".
+  // IMPORTANT: do NOT collapse runs of spaces. Those columns are how PDF/website chord rows
+  // preserve their horizontal relationship to the lyric line below them.
   return String(text || "").split("\n").map(line => {
-    let s = String(line || "");
-    // Merge sequences of spaced letters inside the line
+    let s = String(line || "").replace(/\t/g, "    ");
     s = s.replace(/(?:\b[A-Za-z]\s){2,}[A-Za-z]\b/g, (m)=>m.replace(/\s+/g,""));
-    // Clean up excessive spaces
-    s = s.replace(/[ \t]+\n/g,"\n");
-    return s.replace(/[ \t]{2,}/g," ").trimEnd();
+    return s.replace(/[ \t]+$/g,"");
   }).join("\n");
 }
 
@@ -11095,6 +11168,13 @@ async function extractTextFromPdfFile(file){
       // some users keep it in /lib
       asUrl("lib/pdf.min.js?v="+stamp),
       asUrl("./lib/pdf.min.js?v="+stamp),
+    ];
+    const localModuleCandidates = [
+      asUrl("pdf.mjs?v="+stamp),
+      asUrl("./pdf.mjs?v="+stamp),
+      asUrl("../pdf.mjs?v="+stamp),
+      asUrl("lib/pdf.mjs?v="+stamp),
+      asUrl("./lib/pdf.mjs?v="+stamp),
     ];
 
     // CDN fallbacks (classic / legacy builds)
@@ -11175,7 +11255,25 @@ async function extractTextFromPdfFile(file){
       }catch(e){}
     }
 
-    // 2) CDN classic with known worker URL pair
+    // 2) Local ESM build. This repo ships pdf.mjs/pdf.worker.mjs, so use them
+    // before going to the network when the classic pdf.min.js file is absent.
+    for(const mjsUrl of localModuleCandidates){
+      const ok = await fetchOk(mjsUrl);
+      if(!ok) continue;
+      try{
+        const mod = await import(mjsUrl);
+        const lib = (mod && typeof mod.getDocument === "function") ? mod : mod?.default;
+        if(lib && typeof lib.getDocument === "function"){
+          window.pdfjsLib = lib;
+          await setWorkerSrc(null);
+          return;
+        }
+      }catch(e){
+        console.warn("Local PDF.js module load failed", e);
+      }
+    }
+
+    // 3) CDN classic with known worker URL pair
     for(const cdn of cdnClassicCandidates){
       const ok = await fetchOk(cdn.js);
       if(!ok) continue;
@@ -11316,9 +11414,8 @@ function installClipboardImport(){
   document.addEventListener("paste", async (e) => {
     try{
       const items = e.clipboardData && e.clipboardData.items ? Array.from(e.clipboardData.items) : [];
-      if(!items.length) return;
 
-      // Prefer PDF file if present
+      // Prefer PDF file if present.
       for(const it of items){
         const file = it.getAsFile && it.getAsFile();
         if(!file) continue;
@@ -11327,8 +11424,25 @@ function installClipboardImport(){
         const name = String(file.name || "").toLowerCase();
         const isPdf = type === "application/pdf" || name.endsWith(".pdf");
         if(isPdf){
+          e.preventDefault();
           await importPdfToFull(file);
           return;
+        }
+      }
+
+      // If the user pastes copied chord/lyric text while focus is NOT already in an editor,
+      // treat it as a song import. Pasting inside an SRP textarea/contenteditable stays normal;
+      // its own input handler will parse the updated Full Song text automatically.
+      const target = e.target;
+      const editable = !!(target && (
+        target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable ||
+        target.closest?.('[contenteditable="true"]')
+      ));
+      if(!editable){
+        const txt = String(e.clipboardData?.getData?.("text/plain") || "");
+        if(txt.trim()){
+          e.preventDefault();
+          await importTextToFull(txt);
         }
       }
     }catch(err){
@@ -16592,7 +16706,16 @@ KEEP RHYME UI ABOVE KEYBOARD
   function readLinkSession(){try{const x=readJson(LINK_SESSION_KEY,null);return x&&x.linked===true?x:null}catch{return null}}
   function writeLinkSession(crpProjectId,srpProjectId){const prev=readJson(LINK_SESSION_KEY,{})||{};const next={linked:true,crpProjectId:String(crpProjectId||''),srpProjectId:String(srpProjectId||''),rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};writeJson(LINK_SESSION_KEY,next);return next}
   function clearLinkSession(){try{localStorage.removeItem(LINK_SESSION_KEY)}catch{}}
-  function exactLinkForCurrentProject(){const x=readLinkSession();return !!(x&&x.crpProjectId&&x.srpProjectId)}
+  function exactLinkForCurrentProject(){
+    const x=readLinkSession();
+    const currentId=String(state.project?.id||'');
+    const projectCrpId=String(state.project?.linkedCrpProjectId||'');
+    return !!(
+      x && x.crpProjectId && x.srpProjectId && currentId &&
+      String(x.srpProjectId||'')===currentId &&
+      projectCrpId===String(x.crpProjectId||'')
+    );
+  }
   function readCanonicalMeta(id){try{const sid=String(id||activeUnifiedCrpId()||'');if(!sid)return null;const m=readJson(canonicalMetaKey(sid),null);return m&&String(m.projectId||'')===sid?m:null}catch{return null}}
   function writeCanonicalMeta(id,meta,source='srp'){
     if(!id)return null;
@@ -16721,9 +16844,15 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
   function refreshLinkedPlaybackProject(w){
     try{
-      const activeId=String(localStorage.getItem('crp-active-project-id')||'');
-      if(activeId && typeof w?.CRPCore?.loadProjectById==='function') w.CRPCore.loadProjectById(activeId);
+      if(!exactLinkForCurrentProject()) return false;
+      const session=readLinkSession();
+      const linkedId=String(session?.crpProjectId||'');
+      if(linkedId && typeof w?.CRPCore?.loadProjectById==='function'){
+        w.CRPCore.loadProjectById(linkedId);
+        return true;
+      }
     }catch(err){console.warn('Could not refresh linked CRP playback project',err)}
+    return false;
   }
   window.CRP_SRP_getLinkedPlaybackTiming=function(){
     try{
@@ -16734,6 +16863,12 @@ KEEP RHYME UI ABOVE KEYBOARD
   };
 
   window.CRP_SRP_linkedPlaybackCommand=function(command){
+    // Only the exact SRP<->CRP pair may use the hidden CRP/Baby DAW audio engine.
+    // Unlinked SRP songs play their own parsed chords locally instead.
+    if(!exactLinkForCurrentProject()){
+      window.__SRP_LINKED_PLAYING=false;
+      return false;
+    }
     const f=ensureLinkedPlaybackBridge();
     const w=f?.contentWindow;
     if(!w){ return false; }
@@ -16773,7 +16908,9 @@ KEEP RHYME UI ABOVE KEYBOARD
       const projects=readJson('crp-projects',[])||[];
       const h=handoff();
       const session=readLinkSession();
-      const activeId=String(session?.crpProjectId||h?.payload?.crpProjectId||localStorage.getItem('crp-active-project-id')||'');
+      // The CRP/Baby DAW project the user actually has loaded is the linking target.
+      // A stale SRP link session must never override that active workspace on refresh/link.
+      const activeId=String(localStorage.getItem('crp-active-project-id')||h?.payload?.crpProjectId||session?.crpProjectId||'');
       let p=(activeId&&projects.find(x=>String(x?.id||'')===activeId)) ||
         (h?.payload?.crpProjectId&&projects.find(x=>String(x?.id||'')===String(h.payload.crpProjectId))) || null;
       if(p?.id){
@@ -16824,12 +16961,37 @@ KEEP RHYME UI ABOVE KEYBOARD
     try{
       persistActiveProjectState?.();
       let all=loadAllProjects().map(normalizeProject).filter(Boolean);
-      let p=all.find(x=>String(x.linkedCrpProjectId||'')===String(payload.crpProjectId));
-      if(!p&&requestedId)p=all.find(x=>String(x.id)===String(requestedId));
-      if(!p&&forceCreate){p=state.project?normalizeProject(deepClone(state.project)):defaultProject(payload.name||'Linked Song');p.linkedCrpProjectId=payload.crpProjectId;}
+      let p=null;
+      if(forceCreate){
+        // A tap on Link SRP always links the SRP project currently on screen.
+        // Never jump to an older SRP project that happened to be linked to this CRP before.
+        p=state.project?normalizeProject(deepClone(state.project)):defaultProject('New Song');
+
+        // Keep links one-to-one. Detach stale records that point either side at another project.
+        const linkMap=links();
+        for(const [oldCrpId,rec] of Object.entries(linkMap)){
+          const oldSrpId=String(rec?.srpProjectId||'');
+          if(String(oldCrpId)===String(payload.crpProjectId) || oldSrpId===String(p.id||'')){
+            delete linkMap[oldCrpId];
+            if(oldSrpId && oldSrpId!==String(p.id||'')){
+              const oldProj=all.find(x=>String(x.id||'')===oldSrpId);
+              if(oldProj && String(oldProj.linkedCrpProjectId||'')===String(oldCrpId)){
+                oldProj.linkedCrpProjectId='';
+                oldProj.linkedOctave=0;
+                oldProj.linkedTranspose=false;
+                upsertProject(oldProj);
+              }
+            }
+          }
+        }
+        setLinks(linkMap);
+      }else{
+        if(requestedId)p=all.find(x=>String(x.id)===String(requestedId));
+        if(!p)p=all.find(x=>String(x.linkedCrpProjectId||'')===String(payload.crpProjectId));
+      }
       if(!p)return null;
       p.linkedCrpProjectId=payload.crpProjectId;
-      p.name=payload.name||p.name;
+      // SRP owns its own project name. Linking/syncing must never rename it to the CRP name.
       p.bpm=Number(payload.bpm)||p.bpm||95;
       p.crpKey=String(payload.key||'');
       p.capo=Math.max(0,Math.min(12,Number(payload.capo)||0));
@@ -16871,15 +17033,11 @@ KEEP RHYME UI ABOVE KEYBOARD
     try{
       let p=state.project;if(!p)return;
       const crpId=activeLinkedCrpId();if(!crpId)return;
-      // If startup briefly selected another SRP project, switch to the linked project BUT DO NOT
-      // return. Returning here used to discard the exact BPM/capo edit that triggered this sync.
-      const rec=links()[crpId];
+      // Never change the SRP project selection from background link sync.
       const session=readLinkSession();
-      const targetSrpId=String(session?.srpProjectId||rec?.srpProjectId||'');
-      if(targetSrpId && String(p.id||'')!==targetSrpId){
-        const linked=loadAllProjects().map(normalizeProject).filter(Boolean).find(x=>String(x.id)===targetSrpId);
-        if(linked){p=linked;state.project=linked;setCurrentProjectIdForScope(getStorageScope(),linked.id);}
-      }
+      // Project-level metadata only belongs to the exact pair on screen.
+      // Global BPM/CAPO/STEP sync is handled separately by the suite transport bus.
+      if(!session || String(session.srpProjectId||'')!==String(p.id||'') || String(session.crpProjectId||'')!==String(crpId)) return;
       p.linkedCrpProjectId=crpId;
       const liveBpm=Number(el?.bpmInput?.value);
       const rawAmount=Number(el?.capoInput?.value);
@@ -16944,15 +17102,9 @@ KEEP RHYME UI ABOVE KEYBOARD
       if(rev===__lastAppliedLiveRev)return false;
       __lastAppliedLiveRev=rev;
 
-      const rec=links()[crpId];
       const session=readLinkSession();
-      const targetSrpId=String(session?.srpProjectId||rec?.srpProjectId||'');
       let p=state.project;
-      if(targetSrpId && String(p?.id||'')!==targetSrpId){
-        const linked=loadAllProjects().map(normalizeProject).filter(Boolean).find(x=>String(x.id)===targetSrpId);
-        if(linked)p=linked;
-      }
-      if(!p)return false;
+      if(!p || !session || String(session.srpProjectId||'')!==String(p.id||'')) return false;
       p.linkedCrpProjectId=crpId;
       p.bpm=Math.max(40,Math.min(240,Number(live.bpm)||p.bpm||95));
       p.capo=Math.max(0,Math.min(12,Number(live.capo)||0));
@@ -16976,10 +17128,17 @@ KEEP RHYME UI ABOVE KEYBOARD
     const x=readLinkSession();
     return !!(payload?.crpProjectId&&x&&state.project&&String(x.crpProjectId||'')===String(payload.crpProjectId)&&String(x.srpProjectId||'')===String(state.project.id||'')&&String(state.project.linkedCrpProjectId||'')===String(payload.crpProjectId));
   }
+  window.CRP_SRP_isCurrentProjectLinked=()=>isCurrentCrpSrpLinked();
 
   function unlinkCurrentCrpSrp(){
     const x=readLinkSession();
     const crpId=String(x?.crpProjectId||state.project?.linkedCrpProjectId||'');
+    // Stop the linked arrangement before removing the pair so no hidden CRP/BD audio
+    // can continue after the UI says this SRP project is unlinked.
+    if(window.__SRP_LINKED_PLAYING && exactLinkForCurrentProject()){
+      try{ window.CRP_SRP_linkedPlaybackCommand?.('stop'); }catch{}
+    }
+    window.__SRP_LINKED_PLAYING=false;
     if(crpId){const all=links();delete all[crpId];setLinks(all);}
     if(state.project){
       state.project.linkedCrpProjectId='';
@@ -16990,6 +17149,7 @@ KEEP RHYME UI ABOVE KEYBOARD
     clearLinkSession();
     try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}
     refreshCrpLinkUi();
+    try{renderSheetTitleBar();}catch{}
   }
 
   function refreshCrpLinkUi(){
@@ -17059,7 +17219,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   if(integrated){
     if(!readLinkSession()){try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}}
     window.CRP_SRP_importCrpStructure=importCrpStructure;
-    if(!lyricsOverlay && !(window.parent&&window.parent!==window)) setTimeout(ensureLinkedPlaybackBridge,0);
+    if(!lyricsOverlay && !(window.parent&&window.parent!==window)) setTimeout(()=>{if(isCurrentCrpSrpLinked())ensureLinkedPlaybackBridge();},0);
     document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{
       e.preventDefault();
       e.stopPropagation();
