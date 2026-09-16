@@ -2824,25 +2824,61 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .lead-bar-tools{order:10;}
 }
 
-/* v3.2.2 — Baby DAW chord setup is independent from CRP Hide/Show.
-   Reuse the existing Parts row so no extra toolbar row is added. */
+/* v3.2.3 — Baby DAW setup toggle lives beside Auto Scroll.
+   CRP and Baby DAW still keep independent setup visibility, but the Parts strip
+   now gets the space back for more part tabs. */
 .baby-chord-setup-toggle[hidden]{display:none!important;}
 .baby-chord-setup-toggle{
   flex:0 0 auto;
-  min-width:74px;
-  padding:8px 10px;
+  min-width:78px;
+  min-height:40px;
+  padding:6px 9px;
   border:1px solid #46505d;
   border-radius:12px;
   background:#171c23;
   color:#f1f3f5;
   font-weight:750;
-  font-size:.78rem;
+  font-size:.74rem;
   line-height:1.05;
   white-space:normal;
   text-align:center;
 }
 body:not(.workspace-baby-daw) .baby-chord-setup-toggle{display:none!important;}
-@media(max-width:720px){
-  .baby-chord-setup-toggle{min-width:66px;padding:7px 8px;font-size:.72rem;}
-  body.workspace-baby-daw .part-strip{max-width:calc(100vw - 218px);}
+body.workspace-baby-daw .part-strip{max-width:none!important;}
+
+/* Desktop/tablet transport: Setup sits immediately after Auto Scroll. */
+.transport-line-actions .baby-chord-setup-toggle{
+  margin:0!important;
+  align-self:center;
+}
+
+@media(max-width:700px){
+  .transport-line-actions{
+    grid-template-columns:minmax(92px,128px) auto 40px minmax(68px,82px) !important;
+    gap:8px !important;
+  }
+  .transport-line-actions #playAllBtn{grid-column:1 !important;}
+  .transport-line-actions .repeat-control{grid-column:2 !important;}
+  .transport-line-actions #autoScrollBtn{grid-column:3 !important;}
+  .transport-line-actions #babyChordSetupToggleBtn{
+    grid-column:4 !important;
+    width:100% !important;
+    min-width:68px !important;
+    min-height:40px !important;
+    padding:5px 6px !important;
+    font-size:.69rem !important;
+    justify-self:start !important;
+  }
+}
+@media(max-width:380px){
+  .transport-line-actions{
+    grid-template-columns:minmax(86px,108px) auto 38px minmax(62px,72px) !important;
+    gap:6px !important;
+  }
+  .transport-line-actions #babyChordSetupToggleBtn{
+    min-width:62px !important;
+    min-height:38px !important;
+    padding:4px 5px !important;
+    font-size:.64rem !important;
+  }
 }
