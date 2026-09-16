@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.2.4-app-icon';
+const CACHE = 'song-rider-suite-v3.2.5-padded-app-icon';
 const ASSETS = [
   './assets/chord-rider-pro-wordmark.png',
   './song-rider/suite-header-master.png',
@@ -22,8 +22,8 @@ const ASSETS = [
   './parts.js',
   './beat-maker.js',
   './manifest.webmanifest',
-  './assets/icon-192.png',
   './assets/apple-touch-icon.png',
+  './assets/icon-192.png',
   './assets/rider-and-bones-icon.png',
   './assets/rider-and-bones-left.gif',
   './assets/rider-and-bones-right.gif',
