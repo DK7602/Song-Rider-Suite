@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.2.0-lead-harmony';
+const CACHE = 'song-rider-suite-v3.2.1-lead-bar-wrap';
 const ASSETS = [
   './assets/chord-rider-pro-wordmark.png',
   './song-rider/suite-header-master.png',
