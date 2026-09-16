@@ -2823,3 +2823,26 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .lead-harmony-chip{min-height:23px;font-size:.71rem;padding:3px 6px;}
   .lead-bar-tools{order:10;}
 }
+
+/* v3.2.2 — Baby DAW chord setup is independent from CRP Hide/Show.
+   Reuse the existing Parts row so no extra toolbar row is added. */
+.baby-chord-setup-toggle[hidden]{display:none!important;}
+.baby-chord-setup-toggle{
+  flex:0 0 auto;
+  min-width:74px;
+  padding:8px 10px;
+  border:1px solid #46505d;
+  border-radius:12px;
+  background:#171c23;
+  color:#f1f3f5;
+  font-weight:750;
+  font-size:.78rem;
+  line-height:1.05;
+  white-space:normal;
+  text-align:center;
+}
+body:not(.workspace-baby-daw) .baby-chord-setup-toggle{display:none!important;}
+@media(max-width:720px){
+  .baby-chord-setup-toggle{min-width:66px;padding:7px 8px;font-size:.72rem;}
+  body.workspace-baby-daw .part-strip{max-width:calc(100vw - 218px);}
+}

@@ -55,12 +55,20 @@
     if(p?.type==='chord'&&p.id===loadedChordPartId)p.data=core.snapshot();
   }
 
+  function refreshBabySetupToggle(){
+    const btn=$('babyChordSetupToggleBtn');if(!btn)return;
+    const chord=active()?.type==='chord';
+    const inBaby=document.body.classList.contains('workspace-baby-daw');
+    btn.hidden=!(inBaby&&chord);
+    if(inBaby&&chord)core.refreshSetupVisibility?.();
+  }
   function setEditorMode(type){
     const chord=type==='chord';
     $('chordPartControls')?.classList.toggle('part-hidden',!chord);
     $('chordPartRows')?.classList.toggle('part-hidden',!chord);
     if($('leadPartEditor'))$('leadPartEditor').hidden=type!=='lead';
     if($('vocalPartEditor'))$('vocalPartEditor').hidden=type!=='vocal';
+    refreshBabySetupToggle();
   }
 
   function selectPart(id){
@@ -114,6 +122,10 @@
     syncLoadedChord();let p;
     if(type==='chord'){
       p=chordPart(`Chords ${countType('chord')+1}`,{...core.snapshot(),rows:[[]],key:''});
+      // A brand-new Baby DAW chord part always opens its setup controls so the user
+      // can immediately choose Piano/Guitar, Chord/Note, Sound, Octave, Capo, etc.
+      // This changes Baby DAW only; CRP keeps its own Hide/Show preference untouched.
+      core.setBabyDawSetupHidden?.(false);
     }else if(type==='lead')p=leadPart(`Lead ${countType('lead')+1}`);
     else p=vocalPart(`Vocals ${countType('vocal')+1}`);
     parts.push(p);closeModal();selectPart(p.id);core.scheduleAutoSave();
@@ -592,7 +604,7 @@
   }
 
   function wire(){
-    ensureInitial();renderParts();
+    ensureInitial();setEditorMode(active()?.type||'chord');renderParts();
     $('addPartBtn')?.addEventListener('click',openModal);$('closePartModal')?.addEventListener('click',closeModal);document.querySelector('[data-close-part-modal]')?.addEventListener('click',closeModal);document.querySelectorAll('.part-choice').forEach(b=>b.addEventListener('click',()=>addPart(b.dataset.partType)));
     document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;p.instrument=b.dataset.leadInstrument;p.sound=(core.sounds[p.instrument]||[])[0]?.[0]||p.sound;invalidatePartPlayers(p);renderLeadEditor(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();});
     $('leadRepeat').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.repeat=e.target.checked;core.scheduleAutoSave();};
@@ -646,7 +658,7 @@
       msUntilNextBeat=beatMs;
     }
     return {playing:true,ready:true,bpm,beatMs,currentBeat,msUntilNextBeat};
-  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncCloudAudio,openStudioExport,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(c&&activePartId!==c.id)selectPart(c.id);},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
+  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncCloudAudio,openStudioExport,refreshBabySetupToggle,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(c&&activePartId!==c.id)selectPart(c.id);else refreshBabySetupToggle();},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
   // app.js intentionally loads first to expose CRPCore. Tell it that the parts module now
   // exists so the active saved project can be rehydrated with ALL Baby DAW parts before any
   // workspace navigation/save is allowed to capture state.

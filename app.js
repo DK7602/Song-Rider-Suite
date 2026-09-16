@@ -1519,6 +1519,43 @@
       location.href=new URL(appRoot+'song-rider/index.html?crpMode=1',location.origin).href;
     }
   }
+  // v3.2.2 — CRP and Baby DAW keep independent setup-menu visibility.
+  // Hiding Piano/Guitar/etc. in CRP must never strand Baby DAW chord parts without those controls.
+  const CRP_SETUP_HIDDEN_KEY='crp-setup-controls-hidden';
+  const BD_SETUP_HIDDEN_KEY='baby-daw-setup-controls-hidden-v1';
+  function setupHiddenFor(mode){
+    const key=mode==='baby-daw'?BD_SETUP_HIDDEN_KEY:CRP_SETUP_HIDDEN_KEY;
+    try{return localStorage.getItem(key)==='1'}catch{return false}
+  }
+  function currentSetupWorkspace(){return document.body.classList.contains('workspace-baby-daw')?'baby-daw':'chord-rider'}
+  function applySetupVisibility(){
+    const toolbar=document.querySelector('.primary-toolbar');
+    if(!toolbar)return;
+    const mode=currentSetupWorkspace();
+    const hidden=setupHiddenFor(mode);
+    toolbar.classList.toggle('crp-controls-hidden',hidden);
+
+    const crpToggle=$('toggleCrpControlsBtn');
+    if(crpToggle){
+      const crpHidden=setupHiddenFor('chord-rider');
+      crpToggle.textContent=crpHidden?'Show':'Hide';
+      crpToggle.setAttribute('aria-expanded',String(!crpHidden));
+    }
+    const bdToggle=$('babyChordSetupToggleBtn');
+    if(bdToggle){
+      const bdHidden=setupHiddenFor('baby-daw');
+      bdToggle.textContent=bdHidden?'Show Setup':'Hide Setup';
+      bdToggle.setAttribute('aria-expanded',String(!bdHidden));
+    }
+  }
+  function setWorkspaceSetupHidden(mode,hidden,persist=true){
+    mode=mode==='baby-daw'?'baby-daw':'chord-rider';
+    if(persist){
+      const key=mode==='baby-daw'?BD_SETUP_HIDDEN_KEY:CRP_SETUP_HIDDEN_KEY;
+      try{localStorage.setItem(key,hidden?'1':'0')}catch{}
+    }
+    applySetupVisibility();
+  }
   function applyWorkspaceMode(mode, persist=true){
     mode=['chord-rider','baby-daw','song-rider'].includes(mode)?mode:'chord-rider';
     if(mode==='song-rider'){
@@ -1532,6 +1569,8 @@
       const on=btn.dataset.workspaceMode===mode;btn.classList.toggle('active',on);btn.setAttribute('aria-pressed',String(on));
     });
     if(mode==='chord-rider') window.CRPParts?.focusChordPart?.();
+    applySetupVisibility();
+    window.CRPParts?.refreshBabySetupToggle?.();
     if(persist){try{localStorage.setItem(WORKSPACE_MODE_KEY,mode)}catch{}}
   }
   function initWorkspaceMode(){
@@ -1545,20 +1584,9 @@
     document.querySelectorAll('[data-workspace-mode]').forEach(btn=>btn.addEventListener('click',()=>applyWorkspaceMode(btn.dataset.workspaceMode,true)));
 
     const crpControlsToggle=$('toggleCrpControlsBtn');
-    const crpSetupToolbar=document.querySelector('.primary-toolbar');
-    function setCrpSetupHidden(hidden){
-      if(!crpSetupToolbar||!crpControlsToggle)return;
-      crpSetupToolbar.classList.toggle('crp-controls-hidden',!!hidden);
-      crpControlsToggle.textContent=hidden?'Show':'Hide';
-      crpControlsToggle.setAttribute('aria-expanded',String(!hidden));
-      try{localStorage.setItem('crp-setup-controls-hidden',hidden?'1':'0')}catch{}
-    }
-    if(crpControlsToggle&&crpSetupToolbar){
-      let hidden=false;
-      try{hidden=localStorage.getItem('crp-setup-controls-hidden')==='1'}catch{}
-      setCrpSetupHidden(hidden);
-      crpControlsToggle.addEventListener('click',()=>setCrpSetupHidden(!crpSetupToolbar.classList.contains('crp-controls-hidden')));
-    }
+    if(crpControlsToggle)crpControlsToggle.addEventListener('click',()=>setWorkspaceSetupHidden('chord-rider',!setupHiddenFor('chord-rider')));
+    const bdControlsToggle=$('babyChordSetupToggleBtn');
+    if(bdControlsToggle)bdControlsToggle.addEventListener('click',()=>setWorkspaceSetupHidden('baby-daw',!setupHiddenFor('baby-daw')));
 
     applyWorkspaceMode(mode,false);
   }
@@ -1704,6 +1732,9 @@
     },
     setPlaying(on){state.playing=!!on;setRiderBonesRiding(!!on);$('playAllBtn').textContent=on?'■ Stop':'▶ Play';if(!on)document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');},
     status(msg){$('status').textContent=msg||'';},
+    setBabyDawSetupHidden(hidden){setWorkspaceSetupHidden('baby-daw',!!hidden);},
+    refreshSetupVisibility(){applySetupVisibility();},
+    get workspaceMode(){return currentSetupWorkspace();},
     noteAtMidi
   };
 
