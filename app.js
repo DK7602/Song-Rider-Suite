@@ -1282,6 +1282,13 @@
       const id=state.currentProjectId||String(localStorage.getItem('crp-active-project-id')||'');
       if(id) loadProject(id);
     },{once:true});
+    // beat-maker.js loads after both app.js and parts.js. The first project restore can therefore
+    // happen before CRPBeatMaker exists. Re-load the same active project once the beat bridge is
+    // ready so the persisted drum pattern is restored instead of a fresh blank sequencer.
+    window.addEventListener('crp-beat-ready',()=>{
+      const id=state.currentProjectId||String(localStorage.getItem('crp-active-project-id')||'');
+      if(id) loadProject(id);
+    },{once:true});
     setTimeout(applyLinkedMetaFromSrpHandoff,0);
     // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
     // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.

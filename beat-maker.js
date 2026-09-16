@@ -595,8 +595,10 @@
     stopMainNow(){stopMainDrums();}
   };
 
-  // App startup begins with a blank beat. A saved project's drums are loaded only
-  // when that project is explicitly opened by the core app.
+  // v3.2.7: beat-maker.js loads AFTER app.js/parts.js. On startup the core can restore
+  // the active project before CRPBeatMaker exists, so the old init() always replaced the saved
+  // drum state with a fresh blank beat. Restore the active saved project's beat here, after the
+  // bridge is actually available, and announce readiness so the core can re-apply the same project.
   function init(){
     if(!document.querySelector('link[href$="beat-maker.css"]')){
       const css=document.createElement('link'); css.rel='stylesheet'; css.href='beat-maker.css'; document.head.appendChild(css);
@@ -605,7 +607,17 @@
     beat=freshBeat();
     beatUpdatedAt=0;
     activeProjectId=null;
-    updateMainControls();
+    try{
+      const id=String(localStorage.getItem('crp-active-project-id')||'').trim();
+      const ps=readProjects();
+      const saved=id ? ps.find(p=>String(p?.id||'')===id) : inferActiveProject();
+      if(saved) loadBeatFromProject(saved);
+      else updateMainControls();
+    }catch(err){
+      console.warn('Could not restore saved beat on startup',err);
+      updateMainControls();
+    }
+    try{window.dispatchEvent(new CustomEvent('crp-beat-ready'));}catch{}
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
