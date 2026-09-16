@@ -794,10 +794,39 @@
   function capture(id,name){
     const existing=id?localProjects().find(x=>x.id===id):null;
     const liveBeat=window.CRPBeatMaker?.getBeat?.();
-    return{id:id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())),name,updatedAt:Date.now(),archived:!!existing?.archived,instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:state.rows,bpm:+$('bpmInput').value||92,beats:+$('beatsSelect').value||4,loop:$('loopToggle').checked,notes:$('notesEditor').innerHTML,key:$('keyInput').value.trim(),beatMaker:liveBeat||existing?.beatMaker,parts:window.CRPParts?.capture?.()||existing?.parts};
+    return{id:id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())),name,updatedAt:Date.now(),archived:!!existing?.archived,instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:state.rows,bpm:+$('bpmInput').value||92,beats:+$('beatsSelect').value||4,loop:$('loopToggle').checked,notes:$('notesEditor').innerHTML,key:$('keyInput').value.trim(),beatMaker:liveBeat||existing?.beatMaker,beatMakerUpdatedAt:window.CRPBeatMaker?.getUpdatedAt?.()||existing?.beatMakerUpdatedAt||0,parts:window.CRPParts?.capture?.()||existing?.parts};
   }
   function upsertLocal(p){const ps=localProjects(),i=ps.findIndex(x=>x.id===p.id);if(i>=0)ps[i]=p;else ps.unshift(p);saveLocalProjects(ps);}
-  async function refreshCloudProjects(){if(!accountUser){cloudProjects=null;cloudSyncState='idle';renderProjects();return;}cloudSyncState='syncing';updateAccountSummary();try{const d=await api('/api/projects');const incoming=d.projects||[];const locals=localProjects();const localById=new Map(locals.map(p=>[String(p?.id||''),p]));cloudProjects=incoming.map(remote=>{const local=localById.get(String(remote?.id||''));if(!local)return remote;const localParts=local?.parts?.items?.length||0,remoteParts=remote?.parts?.items?.length||0;const localNewer=Number(local?.updatedAt||0)>Number(remote?.updatedAt||0);const localRicher=localParts>remoteParts;return (localNewer||localRicher)?{...remote,...local}:remote;});cloudProjects.forEach(p=>{const local=localById.get(String(p?.id||''));const localParts=local?.parts?.items?.length||0,pParts=p?.parts?.items?.length||0;if(local&&(Number(local?.updatedAt||0)>Number(p?.updatedAt||0)||localParts>pParts))return;upsertLocal(p);});cloudSyncState='ready';updateAccountSummary();renderProjects();}catch(e){cloudSyncState='error';updateAccountSummary();$('status').textContent='Cloud sync unavailable — using local backup.';renderProjects();}}
+  async function refreshCloudProjects(){
+    if(!accountUser){cloudProjects=null;cloudSyncState='idle';renderProjects();return;}
+    cloudSyncState='syncing';updateAccountSummary();
+    try{
+      const d=await api('/api/projects');
+      const incoming=d.projects||[];
+      const locals=localProjects();
+      const localById=new Map(locals.map(p=>[String(p?.id||''),p]));
+      cloudProjects=incoming.map(remote=>{
+        const local=localById.get(String(remote?.id||''));
+        if(!local)return remote;
+        const localNewer=Number(local?.updatedAt||0)>Number(remote?.updatedAt||0);
+        // Merge the general project by project timestamp, but merge Baby DAW parts and drums
+        // by their own edit clocks. This prevents a deleted vocal or a newly-written beat from
+        // being resurrected/erased by an older cloud snapshot with a newer server timestamp.
+        const merged=localNewer?{...remote,...local}:{...local,...remote};
+        const lp=Number(local?.parts?.updatedAt||0), rp=Number(remote?.parts?.updatedAt||0);
+        if(lp||rp) merged.parts = lp>=rp ? local.parts : remote.parts;
+        else if(localNewer && local.parts) merged.parts=local.parts;
+        const lb=Number(local?.beatMakerUpdatedAt||0), rb=Number(remote?.beatMakerUpdatedAt||0);
+        if(lb||rb){
+          if(lb>=rb){merged.beatMaker=local.beatMaker;merged.beatMakerUpdatedAt=lb;}
+          else {merged.beatMaker=remote.beatMaker;merged.beatMakerUpdatedAt=rb;}
+        }else if(localNewer && local.beatMaker){merged.beatMaker=local.beatMaker;}
+        return merged;
+      });
+      cloudProjects.forEach(p=>upsertLocal(p));
+      cloudSyncState='ready';updateAccountSummary();renderProjects();
+    }catch(e){cloudSyncState='error';updateAccountSummary();$('status').textContent='Cloud sync unavailable — using local backup.';renderProjects();}
+  }
   let autoSaveTimer=null, autoSaveRunning=false, autoSaveQueued=false;
 
   function updateCloudSnapshot(p){
@@ -1665,7 +1694,7 @@
   window.addEventListener('focus',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
   window.addEventListener('storage',e=>{if(e.key===SRP_HARD_SYNC_KEY||e.key===SRP_LINK_SESSION_KEY||String(e.key||'').startsWith(SRP_CANONICAL_PREFIX)||e.key===SRS_TRANSPORT_KEY)setTimeout(applyHardSync,0);});
   window.addEventListener('pageshow',()=>setTimeout(applyHardSync,0));
-  if(!IS_PLAYBACK_BRIDGE)window.addEventListener('pagehide',()=>{try{writeNavigationSnapshot();}catch{}});
+  if(!IS_PLAYBACK_BRIDGE)window.addEventListener('pagehide',()=>{try{flushAutoSaveNow();writeNavigationSnapshot();window.CRPBeatMaker?.persist?.();}catch{}});
   window.addEventListener('focus',()=>setTimeout(applyHardSync,0));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSync,0);});
   setInterval(applyHardSync,250);
@@ -1706,7 +1735,7 @@
   }
   window.CRPCore={
     snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,
-    scheduleAutoSave,renderAll,syncBuildInput,publishSrpHandoff,loadProjectById:loadProject,
+    scheduleAutoSave,flushAutoSaveNow,renderAll,syncBuildInput,publishSrpHandoff,loadProjectById:loadProject,
     get beats(){return +$('beatsSelect').value||4},get bpm(){return +$('bpmInput').value||92},get loop(){return $('loopToggle').checked},
     get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
     startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).reduce((n,r)=>n+r.length,0)*(+$('beatsSelect').value||4);},

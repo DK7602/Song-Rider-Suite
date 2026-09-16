@@ -45,6 +45,7 @@
   let mainNextTime = 0;
   let activeProjectId = null;
   let beat = freshBeat();
+  let beatUpdatedAt=0;
 
   function freshBeat(){
     const tracks = {};
@@ -97,24 +98,34 @@
   }
   function loadBeatFromProject(p){
     activeProjectId = p?.id || null;
+    beatUpdatedAt = Number(p?.beatMakerUpdatedAt||p?.updatedAt||0)||0;
     beat = normalizeBeat(p?.beatMaker);
     currentBar = clamp(currentBar,0,beat.bars-1);
     updateMainControls();
     if($('crpBeatModal')?.classList.contains('open')) renderEditor();
   }
   function persistBeatIntoProject(){
+    const now=Date.now();
+    beatUpdatedAt=now;
     const ps = readProjects();
     let p = activeProjectId ? ps.find(x=>x.id===activeProjectId) : null;
     if(!p){
       const name = projectName();
       p = ps.filter(x=>x.name===name).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0] || null;
     }
-    if(!p){ localStorage.setItem(DRAFT_KEY, JSON.stringify(beat)); return false; }
+    if(!p){
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({beat:normalizeBeat(beat),updatedAt:beatUpdatedAt}));
+      // The core save will include the live beat when this draft gets its first project ID.
+      window.CRPCore?.scheduleAutoSave?.();
+      return false;
+    }
     activeProjectId = p.id;
     const idx = ps.findIndex(x=>x.id===p.id);
-    ps[idx] = {...p, beatMaker: normalizeBeat(beat), updatedAt: Date.now()};
+    ps[idx] = {...p, beatMaker: normalizeBeat(beat), beatMakerUpdatedAt:beatUpdatedAt, updatedAt: now};
     writeProjects(ps);
     localStorage.removeItem(DRAFT_KEY);
+    // Keep the authoritative project payload/cloud snapshot in lockstep with the drum editor.
+    window.CRPCore?.scheduleAutoSave?.();
     return true;
   }
   function countHits(){
@@ -566,6 +577,7 @@
     getBeat(){
       return JSON.parse(JSON.stringify(normalizeBeat(beat)));
     },
+    getUpdatedAt(){ return Number(beatUpdatedAt)||0; },
     loadProject(project){
       // Passing null means New/blank project. Reset the sequencer and discard any
       // stale unsaved drum draft so another project's beat can never carry over.
@@ -591,6 +603,7 @@
     }
     injectUi();
     beat=freshBeat();
+    beatUpdatedAt=0;
     activeProjectId=null;
     updateMainControls();
   }

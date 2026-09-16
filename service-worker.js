@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.2.5-padded-app-icon';
+const CACHE = 'song-rider-suite-v3.2.6-persistence-fix';
 const ASSETS = [
   './assets/chord-rider-pro-wordmark.png',
   './song-rider/suite-header-master.png',
