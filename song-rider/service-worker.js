@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.14-playback-layout-audio-export';
+const CACHE = 'song-rider-suite-v3.3.15-song-end-pro-autotune';
 const ASSETS = [
   './vocal-autotune-worklet.js',
   './song-rider-pro-wordmark-hq.png',
