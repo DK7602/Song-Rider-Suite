@@ -1,0 +1,5 @@
+v3.3.11
+- Replaced CRP title with user-provided high-quality wordmark.
+- Replaced suite header with user-provided HD header art.
+- Replaced Baby DAW button with user-provided image.
+- Bumped cache/query versions so the new images refresh properly.
