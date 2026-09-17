@@ -602,18 +602,33 @@
         label.title=`${formatBeatDuration(next)} beats`;
         $('status').textContent=`${displayedValue(card)} duration: ${formatBeatDuration(next)} beat${next===1?'':'s'}`;
       };
-      const autoScroll=()=>{
+      // Precision edge-scroll while resizing. v3.3.3 scrolled by up to 18px
+      // every animation frame (>1000px/sec on a 60Hz phone), which made it
+      // nearly impossible to release on the intended beat. Use time-based,
+      // deliberately slow scrolling instead: ~24px/sec when entering the edge
+      // zone and up to ~72px/sec at the very edge.
+      let autoLastTs=0;
+      const autoScroll=ts=>{
         autoRaf=0;
         const r=wrap.getBoundingClientRect();
-        let delta=0;
-        if(lastClientX>r.right-34)delta=Math.min(18,Math.max(4,(lastClientX-(r.right-34))*.55));
-        else if(lastClientX<r.left+82)delta=-Math.min(18,Math.max(4,((r.left+82)-lastClientX)*.55));
-        if(delta){wrap.scrollLeft=Math.max(0,wrap.scrollLeft+delta);apply(lastClientX);autoRaf=requestAnimationFrame(autoScroll);}
+        const edgeRight=48,edgeLeft=88;
+        let direction=0,depth=0;
+        if(lastClientX>r.right-edgeRight){direction=1;depth=Math.min(1,Math.max(0,(lastClientX-(r.right-edgeRight))/edgeRight));}
+        else if(lastClientX<r.left+edgeLeft){direction=-1;depth=Math.min(1,Math.max(0,((r.left+edgeLeft)-lastClientX)/edgeLeft));}
+        if(direction){
+          const dt=autoLastTs?Math.min(40,Math.max(8,ts-autoLastTs)):16.67;
+          const pxPerSecond=24+(48*depth);
+          const before=wrap.scrollLeft;
+          wrap.scrollLeft=Math.max(0,Math.min(wrap.scrollWidth-wrap.clientWidth,before+direction*pxPerSecond*(dt/1000)));
+          if(Math.abs(wrap.scrollLeft-before)>.01)apply(lastClientX);
+          autoLastTs=ts;
+          autoRaf=requestAnimationFrame(autoScroll);
+        }else autoLastTs=0;
       };
       const onMove=ev=>{
         if(ev.pointerId!==pointerId)return;
         ev.preventDefault();lastClientX=ev.clientX;apply(ev.clientX);
-        if(!autoRaf)autoRaf=requestAnimationFrame(autoScroll);
+        if(!autoRaf){autoLastTs=0;autoRaf=requestAnimationFrame(autoScroll);}
       };
       const finish=ev=>{
         if(ev.pointerId!==pointerId)return;
