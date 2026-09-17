@@ -1,0 +1,20 @@
+Song Rider Suite v3.3.1
+
+UPGRADES
+1. Chord Rider Pro MIDI View
+   - Added a MIDI View toggle beside Auto Scroll on the CRP chord page.
+   - MIDI View replaces each chord/note diagram with a compact piano-roll-style note grid.
+   - The grid is generated from the same notes/voicing used by playback.
+   - Chords entered with Build or tapped from Chords that fit auto-populate their notes.
+   - Note mode auto-populates the selected/typed note.
+   - Capo, octave/step, instrument/voicing changes re-render the MIDI notes automatically.
+   - Diagram View restores the existing chord diagrams.
+   - The view preference is remembered on the device. Baby DAW remains on its existing diagram view.
+
+2. PNG/Image export chooser
+   - PNG Image now opens the same type of part-selection dialog as PDF export.
+   - Choose individual Chord/Note, Lead/Bass, and Vocal parts.
+   - Drums and Project Notes have independent checkboxes.
+   - PNG generation now respects that selection instead of always forcing drums on / notes off.
+
+Cache bumped to v3.3.1 so installed PWAs receive the updated app.js/styles.css.

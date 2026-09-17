@@ -2882,3 +2882,93 @@ body.workspace-baby-daw .part-strip{max-width:none!important;}
     font-size:.64rem !important;
   }
 }
+
+/* v3.3.1 — CRP MIDI/diagram view toggle + compact auto-filled MIDI card grid. */
+.midi-view-toggle{
+  min-height:40px;
+  padding:8px 11px;
+  border-color:rgba(233,196,106,.9);
+  color:var(--accent);
+  background:#181d24;
+  font-weight:850;
+  white-space:nowrap;
+}
+.midi-view-toggle.on{background:var(--accent);color:#17130a;border-color:#d7b654;}
+.card-midi-grid{
+  display:grid;
+  grid-template-columns:44px minmax(0,1fr);
+  width:100%;
+  overflow:hidden;
+  border:1px solid #303946;
+  border-radius:11px;
+  background:#0a0e14;
+}
+.card-midi-head{
+  min-height:20px;
+  display:flex;
+  align-items:center;
+  padding:2px 6px;
+  border-bottom:1px solid #303946;
+  border-right:1px solid #303946;
+  background:#141a22;
+  color:#8f99a7;
+  font-size:.60rem;
+  font-weight:800;
+}
+.card-midi-head:nth-child(2){border-right:0;}
+.card-midi-note,.card-midi-cell{
+  min-height:14px;
+  display:flex;
+  align-items:center;
+  border-bottom:1px solid #202833;
+}
+.card-midi-note{
+  justify-content:center;
+  border-right:1px solid #303946;
+  background:#141a22;
+  color:#dfe4ea;
+  font-size:.59rem;
+  font-weight:800;
+}
+.card-midi-note.black-key{background:#0d1218;color:#aeb7c2;}
+.card-midi-cell{
+  justify-content:flex-start;
+  padding:0 6px;
+  background:#0e131a;
+  color:#17130a;
+  font-size:.56rem;
+  font-weight:900;
+  overflow:hidden;
+}
+.card-midi-cell.black-key{background:#0b1016;}
+.card-midi-cell.on{background:var(--accent);box-shadow:inset 0 0 0 1px #141414;}
+.card-midi-hit{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+body.workspace-baby-daw #midiViewBtn{display:none!important;}
+
+@media(max-width:700px){
+  body.workspace-chord-rider .transport-line-actions{
+    grid-template-columns:minmax(96px,128px) auto 40px minmax(78px,96px) !important;
+    gap:8px !important;
+  }
+  body.workspace-chord-rider .transport-line-actions #playAllBtn{grid-column:1 !important;}
+  body.workspace-chord-rider .transport-line-actions .repeat-control{grid-column:2 !important;}
+  body.workspace-chord-rider .transport-line-actions #autoScrollBtn{grid-column:3 !important;}
+  body.workspace-chord-rider .transport-line-actions #midiViewBtn{
+    display:block!important;
+    grid-column:4 !important;
+    width:100% !important;
+    min-width:78px !important;
+    min-height:40px !important;
+    margin:0 !important;
+    padding:6px 6px !important;
+    font-size:.69rem !important;
+    line-height:1.05 !important;
+  }
+}
+@media(max-width:380px){
+  body.workspace-chord-rider .transport-line-actions{
+    grid-template-columns:minmax(86px,108px) auto 38px minmax(70px,82px) !important;
+    gap:6px !important;
+  }
+  body.workspace-chord-rider .transport-line-actions #midiViewBtn{min-width:70px !important;min-height:38px !important;font-size:.64rem !important;}
+}

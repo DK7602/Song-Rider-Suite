@@ -35,7 +35,8 @@
     rows:[[]], selectedRow:0, playing:false, timer:null,
     audioCtx:null, player:null, playerName:'', currentProjectId:null, drag:null, lineDrag:null,
     autoScroll:localStorage.getItem('crp-auto-scroll')==='1',
-    sustain:localStorage.getItem('crp-sustain')==='1'
+    sustain:localStorage.getItem('crp-sustain')==='1',
+    cardView:localStorage.getItem('crp-card-view')==='midi'?'midi':'diagram'
   };
   state.sound = SOUNDS[state.instrument][0][0];
 
@@ -57,7 +58,7 @@
   function transposeRoot(root,semi){const n=NOTE_INDEX[root];return n==null?root:NOTES[(n+semi+120)%12];}
   function transposeChord(name,semi){const c=parseChord(name);return c?transposeRoot(c.root,semi)+c.quality:name;}
   function chordNotes(name,baseOct=4){const c=parseChord(name);if(!c)return[];return QUALITY[c.quality].map(iv=>{const n=NOTE_INDEX[c.root]+iv;return NOTES[n%12]+(baseOct+Math.floor(n/12));});}
-  function midiOf(note){const m=note.match(/^([A-G])(#?)(-?\d+)$/);return m?(Number(m[3])+1)*12+NOTE_INDEX[m[1]+m[2]]:null;}
+  function midiOf(note){const m=String(note).match(/^([A-G])([#b]?)(-?\d+)$/);return m?(Number(m[3])+1)*12+NOTE_INDEX[m[1]+m[2]]:null;}
   function noteAtMidi(m){return NOTES[(m%12+12)%12]+(Math.floor(m/12)-1);}
 
   // Canonical piano voicing: always spell chords upward from the root.
@@ -509,6 +510,26 @@
     $('status').textContent='Line moved.';
     renderRows();syncBuildInput();renderFits();scheduleAutoSave();
   }
+  function midiCardGrid(card){
+    // Compact read-only piano-roll view of the notes that this chord/note actually plays.
+    // It is derived from the same voicing source used by playback so typing a chord, tapping a
+    // suggestion, changing octave/capo, or switching to Note mode updates the MIDI view instantly.
+    let sounding=[];
+    try{sounding=coreNotesFor(card)||[];}catch(_){sounding=[];}
+    const byPc=new Map();
+    sounding.forEach(note=>{
+      const midi=midiOf(String(note));if(midi==null)return;
+      const pc=((midi%12)+12)%12,arr=byPc.get(pc)||[];
+      if(!arr.includes(note))arr.push(note);byPc.set(pc,arr);
+    });
+    const rows=[];
+    for(let pc=11;pc>=0;pc--){
+      const label=NOTES[pc],hits=byPc.get(pc)||[],black=label.includes('#')?' black-key':'';
+      rows.push(`<div class="card-midi-note${black}">${esc(label)}</div><div class="card-midi-cell${hits.length?' on':''}${black}" title="${hits.length?esc(hits.join(', ')):esc(label)}">${hits.length?`<span class="card-midi-hit">${esc(hits.join(' · '))}</span>`:''}</div>`);
+    }
+    return `<div class="card-midi-grid" aria-label="MIDI notes for ${esc(displayedValue(card))}"><div class="card-midi-head">Pitch</div><div class="card-midi-head">${card.type==='note'?'Note':'Chord notes'}</div>${rows.join('')}</div>`;
+  }
+
   function renderRows(){
     const wrap=$('progression');wrap.innerHTML='';
     state.rows.forEach((row,ri)=>{
@@ -596,7 +617,9 @@
       row.forEach((card,ci)=>{
         const el=document.createElement('div');el.className='chord-card'+(card.type==='note'?' note-card':'');el.draggable=!state.autoScroll;
         const shown=displayedValue(card),sub=subtitle(card),hint=state.autoScroll?'Tap to play • Auto Scroll locks reordering':'Tap to play • hold & drag to move';
-        el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}<div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div><div class="hint">${hint}</div>`;
+        const useMidiView=state.cardView==='midi'&&!document.body.classList.contains('workspace-baby-daw');
+        const visual=useMidiView?midiCardGrid(card):`<div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div>`;
+        el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}${visual}<div class="hint">${hint}</div>`;
         el.querySelector('.remove').onclick=e=>{e.stopPropagation();row.splice(ci,1);renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
         el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove')){const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4,stepSeconds=60/bpm*beats;playCard(card,state.sustain?Math.max(.4,stepSeconds*1.03):Math.max(.35,stepSeconds*.62));}};
         el.addEventListener('dragstart',e=>{if(state.autoScroll){e.preventDefault();$('status').textContent='Turn Auto Scroll off to reorder cards.';return;}state.drag={row:ri,index:ci};e.dataTransfer.effectAllowed='move';el.classList.add('dragging');});
@@ -628,11 +651,20 @@
     };w.appendChild(b);});
   }
   function renderSound(){const s=$('soundSelect');s.innerHTML='';SOUNDS[state.instrument].forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;s.appendChild(o);});if(!SOUNDS[state.instrument].some(x=>x[0]===state.sound))state.sound=SOUNDS[state.instrument][0][0];s.value=state.sound;}
+  function updateCardViewButton(){
+    const b=$('midiViewBtn');if(!b)return;
+    const midi=state.cardView==='midi';
+    b.textContent=midi?'Diagram View':'MIDI View';
+    b.classList.toggle('on',midi);
+    b.setAttribute('aria-pressed',String(midi));
+    b.setAttribute('title',midi?'Switch back to chord diagrams':'Show the chord/note notes in a MIDI-style grid');
+  }
+
   function renderAll(){
     renderSound();document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.classList.toggle('active',b.dataset.instrument===state.instrument));document.querySelectorAll('#modeTabs .seg').forEach(b=>b.classList.toggle('active',b.dataset.mode===state.mode));
     $('octaveValue').textContent=state.octave>0?'+'+state.octave:state.octave;$('capoWrap').style.display=$('transposeWrap').style.display=state.instrument==='guitar'?'':'none';$('neckWrap').style.display=state.instrument==='guitar'&&state.mode==='chord'?'':'none';$('neckSelect').value=state.neck;
     $('transposeBtn').textContent=state.transpose?'Transpose ON':'Transpose OFF';$('transposeBtn').classList.toggle('on',state.transpose);$('transposeBtn').setAttribute('aria-pressed',String(state.transpose));
-    $('chordInput').placeholder=state.mode==='chord'?'Enter chords, e.g. Em A7 Cmaj7 B7':'Enter notes, e.g. E F# A B';renderFits();renderRows();
+    $('chordInput').placeholder=state.mode==='chord'?'Enter chords, e.g. Em A7 Cmaj7 B7':'Enter notes, e.g. E F# A B';updateCardViewButton();renderFits();renderRows();
   }
 
   function updateAutoScrollButton(){
@@ -1168,10 +1200,17 @@
     return{sheet,canvas,breaks};
   }
   function downloadDataUrl(dataUrl,name){const a=document.createElement('a');a.href=dataUrl;a.download=name;document.body.appendChild(a);a.click();a.remove();}
-  async function exportPng(){
+  async function exportPng(selection={}){
     closeExportMenu();$('status').textContent='Creating PNG chord sheet…';
-    try{const {canvas}=await captureExportSheet(false,{drums:true,notes:false});downloadDataUrl(canvas.toDataURL('image/png'),exportFileName('png'));$('status').textContent='PNG chord sheet exported.';}
+    try{const {canvas}=await captureExportSheet(false,selection);downloadDataUrl(canvas.toDataURL('image/png'),exportFileName('png'));$('status').textContent='PNG chord sheet exported.';}
     catch(e){$('status').textContent=e.message||'Could not export PNG.';}
+  }
+  function closePngExport(){document.getElementById('pngExportModal')?.remove();}
+  function openPngExport(){
+    closeExportMenu();closePngExport();const parts=window.CRPParts?.getExportData?.()||[];
+    const rows=parts.map(p=>`<label class="studio-export-row"><input type="checkbox" data-png-part="${p.id}" ${p.enabled===false?'':'checked'}><span><strong>${esc(p.name)}</strong><br><span class="subtle tiny">${p.type==='chord'?'Chord / Note':p.type==='lead'?'Lead / Bass':'Vocals'}</span></span></label>`).join('');
+    const modal=document.createElement('div');modal.id='pngExportModal';modal.className='studio-export-modal';modal.innerHTML=`<div class="studio-export-backdrop"></div><div class="studio-export-card"><h2>PNG song blueprint</h2><p class="subtle">Choose exactly what appears in the image. Each Line is grouped as Drums → Vocals → Lead → Bass → Chords.</p><div class="studio-export-list">${rows}<label class="studio-export-row"><input id="pngExportDrums" type="checkbox" checked><span><strong>Drums</strong><br><span class="subtle tiny">Visual pattern grid</span></span></label><label class="studio-export-row"><input id="pngExportNotes" type="checkbox"><span><strong>Project notes</strong><br><span class="subtle tiny">Only included when checked</span></span></label></div><div class="studio-export-actions"><button id="pngExportCancel" type="button">Cancel</button><button id="pngExportGo" class="accent" type="button">Create PNG</button></div></div>`;
+    document.body.appendChild(modal);modal.querySelector('.studio-export-backdrop').onclick=closePngExport;modal.querySelector('#pngExportCancel').onclick=closePngExport;modal.querySelector('#pngExportGo').onclick=()=>{const partIds=[...modal.querySelectorAll('[data-png-part]:checked')].map(x=>x.dataset.pngPart);const selection={partIds,drums:modal.querySelector('#pngExportDrums').checked,notes:modal.querySelector('#pngExportNotes').checked};closePngExport();exportPng(selection)};
   }
   function closePdfExport(){document.getElementById('pdfExportModal')?.remove();}
   function openPdfExport(){
@@ -1211,13 +1250,14 @@
     $('capoSelect').onchange=e=>{state.capo=+e.target.value;if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:'capo'});publishLiveSrpMeta('crp');writeHardSync('crp','capo');renderAll();scheduleAutoSave();publishSrpHandoff();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();scheduleAutoSave();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;publishLiveSrpMeta('crp');renderAll();scheduleAutoSave();publishSrpHandoff();};
     $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();scheduleAutoSave();};
     $('autoScrollBtn').onclick=()=>{state.autoScroll=!state.autoScroll;localStorage.setItem('crp-auto-scroll',state.autoScroll?'1':'0');updateAutoScrollButton();};
-    updateAutoScrollButton();
+    $('midiViewBtn').onclick=()=>{state.cardView=state.cardView==='midi'?'diagram':'midi';localStorage.setItem('crp-card-view',state.cardView);updateCardViewButton();renderRows();};
+    updateAutoScrollButton();updateCardViewButton();
     let lastMobileCarousel=isMobileCarousel(),resizeTimer=null;
     window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{const mobile=isMobileCarousel();if(mobile!==lastMobileCarousel){lastMobileCarousel=mobile;renderRows();}},120);},{passive:true});
     $('playAllBtn').onclick=playProgression;
     $('newProjectBtn').onclick=newProject;
     $('saveProjectBtn').onclick=saveProject;
-    $('exportBtn').onclick=e=>{e.stopPropagation();toggleExportMenu();};$('exportPdfBtn').onclick=openPdfExport;$('exportPngBtn').onclick=exportPng;$('exportStudioBtn').onclick=()=>{closeExportMenu();window.CRPParts?.openStudioExport?.();};
+    $('exportBtn').onclick=e=>{e.stopPropagation();toggleExportMenu();};$('exportPdfBtn').onclick=openPdfExport;$('exportPngBtn').onclick=openPngExport;$('exportStudioBtn').onclick=()=>{closeExportMenu();window.CRPParts?.openStudioExport?.();};
     document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))closeExportMenu();});
 
     // Programmatic scrollIntoView does not generate touchmove/wheel events,
@@ -1615,6 +1655,7 @@
       const on=btn.dataset.workspaceMode===mode;btn.classList.toggle('active',on);btn.setAttribute('aria-pressed',String(on));
     });
     if(mode==='chord-rider') window.CRPParts?.focusChordPart?.();
+    renderRows();updateCardViewButton();
     applySetupVisibility();
     window.CRPParts?.refreshBabySetupToggle?.();
     if(persist){try{localStorage.setItem(WORKSPACE_MODE_KEY,mode)}catch{}}
