@@ -7,7 +7,7 @@
   const clone = v => JSON.parse(JSON.stringify(v));
   const uid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-  const SOUND_GAIN={acoustic_grand_piano:2.35,electric_piano_1:2.35,acoustic_guitar_steel:2.55,electric_guitar_clean:2.45,synth_strings_1:1.05,electric_bass_finger:1.05};
+  const SOUND_GAIN={acoustic_grand_piano:2.65,electric_piano_1:2.35,acoustic_guitar_steel:2.55,electric_guitar_clean:2.45,synth_strings_1:1.05,electric_bass_finger:1.05};
   const LEAD_OUTPUT_BOOST=1.90; // Lead/Bass parts were much quieter than chord playback
 
   let parts=[];
@@ -31,14 +31,14 @@
     return {id:uid(),type:'lead',name,enabled:true,repeat:true,sustain:false,volume:.8,instrument:'piano',sound:'acoustic_grand_piano',octave:0,gridOctave:3,resolution:16,bars:4,events:[]};
   }
   function vocalPart(name='Vocals 1'){
-    return {id:uid(),type:'vocal',name,enabled:true,repeat:true,volume:1,transcript:'',recordings:[],activeTakeId:null,backingPartIds:[],backingDrums:true,backingVolume:.8,fx:{eq:'clear',comp:'medium',reverb:.12,delay:0}};
+    return {id:uid(),type:'vocal',name,enabled:true,repeat:true,volume:1,transcript:'',recordings:[],activeTakeId:null,backingPartIds:[],backingDrums:true,backingVolume:.8,fx:{eq:'clear',comp:'medium',reverb:.12,delay:0,autotune:0}};
   }
   function normalizePart(p,i){
     if(!p||!p.type)return null;
     const base={id:p.id||uid(),name:p.name||`${p.type==='chord'?'Chords':p.type==='lead'?'Lead':'Vocals'} ${i+1}`,enabled:p.enabled!==false,volume:Number.isFinite(+p.volume)?Math.max(0,Math.min(1,+p.volume)):.85};
     if(p.type==='chord')return {...base,type:'chord',data:clone(p.data||core.snapshot())};
     if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,sustain:p.sustain===true,instrument:p.instrument==='guitar'?'guitar':'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(16,+p.bars||4)),events:Array.isArray(p.events)?p.events.map(e=>({step:+e.step,midi:+e.midi})).filter(e=>Number.isFinite(e.step)&&Number.isFinite(e.midi)):[]};
-    return {...base,type:'vocal',repeat:p.repeat!==false,transcript:String(p.transcript||''),transcriptWords:Array.isArray(p.transcriptWords)?p.transcriptWords:[],recordings:Array.isArray(p.recordings)?p.recordings.map(r=>({...r,blob:null})):[],activeTakeId:p.activeTakeId||null,backingPartIds:Array.isArray(p.backingPartIds)?p.backingPartIds:[],backingDrums:p.backingDrums!==false,backingVolume:Number.isFinite(+p.backingVolume)?Math.max(0,Math.min(1,+p.backingVolume)):.8,fx:{eq:p.fx?.eq||'clear',comp:p.fx?.comp||'medium',reverb:Number(p.fx?.reverb??.12),delay:Number(p.fx?.delay||0)}};
+    return {...base,type:'vocal',repeat:p.repeat!==false,transcript:String(p.transcript||''),transcriptWords:Array.isArray(p.transcriptWords)?p.transcriptWords:[],recordings:Array.isArray(p.recordings)?p.recordings.map(r=>({...r,blob:null})):[],activeTakeId:p.activeTakeId||null,backingPartIds:Array.isArray(p.backingPartIds)?p.backingPartIds:[],backingDrums:p.backingDrums!==false,backingVolume:Number.isFinite(+p.backingVolume)?Math.max(0,Math.min(1,+p.backingVolume)):.8,fx:{eq:p.fx?.eq||'clear',comp:p.fx?.comp||'medium',reverb:Number(p.fx?.reverb??.12),delay:Number(p.fx?.delay||0),autotune:Math.max(0,Math.min(100,Number(p.fx?.autotune)||0))}};
   }
   function ensureInitial(){
     if(parts.length)return;
@@ -126,6 +126,16 @@
     if(!options.some(x=>x[0]===p.sound))p.sound=options[0][0];select.value=p.sound;
   }
   function midiName(m){return NOTE_NAMES[(m%12+12)%12]+(Math.floor(m/12)-1);}
+  function vocalTuneScale(){
+    const chord=loadedChord()||parts.find(x=>x.type==='chord')||null,data=chord?.data||core.snapshot(),raw=String(data?.key||'').trim().replace(/♭/g,'b').replace(/♯/g,'#');
+    const idx={C:0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A:9,'A#':10,Bb:10,B:11};let root=null,minor=false,m=raw.match(/^([A-Ga-g])([#b]?)(?:\s*(m|minor|maj|major))?$/i);
+    if(m){root=m[1].toUpperCase()+m[2];minor=/^(m|minor)$/i.test(m[3]||'');}else{const first=(data?.rows||[]).flat().find(c=>c?.type==='chord');if(first){m=String(first.value||'').trim().match(/^([A-Ga-g])([#b]?)(.*)$/);if(m){root=m[1].toUpperCase()+m[2];const q=(m[3]||'').toLowerCase();minor=q.startsWith('m')&&!q.startsWith('maj');}}}
+    const ri=idx[root];if(!Number.isFinite(ri))return [];const ints=minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];return ints.map(i=>(ri+i)%12);
+  }
+  const autotuneReadyContexts=new WeakSet(),autotuneLoadingContexts=new WeakMap();
+  async function ensureAutotuneWorklet(ctx){if(!ctx?.audioWorklet||typeof AudioWorkletNode==='undefined')return false;if(autotuneReadyContexts.has(ctx))return true;if(autotuneLoadingContexts.has(ctx))return autotuneLoadingContexts.get(ctx);const q=ctx.audioWorklet.addModule('./vocal-autotune-worklet.js?v=3.3.13').then(()=>{autotuneReadyContexts.add(ctx);return true;}).catch(()=>false);autotuneLoadingContexts.set(ctx,q);return q;}
+  function makeAutotuneNode(ctx,p){const amount=Math.max(0,Math.min(100,Number(p?.fx?.autotune)||0)),allowedPcs=vocalTuneScale();if(amount<=0||!allowedPcs.length||!autotuneReadyContexts.has(ctx)||typeof AudioWorkletNode==='undefined')return null;try{const n=new AudioWorkletNode(ctx,'crp-vocal-autotune',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1]});n.port.postMessage({amount,allowedPcs});return n;}catch{return null;}}
+  const LONG_SUSTAIN_SOUNDS=new Set(['acoustic_grand_piano','electric_piano_1','acoustic_guitar_steel']);function sustainedPartSeconds(sound,seconds){const s=Math.max(.05,Number(seconds)||.05);return LONG_SUSTAIN_SOUNDS.has(sound)?Math.max(.78,s*1.38+.18):Math.max(.65,s*1.08);}
   function renderLeadEditor(p=active()){
     if(!p||p.type!=='lead')return;
     $('leadPartTitle').textContent=p.name;if($('leadRepeat'))$('leadRepeat').checked=p.repeat!==false;if($('leadSustain'))$('leadSustain').checked=p.sustain===true;
@@ -264,7 +274,7 @@
   async function downloadTake(take){const blob=await getTakeBlob(take);if(!blob){core.status('This take audio is not available on this device or cloud.');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${(take.name||'vocal-take').replace(/[^a-z0-9_-]+/gi,'-')}.wav`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);}
   function stopPreview(){if(currentPreview){try{currentPreview.source?.stop();currentPreview.audio?.pause();}catch{}try{currentPreview.ctx?.close();}catch{}currentPreview=null;}}
   function impulse(ctx,seconds=.9,decay=2.4){const length=Math.floor(ctx.sampleRate*seconds),b=ctx.createBuffer(2,length,ctx.sampleRate);for(let c=0;c<2;c++){const d=b.getChannelData(c);for(let i=0;i<length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/length,decay);}return b;}
-  async function previewTake(p,take,btn){stopPreview();const blob=await getTakeBlob(take);if(!blob){core.status('This take audio is not available on this device or cloud.');return;}const ctx=new (window.AudioContext||window.webkitAudioContext)(),buf=await ctx.decodeAudioData(await blob.arrayBuffer()),src=ctx.createBufferSource(),eq=ctx.createBiquadFilter(),comp=ctx.createDynamicsCompressor(),dry=ctx.createGain(),wet=ctx.createGain(),rev=ctx.createConvolver(),delay=ctx.createDelay(1),delayGain=ctx.createGain(),out=ctx.createGain();src.buffer=buf;const fx=p.fx||{};eq.type=fx.eq==='warm'?'lowshelf':fx.eq==='bright'?'highshelf':'peaking';eq.frequency.value=fx.eq==='warm'?180:fx.eq==='bright'?4500:2800;eq.gain.value=fx.eq==='flat'?0:fx.eq==='warm'?2:fx.eq==='bright'?2.5:1.5;const c=fx.comp||'medium';comp.threshold.value=c==='off'?0:c==='light'?-12:c==='heavy'?-24:-18;comp.ratio.value=c==='off'?1:c==='light'?2:c==='heavy'?6:3.5;comp.attack.value=.008;comp.release.value=.12;dry.gain.value=1;wet.gain.value=Number(fx.reverb||0);rev.buffer=impulse(ctx,fx.reverb>.25?1.6:fx.reverb>.15?1.1:.7);delay.delayTime.value=Number(fx.delay||0);delayGain.gain.value=fx.delay?0.22:0;out.gain.value=p.volume;src.connect(eq);eq.connect(comp);comp.connect(dry);dry.connect(out);comp.connect(rev);rev.connect(wet);wet.connect(out);comp.connect(delay);delay.connect(delayGain);delayGain.connect(out);out.connect(ctx.destination);src.start();currentPreview={ctx,source:src};src.onended=()=>{try{ctx.close();}catch{}if(currentPreview?.source===src)currentPreview=null;};}
+  async function previewTake(p,take,btn){stopPreview();const blob=await getTakeBlob(take);if(!blob){core.status('This take audio is not available on this device or cloud.');return;}const ctx=new (window.AudioContext||window.webkitAudioContext)(),buf=await ctx.decodeAudioData(await blob.arrayBuffer()),src=ctx.createBufferSource(),eq=ctx.createBiquadFilter(),comp=ctx.createDynamicsCompressor(),dry=ctx.createGain(),wet=ctx.createGain(),rev=ctx.createConvolver(),delay=ctx.createDelay(1),delayGain=ctx.createGain(),out=ctx.createGain();src.buffer=buf;const fx=p.fx||{};if(Number(fx.autotune)>0)await ensureAutotuneWorklet(ctx);eq.type=fx.eq==='warm'?'lowshelf':fx.eq==='bright'?'highshelf':'peaking';eq.frequency.value=fx.eq==='warm'?180:fx.eq==='bright'?4500:2800;eq.gain.value=fx.eq==='flat'?0:fx.eq==='warm'?2:fx.eq==='bright'?2.5:1.5;const c=fx.comp||'medium';comp.threshold.value=c==='off'?0:c==='light'?-12:c==='heavy'?-24:-18;comp.ratio.value=c==='off'?1:c==='light'?2:c==='heavy'?6:3.5;comp.attack.value=.008;comp.release.value=.12;dry.gain.value=1;wet.gain.value=Number(fx.reverb||0);rev.buffer=impulse(ctx,fx.reverb>.25?1.6:fx.reverb>.15?1.1:.7);delay.delayTime.value=Number(fx.delay||0);delayGain.gain.value=fx.delay?0.22:0;out.gain.value=p.volume;const tune=makeAutotuneNode(ctx,p);src.connect(eq);eq.connect(comp);const post=tune||comp;if(tune)comp.connect(tune);post.connect(dry);dry.connect(out);post.connect(rev);rev.connect(wet);wet.connect(out);post.connect(delay);delay.connect(delayGain);delayGain.connect(out);out.connect(ctx.destination);src.start();currentPreview={ctx,source:src};src.onended=()=>{try{ctx.close();}catch{}if(currentPreview?.source===src)currentPreview=null;};}
 
   function partDurationBeats(p){
     if(p.type==='chord')return (p.data?.rows||[]).reduce((n,r)=>n+r.length,0)*core.beats;
@@ -302,7 +312,7 @@
       if(p.sound==='electric_bass_finger')soundingMidi-=12;
       const at=(audioCtx?.currentTime||0)+.01;
       const beatSec=60/Math.max(40,Math.min(240,+core.bpm||92));
-      const auditionDuration=p.sustain?Math.max(.65,beatSec*1.03):.42;
+      const auditionDuration=p.sustain?sustainedPartSeconds(p.sound,beatSec):.42;
       playTracked(player,midiName(soundingMidi),at,{duration:auditionDuration,gain:.96});
     }catch(e){
       console.warn('Could not audition lead/bass note',e);
@@ -321,11 +331,11 @@
     const fx=p.fx||{};eq.type=fx.eq==='warm'?'lowshelf':fx.eq==='bright'?'highshelf':'peaking';eq.frequency.value=fx.eq==='warm'?180:fx.eq==='bright'?4500:2800;eq.gain.value=fx.eq==='flat'?0:fx.eq==='warm'?2:fx.eq==='bright'?2.5:1.5;
     const c=fx.comp||'medium';comp.threshold.value=c==='off'?0:c==='light'?-12:c==='heavy'?-24:-18;comp.ratio.value=c==='off'?1:c==='light'?2:c==='heavy'?6:3.5;comp.attack.value=.008;comp.release.value=.12;
     dry.gain.value=1;wet.gain.value=Number(fx.reverb||0);rev.buffer=impulse(audioCtx,fx.reverb>.25?1.6:fx.reverb>.15?1.1:.7);delay.delayTime.value=Number(fx.delay||0);delayGain.gain.value=fx.delay?0.22:0;out.gain.value=p.volume;
-    src.connect(eq);eq.connect(comp);comp.connect(dry);dry.connect(out);comp.connect(rev);rev.connect(wet);wet.connect(out);comp.connect(delay);delay.connect(delayGain);delayGain.connect(out);out.connect(masterLimiter);
+    const tune=makeAutotuneNode(audioCtx,p);src.connect(eq);eq.connect(comp);const post=tune||comp;if(tune)comp.connect(tune);post.connect(dry);dry.connect(out);post.connect(rev);rev.connect(wet);wet.connect(out);post.connect(delay);delay.connect(delayGain);delayGain.connect(out);out.connect(masterLimiter);
     return {eq,comp,dry,wet,rev,delay,delayGain,out};
   }
   async function scheduleVocalSegment(p,startTime,fromBeat,toBeat,generation){
-    if(!playing||generation!==playbackGeneration)return;const buf=await vocalBufferFor(p);if(!buf||!playing||generation!==playbackGeneration)return;
+    if(!playing||generation!==playbackGeneration)return;const buf=await vocalBufferFor(p);if(!buf||!playing||generation!==playbackGeneration)return;if(Number(p.fx?.autotune)>0)await ensureAutotuneWorklet(audioCtx);
     const beatSec=60/core.bpm,vocalBeats=Math.max(.001,buf.duration/beatSec);
     const scheduleOne=(cycleStartBeat)=>{const clipStart=Math.max(fromBeat,cycleStartBeat),clipEnd=Math.min(toBeat,cycleStartBeat+vocalBeats);if(clipEnd<=clipStart)return;const offsetSec=(clipStart-cycleStartBeat)*beatSec,dur=(clipEnd-clipStart)*beatSec,at=startTime+(clipStart-fromBeat)*beatSec;const src=audioCtx.createBufferSource();src.buffer=buf;connectVocalFx(p,src);activeVocalSources.add(src);src.onended=()=>activeVocalSources.delete(src);try{src.start(at,offsetSec,Math.min(dur,buf.duration-offsetSec));}catch(e){activeVocalSources.delete(src);try{src.disconnect();}catch{}console.warn('Could not schedule vocal',e);}};
     if(p.repeat){const first=Math.max(0,Math.floor(fromBeat/vocalBeats));const last=Math.floor((toBeat-1e-6)/vocalBeats);for(let c=first;c<=last;c++)scheduleOne(c*vocalBeats);}else scheduleOne(0);
@@ -395,7 +405,7 @@
     const generation=++playbackGeneration;
     starting=true;
     try{
-      core.status('Loading parts…');ensureAudio();await Promise.all([preload(ps),...vs.map(v=>vocalBufferFor(v))]);
+      core.status('Loading parts…');ensureAudio();if(vs.some(v=>Number(v.fx?.autotune)>0))await ensureAutotuneWorklet(audioCtx);await Promise.all([preload(ps),...vs.map(v=>vocalBufferFor(v))]);
       if(generation!==playbackGeneration)return;
 
       // Keep every playback source on the same musical downbeat. Drums use a
