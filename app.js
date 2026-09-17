@@ -749,14 +749,25 @@
         const onDocUp=ev=>finishDocMove(ev,false),onDocCancel=ev=>finishDocMove(ev,true);
         document.addEventListener('pointermove',onDocMove,{capture:true,passive:false});document.addEventListener('pointerup',onDocUp,{capture:true,passive:false});document.addEventListener('pointercancel',onDocCancel,{capture:true,passive:false});
 
-        lineHold=setTimeout(()=>{
-          if(state.autoScroll)return;
+        const beginLineMove=()=>{
+          if(state.autoScroll||lineMoveActive)return;
           lineMoveActive=true;state.lineDrag={from:ri,insert:ri};
           try{badge.setPointerCapture?.(pointerId);}catch(_){}
           line.classList.add('line-moving');document.body.classList.add('moving-line');
-          $('status').textContent=isMobileCarousel()?'Move the line left or right, then release.':'Move the whole line, then release.';
-          navigator.vibrate?.(20);updateLineDestination(lastX,lastY);
-        },450);
+          $('status').textContent=isMobileCarousel()?'Move the line left or right, then release.':'Drag the line up or down, then release.';
+          if(e.pointerType!=='mouse')navigator.vibrate?.(20);
+          updateLineDestination(lastX,lastY);
+        };
+        // Desktop mouse users expect a normal grab-and-drop interaction. Start
+        // immediately on the line badge; touch keeps the deliberate long press
+        // so vertical page scrolling is not stolen accidentally.
+        const desktopGrab=e.pointerType==='mouse'||(e.pointerType==='pen'&&window.matchMedia('(hover:hover) and (pointer:fine)').matches);
+        if(desktopGrab){
+          e.preventDefault();
+          beginLineMove();
+        }else{
+          lineHold=setTimeout(beginLineMove,450);
+        }
       });
       badge.addEventListener('pointerleave',()=>{if(!lineMoveActive){/* document listeners keep tracking until release */}});
       badge.addEventListener('click',e=>{if(suppressBadgeClick){e.preventDefault();e.stopPropagation();suppressBadgeClick=false;}});

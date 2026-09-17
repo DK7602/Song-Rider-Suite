@@ -1,5 +1,10 @@
-const CACHE = 'song-rider-suite-v3.3.9-hq-branding';
+const CACHE = 'song-rider-suite-v3.3.10-hq-branding-drag';
 const ASSETS = [
+  './assets/chord-rider-pro-wordmark-hq2.png',
+  './assets/song-rider-pro-wordmark-hq.png',
+  './assets/baby-daw-button-hq.png',
+  './song-rider/song-rider-pro-wordmark-hq.png',
+  './song-rider/baby-daw-button-hq.png',
   './assets/chord-rider-pro-wordmark-hq.png',
   './assets/baby-daw-mic.png',
   './assets/chord-rider-pro-wordmark.png',

@@ -1,0 +1,7 @@
+Song Rider Suite v3.3.10
+
+- Rebuilt CRP wordmark from one uniform transparent source at 4x delivery resolution; removes the mixed-quality CHORD/RIDER PRO composite.
+- Restored the complete Baby DAW button artwork (no cropped/blown-up skull); padded to the app button aspect ratio and delivered at 2x resolution.
+- Added a 4x SRP title asset and made desktop/tablet SONG RIDER PRO fill the full title cell up to Hide/Show. Mobile sizing is unchanged.
+- Fixed PC whole-line grab/drop: mouse drag begins immediately from the Line badge; mobile retains long-press behavior.
+- Cache bumped to v3.3.10.

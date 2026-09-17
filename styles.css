@@ -3115,3 +3115,10 @@ body.workspace-chord-rider #chordPartControls.setup-collapsed > .entry-row{
   .capo-shape-mode-row select,
   .capo-shape-mode-row #transposeBtn{padding-left:6px;padding-right:6px;font-size:.75rem;}
 }
+
+
+/* v3.3.10 — desktop line grab/drop feedback. */
+@media (hover:hover) and (pointer:fine){
+  .line-badge{cursor:grab!important;}
+  body.moving-line .line-badge,.progression-line.line-moving .line-badge{cursor:grabbing!important;}
+}
