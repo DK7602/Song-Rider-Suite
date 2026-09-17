@@ -3183,27 +3183,36 @@ body.workspace-chord-rider .primary-toolbar > .capo-shape-mode-row{
   body.workspace-chord-rider .primary-toolbar > .sustain-control{width:62px!important;min-width:62px!important;}
 }
 
-/* v3.3.15 — Baby DAW song-end editor + full-travel professional Auto-Tune slider */
-body:not(.workspace-baby-daw) #songEndEditor{display:none!important;}
-body.workspace-baby-daw #songEndEditor{
-  display:grid!important;
-  grid-template-columns:minmax(160px,1fr) auto auto auto auto!important;
-  align-items:center!important;
-  gap:8px!important;
-  margin:8px 0 12px!important;
-  padding:10px 12px!important;
-  border:1px solid #394452!important;
-  border-radius:14px!important;
-  background:#0d131a!important;
+/* v3.3.16 — collapsed Baby DAW Song End panel, below the full part editor and above Projects. */
+body:not(.workspace-baby-daw) #songEndPanel{display:none!important;}
+body.workspace-baby-daw #songEndPanel{
+  display:block!important;margin:12px 0!important;padding:0!important;overflow:hidden!important;
+  border:1px solid #394452!important;border-radius:16px!important;background:#121820!important;
+}
+.song-end-toggle{
+  width:100%!important;min-height:52px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;
+  gap:12px!important;padding:11px 14px!important;border:0!important;border-radius:0!important;background:#171e27!important;color:#f4f6f8!important;
+  text-align:left!important;box-shadow:none!important;
+}
+.song-end-toggle-copy{display:flex!important;align-items:baseline!important;gap:10px!important;min-width:0!important;}
+.song-end-toggle-copy strong{font-size:1rem!important;white-space:nowrap!important;}
+#songEndSummaryValue{color:var(--accent)!important;font-weight:850!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}
+.song-end-toggle-chevron{font-size:1.15rem!important;color:var(--accent)!important;transition:transform .16s ease!important;}
+.song-end-panel.is-open .song-end-toggle-chevron{transform:rotate(180deg)!important;}
+#songEndEditor[hidden]{display:none!important;}
+body.workspace-baby-daw #songEndEditor:not([hidden]){
+  display:grid!important;grid-template-columns:minmax(160px,1fr) auto auto auto auto!important;
+  align-items:center!important;gap:8px!important;margin:0!important;padding:12px 14px 14px!important;
+  border:0!important;border-top:1px solid #303a46!important;border-radius:0!important;background:#0d131a!important;
 }
 .song-end-copy{display:grid!important;grid-template-columns:auto auto!important;align-items:baseline!important;justify-content:start!important;gap:3px 10px!important;min-width:0!important;}
-.song-end-copy strong{font-size:.95rem!important;color:#f4f6f8!important;}
+.song-end-copy .subtle:first-child{font-weight:700!important;}
 #songEndValue{font-weight:800!important;color:var(--accent)!important;white-space:nowrap!important;}
 #songPlayheadValue{grid-column:1/-1!important;white-space:nowrap!important;}
 .song-end-editor button{white-space:nowrap!important;min-height:38px!important;padding:7px 10px!important;}
 .song-end-hint{grid-column:1/-1!important;margin:0!important;line-height:1.3!important;}
 @media(max-width:760px){
-  body.workspace-baby-daw #songEndEditor{grid-template-columns:minmax(0,1fr) auto auto!important;}
+  body.workspace-baby-daw #songEndEditor:not([hidden]){grid-template-columns:minmax(0,1fr) auto auto!important;}
   .song-end-copy{grid-column:1/-1!important;}
   #songEndSetBtn{grid-column:1!important;}
   #songEndClearBtn{grid-column:1/-1!important;}

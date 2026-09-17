@@ -18,6 +18,7 @@
   let playbackScope=null; // null = normal enabled-part playback; otherwise a scoped Lead/Vocal preview
   let playbackClockStartAudioTime=0, playbackClockStartBeat=0, playbackClockBpm=92, playbackTotalBeats=0;
   let songEndBeat=null, songEndUiTimer=null;
+  const SONG_END_OPEN_KEY='crp-song-end-open-v1';
   let audioCtx=null, masterLimiter=null, cycleTimer=null;
   let playerCache=new Map(), partBuses=new Map(), highlightTimers=[], activeVoices=new Set(), vocalBufferCache=new Map(), activeVocalSources=new Set();
   let micStream=null,micCtx=null,micSource=null,micAnalyser=null,micProcessor=null,micSilentGain=null,micMeterRaf=0;
@@ -571,12 +572,30 @@
     const box=$('songEndEditor');if(!box)return;
     const natural=naturalSongDurationBeats(),custom=Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0;
     const end=custom?effectiveSongEndBeats(natural):natural;
-    if($('songEndValue'))$('songEndValue').textContent=custom?formatSongTime(songEndSeconds(end)):'Full song';
+    const endLabel=custom?formatSongTime(songEndSeconds(end)):'Full song';
+    if($('songEndValue'))$('songEndValue').textContent=endLabel;
+    if($('songEndSummaryValue'))$('songEndSummaryValue').textContent=endLabel;
     const playhead=currentCycleBeat();
     if($('songPlayheadValue'))$('songPlayheadValue').textContent=`Playhead ${formatSongTime(songEndSeconds(playhead??0))}`;
     if($('songEndMinusBtn'))$('songEndMinusBtn').disabled=natural<=0;
     if($('songEndPlusBtn'))$('songEndPlusBtn').disabled=natural<=0;
     if($('songEndClearBtn'))$('songEndClearBtn').disabled=!custom;
+  }
+  function setSongEndPanelOpen(open,persist=true){
+    const panel=$('songEndPanel'),editor=$('songEndEditor'),btn=$('songEndToggleBtn');
+    if(!panel||!editor||!btn)return;
+    const on=!!open;
+    panel.classList.toggle('is-open',on);
+    editor.hidden=!on;
+    btn.setAttribute('aria-expanded',String(on));
+    if(persist){try{localStorage.setItem(SONG_END_OPEN_KEY,on?'1':'0')}catch{}}
+  }
+  function initSongEndPanel(){
+    let open=false;
+    try{open=localStorage.getItem(SONG_END_OPEN_KEY)==='1'}catch{}
+    setSongEndPanelOpen(open,false);
+    const btn=$('songEndToggleBtn');
+    if(btn)btn.onclick=()=>setSongEndPanelOpen(btn.getAttribute('aria-expanded')!=='true');
   }
   function setSongEndAtPlayhead(){
     const beat=currentCycleBeat();
@@ -1023,7 +1042,7 @@
   }
 
   function wire(){
-    ensureInitial();setEditorMode(active()?.type||'chord');renderParts();
+    ensureInitial();setEditorMode(active()?.type||'chord');renderParts();initSongEndPanel();
     if($('songEndSetBtn'))$('songEndSetBtn').onclick=setSongEndAtPlayhead;
     if($('songEndMinusBtn'))$('songEndMinusBtn').onclick=()=>nudgeSongEnd(-.1);
     if($('songEndPlusBtn'))$('songEndPlusBtn').onclick=()=>nudgeSongEnd(.1);

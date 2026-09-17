@@ -1,0 +1,7 @@
+v3.3.16
+- SRP now uses the exact same canonical suite header/mode-button CSS and root assets as CRP/Baby DAW.
+- Removed the SRP legacy code that unregistered the suite service worker and deleted all caches on every SRP load.
+- Added a final shared shell lock stylesheet so CRP/BD/SRP branding cannot drift between pages.
+- Added a final CRP layout lock stylesheet so Sound / Octave / Sustain stay in the correct row even if older layout rules exist.
+- Moved Song End below the parts editor and directly above Projects in Baby DAW.
+- Song End is now collapsed behind a Song End button and remembers its expanded/collapsed state.

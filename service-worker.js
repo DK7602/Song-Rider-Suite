@@ -1,5 +1,7 @@
-const CACHE = 'song-rider-suite-v3.3.15-song-end-pro-autotune';
+const CACHE = 'song-rider-suite-v3.3.16-shell-layout-songend';
 const ASSETS = [
+  './crp-layout-lock.css',
+  './suite-shell-lock.css',
   './vocal-autotune-worklet.js',
   './assets/chord-rider-pro-wordmark-hq2.png',
   './assets/song-rider-pro-wordmark-hq.png',

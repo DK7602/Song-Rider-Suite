@@ -1,0 +1,19 @@
+/* v3.3.16 — authoritative shared chord setup geometry. Loaded last. */
+#chordPartControls > .primary-toolbar{
+  display:grid!important;grid-template-columns:minmax(0,1fr) 104px 72px!important;
+  gap:12px!important;align-items:end!important;width:100%!important;min-width:0!important;
+}
+#chordPartControls > .primary-toolbar[hidden],
+#chordPartControls > .primary-toolbar.crp-controls-hidden{display:none!important;}
+#chordPartControls > .primary-toolbar > #instrumentTabs,
+#chordPartControls > .primary-toolbar > #modeTabs{grid-column:1/-1!important;width:100%!important;min-width:0!important;}
+#chordPartControls > .primary-toolbar > .sound-control{grid-column:1!important;width:100%!important;min-width:0!important;}
+#chordPartControls > .primary-toolbar > .sound-control #soundSelect{width:100%!important;min-width:0!important;}
+#chordPartControls > .primary-toolbar > .octave-control{grid-column:2!important;width:104px!important;min-width:104px!important;justify-self:end!important;}
+#chordPartControls > .primary-toolbar > .sustain-control{grid-column:3!important;width:72px!important;min-width:72px!important;justify-self:end!important;}
+#chordPartControls > .primary-toolbar > .capo-shape-mode-row{grid-column:1/-1!important;width:100%!important;}
+@media(max-width:390px){
+  #chordPartControls > .primary-toolbar{grid-template-columns:minmax(0,1fr) 96px 62px!important;gap:8px!important;}
+  #chordPartControls > .primary-toolbar > .octave-control{width:96px!important;min-width:96px!important;}
+  #chordPartControls > .primary-toolbar > .sustain-control{width:62px!important;min-width:62px!important;}
+}

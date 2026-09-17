@@ -9,9 +9,11 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.15-SONG-END-PRO-TUNE" />
+  <link rel="stylesheet" href="styles.css?v=3.3.16-SHELL-LAYOUT-END-PANEL" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
+  <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
+  <link rel="stylesheet" href="crp-layout-lock.css?v=3.3.16">
 </head>
 <body>
   <header class="app-header suite-master-header"><img src="assets/suite-header-new.png?v=3.3.12" alt="Song Rider Suite — Ride the progression. See it. Hear it. Build it."></header>
@@ -148,19 +150,6 @@
         </div>
       </div>
 
-      <div id="songEndEditor" class="song-end-editor" aria-label="Song end editor">
-        <div class="song-end-copy">
-          <strong>Song End</strong>
-          <span id="songEndValue">Full song</span>
-          <small id="songPlayheadValue" class="subtle">Playhead 00:00.0</small>
-        </div>
-        <button id="songEndSetBtn" class="accent" type="button">Set End Here</button>
-        <button id="songEndMinusBtn" type="button" title="Move song end 0.1 second earlier">−0.1s</button>
-        <button id="songEndPlusBtn" type="button" title="Move song end 0.1 second later">+0.1s</button>
-        <button id="songEndClearBtn" type="button">Full Song</button>
-        <small class="song-end-hint subtle">Play the song and tap <b>Set End Here</b> at the exact cutoff. Use ±0.1s for fine adjustment. Playback and WAV export stop there.</small>
-      </div>
-
       <div id="leadPartEditor" class="lead-part-editor" hidden>
         <div class="lead-editor-head">
           <div>
@@ -274,6 +263,25 @@
 
       <div id="progression" class="progression" aria-label="Chord and note progression"></div>
       <div id="mobileLineIndicator" class="mobile-line-indicator" hidden aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section id="songEndPanel" class="panel song-end-panel baby-daw-only" aria-label="Song end">
+      <button id="songEndToggleBtn" class="song-end-toggle" type="button" aria-expanded="false">
+        <span class="song-end-toggle-copy"><strong>Song End</strong><span id="songEndSummaryValue">Full song</span></span>
+        <span class="song-end-toggle-chevron" aria-hidden="true">▾</span>
+      </button>
+      <div id="songEndEditor" class="song-end-editor" aria-label="Song end editor" hidden>
+        <div class="song-end-copy">
+          <span class="subtle">Cutoff</span>
+          <span id="songEndValue">Full song</span>
+          <small id="songPlayheadValue" class="subtle">Playhead 00:00.0</small>
+        </div>
+        <button id="songEndSetBtn" class="accent" type="button">Set End Here</button>
+        <button id="songEndMinusBtn" type="button" title="Move song end 0.1 second earlier">−0.1s</button>
+        <button id="songEndPlusBtn" type="button" title="Move song end 0.1 second later">+0.1s</button>
+        <button id="songEndClearBtn" type="button">Full Song</button>
+        <small class="song-end-hint subtle">Play the song and tap <b>Set End Here</b> at the exact cutoff. Use ±0.1s for fine adjustment. Playback and WAV export stop there.</small>
       </div>
     </section>
 
@@ -397,8 +405,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.14-AUDIO-POLISH"></script>
-  <script src="parts.js?v=3.3.15-SONG-END-PRO-TUNE"></script>
+  <script src="app.js?v=3.3.16-SHELL-LAYOUT-END-PANEL"></script>
+  <script src="parts.js?v=3.3.16-SHELL-LAYOUT-END-PANEL"></script>
   <script src="beat-maker.js?v=3.3.8-LAST-MIDI-DURATION-CAPO-ROW"></script>
 </body>
 </html>
