@@ -1,0 +1,11 @@
+Song Rider Suite v3.2.9 — Project-scoped SRP linking
+
+Fixes the Link SRP behavior shown in the supplied video.
+
+1. Each SRP project now keeps its own CRP/Baby DAW link.
+2. Switching SRP projects activates only that SRP project's saved pair; an unlinked SRP project no longer inherits the previous project's link session or Unlink SRP button state.
+3. Linking an SRP project to a CRP/BD project remains one-to-one. If that CRP/BD project was linked to a different SRP project, the old SRP project is detached.
+4. Existing valid links are migrated/repaired from legacy per-project link fields into the persistent link map. Stale conflicting fields are cleared.
+5. Linked playback is stopped before switching SRP projects so audio cannot continue from the old pair.
+6. Background CRP structure sync is pinned to the current SRP project's saved CRP partner instead of following whichever CRP/BD project was most recently open.
+7. BPM / CAPO / STEP transport-sync code remains on the existing suite transport bus and was not replaced.

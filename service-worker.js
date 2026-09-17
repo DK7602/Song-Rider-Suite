@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.2.8-srp-parse-link-fix';
+const CACHE = 'song-rider-suite-v3.2.9-project-scoped-link';
 const ASSETS = [
   './assets/chord-rider-pro-wordmark.png',
   './song-rider/suite-header-master.png',
