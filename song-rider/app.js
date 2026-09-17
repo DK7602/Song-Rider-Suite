@@ -2290,6 +2290,7 @@ async function reloadProjectForCurrentScope(){
   refreshRhymesFromActive();
   refreshDisplayedNoteCells();
   updateAudioButtonsUI();
+  try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
 }
 
 async function handleAuthSessionChange(session, reason=""){
@@ -12246,6 +12247,7 @@ function moveProjectToArchive(projectId){
     state.currentSection = "Full";
     applyProjectSettingsToUI();
     renderAll();
+    try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
   }else{
     renderProjectsDropdown();
   }
@@ -12370,11 +12372,20 @@ function loadProjectById(id){
   const all = loadAllProjects().map(normalizeProject).filter(Boolean);
   const p = all.find(x => x.id === id);
   if(!p) return;
+  // Stop the OLD project's linked CRP/BD playback before state.project changes,
+  // otherwise the exact-pair guard correctly refuses to stop it after the switch.
+  if(window.__SRP_LINKED_PLAYING){
+    try{ window.CRP_SRP_linkedPlaybackCommand?.('stop'); }catch{}
+  }
   state.project = p;
   setCurrentProjectIdForScope(getStorageScope(), p.id);
 
   applyProjectSettingsToUI();
   renderAll();
+  // v3.2.9: the CRP↔SRP link is project-scoped. Switching SRP projects must
+  // immediately activate ONLY this project's saved pair (or no pair at all),
+  // instead of leaving the previous project's global link-session/UI behind.
+  try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
 }
 
 /***********************
@@ -16261,6 +16272,7 @@ const v = Number.isFinite(raw) ? raw : 0;
     state.currentSection = "Full";
     applyProjectSettingsToUI();
     renderAll();
+    try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
   });
 
   if(el.renameProjectBtn) el.renameProjectBtn.addEventListener("click", () => {
@@ -16288,6 +16300,7 @@ const v = Number.isFinite(raw) ? raw : 0;
     applyProjectSettingsToUI();
     renderAll();
     renderArchiveModal();
+    try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
   });
 if(el.uploadAudioBtn){
   el.uploadAudioBtn.addEventListener("click", async () => {
@@ -16706,15 +16719,82 @@ KEEP RHYME UI ABOVE KEYBOARD
   function readLinkSession(){try{const x=readJson(LINK_SESSION_KEY,null);return x&&x.linked===true?x:null}catch{return null}}
   function writeLinkSession(crpProjectId,srpProjectId){const prev=readJson(LINK_SESSION_KEY,{})||{};const next={linked:true,crpProjectId:String(crpProjectId||''),srpProjectId:String(srpProjectId||''),rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};writeJson(LINK_SESSION_KEY,next);return next}
   function clearLinkSession(){try{localStorage.removeItem(LINK_SESSION_KEY)}catch{}}
+
+  // v3.2.9 PROJECT-SCOPED LINKING
+  // The link map is persistent truth (CRP id -> SRP id). LINK_SESSION_KEY is only the
+  // currently loaded SRP project's active pair. This prevents a link from visually or
+  // behaviorally following every SRP project as the user switches projects.
+  function persistentLinkForSrpProject(project=state.project, repair=true){
+    try{
+      const sid=String(project?.id||'');
+      if(!sid)return null;
+      const all=links();
+      const matches=Object.entries(all).filter(([,rec])=>String(rec?.srpProjectId||'')===sid);
+      const projectCrpId=String(project?.linkedCrpProjectId||'');
+      let chosen=null;
+      if(matches.length){
+        chosen=matches.find(([crpId])=>String(crpId)===projectCrpId) ||
+          matches.slice().sort((a,b)=>(Number(b[1]?.linkedAt)||0)-(Number(a[1]?.linkedAt)||0))[0];
+        if(repair && matches.length>1){
+          for(const [crpId] of matches){ if(String(crpId)!==String(chosen[0])) delete all[crpId]; }
+          setLinks(all);
+        }
+      }else if(projectCrpId){
+        const occupying=all[projectCrpId];
+        if(!occupying){
+          // Migrate a valid legacy per-project link into the link map once.
+          const rec={srpProjectId:sid,srpName:project?.name||'Song Rider project',linkedAt:Date.now()};
+          all[projectCrpId]=rec;
+          if(repair)setLinks(all);
+          chosen=[projectCrpId,rec];
+        }else if(repair){
+          // The CRP project is owned by another SRP project. This field is stale.
+          project.linkedCrpProjectId='';
+          project.linkedOctave=0;
+          project.linkedTranspose=false;
+          upsertProject(project);
+        }
+      }
+      if(!chosen)return null;
+      const crpId=String(chosen[0]);
+      const rec=chosen[1]||{};
+      if(repair && String(project.linkedCrpProjectId||'')!==crpId){
+        project.linkedCrpProjectId=crpId;
+        upsertProject(project);
+      }
+      return {crpProjectId:crpId,srpProjectId:sid,srpName:rec.srpName||project?.name||'Song Rider project',linkedAt:Number(rec.linkedAt)||0};
+    }catch{return null}
+  }
+
+  function activateLinkForCurrentSrpProject(){
+    const p=state.project;
+    const rec=persistentLinkForSrpProject(p,true);
+    if(rec){
+      const x=readLinkSession();
+      if(!x || String(x.crpProjectId||'')!==rec.crpProjectId || String(x.srpProjectId||'')!==rec.srpProjectId){
+        writeLinkSession(rec.crpProjectId,rec.srpProjectId);
+      }
+      try{localStorage.setItem(ACTIVE_LINK_KEY,rec.crpProjectId)}catch{}
+    }else{
+      clearLinkSession();
+      try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}
+    }
+    try{refreshCrpLinkUi();}catch{}
+    try{renderSheetTitleBar();}catch{}
+    return rec;
+  }
+  window.CRP_SRP_onSrpProjectChanged=()=>{
+    const rec=activateLinkForCurrentSrpProject();
+    if(rec)setTimeout(()=>{try{syncFromHandoff(false);applyLiveMetaToSrp();}catch{}},0);
+    return rec;
+  };
+
   function exactLinkForCurrentProject(){
+    const rec=persistentLinkForSrpProject(state.project,false);
     const x=readLinkSession();
-    const currentId=String(state.project?.id||'');
-    const projectCrpId=String(state.project?.linkedCrpProjectId||'');
-    return !!(
-      x && x.crpProjectId && x.srpProjectId && currentId &&
-      String(x.srpProjectId||'')===currentId &&
-      projectCrpId===String(x.crpProjectId||'')
-    );
+    return !!(rec && x &&
+      String(x.crpProjectId||'')===String(rec.crpProjectId||'') &&
+      String(x.srpProjectId||'')===String(rec.srpProjectId||''));
   }
   function readCanonicalMeta(id){try{const sid=String(id||activeUnifiedCrpId()||'');if(!sid)return null;const m=readJson(canonicalMetaKey(sid),null);return m&&String(m.projectId||'')===sid?m:null}catch{return null}}
   function writeCanonicalMeta(id,meta,source='srp'){
@@ -16723,10 +16803,12 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
   function activeUnifiedCrpId(){
     try{
+      const rec=persistentLinkForSrpProject(state.project,false);
+      if(rec?.crpProjectId)return String(rec.crpProjectId);
       const x=readLinkSession();
-      // The explicit link session IS the authority. Do not gate transport on whichever SRP
-      // project happens to be in memory during startup/navigation. That gate was dropping sync.
-      return x?.crpProjectId?String(x.crpProjectId):String(state.project?.linkedCrpProjectId||'');
+      const sid=String(state.project?.id||'');
+      if(x?.crpProjectId && sid && String(x.srpProjectId||'')===sid)return String(x.crpProjectId);
+      return String(state.project?.linkedCrpProjectId||'');
     }catch{return String(state.project?.linkedCrpProjectId||'')}
   }
   function readLiveMeta(){
@@ -16754,8 +16836,7 @@ KEEP RHYME UI ABOVE KEYBOARD
   function readHardSync(){const id=activeUnifiedCrpId();return readSuiteTransport()||readCanonicalMeta(id)||readJson(HARD_SYNC_KEY,null)}
   function writeHardSyncFromSrp(){
     try{
-      const session=readLinkSession();
-      const projectId=String(session?.crpProjectId||state.project?.linkedCrpProjectId||'');
+      const projectId=String(activeLinkedCrpId()||'');
       const mode=state.transposeMode==='step'?'step':'capo';
       const raw=Number(el?.capoInput?.value);
       const bpm=Math.max(40,Math.min(240,Number(el?.bpmInput?.value)||Number(state.bpm)||95));
@@ -16903,16 +16984,17 @@ KEEP RHYME UI ABOVE KEYBOARD
   function handoff(){return readJson(HANDOFF_KEY,{})||{}}
   function links(){return readJson(LINKS_KEY,{})||{}}
   function setLinks(v){writeJson(LINKS_KEY,v||{})}
-  function recoverCrpPayload(){
+  function recoverCrpPayload(preferredCrpId=''){
     try{
       const projects=readJson('crp-projects',[])||[];
       const h=handoff();
       const session=readLinkSession();
-      // The CRP/Baby DAW project the user actually has loaded is the linking target.
-      // A stale SRP link session must never override that active workspace on refresh/link.
-      const activeId=String(localStorage.getItem('crp-active-project-id')||h?.payload?.crpProjectId||session?.crpProjectId||'');
+      // Explicit Link SRP targets the CRP/Baby DAW project actually open right now.
+      // Background sync for an already-linked SRP project instead asks for that project's
+      // persisted CRP partner via preferredCrpId, so the link never follows another project.
+      const activeId=String(preferredCrpId||localStorage.getItem('crp-active-project-id')||h?.payload?.crpProjectId||session?.crpProjectId||'');
       let p=(activeId&&projects.find(x=>String(x?.id||'')===activeId)) ||
-        (h?.payload?.crpProjectId&&projects.find(x=>String(x?.id||'')===String(h.payload.crpProjectId))) || null;
+        (!preferredCrpId&&h?.payload?.crpProjectId&&projects.find(x=>String(x?.id||'')===String(h.payload.crpProjectId))) || null;
       if(p?.id){
         // v2.4.8: shared meta is the single authority for BPM/capo/octave.
         // This prevents a page reload or cloud/current-project restore from resurrecting stale values.
@@ -16937,7 +17019,7 @@ KEEP RHYME UI ABOVE KEYBOARD
         writeJson(HANDOFF_KEY,{payload,rec:links()[p.id]||h?.rec||null,ts:Date.now()});
         return payload;
       }
-      if(h?.payload?.crpProjectId) return h.payload;
+      if(h?.payload?.crpProjectId && (!preferredCrpId || String(h.payload.crpProjectId)===String(preferredCrpId))) return h.payload;
       return null;
     }catch(err){ console.error('Could not recover CRP project for SRP link',err); return handoff()?.payload||null; }
   }
@@ -17026,8 +17108,11 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
 
   function activeLinkedCrpId(){
+    const rec=persistentLinkForSrpProject(state.project,false);
+    if(rec?.crpProjectId)return String(rec.crpProjectId);
     const x=readLinkSession();
-    return x?.crpProjectId?String(x.crpProjectId):String(state.project?.linkedCrpProjectId||'');
+    const sid=String(state.project?.id||'');
+    return (x?.crpProjectId && sid && String(x.srpProjectId||'')===sid)?String(x.crpProjectId):'';
   }
   function syncMetaToCrp(){
     try{
@@ -17124,29 +17209,37 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
 
   function isCurrentCrpSrpLinked(){
-    const payload=recoverCrpPayload();
+    const rec=persistentLinkForSrpProject(state.project,false);
     const x=readLinkSession();
-    return !!(payload?.crpProjectId&&x&&state.project&&String(x.crpProjectId||'')===String(payload.crpProjectId)&&String(x.srpProjectId||'')===String(state.project.id||'')&&String(state.project.linkedCrpProjectId||'')===String(payload.crpProjectId));
+    return !!(rec&&x&&state.project&&
+      String(x.crpProjectId||'')===String(rec.crpProjectId||'')&&
+      String(x.srpProjectId||'')===String(state.project.id||'')&&
+      String(rec.srpProjectId||'')===String(state.project.id||''));
   }
   window.CRP_SRP_isCurrentProjectLinked=()=>isCurrentCrpSrpLinked();
 
   function unlinkCurrentCrpSrp(){
-    const x=readLinkSession();
-    const crpId=String(x?.crpProjectId||state.project?.linkedCrpProjectId||'');
+    const currentId=String(state.project?.id||'');
+    const rec=persistentLinkForSrpProject(state.project,false);
+    const crpId=String(rec?.crpProjectId||'');
     // Stop the linked arrangement before removing the pair so no hidden CRP/BD audio
     // can continue after the UI says this SRP project is unlinked.
     if(window.__SRP_LINKED_PLAYING && exactLinkForCurrentProject()){
       try{ window.CRP_SRP_linkedPlaybackCommand?.('stop'); }catch{}
     }
     window.__SRP_LINKED_PLAYING=false;
-    if(crpId){const all=links();delete all[crpId];setLinks(all);}
+    if(crpId){
+      const all=links();
+      if(String(all[crpId]?.srpProjectId||'')===currentId){delete all[crpId];setLinks(all);}
+    }
     if(state.project){
       state.project.linkedCrpProjectId='';
       state.project.linkedOctave=0;
       state.project.linkedTranspose=false;
       upsertProject(state.project);
     }
-    clearLinkSession();
+    const x=readLinkSession();
+    if(!x || String(x.srpProjectId||'')===currentId)clearLinkSession();
     try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}
     refreshCrpLinkUi();
     try{renderSheetTitleBar();}catch{}
@@ -17154,28 +17247,31 @@ KEEP RHYME UI ABOVE KEYBOARD
 
   function refreshCrpLinkUi(){
     if(!integrated)return;
-    const payload=recoverCrpPayload();
+    const rec=persistentLinkForSrpProject(state.project,false);
+    const payload=recoverCrpPayload(rec?.crpProjectId||'');
     const st=document.getElementById('crpSrpLinkStatus');
     const b=document.getElementById('crpSrpLinkBtn');
-    if(!payload?.crpProjectId){
+    if(!rec && !payload?.crpProjectId){
       if(st)st.textContent='Save this CRP project first';
       if(b){b.hidden=false;b.disabled=false;b.textContent='Link SRP';b.classList.remove('is-linked');b.title='Link this project to Song Rider Pro'}
       return;
     }
-    const linked=isCurrentCrpSrpLinked();
-    if(st)st.textContent=linked?`Linked • ${state.project.name||'Song Rider project'}`:'Not linked';
+    const linked=!!rec;
+    if(st)st.textContent=linked?`Linked • ${state.project?.name||'Song Rider project'}`:'Not linked';
     if(b){
       b.hidden=false;
       b.disabled=false;
       b.textContent=linked?'Unlink SRP':'Link SRP';
-      b.title=linked?'Unlink this Song Rider Pro project from Chord Rider Pro':'Link this project to Song Rider Pro';
+      b.title=linked?'Unlink this Song Rider Pro project from its Chord Rider Pro project':'Link this SRP project to the CRP/Baby DAW project currently open';
       b.classList.toggle('is-linked',linked);
     }
   }
 
   function syncFromHandoff(forceCreate=false){
-    const payload=recoverCrpPayload();
-    const h=handoff();
+    const savedRec=persistentLinkForSrpProject(state.project,false);
+    // A user tap links to the CRP/BD project currently open. Automatic/background sync
+    // must stay pinned to this SRP project's already-saved CRP partner.
+    const payload=recoverCrpPayload(forceCreate?'':(savedRec?.crpProjectId||''));
     const b=document.getElementById('crpSrpLinkBtn');
     const st=document.getElementById('crpSrpLinkStatus');
     if(!payload?.crpProjectId){
@@ -17183,8 +17279,7 @@ KEEP RHYME UI ABOVE KEYBOARD
       if(b){b.disabled=false;b.textContent='Link SRP'}
       return null;
     }
-    const session=readLinkSession();
-    const rec=(session&&String(session.crpProjectId||'')===String(payload.crpProjectId))?{srpProjectId:session.srpProjectId}:null;
+    const rec=forceCreate?null:savedRec;
     if(!forceCreate && (!rec || !state.project || String(rec.srpProjectId||'')!==String(state.project.id||''))){refreshCrpLinkUi();return null}
     if(b){b.disabled=true;b.textContent='Linking…'}
     const linked=importCrpStructure(payload,forceCreate,rec?.srpProjectId||'');
@@ -17224,7 +17319,7 @@ KEEP RHYME UI ABOVE KEYBOARD
       e.preventDefault();
       e.stopPropagation();
       const b=e.currentTarget;
-      if(isCurrentCrpSrpLinked()){
+      if(persistentLinkForSrpProject(state.project,false)){
         b.disabled=true;
         b.textContent='Unlinking…';
         unlinkCurrentCrpSrp();
@@ -17245,7 +17340,7 @@ KEEP RHYME UI ABOVE KEYBOARD
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSyncToSrp,0);});
     setInterval(applyHardSyncToSrp,250);
     window.addEventListener('storage',e=>{if(e.key===LIVE_META_KEY||String(e.key||'').startsWith(UNIFIED_META_PREFIX)){applyLiveMetaToSrp();return;}if(e.key===HANDOFF_KEY||e.key===LINKS_KEY||e.key===LINK_SESSION_KEY||String(e.key||'').startsWith(SHARED_META_PREFIX)){refreshCrpLinkUi();syncFromHandoff(false);applyLiveMetaToSrp();}});
-    const reconcileLinkedWorkspace=()=>{try{refreshCrpLinkUi();syncFromHandoff(false);applyLiveMetaToSrp();if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}}catch{}};
+    const reconcileLinkedWorkspace=()=>{try{activateLinkForCurrentSrpProject();syncFromHandoff(false);applyLiveMetaToSrp();if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}}catch{}};
     // init() is async and used to overwrite the linked project after the early 80ms import.
     // Reconcile after init, and again on browser restore/focus.
     window.addEventListener('srp-init-done',reconcileLinkedWorkspace);
