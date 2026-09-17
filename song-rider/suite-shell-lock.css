@@ -1,0 +1,64 @@
+/* v3.3.16 — canonical Song Rider Suite shell. Loaded LAST on root + SRP. */
+.suite-master-header{
+  display:block!important;width:100%!important;min-height:0!important;height:auto!important;
+  margin:0!important;padding:0!important;border:0!important;background:#080a0d!important;
+  box-shadow:none!important;overflow:hidden!important;position:relative!important;top:auto!important;
+}
+.suite-master-header>img{
+  display:block!important;width:100%!important;height:auto!important;object-fit:contain!important;
+  margin:0!important;padding:0!important;border:0!important;
+}
+.workspace-mode-switch,.crp-srp-modes.workspace-mode-switch{
+  width:100%!important;max-width:none!important;display:grid!important;
+  grid-template-columns:29.2fr 36.4fr 29.2fr!important;align-items:stretch!important;
+  gap:1.25vw!important;padding:2.25vw 2.65vw 2.55vw!important;margin:0!important;
+  box-sizing:border-box!important;background:#10141a!important;border-bottom:1px solid #2d3540!important;
+}
+.workspace-mode-btn,.crp-srp-mode.workspace-mode-btn{
+  width:100%!important;min-width:0!important;max-width:none!important;min-height:0!important;height:auto!important;
+  aspect-ratio:1.30/1!important;display:flex!important;flex-direction:row!important;align-items:center!important;
+  justify-content:flex-start!important;gap:1vw!important;padding:1.55vw 1.25vw!important;box-sizing:border-box!important;
+  border:.20vw solid #46505d!important;border-radius:3vw!important;background:#11161d!important;color:#c8ced6!important;
+  overflow:hidden!important;text-decoration:none!important;position:relative!important;
+}
+.workspace-mode-btn:nth-child(2),.crp-srp-mode.workspace-mode-btn:nth-child(2){aspect-ratio:1.61/1!important;padding:0!important;}
+.workspace-mode-btn.active,.crp-srp-mode.workspace-mode-btn.active{
+  border-color:#f2c44d!important;color:#fff5cf!important;
+  background:radial-gradient(circle at 48% 40%,rgba(111,76,13,.30),transparent 68%),linear-gradient(145deg,#2b2413,#14181e)!important;
+  box-shadow:0 0 0 .13vw rgba(255,217,104,.48),0 0 1.55vw rgba(238,183,48,.55),inset 0 0 1.5vw rgba(231,178,43,.10)!important;
+}
+.workspace-mode-btn .mode-art,.crp-srp-mode.workspace-mode-btn .mode-art{
+  display:flex!important;align-items:center!important;justify-content:center!important;flex:0 0 56%!important;
+  width:56%!important;height:100%!important;min-height:0!important;border:0!important;background:transparent!important;overflow:visible!important;
+}
+.workspace-mode-btn .mode-art img,.crp-srp-mode.workspace-mode-btn .mode-art img{
+  display:block!important;width:100%!important;height:100%!important;max-height:none!important;object-fit:contain!important;
+  border:0!important;background:transparent!important;box-shadow:none!important;filter:none!important;transform:none!important;
+}
+.workspace-mode-btn .mode-copy,.crp-srp-mode.workspace-mode-btn .mode-copy{
+  flex:1 1 44%!important;min-width:0!important;display:flex!important;flex-direction:column!important;
+  align-items:flex-start!important;justify-content:center!important;text-align:left!important;line-height:1.05!important;
+}
+.workspace-mode-btn .mode-copy strong,.crp-srp-mode.workspace-mode-btn .mode-copy strong{
+  font-size:clamp(.72rem,3.05vw,2.55rem)!important;line-height:1.04!important;font-weight:800!important;white-space:normal!important;
+}
+.workspace-mode-btn .mode-copy small,.crp-srp-mode.workspace-mode-btn .mode-copy small{
+  margin-top:1.35vw!important;font-size:clamp(.50rem,1.82vw,1.48rem)!important;line-height:1.20!important;
+  color:#9ba4b0!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;
+}
+.workspace-mode-btn.active .mode-copy small,.crp-srp-mode.workspace-mode-btn.active .mode-copy small{color:#e6d29a!important;}
+.workspace-mode-btn .baby-exact-art,.crp-srp-mode.workspace-mode-btn .baby-exact-art{
+  position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;
+  overflow:hidden!important;border-radius:inherit!important;background:#10161d!important;
+}
+.workspace-mode-btn .baby-exact-art img,.crp-srp-mode.workspace-mode-btn .baby-exact-art img{
+  display:block!important;width:100%!important;height:100%!important;object-fit:fill!important;object-position:center!important;
+  filter:none!important;transform:none!important;max-width:none!important;max-height:none!important;
+}
+@media(max-width:700px){
+  .workspace-mode-switch,.crp-srp-modes.workspace-mode-switch{gap:6px!important;padding:9px 10px 11px!important;}
+  .workspace-mode-btn,.crp-srp-mode.workspace-mode-btn{gap:4px!important;padding:7px 5px!important;border-width:1.5px!important;border-radius:13px!important;}
+  .workspace-mode-btn:nth-child(2),.crp-srp-mode.workspace-mode-btn:nth-child(2){padding:0!important;}
+  .workspace-mode-btn.active,.crp-srp-mode.workspace-mode-btn.active{box-shadow:0 0 0 1px rgba(255,217,104,.45),0 0 8px rgba(238,183,48,.5),inset 0 0 8px rgba(231,178,43,.10)!important;}
+  .workspace-mode-btn .mode-copy small,.crp-srp-mode.workspace-mode-btn .mode-copy small{margin-top:5px!important;}
+}

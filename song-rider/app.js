@@ -31,21 +31,7 @@ let didInitialFullApply = false;
 let sheetHeaderBtnLock = false;
 let pendingFullBlockScroll = null;
 
-/***********************
-FORCE-NUKE OLD SERVICE WORKER CACHE
-***********************/ 
-try{
-  if("serviceWorker" in navigator){
-    navigator.serviceWorker.getRegistrations()
-      .then(rs => Promise.allSettled(rs.map(r => r.unregister())))
-      .catch(()=>{});
-  }
-  if("caches" in window){
-    caches.keys()
-      .then(keys => Promise.allSettled(keys.map(k => caches.delete(k))))
-      .catch(()=>{});
-  }
-}catch{}
+/* v3.3.16 — keep the canonical suite service worker alive across SRP navigation. */
 
 /***********************
 Utils
