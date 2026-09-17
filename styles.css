@@ -3000,3 +3000,40 @@ body.workspace-chord-rider .progression-line.midi-roll-line{display:block;min-wi
   }
   body.workspace-chord-rider .transport-line-actions #midiViewBtn{min-width:70px !important;min-height:38px !important;font-size:.64rem !important;}
 }
+
+/* v3.3.3 — drawn MIDI durations for CRP + Lead/Bass. */
+.crp-midi-step{position:sticky;overflow:visible;grid-template-rows:1fr auto;}
+.crp-midi-step-top{display:flex;align-items:center;min-width:0;padding-right:8px;}
+.crp-midi-step-name{min-width:0;flex:1;}
+.crp-midi-duration-label{flex:0 0 auto;margin-right:3px;padding:2px 4px;border:1px solid rgba(233,196,106,.45);border-radius:5px;color:#e9c46a;background:#0f141b;font-size:.58rem;font-weight:900;line-height:1;}
+.crp-midi-step-actions{padding-right:9px;}
+.crp-midi-repeat,.crp-midi-reset,.crp-midi-remove{width:22px;height:18px;min-height:18px;padding:0;display:grid;place-items:center;border:1px solid #3a4551;border-radius:6px;background:#0f141b;color:#9ca6b2;font-size:.70rem;line-height:1;}
+.crp-midi-repeat{color:#cbd4dd;}
+.crp-midi-duration-handle{position:absolute;z-index:12;right:-1px;top:0;bottom:0;width:10px;touch-action:none;cursor:ew-resize;border-right:3px solid var(--accent);background:linear-gradient(to left,rgba(233,196,106,.16),transparent);}
+.crp-midi-duration-handle::after{content:'';position:absolute;right:-3px;top:50%;width:7px;height:22px;transform:translateY(-50%);border-radius:5px;background:var(--accent);box-shadow:0 0 0 2px #151a21;}
+.crp-midi-duration-handle.dragging::after{box-shadow:0 0 0 2px #fff,0 0 12px rgba(233,196,106,.7);}
+.crp-midi-cell{width:auto;min-width:0;background-color:#0e131a;background-image:repeating-linear-gradient(to right,transparent 0,transparent calc(var(--midi-beat-px,24px) - 1px),rgba(73,84,98,.38) calc(var(--midi-beat-px,24px) - 1px),rgba(73,84,98,.38) var(--midi-beat-px,24px));}
+.crp-midi-cell.black-key{background-color:#0b1016;}
+.crp-midi-cell.on{background-color:var(--accent);background-image:repeating-linear-gradient(to right,transparent 0,transparent calc(var(--midi-beat-px,24px) - 1px),rgba(45,36,12,.28) calc(var(--midi-beat-px,24px) - 1px),rgba(45,36,12,.28) var(--midi-beat-px,24px));}
+
+.lead-grid-step.bar-edge{border-left:3px solid #687686;font-weight:900;color:#e9c46a;}
+.lead-cell.bar-edge{border-left:3px solid #687686;}
+.lead-note-block{position:relative;z-index:2;align-self:stretch;min-width:0;margin:3px 1px;padding:0;border:1px solid #c49f3e;border-radius:5px;background:var(--accent);box-shadow:inset 0 0 0 1px rgba(20,20,20,.55);touch-action:manipulation;overflow:visible;}
+.lead-note-block-fill{position:absolute;inset:0;border-radius:inherit;background:repeating-linear-gradient(to right,transparent 0,transparent 25px,rgba(35,28,12,.22) 25px,rgba(35,28,12,.22) 26px);pointer-events:none;}
+.lead-note-block.playing{outline:2px solid #fff;outline-offset:1px;box-shadow:0 0 0 2px rgba(233,196,106,.35);}
+.lead-note-block.resizing{z-index:9;box-shadow:0 0 0 2px #fff,0 0 14px rgba(233,196,106,.55);}
+.lead-duration-handle{position:absolute;z-index:4;right:-4px;top:-3px;bottom:-3px;width:12px;cursor:ew-resize;touch-action:none;border-radius:6px;background:linear-gradient(to left,rgba(255,255,255,.28),transparent);}
+.lead-duration-handle::after{content:'';position:absolute;right:1px;top:50%;width:5px;height:18px;transform:translateY(-50%);border-radius:4px;background:#fff7d1;box-shadow:0 0 0 1px #8a6b1d;}
+.lead-duration-handle.dragging::after{background:#fff;box-shadow:0 0 0 2px #e9c46a;}
+
+.export-midi-roll-wrap{width:100%;overflow:hidden;border:1px solid #aeb4ba;background:#fff;}
+.export-midi-roll{display:grid;width:100%;min-width:0;background:#fff;}
+.export-midi-corner,.export-midi-head,.export-midi-note,.export-midi-cell{min-width:0;box-sizing:border-box;border-right:1px solid #aeb4ba;border-bottom:1px solid #aeb4ba;color:#222;background:#fff;}
+.export-midi-corner,.export-midi-head{min-height:30px;display:flex;align-items:center;justify-content:center;gap:4px;padding:3px;font-size:8px;}
+.export-midi-head{flex-direction:column;line-height:1.05;}
+.export-midi-head strong{font-size:10px;color:#111;}
+.export-midi-head span{font-size:7px;color:#666;}
+.export-midi-note{display:grid;place-items:center;min-height:18px;padding:0 3px;font-size:8px;font-weight:800;}
+.export-midi-cell{min-height:18px;background:#fff;}
+.export-midi-cell.on{background:#e9c46a;box-shadow:inset 0 0 0 1px #9c7d2f;}
+.card-duration{display:inline-block;margin:2px 0 4px;padding:2px 6px;border:1px solid rgba(233,196,106,.4);border-radius:999px;color:#d9b955;background:rgba(233,196,106,.06);font-size:.68rem;font-weight:800;}

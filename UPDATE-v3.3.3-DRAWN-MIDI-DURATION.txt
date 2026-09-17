@@ -1,0 +1,11 @@
+Song Rider Suite v3.3.3 — Drawn MIDI Duration
+
+- CRP MIDI View: drag the gold right edge of any chord/note column to set its duration in 1/4-beat increments, up to 64 beats. The roll auto-scrolls while dragging near an edge.
+- CRP playback: drawn durations are honored in MIDI View and Diagram View, including Baby DAW chord-part playback and Standard MIDI export.
+- CRP Diagram View: cards with an explicit drawn duration show a duration badge.
+- CRP MIDI repeat: added/fixed a per-chord/note repeat button; Line duplicate now deep-copies MIDI edits and durations.
+- Lead/Bass: upgraded to a continuous horizontal multi-bar MIDI timeline. Notes are drawn as blocks with a right-edge duration handle; drag across beats/bars with edge auto-scroll.
+- Lead/Bass playback, repeat cycles, copy/paste, PNG/PDF grid rendering, and Standard MIDI export now honor drawn note lengths.
+- Lead/Bass Auto Scroll follows the playing note horizontally.
+- PNG/PDF: when CRP is in MIDI View, chord/note parts export as a MIDI roll instead of chord diagrams. Diagram View still exports diagrams.
+- Existing projects remain compatible: old chords use Beats/chord as their default duration; old Lead/Bass events use one grid step until stretched.

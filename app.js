@@ -60,6 +60,12 @@
   function chordNotes(name,baseOct=4){const c=parseChord(name);if(!c)return[];return QUALITY[c.quality].map(iv=>{const n=NOTE_INDEX[c.root]+iv;return NOTES[n%12]+(baseOct+Math.floor(n/12));});}
   function midiOf(note){const m=String(note).match(/^([A-G])([#b]?)(-?\d+)$/);return m?(Number(m[3])+1)*12+NOTE_INDEX[m[1]+m[2]]:null;}
   function noteAtMidi(m){return NOTES[(m%12+12)%12]+(Math.floor(m/12)-1);}
+  const MIDI_BEAT_PX=24;
+  function cardDurationBeats(card,fallback=+$('beatsSelect')?.value||4){
+    const n=Number(card?.durationBeats);
+    return Number.isFinite(n)&&n>0?Math.max(.25,Math.min(64,Math.round(n*4)/4)):Math.max(.25,Number(fallback)||4);
+  }
+  function cardColumnWidth(card){return Math.max(62,Math.round(cardDurationBeats(card)*MIDI_BEAT_PX));}
 
   // Canonical piano voicing: always spell chords upward from the root.
   // This is the single source used by playback, on-screen diagrams and PDF export.
@@ -108,13 +114,15 @@
   function commitBuildInput(){
     const {vals,bad}=parseBuildInput();
     const previous=state.rows[state.selectedRow]||[];
-    // Preserve hand-edited MIDI notes for cards that did not actually change.
-    // This matters when a user edits the MIDI table and then taps another
-    // Chords/Notes-that-fit chip: commitBuildInput runs before the new card is
-    // appended, so unchanged cards should keep their MIDI edits.
+    // Preserve MIDI edits AND drawn durations for unchanged cards. Building or
+    // switching views must never collapse a stretched chord/note back to the
+    // default beats-per-chord value.
     vals.forEach((card,i)=>{
       const prior=previous[i];
-      if(prior&&prior.type===card.type&&prior.value===card.value&&Array.isArray(prior.midiNotes))card.midiNotes=[...prior.midiNotes];
+      if(prior&&prior.type===card.type&&prior.value===card.value){
+        if(Array.isArray(prior.midiNotes))card.midiNotes=[...prior.midiNotes];
+        if(Number.isFinite(+prior.durationBeats)&&+prior.durationBeats>0)card.durationBeats=cardDurationBeats(prior);
+      }
     });
     state.rows[state.selectedRow]=vals;
     return bad;
@@ -567,29 +575,90 @@
   function restoreMidiScroll(ri,left,top=0){
     requestAnimationFrame(()=>{const w=document.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"] .crp-midi-roll-wrap`);if(w){w.scrollLeft=left;w.scrollTop=top;}});
   }
+  function formatBeatDuration(beats){
+    const n=Math.round(Number(beats||0)*4)/4;
+    return Number.isInteger(n)?String(n):String(n).replace(/0+$/,'').replace(/\.$/,'');
+  }
+  function midiGridColumns(row){
+    return `64px ${row.map(card=>`${cardColumnWidth(card)}px`).join(' ')}`;
+  }
+  function bindMidiDurationDrag(handle,{card,row,ri,ci,grid,wrap,label}){
+    handle.addEventListener('pointerdown',e=>{
+      if(e.button!=null&&e.button!==0)return;
+      e.preventDefault();e.stopPropagation();
+      state.selectedRow=ri;syncBuildInput();
+      const pointerId=e.pointerId,startX=e.clientX,startScroll=wrap.scrollLeft,startDur=cardDurationBeats(card);
+      let moved=false,lastDur=startDur,autoRaf=0,lastClientX=e.clientX;
+      handle.classList.add('dragging');
+      try{handle.setPointerCapture?.(pointerId);}catch(_){ }
+      const apply=clientX=>{
+        lastClientX=clientX;
+        const dx=clientX-startX+(wrap.scrollLeft-startScroll);
+        const next=Math.max(.25,Math.min(64,Math.round((startDur+dx/MIDI_BEAT_PX)*4)/4));
+        if(next===lastDur)return;
+        moved=true;lastDur=next;card.durationBeats=next;
+        grid.style.gridTemplateColumns=midiGridColumns(row);
+        label.textContent=`${formatBeatDuration(next)}b`;
+        label.title=`${formatBeatDuration(next)} beats`;
+        $('status').textContent=`${displayedValue(card)} duration: ${formatBeatDuration(next)} beat${next===1?'':'s'}`;
+      };
+      const autoScroll=()=>{
+        autoRaf=0;
+        const r=wrap.getBoundingClientRect();
+        let delta=0;
+        if(lastClientX>r.right-34)delta=Math.min(18,Math.max(4,(lastClientX-(r.right-34))*.55));
+        else if(lastClientX<r.left+82)delta=-Math.min(18,Math.max(4,((r.left+82)-lastClientX)*.55));
+        if(delta){wrap.scrollLeft=Math.max(0,wrap.scrollLeft+delta);apply(lastClientX);autoRaf=requestAnimationFrame(autoScroll);}
+      };
+      const onMove=ev=>{
+        if(ev.pointerId!==pointerId)return;
+        ev.preventDefault();lastClientX=ev.clientX;apply(ev.clientX);
+        if(!autoRaf)autoRaf=requestAnimationFrame(autoScroll);
+      };
+      const finish=ev=>{
+        if(ev.pointerId!==pointerId)return;
+        ev.preventDefault();ev.stopPropagation();
+        document.removeEventListener('pointermove',onMove,true);document.removeEventListener('pointerup',finish,true);document.removeEventListener('pointercancel',finish,true);
+        if(autoRaf)cancelAnimationFrame(autoRaf);handle.classList.remove('dragging');
+        try{handle.releasePointerCapture?.(pointerId);}catch(_){ }
+        if(moved){scheduleAutoSave();$('status').textContent=`${displayedValue(card)} set to ${formatBeatDuration(cardDurationBeats(card))} beat${cardDurationBeats(card)===1?'':'s'}.`;}
+      };
+      document.addEventListener('pointermove',onMove,{capture:true,passive:false});
+      document.addEventListener('pointerup',finish,{capture:true,passive:false});
+      document.addEventListener('pointercancel',finish,{capture:true,passive:false});
+    });
+    handle.onclick=e=>{e.preventDefault();e.stopPropagation();};
+  }
   function renderMidiRoll(line,row,ri){
     line.classList.add('midi-roll-line');
     if(!row.length){const empty=document.createElement('div');empty.className='empty-line';empty.textContent='Empty line — type or tap a chord/note to auto-fill the MIDI table';line.appendChild(empty);return;}
     const shell=document.createElement('div');shell.className='crp-midi-roll-shell';
-    const hint=document.createElement('div');hint.className='crp-midi-roll-hint';hint.textContent='Tap cells to edit notes • chord/note columns auto-fill • swipe sideways to move through the line';shell.appendChild(hint);
+    const hint=document.createElement('div');hint.className='crp-midi-roll-hint';hint.textContent='Tap cells to edit notes • drag the gold right edge to stretch a chord/note • swipe sideways through the timeline';shell.appendChild(hint);
     const wrap=document.createElement('div');wrap.className='crp-midi-roll-wrap';
-    const grid=document.createElement('div');grid.className='crp-midi-roll';grid.style.gridTemplateColumns=`64px repeat(${row.length},76px)`;
+    const grid=document.createElement('div');grid.className='crp-midi-roll';grid.style.gridTemplateColumns=midiGridColumns(row);grid.style.setProperty('--midi-beat-px',`${MIDI_BEAT_PX}px`);
     const corner=document.createElement('div');corner.className='crp-midi-corner';corner.textContent='Note';grid.appendChild(corner);
     row.forEach((card,ci)=>{
-      const head=document.createElement('div');head.className='crp-midi-step';head.dataset.cardIndex=String(ci);head.title='Tap chord/name to audition';
-      const name=document.createElement('button');name.type='button';name.className='crp-midi-step-name';name.textContent=displayedValue(card);name.onclick=e=>{e.stopPropagation();state.selectedRow=ri;syncBuildInput();const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4,secs=60/bpm*beats;playCard(card,state.sustain?Math.max(.4,secs*1.03):Math.max(.35,secs*.62));};
+      const head=document.createElement('div');head.className='crp-midi-step';head.dataset.cardIndex=String(ci);head.title='Tap name to audition • drag gold edge to change duration';
+      const top=document.createElement('div');top.className='crp-midi-step-top';
+      const name=document.createElement('button');name.type='button';name.className='crp-midi-step-name';name.textContent=displayedValue(card);name.onclick=e=>{e.stopPropagation();state.selectedRow=ri;syncBuildInput();const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),secs=60/bpm*cardDurationBeats(card);playCard(card,state.sustain?Math.max(.4,secs*1.03):Math.max(.35,secs*.92));};
+      const dur=document.createElement('span');dur.className='crp-midi-duration-label';dur.textContent=`${formatBeatDuration(cardDurationBeats(card))}b`;dur.title=`${formatBeatDuration(cardDurationBeats(card))} beats`;
+      top.append(name,dur);
       const actions=document.createElement('span');actions.className='crp-midi-step-actions';
-      const reset=document.createElement('button');reset.type='button';reset.className='crp-midi-reset';reset.textContent='↺';reset.title='Reset this column to the automatic chord/note fill';reset.hidden=!Array.isArray(card.midiNotes);reset.onclick=e=>{e.stopPropagation();const left=wrap.scrollLeft,top=wrap.scrollTop;delete card.midiNotes;renderRows();restoreMidiScroll(ri,left,top);scheduleAutoSave();$('status').textContent=`${displayedValue(card)} MIDI notes reset to automatic.`;};
+      const repeat=document.createElement('button');repeat.type='button';repeat.className='crp-midi-repeat';repeat.textContent='⧉';repeat.title='Repeat this chord/note';repeat.onclick=e=>{e.stopPropagation();const left=wrap.scrollLeft,copy=JSON.parse(JSON.stringify(card));row.splice(ci+1,0,copy);renderRows();syncBuildInput();renderFits();restoreMidiScroll(ri,left+Math.min(cardColumnWidth(card),90),wrap.scrollTop);scheduleAutoSave();$('status').textContent=`${displayedValue(card)} repeated.`;};
+      const reset=document.createElement('button');reset.type='button';reset.className='crp-midi-reset';reset.textContent='↺';reset.title='Reset the MIDI notes to the automatic chord/note fill';reset.hidden=!Array.isArray(card.midiNotes);reset.onclick=e=>{e.stopPropagation();const left=wrap.scrollLeft,top=wrap.scrollTop;delete card.midiNotes;renderRows();restoreMidiScroll(ri,left,top);scheduleAutoSave();$('status').textContent=`${displayedValue(card)} MIDI notes reset to automatic.`;};
       const remove=document.createElement('button');remove.type='button';remove.className='crp-midi-remove';remove.textContent='×';remove.title='Remove chord/note';remove.onclick=e=>{e.stopPropagation();const left=wrap.scrollLeft,top=wrap.scrollTop;row.splice(ci,1);renderRows();restoreMidiScroll(ri,left,top);syncBuildInput();renderFits();scheduleAutoSave();};
-      actions.append(reset,remove);head.append(name,actions);grid.appendChild(head);
+      actions.append(repeat,reset,remove);head.append(top,actions);
+      const drag=document.createElement('span');drag.className='crp-midi-duration-handle';drag.title='Drag to change chord/note duration';drag.setAttribute('aria-label','Drag duration');head.appendChild(drag);
+      bindMidiDurationDrag(drag,{card,row,ri,ci,grid,wrap,label:dur});
+      grid.appendChild(head);
     });
     const {low,high}=midiRollRange(row);
     const onByCard=row.map(card=>new Set(midiNotesForCard(card)));
     for(let midi=high;midi>=low;midi--){
       const label=document.createElement('div');label.className='crp-midi-note'+(NOTES[(midi%12+12)%12].includes('#')?' black-key':'');label.textContent=noteAtMidi(midi);grid.appendChild(label);
       row.forEach((card,ci)=>{
-        const cell=document.createElement('button');cell.type='button';cell.className='crp-midi-cell'+(NOTES[(midi%12+12)%12].includes('#')?' black-key':'')+(onByCard[ci].has(midi)?' on':'');cell.dataset.cardIndex=String(ci);cell.dataset.midi=String(midi);cell.title=`${noteAtMidi(midi)} • ${displayedValue(card)}`;
-        cell.onclick=e=>{e.stopPropagation();state.selectedRow=ri;syncBuildInput();const notes=new Set(midiNotesForCard(card));if(notes.has(midi))notes.delete(midi);else notes.add(midi);card.midiNotes=[...notes].sort((a,b)=>a-b);cell.classList.toggle('on',notes.has(midi));reset.hidden=false;auditionMidiNote(midi);scheduleAutoSave();};
+        const cell=document.createElement('button');cell.type='button';cell.className='crp-midi-cell'+(NOTES[(midi%12+12)%12].includes('#')?' black-key':'')+(onByCard[ci].has(midi)?' on':'');cell.dataset.cardIndex=String(ci);cell.dataset.midi=String(midi);cell.title=`${noteAtMidi(midi)} • ${displayedValue(card)} • ${formatBeatDuration(cardDurationBeats(card))} beats`;
+        cell.onclick=e=>{e.stopPropagation();state.selectedRow=ri;syncBuildInput();const notes=new Set(midiNotesForCard(card));if(notes.has(midi))notes.delete(midi);else notes.add(midi);card.midiNotes=[...notes].sort((a,b)=>a-b);cell.classList.toggle('on',notes.has(midi));const head=grid.querySelector(`.crp-midi-step[data-card-index="${ci}"]`),reset=head?.querySelector('.crp-midi-reset');if(reset)reset.hidden=false;auditionMidiNote(midi);scheduleAutoSave();};
         grid.appendChild(cell);
       });
     }
@@ -597,7 +666,7 @@
     // Match the existing Auto Scroll rule: a deliberate horizontal swipe takes
     // control away from playback-follow mode, while simple taps keep it on.
     let tx=null,ty=null;
-    wrap.addEventListener('touchstart',e=>{if(!e.touches?.length)return;tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+    wrap.addEventListener('touchstart',e=>{if(!e.touches?.length||e.target.closest('.crp-midi-duration-handle'))return;tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
     wrap.addEventListener('touchmove',e=>{if(tx==null||!e.touches?.length)return;const dx=e.touches[0].clientX-tx,dy=e.touches[0].clientY-ty;if(Math.abs(dx)>14&&Math.abs(dx)>Math.abs(dy)){tx=ty=null;if(state.autoScroll)disableAutoScrollForManualScroll();}},{passive:true});
     wrap.addEventListener('touchend',()=>{tx=ty=null;},{passive:true});
   }
@@ -671,7 +740,7 @@
       badge.addEventListener('click',e=>{if(suppressBadgeClick){e.preventDefault();e.stopPropagation();suppressBadgeClick=false;}});
       line.querySelector('.duplicate-line').onclick=e=>{
         e.stopPropagation();
-        const copy=row.map(card=>({...card}));
+        const copy=JSON.parse(JSON.stringify(row));
         state.rows.splice(ri+1,0,copy);
         state.selectedRow=ri+1;
         renderRows();
@@ -696,9 +765,10 @@
         const el=document.createElement('div');el.className='chord-card'+(card.type==='note'?' note-card':'');el.draggable=!state.autoScroll;
         const shown=displayedValue(card),sub=subtitle(card),hint=state.autoScroll?'Tap to play • Auto Scroll locks reordering':'Tap to play • hold & drag to move';
         const visual=`<div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div>`;
-        el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}${visual}<div class="hint">${hint}</div>`;
+        const explicitDur=Number.isFinite(+card.durationBeats)&&+card.durationBeats>0?cardDurationBeats(card):null,durBadge=explicitDur?`<div class="card-duration">${formatBeatDuration(explicitDur)} beat${explicitDur===1?'':'s'}</div>`:'';
+        el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}${durBadge}${visual}<div class="hint">${hint}</div>`;
         el.querySelector('.remove').onclick=e=>{e.stopPropagation();row.splice(ci,1);renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
-        el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove')){const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4,stepSeconds=60/bpm*beats;playCard(card,state.sustain?Math.max(.4,stepSeconds*1.03):Math.max(.35,stepSeconds*.62));}};
+        el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove')){const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),stepSeconds=60/bpm*cardDurationBeats(card);playCard(card,state.sustain?Math.max(.4,stepSeconds*1.03):Math.max(.35,stepSeconds*.92));}};
         el.addEventListener('dragstart',e=>{if(state.autoScroll){e.preventDefault();$('status').textContent='Turn Auto Scroll off to reorder cards.';return;}state.drag={row:ri,index:ci};e.dataTransfer.effectAllowed='move';el.classList.add('dragging');});
         el.addEventListener('dragend',()=>{el.classList.remove('dragging');state.drag=null;});
         el.addEventListener('dragover',e=>{if(!state.autoScroll)e.preventDefault();});
@@ -817,11 +887,11 @@
       const list=state.rows.flatMap((r,ri)=>r.map((c,ci)=>({c,ri,ci})));
       if(!list.length)return stopProgression();
       if(idx>=list.length){if($('loopToggle').checked)idx=0;else return stopProgression();}
-      const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4,ms=60000/bpm*beats,item=list[idx++];
+      const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),item=list[idx++],durBeats=cardDurationBeats(item.c),ms=60000/bpm*durBeats;
       const stepSeconds=ms/1000;
       const noteSeconds=state.sustain
         ? Math.max(.4,stepSeconds*1.03)
-        : Math.max(.35,stepSeconds*.62);
+        : Math.max(.35,stepSeconds*.92);
       await playCard(item.c,noteSeconds);
       // In mobile infinite-carousel mode there is a visual clone of the last line
       // before Line 1. Always target the real project line so Auto Scroll never
@@ -1209,14 +1279,30 @@
     return exportGrid(`Drums — Bar ${bi+1}`,Object.keys(hitsets),cols,(r,i)=>hitsets[r].has(i*stride));
   }
   function leadGridForBar(part,bar){
-    const res=+part.resolution||16,bi=bar%Math.max(1,+part.bars||1),start=bi*res;
-    const ev=(part.events||[]).filter(e=>e.step>=start&&e.step<start+res);
+    const res=+part.resolution||16,bi=bar%Math.max(1,+part.bars||1),start=bi*res,end=start+res;
+    const durSteps=e=>Math.max(1,Math.round(Number(e?.durationSteps)||1));
+    const ev=(part.events||[]).filter(e=>e.step<end&&e.step+durSteps(e)>start);
     if(!ev.length)return null;
     const nn=n=>['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((n%12)+12)%12]+(Math.floor(n/12)-1);
     const notes=[...new Set(ev.map(e=>nn(e.midi+(part.octave||0)*12)))].sort((a,b)=>{const m=x=>{const z=x.match(/^([A-G])(#?)(-?\d+)$/),pc={C:0,D:2,E:4,F:5,G:7,A:9,B:11}[z[1]]+(z[2]?1:0);return (+z[3]+1)*12+pc};return m(b)-m(a)});
-    const sets=Object.fromEntries(notes.map(n=>[n,new Set()]));ev.forEach(e=>sets[nn(e.midi+(part.octave||0)*12)].add(e.step-start));
+    const sets=Object.fromEntries(notes.map(n=>[n,new Set()]));
+    ev.forEach(e=>{const key=nn(e.midi+(part.octave||0)*12),a=Math.max(start,e.step),z=Math.min(end,e.step+durSteps(e));for(let step=a;step<z;step++)sets[key].add(step-start);});
     const spb=res/4,sub16=['1','e','&','a'];const cols=Array.from({length:res},(_,i)=>{const pos=i%spb,beat=Math.floor(i/spb)+1;if(pos===0)return String(beat);if(spb===2)return '&';if(spb===4)return sub16[pos];return pos===spb/2?'&':String(pos+1);});
     return exportGrid(`${part.name} — Bar ${bi+1}`,notes,cols,(r,i)=>sets[r].has(i));
+  }
+  function chordMidiBlockForLine(part,lineIndex){
+    const row=part.data?.rows?.[lineIndex]||[];if(!row.length)return null;
+    const cards=row.map(card=>({card,duration:cardDurationBeats(card,part.data?.beats||+$('beatsSelect').value||4),notes:(coreNotesFor(card,part.data)||[]).map(n=>({name:n,midi:midiOf(n)})).filter(n=>n.midi!=null)}));
+    const all=[...new Set(cards.flatMap(x=>x.notes.map(n=>n.midi)))].sort((a,b)=>b-a);if(!all.length)return null;
+    const sec=document.createElement('div');sec.className='export-grid-block export-chord-midi-block';
+    const h=document.createElement('div');h.className='export-part-label';h.textContent=`${part.name} — MIDI`;sec.appendChild(h);
+    const wrap=document.createElement('div');wrap.className='export-midi-roll-wrap';
+    const grid=document.createElement('div');grid.className='export-midi-roll';
+    grid.style.gridTemplateColumns=`70px ${cards.map(x=>`${Math.max(.25,x.duration)}fr`).join(' ')}`;
+    const corner=document.createElement('div');corner.className='export-midi-corner';corner.textContent='Note';grid.appendChild(corner);
+    cards.forEach(({card,duration})=>{const el=document.createElement('div');el.className='export-midi-head';el.innerHTML=`<strong>${esc(displayedValue(card))}</strong><span>${esc(formatBeatDuration(duration))}b</span>`;grid.appendChild(el);});
+    all.forEach(m=>{const label=document.createElement('div');label.className='export-midi-note';label.textContent=noteAtMidi(m);grid.appendChild(label);cards.forEach(({notes,duration})=>{const cell=document.createElement('div');cell.className='export-midi-cell'+(notes.some(n=>n.midi===m)?' on':'');cell.style.setProperty('--duration-beats',String(duration));grid.appendChild(cell);});});
+    wrap.appendChild(grid);sec.appendChild(wrap);return sec;
   }
   function chordBlockForLine(part,lineIndex){
     const row=part.data?.rows?.[lineIndex]||[];if(!row.length)return null;
@@ -1261,7 +1347,7 @@
       vocals.forEach(v=>{if(!v.transcript?.trim())return;let text=v.transcript;const words=Array.isArray(v.transcriptWords)?v.transcriptWords:[];if(words.length){const barSec=4*60/bpm,start=li*barSec,end=(li+1)*barSec;const timed=words.filter(w=>{const a=Number(w.start??w.start_time??w.begin??0),z=Number(w.end??w.end_time??a);return z>start&&a<end;}).map(w=>String(w.word??w.text??'').trim()).filter(Boolean);text=timed.join(' ').replace(/\s+/g,' ').trim();if(!text)return;}else if(li>0)return;const b=document.createElement('div');b.className='export-vocal-block';b.innerHTML=`<div class="export-part-label">${esc(v.name)}</div><div class="export-lyrics">${esc(text)}</div>`;line.appendChild(b)});
       leadParts.forEach(p=>{const g=leadGridForBar(p,li);if(g)line.appendChild(g)});
       bassParts.forEach(p=>{const g=leadGridForBar(p,li);if(g)line.appendChild(g)});
-      chordParts.forEach(p=>{const c=chordBlockForLine(p,li);if(c)line.appendChild(c)});
+      chordParts.forEach(p=>{const c=state.cardView==='midi'?chordMidiBlockForLine(p,li):chordBlockForLine(p,li);if(c)line.appendChild(c)});
       sheet.appendChild(line);
     }
     if(selection.notes){const notes=$('notesEditor').innerHTML.trim();if(notes&&$('notesEditor').textContent.trim()){const n=document.createElement('section');n.className='export-notes';n.innerHTML=`<h3>Project notes</h3><div class="export-notes-body">${notes}</div>`;sheet.appendChild(n)}}
@@ -1767,7 +1853,7 @@
   function srpPayload(){
     const p=currentCrpProject(); if(!p)return null;
     const live=capture(p.id,p.name||$('projectName').value.trim()||'Untitled');
-    return {crpProjectId:p.id,name:live.name||p.name||'Untitled',bpm:+live.bpm||92,beats:+live.beats||4,key:live.key||'',capo:Number(live.capo)||0,octave:Number(live.octave)||0,transpose:!!live.transpose,pitchMode:linkedPitchMode(p.id),rows:(live.rows||[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(row||[]).map(c=>({type:c.type||'chord',value:c.value||''}))}))};
+    return {crpProjectId:p.id,name:live.name||p.name||'Untitled',bpm:+live.bpm||92,beats:+live.beats||4,key:live.key||'',capo:Number(live.capo)||0,octave:Number(live.octave)||0,transpose:!!live.transpose,pitchMode:linkedPitchMode(p.id),rows:(live.rows||[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(row||[]).map(c=>({type:c.type||'chord',value:c.value||'',durationBeats:cardDurationBeats(c,+live.beats||4)}))}))};
   }
   function publishSrpHandoff(){
     try{
@@ -1866,11 +1952,11 @@
     }
   }
   window.CRPCore={
-    snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,
+    snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,cardDurationBeats,
     scheduleAutoSave,flushAutoSaveNow,renderAll,syncBuildInput,publishSrpHandoff,loadProjectById:loadProject,
     get beats(){return +$('beatsSelect').value||4},get bpm(){return +$('bpmInput').value||92},get loop(){return $('loopToggle').checked},
     get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
-    startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).reduce((n,r)=>n+r.length,0)*(+$('beatsSelect').value||4);},
+    startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).flat().reduce((n,c)=>n+cardDurationBeats(c),0);},
     get autoScroll(){return !!state.autoScroll;},
     followChordCard(cardIndex){
       let flat=Math.max(0,Number(cardIndex)||0),ri=0,ci=0,found=false;
