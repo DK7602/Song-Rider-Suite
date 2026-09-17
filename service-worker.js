@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.1-midi-png-chooser';
+const CACHE = 'song-rider-suite-v3.3.2-editable-midi-roll';
 const ASSETS = [
   './assets/chord-rider-pro-wordmark.png',
   './song-rider/suite-header-master.png',

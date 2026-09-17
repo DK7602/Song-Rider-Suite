@@ -107,6 +107,15 @@
   }
   function commitBuildInput(){
     const {vals,bad}=parseBuildInput();
+    const previous=state.rows[state.selectedRow]||[];
+    // Preserve hand-edited MIDI notes for cards that did not actually change.
+    // This matters when a user edits the MIDI table and then taps another
+    // Chords/Notes-that-fit chip: commitBuildInput runs before the new card is
+    // appended, so unchanged cards should keep their MIDI edits.
+    vals.forEach((card,i)=>{
+      const prior=previous[i];
+      if(prior&&prior.type===card.type&&prior.value===card.value&&Array.isArray(prior.midiNotes))card.midiNotes=[...prior.midiNotes];
+    });
     state.rows[state.selectedRow]=vals;
     return bad;
   }
@@ -230,16 +239,31 @@
     $('status').textContent='Loading instrument samples…';
     return Soundfont.instrument(state.audioCtx,state.sound,{format:'mp3',soundfont:'MusyngKite',destination:state.instrumentBus}).then(p=>{state.player=p;state.playerName=state.sound;$('status').textContent='';return p;});
   }
-  async function playCard(card,seconds=1.5){
-    const p=await ensureAudio(),val=displayedValue(card);let notes;
-    if(card.type==='note'){const oct=(state.instrument==='piano'?4:3)+state.octave;notes=[val+oct];}
-    else if(state.instrument==='guitar'){
-      // Play the actual selected guitar voicing so what you hear matches the diagram.
+  function automaticMidiNotesForCard(card){
+    const val=displayedValue(card);let notes;
+    if(card.type==='note'){
+      const oct=(state.instrument==='piano'?4:3)+state.octave;
+      notes=[midiOf(val+oct)].filter(x=>x!=null);
+    }else if(state.instrument==='guitar'){
       const frets=guitarShapeForCard(card),opens=[40,45,50,55,59,64];
-      notes=frets.map((f,i)=>f==null?null:noteAtMidi(opens[i]+f+state.capo+state.octave*12)).filter(Boolean);
-      if(!notes.length)notes=chordNotes(val,3+state.octave);
-    }else notes=pianoMidisForCard(card).map(noteAtMidi);
-    if(state.sound==='electric_bass_finger')notes=notes.slice(0,card.type==='note'?1:3).map(n=>noteAtMidi(midiOf(n)-12));
+      notes=frets.map((f,i)=>f==null?null:opens[i]+f+state.capo+state.octave*12).filter(x=>x!=null);
+      if(!notes.length)notes=chordNotes(val,3+state.octave).map(midiOf).filter(x=>x!=null);
+    }else notes=pianoMidisForCard(card);
+    if(state.sound==='electric_bass_finger')notes=notes.slice(0,card.type==='note'?1:3).map(m=>m-12);
+    return [...new Set(notes.map(Number).filter(Number.isFinite))].sort((a,b)=>a-b);
+  }
+  function midiNotesForCard(card){
+    // Once the user edits a MIDI column, the exact note numbers become the
+    // playback source for that card. Until then the table remains truly
+    // auto-filled from the chord/note, instrument, capo and step settings.
+    if(Array.isArray(card?.midiNotes))return [...new Set(card.midiNotes.map(Number).filter(Number.isFinite))].sort((a,b)=>a-b);
+    return automaticMidiNotesForCard(card);
+  }
+  async function auditionMidiNote(midi){
+    try{const p=await ensureAudio(),now=state.audioCtx.currentTime;p.play(noteAtMidi(midi),now,{duration:.55,gain:.9});}catch(_){ }
+  }
+  async function playCard(card,seconds=1.5){
+    const p=await ensureAudio(),notes=midiNotesForCard(card).map(noteAtMidi);
     // Keep note gain near unity; overall instrument loudness is handled by
     // the normalized instrument bus above, followed by a peak limiter.
     const now=state.audioCtx.currentTime;notes.forEach((n,i)=>p.play(n,now+(state.instrument==='guitar'?i*.035:0),{duration:seconds,gain:.95}));
@@ -388,7 +412,8 @@
     return [kind,capoText].filter(Boolean).join(' • ');
   }
 
-  function isMobileCarousel(){return window.matchMedia('(max-width:700px)').matches;}
+  function isMidiRollActive(){return state.cardView==='midi'&&document.body.classList.contains('workspace-chord-rider');}
+  function isMobileCarousel(){return window.matchMedia('(max-width:700px)').matches&&!isMidiRollActive();}
   function realCarouselLines(){return [...document.querySelectorAll('#progression .progression-line:not(.carousel-clone)')];}
   function lineScrollLeft(wrap,line){
     const wr=wrap.getBoundingClientRect(),lr=line.getBoundingClientRect();
@@ -510,25 +535,73 @@
     $('status').textContent='Line moved.';
     renderRows();syncBuildInput();renderFits();scheduleAutoSave();
   }
-  function midiCardGrid(card){
-    // Compact read-only piano-roll view of the notes that this chord/note actually plays.
-    // It is derived from the same voicing source used by playback so typing a chord, tapping a
-    // suggestion, changing octave/capo, or switching to Note mode updates the MIDI view instantly.
-    let sounding=[];
-    try{sounding=coreNotesFor(card)||[];}catch(_){sounding=[];}
-    const byPc=new Map();
-    sounding.forEach(note=>{
-      const midi=midiOf(String(note));if(midi==null)return;
-      const pc=((midi%12)+12)%12,arr=byPc.get(pc)||[];
-      if(!arr.includes(note))arr.push(note);byPc.set(pc,arr);
-    });
-    const rows=[];
-    for(let pc=11;pc>=0;pc--){
-      const label=NOTES[pc],hits=byPc.get(pc)||[],black=label.includes('#')?' black-key':'';
-      rows.push(`<div class="card-midi-note${black}">${esc(label)}</div><div class="card-midi-cell${hits.length?' on':''}${black}" title="${hits.length?esc(hits.join(', ')):esc(label)}">${hits.length?`<span class="card-midi-hit">${esc(hits.join(' · '))}</span>`:''}</div>`);
-    }
-    return `<div class="card-midi-grid" aria-label="MIDI notes for ${esc(displayedValue(card))}"><div class="card-midi-head">Pitch</div><div class="card-midi-head">${card.type==='note'?'Note':'Chord notes'}</div>${rows.join('')}</div>`;
+  function midiRollRange(row){
+    const notes=row.flatMap(card=>midiNotesForCard(card));
+    if(!notes.length){const base=(4+state.octave+1)*12;return{low:base,high:base+11};}
+    let low=Math.min(...notes)-2,high=Math.max(...notes)+2;
+    // Give the table at least one complete octave of room for editing, but
+    // avoid an excessively tall roll for normal chord voicings.
+    while(high-low<11){low--;high++;}
+    if(high-low>27){const mid=Math.round((low+high)/2);low=mid-13;high=mid+14;}
+    low=Math.max(24,low);high=Math.min(108,high);
+    return{low,high};
   }
+  function midiColumnScrollIntoView(ri,ci,smooth=true){
+    const line=document.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"]`);
+    const wrap=line?.querySelector('.crp-midi-roll-wrap');
+    const head=wrap?.querySelector(`.crp-midi-step[data-card-index="${ci}"]`);
+    if(!wrap||!head)return;
+    const sticky=64,target=head.offsetLeft-sticky-(wrap.clientWidth-head.offsetWidth-sticky)/2;
+    wrap.scrollTo({left:Math.max(0,target),behavior:smooth?'smooth':'auto'});
+  }
+  function clearPlaybackHighlights(){
+    document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');
+    document.querySelectorAll('.crp-midi-step.playing,.crp-midi-cell.playing').forEach(el=>el.classList.remove('playing'));
+  }
+  function highlightMidiColumn(ri,ci){
+    clearPlaybackHighlights();
+    const line=document.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"]`);
+    line?.querySelector(`.crp-midi-step[data-card-index="${ci}"]`)?.classList.add('playing');
+    line?.querySelectorAll(`.crp-midi-cell[data-card-index="${ci}"]`).forEach(el=>el.classList.add('playing'));
+  }
+  function restoreMidiScroll(ri,left,top=0){
+    requestAnimationFrame(()=>{const w=document.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"] .crp-midi-roll-wrap`);if(w){w.scrollLeft=left;w.scrollTop=top;}});
+  }
+  function renderMidiRoll(line,row,ri){
+    line.classList.add('midi-roll-line');
+    if(!row.length){const empty=document.createElement('div');empty.className='empty-line';empty.textContent='Empty line — type or tap a chord/note to auto-fill the MIDI table';line.appendChild(empty);return;}
+    const shell=document.createElement('div');shell.className='crp-midi-roll-shell';
+    const hint=document.createElement('div');hint.className='crp-midi-roll-hint';hint.textContent='Tap cells to edit notes • chord/note columns auto-fill • swipe sideways to move through the line';shell.appendChild(hint);
+    const wrap=document.createElement('div');wrap.className='crp-midi-roll-wrap';
+    const grid=document.createElement('div');grid.className='crp-midi-roll';grid.style.gridTemplateColumns=`64px repeat(${row.length},76px)`;
+    const corner=document.createElement('div');corner.className='crp-midi-corner';corner.textContent='Note';grid.appendChild(corner);
+    row.forEach((card,ci)=>{
+      const head=document.createElement('div');head.className='crp-midi-step';head.dataset.cardIndex=String(ci);head.title='Tap chord/name to audition';
+      const name=document.createElement('button');name.type='button';name.className='crp-midi-step-name';name.textContent=displayedValue(card);name.onclick=e=>{e.stopPropagation();state.selectedRow=ri;syncBuildInput();const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4,secs=60/bpm*beats;playCard(card,state.sustain?Math.max(.4,secs*1.03):Math.max(.35,secs*.62));};
+      const actions=document.createElement('span');actions.className='crp-midi-step-actions';
+      const reset=document.createElement('button');reset.type='button';reset.className='crp-midi-reset';reset.textContent='↺';reset.title='Reset this column to the automatic chord/note fill';reset.hidden=!Array.isArray(card.midiNotes);reset.onclick=e=>{e.stopPropagation();const left=wrap.scrollLeft,top=wrap.scrollTop;delete card.midiNotes;renderRows();restoreMidiScroll(ri,left,top);scheduleAutoSave();$('status').textContent=`${displayedValue(card)} MIDI notes reset to automatic.`;};
+      const remove=document.createElement('button');remove.type='button';remove.className='crp-midi-remove';remove.textContent='×';remove.title='Remove chord/note';remove.onclick=e=>{e.stopPropagation();const left=wrap.scrollLeft,top=wrap.scrollTop;row.splice(ci,1);renderRows();restoreMidiScroll(ri,left,top);syncBuildInput();renderFits();scheduleAutoSave();};
+      actions.append(reset,remove);head.append(name,actions);grid.appendChild(head);
+    });
+    const {low,high}=midiRollRange(row);
+    const onByCard=row.map(card=>new Set(midiNotesForCard(card)));
+    for(let midi=high;midi>=low;midi--){
+      const label=document.createElement('div');label.className='crp-midi-note'+(NOTES[(midi%12+12)%12].includes('#')?' black-key':'');label.textContent=noteAtMidi(midi);grid.appendChild(label);
+      row.forEach((card,ci)=>{
+        const cell=document.createElement('button');cell.type='button';cell.className='crp-midi-cell'+(NOTES[(midi%12+12)%12].includes('#')?' black-key':'')+(onByCard[ci].has(midi)?' on':'');cell.dataset.cardIndex=String(ci);cell.dataset.midi=String(midi);cell.title=`${noteAtMidi(midi)} • ${displayedValue(card)}`;
+        cell.onclick=e=>{e.stopPropagation();state.selectedRow=ri;syncBuildInput();const notes=new Set(midiNotesForCard(card));if(notes.has(midi))notes.delete(midi);else notes.add(midi);card.midiNotes=[...notes].sort((a,b)=>a-b);cell.classList.toggle('on',notes.has(midi));reset.hidden=false;auditionMidiNote(midi);scheduleAutoSave();};
+        grid.appendChild(cell);
+      });
+    }
+    wrap.appendChild(grid);shell.appendChild(wrap);line.appendChild(shell);
+    // Match the existing Auto Scroll rule: a deliberate horizontal swipe takes
+    // control away from playback-follow mode, while simple taps keep it on.
+    let tx=null,ty=null;
+    wrap.addEventListener('touchstart',e=>{if(!e.touches?.length)return;tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+    wrap.addEventListener('touchmove',e=>{if(tx==null||!e.touches?.length)return;const dx=e.touches[0].clientX-tx,dy=e.touches[0].clientY-ty;if(Math.abs(dx)>14&&Math.abs(dx)>Math.abs(dy)){tx=ty=null;if(state.autoScroll)disableAutoScrollForManualScroll();}},{passive:true});
+    wrap.addEventListener('touchend',()=>{tx=ty=null;},{passive:true});
+  }
+
 
   function renderRows(){
     const wrap=$('progression');wrap.innerHTML='';
@@ -613,12 +686,16 @@
       line.addEventListener('dragover',e=>{if(state.autoScroll)return;e.preventDefault();line.classList.add('drop-target');});
       line.addEventListener('dragleave',()=>line.classList.remove('drop-target'));
       line.addEventListener('drop',e=>{if(state.autoScroll)return;e.preventDefault();line.classList.remove('drop-target');moveDragged(ri,row.length);});
+      if(isMidiRollActive()){
+        renderMidiRoll(line,row,ri);
+        wrap.appendChild(line);
+        return;
+      }
       if(!row.length){const empty=document.createElement('div');empty.className='empty-line';empty.textContent='Empty line — tap to select or drop a card here';line.appendChild(empty);}
       row.forEach((card,ci)=>{
         const el=document.createElement('div');el.className='chord-card'+(card.type==='note'?' note-card':'');el.draggable=!state.autoScroll;
         const shown=displayedValue(card),sub=subtitle(card),hint=state.autoScroll?'Tap to play • Auto Scroll locks reordering':'Tap to play • hold & drag to move';
-        const useMidiView=state.cardView==='midi'&&!document.body.classList.contains('workspace-baby-daw');
-        const visual=useMidiView?midiCardGrid(card):`<div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div>`;
+        const visual=`<div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div>`;
         el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}${visual}<div class="hint">${hint}</div>`;
         el.querySelector('.remove').onclick=e=>{e.stopPropagation();row.splice(ci,1);renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
         el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove')){const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),beats=+$('beatsSelect').value||4,stepSeconds=60/bpm*beats;playCard(card,state.sustain?Math.max(.4,stepSeconds*1.03):Math.max(.35,stepSeconds*.62));}};
@@ -657,7 +734,7 @@
     b.textContent=midi?'Diagram View':'MIDI View';
     b.classList.toggle('on',midi);
     b.setAttribute('aria-pressed',String(midi));
-    b.setAttribute('title',midi?'Switch back to chord diagrams':'Show the chord/note notes in a MIDI-style grid');
+    b.setAttribute('title',midi?'Switch back to chord diagrams':'Open the editable horizontal MIDI table');
   }
 
   function renderAll(){
@@ -746,26 +823,31 @@
         ? Math.max(.4,stepSeconds*1.03)
         : Math.max(.35,stepSeconds*.62);
       await playCard(item.c,noteSeconds);
-      document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');
       // In mobile infinite-carousel mode there is a visual clone of the last line
       // before Line 1. Always target the real project line so Auto Scroll never
       // mistakes that edge clone for the actual last line.
       const playingLine=document.querySelector(`.progression-line:not(.carousel-clone)[data-row="${item.ri}"]`);
-      const playingCard=playingLine?.querySelectorAll('.chord-card')[item.ci];
-      playingCard?.style.setProperty('outline','2px solid var(--accent)');
-      if(state.autoScroll&&playingCard){
-        if(isMobileCarousel()){
-          scrollMobileLineTo(item.ri,true);
-          updateMobileLineIndicator(item.ri);
-          setTimeout(()=>{if(state.autoScroll)playingCard.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});},180);
-        }else playingCard.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
+      if(isMidiRollActive()){
+        highlightMidiColumn(item.ri,item.ci);
+        if(state.autoScroll){playingLine?.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});midiColumnScrollIntoView(item.ri,item.ci,true);}
+      }else{
+        clearPlaybackHighlights();
+        const playingCard=playingLine?.querySelectorAll('.chord-card')[item.ci];
+        playingCard?.style.setProperty('outline','2px solid var(--accent)');
+        if(state.autoScroll&&playingCard){
+          if(isMobileCarousel()){
+            scrollMobileLineTo(item.ri,true);
+            updateMobileLineIndicator(item.ri);
+            setTimeout(()=>{if(state.autoScroll)playingCard.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});},180);
+          }else playingCard.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
+        }
       }
       nextStepAt += ms;
       state.timer=setTimeout(step,Math.max(0,nextStepAt-performance.now()));
     };
     step();
   }
-  function stopProgression(){if(window.CRPParts?.handlesPlayback&&window.CRPParts?.isPlaying?.())return window.CRPParts.stopPlayback();state.playing=false;clearTimeout(state.timer);state.timer=null;setRiderBonesRiding(false);$('playAllBtn').textContent='▶ Play';document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');}
+  function stopProgression(){if(window.CRPParts?.handlesPlayback&&window.CRPParts?.isPlaying?.())return window.CRPParts.stopPlayback();state.playing=false;clearTimeout(state.timer);state.timer=null;setRiderBonesRiding(false);$('playAllBtn').textContent='▶ Play';clearPlaybackHighlights();}
 
   let accountUser=null, cloudProjects=null, cloudSyncState='idle';
   function accountDisplayName(){return accountUser?.display_name||accountUser?.email||'Account';}
@@ -1778,15 +1860,7 @@
     const saved=coreSnapshot();
     try{
       if(snapshot){state.instrument=snapshot.instrument||'piano';state.mode=snapshot.mode||'chord';state.sound=snapshot.sound||SOUNDS[state.instrument][0][0];state.octave=Number(snapshot.octave)||0;state.capo=Number(snapshot.capo)||0;state.neck=snapshot.neck||'open';state.transpose=!!snapshot.transpose;}
-      const val=displayedValue(card);let notes;
-      if(card.type==='note'){const oct=(state.instrument==='piano'?4:3)+state.octave;notes=[val+oct];}
-      else if(state.instrument==='guitar'){
-        const frets=guitarShapeForCard(card),opens=[40,45,50,55,59,64];
-        notes=frets.map((f,i)=>f==null?null:noteAtMidi(opens[i]+f+state.capo+state.octave*12)).filter(Boolean);
-        if(!notes.length)notes=chordNotes(val,3+state.octave);
-      }else notes=pianoMidisForCard(card).map(noteAtMidi);
-      if(state.sound==='electric_bass_finger')notes=notes.slice(0,card.type==='note'?1:3).map(n=>noteAtMidi(midiOf(n)-12));
-      return notes;
+      return midiNotesForCard(card).map(noteAtMidi);
     } finally {
       state.instrument=saved.instrument;state.mode=saved.mode;state.sound=saved.sound;state.octave=saved.octave;state.capo=saved.capo;state.neck=saved.neck;state.transpose=saved.transpose;state.rows=saved.rows;
     }
@@ -1799,25 +1873,20 @@
     startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).reduce((n,r)=>n+r.length,0)*(+$('beatsSelect').value||4);},
     get autoScroll(){return !!state.autoScroll;},
     followChordCard(cardIndex){
-      if(!state.autoScroll)return;
-      const cards=[...document.querySelectorAll('.progression-line:not(.carousel-clone) .chord-card')];
-      const card=cards[Number(cardIndex)||0];
-      if(!card)return;
-      const line=card.closest('.progression-line:not(.carousel-clone)');
-      const ri=Number(line?.dataset.row);
-      if(Number.isFinite(ri)){
-        state.selectedRow=ri;
-        updateMobileLineIndicator(ri);
-        realCarouselLines().forEach(el=>el.classList.toggle('selected',+el.dataset.row===ri));
+      let flat=Math.max(0,Number(cardIndex)||0),ri=0,ci=0,found=false;
+      for(let r=0;r<state.rows.length;r++){if(flat<state.rows[r].length){ri=r;ci=flat;found=true;break;}flat-=state.rows[r].length;}
+      if(!found)return;
+      state.selectedRow=ri;realCarouselLines().forEach(el=>el.classList.toggle('selected',+el.dataset.row===ri));updateMobileLineIndicator(ri);
+      if(isMidiRollActive()){
+        highlightMidiColumn(ri,ci);
+        if(state.autoScroll){document.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"]`)?.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});midiColumnScrollIntoView(ri,ci,true);}
+        return;
       }
-      if(isMobileCarousel()&&Number.isFinite(ri)){
-        scrollMobileLineTo(ri,true);
-        setTimeout(()=>{if(state.autoScroll)card.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});},180);
-      }else{
-        card.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
-      }
+      const line=document.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"]`),card=line?.querySelectorAll('.chord-card')[ci];if(!card||!state.autoScroll)return;
+      if(isMobileCarousel()){scrollMobileLineTo(ri,true);setTimeout(()=>{if(state.autoScroll)card.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});},180);}
+      else card.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
     },
-    setPlaying(on){state.playing=!!on;setRiderBonesRiding(!!on);$('playAllBtn').textContent=on?'■ Stop':'▶ Play';if(!on)document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');},
+    setPlaying(on){state.playing=!!on;setRiderBonesRiding(!!on);$('playAllBtn').textContent=on?'■ Stop':'▶ Play';if(!on)clearPlaybackHighlights();},
     status(msg){$('status').textContent=msg||'';},
     setBabyDawSetupHidden(hidden){setWorkspaceSetupHidden('baby-daw',!!hidden);},
     refreshSetupVisibility(){applySetupVisibility();},
