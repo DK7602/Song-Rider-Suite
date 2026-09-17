@@ -9,7 +9,7 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.14-AUTOTUNE-AUDIO-POLISH" />
+  <link rel="stylesheet" href="styles.css?v=3.3.15-SONG-END-PRO-TUNE" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
 </head>
@@ -146,6 +146,19 @@
           <div id="partStrip" class="part-strip" aria-label="Parts"></div>
           <button id="addPartBtn" class="add-part-btn" type="button"><span>Add</span><span>Part</span></button>
         </div>
+      </div>
+
+      <div id="songEndEditor" class="song-end-editor" aria-label="Song end editor">
+        <div class="song-end-copy">
+          <strong>Song End</strong>
+          <span id="songEndValue">Full song</span>
+          <small id="songPlayheadValue" class="subtle">Playhead 00:00.0</small>
+        </div>
+        <button id="songEndSetBtn" class="accent" type="button">Set End Here</button>
+        <button id="songEndMinusBtn" type="button" title="Move song end 0.1 second earlier">−0.1s</button>
+        <button id="songEndPlusBtn" type="button" title="Move song end 0.1 second later">+0.1s</button>
+        <button id="songEndClearBtn" type="button">Full Song</button>
+        <small class="song-end-hint subtle">Play the song and tap <b>Set End Here</b> at the exact cutoff. Use ±0.1s for fine adjustment. Playback and WAV export stop there.</small>
       </div>
 
       <div id="leadPartEditor" class="lead-part-editor" hidden>
@@ -385,7 +398,7 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="app.js?v=3.3.14-AUDIO-POLISH"></script>
-  <script src="parts.js?v=3.3.14-AUTOTUNE"></script>
+  <script src="parts.js?v=3.3.15-SONG-END-PRO-TUNE"></script>
   <script src="beat-maker.js?v=3.3.8-LAST-MIDI-DURATION-CAPO-ROW"></script>
 </body>
 </html>

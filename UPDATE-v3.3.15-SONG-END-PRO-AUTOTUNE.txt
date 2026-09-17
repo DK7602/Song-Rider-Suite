@@ -1,0 +1,6 @@
+v3.3.15
+- Added Baby DAW Song End editor: play the song, tap Set End Here at the exact cutoff, fine-nudge +/-0.1 s, or reset to Full Song.
+- Song End persists with the project and is honored by normal playback, repeat boundaries, Vocal Play Mix, and one-file WAV audio export.
+- Rebuilt vocal pitch correction around YIN pitch detection, faster key-locked retune, larger correction range, and a smoother dual-grain pitch shifter. 100% is the hard/robotic end of the control; 0% is clean bypass.
+- Rebuilt the Auto-Tune range styling so the control visually travels all the way from 0% to 100%.
+- Bumped service-worker cache and worklet versions.

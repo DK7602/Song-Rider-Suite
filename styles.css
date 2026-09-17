@@ -3182,3 +3182,54 @@ body.workspace-chord-rider .primary-toolbar > .capo-shape-mode-row{
   body.workspace-chord-rider .primary-toolbar > .octave-control{width:96px!important;min-width:96px!important;}
   body.workspace-chord-rider .primary-toolbar > .sustain-control{width:62px!important;min-width:62px!important;}
 }
+
+/* v3.3.15 — Baby DAW song-end editor + full-travel professional Auto-Tune slider */
+body:not(.workspace-baby-daw) #songEndEditor{display:none!important;}
+body.workspace-baby-daw #songEndEditor{
+  display:grid!important;
+  grid-template-columns:minmax(160px,1fr) auto auto auto auto!important;
+  align-items:center!important;
+  gap:8px!important;
+  margin:8px 0 12px!important;
+  padding:10px 12px!important;
+  border:1px solid #394452!important;
+  border-radius:14px!important;
+  background:#0d131a!important;
+}
+.song-end-copy{display:grid!important;grid-template-columns:auto auto!important;align-items:baseline!important;justify-content:start!important;gap:3px 10px!important;min-width:0!important;}
+.song-end-copy strong{font-size:.95rem!important;color:#f4f6f8!important;}
+#songEndValue{font-weight:800!important;color:var(--accent)!important;white-space:nowrap!important;}
+#songPlayheadValue{grid-column:1/-1!important;white-space:nowrap!important;}
+.song-end-editor button{white-space:nowrap!important;min-height:38px!important;padding:7px 10px!important;}
+.song-end-hint{grid-column:1/-1!important;margin:0!important;line-height:1.3!important;}
+@media(max-width:760px){
+  body.workspace-baby-daw #songEndEditor{grid-template-columns:minmax(0,1fr) auto auto!important;}
+  .song-end-copy{grid-column:1/-1!important;}
+  #songEndSetBtn{grid-column:1!important;}
+  #songEndClearBtn{grid-column:1/-1!important;}
+  .song-end-editor button{padding:7px 8px!important;}
+}
+
+/* Native mobile range controls reserve invisible thumb gutters. Replace that track
+   so 0% and 100% visibly travel all the way to the ends of the Auto-Tune control. */
+.vocal-autotune-slider{overflow:visible!important;padding-left:11px!important;padding-right:11px!important;}
+#vocalFxAutotune{
+  -webkit-appearance:none!important;appearance:none!important;
+  width:calc(100% + 22px)!important;min-width:0!important;
+  height:28px!important;margin:0 0 0 -11px!important;padding:0!important;
+  background:transparent!important;overflow:visible!important;cursor:pointer!important;
+}
+#vocalFxAutotune::-webkit-slider-runnable-track{
+  height:6px!important;border-radius:999px!important;
+  background:linear-gradient(to right,var(--accent) 0,var(--accent) var(--tune-fill,0%),#555d67 var(--tune-fill,0%),#555d67 100%)!important;
+  border:1px solid #707781!important;
+}
+#vocalFxAutotune::-webkit-slider-thumb{
+  -webkit-appearance:none!important;appearance:none!important;
+  width:24px!important;height:24px!important;border-radius:50%!important;
+  margin-top:-10px!important;background:var(--accent)!important;border:2px solid #1a2029!important;
+  box-shadow:0 1px 4px rgba(0,0,0,.5)!important;
+}
+#vocalFxAutotune::-moz-range-track{height:6px!important;border-radius:999px!important;background:#555d67!important;border:1px solid #707781!important;}
+#vocalFxAutotune::-moz-range-progress{height:6px!important;border-radius:999px!important;background:var(--accent)!important;}
+#vocalFxAutotune::-moz-range-thumb{width:24px!important;height:24px!important;border-radius:50%!important;background:var(--accent)!important;border:2px solid #1a2029!important;box-shadow:0 1px 4px rgba(0,0,0,.5)!important;}
