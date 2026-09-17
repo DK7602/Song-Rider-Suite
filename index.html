@@ -9,7 +9,7 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.7-CRP-SHOW-HIDE-LAYOUT" />
+  <link rel="stylesheet" href="styles.css?v=3.3.8-LAST-MIDI-DURATION-CAPO-ROW" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.4" />
 <link rel="stylesheet" href="branding-shell.css?v=3.1.0">
 </head>
@@ -74,28 +74,30 @@
           <button id="sustainBtn" class="toggle-btn sustain-btn" type="button" aria-pressed="false">OFF</button>
         </label>
 
-        <label id="capoWrap">
-          Capo
-          <select id="capoSelect"></select>
-        </label>
+        <div class="capo-shape-mode-row" aria-label="Capo and chord-shape controls">
+          <label id="capoWrap">
+            Capo
+            <select id="capoSelect"></select>
+          </label>
 
-        <label id="neckWrap">
-          Chord Shape
-          <select id="neckSelect">
-            <option value="open">Open / Easy</option>
-            <option value="triad">Triad</option>
-            <option value="barre">Barre Chord</option>
-            <option value="power">Power Chord</option>
-            <option value="shell">Shell Voicing</option>
-            <option value="inversion">Inversion</option>
-            <option value="color">Color / Extended</option>
-          </select>
-        </label>
+          <label id="neckWrap">
+            Chord Shape
+            <select id="neckSelect">
+              <option value="open">Open / Easy</option>
+              <option value="triad">Triad</option>
+              <option value="barre">Barre Chord</option>
+              <option value="power">Power Chord</option>
+              <option value="shell">Shell Voicing</option>
+              <option value="inversion">Inversion</option>
+              <option value="color">Color / Extended</option>
+            </select>
+          </label>
 
-        <label id="transposeWrap">
-          Capo mode
-          <button id="transposeBtn" class="toggle-btn" type="button" aria-pressed="false">Transpose OFF</button>
-        </label>
+          <label id="transposeWrap">
+            Capo mode
+            <button id="transposeBtn" class="toggle-btn" type="button" aria-pressed="false">Transpose OFF</button>
+          </label>
+        </div>
       </div>
 
       <div class="entry-row">
@@ -376,8 +378,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.7-CRP-SHOW-HIDE-LAYOUT"></script>
-  <script src="parts.js?v=3.3.7-CRP-SHOW-HIDE-LAYOUT"></script>
-  <script src="beat-maker.js?v=3.3.7-CRP-SHOW-HIDE-LAYOUT"></script>
+  <script src="app.js?v=3.3.8-LAST-MIDI-DURATION-CAPO-ROW"></script>
+  <script src="parts.js?v=3.3.8-LAST-MIDI-DURATION-CAPO-ROW"></script>
+  <script src="beat-maker.js?v=3.3.8-LAST-MIDI-DURATION-CAPO-ROW"></script>
 </body>
 </html>

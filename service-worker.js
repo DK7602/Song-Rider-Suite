@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.7-crp-show-hide-layout';
+const CACHE = 'song-rider-suite-v3.3.8-last-midi-duration-capo-row';
 const ASSETS = [
   './assets/chord-rider-pro-wordmark.png',
   './song-rider/suite-header-master.png',

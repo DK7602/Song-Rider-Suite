@@ -587,13 +587,19 @@
       if(e.button!=null&&e.button!==0)return;
       e.preventDefault();e.stopPropagation();
       state.selectedRow=ri;syncBuildInput();
-      const pointerId=e.pointerId,startX=e.clientX,startScroll=wrap.scrollLeft,startDur=cardDurationBeats(card);
+      const pointerId=e.pointerId,startX=e.clientX,startDur=cardDurationBeats(card);
+      // Track only scroll movement that WE deliberately cause while the pointer is
+      // parked at an edge. The final MIDI column changes the roll's total width as
+      // it is resized, so the browser can clamp wrap.scrollLeft on its own. Feeding
+      // that clamp back into the duration calculation made the last chord/note race
+      // through beats while every earlier column felt normal.
+      let dragScrollDelta=0;
       let moved=false,lastDur=startDur,autoRaf=0,lastClientX=e.clientX;
       handle.classList.add('dragging');
       try{handle.setPointerCapture?.(pointerId);}catch(_){ }
       const apply=clientX=>{
         lastClientX=clientX;
-        const dx=clientX-startX+(wrap.scrollLeft-startScroll);
+        const dx=clientX-startX+dragScrollDelta;
         const next=Math.max(.25,Math.min(64,Math.round((startDur+dx/MIDI_BEAT_PX)*4)/4));
         if(next===lastDur)return;
         moved=true;lastDur=next;card.durationBeats=next;
@@ -620,7 +626,8 @@
           const pxPerSecond=minSpeed+(maxExtra*depth);
           const before=wrap.scrollLeft;
           wrap.scrollLeft=Math.max(0,Math.min(wrap.scrollWidth-wrap.clientWidth,before+direction*pxPerSecond*(dt/1000)));
-          if(Math.abs(wrap.scrollLeft-before)>.01)apply(lastClientX);
+          const deliberateDelta=wrap.scrollLeft-before;
+          if(Math.abs(deliberateDelta)>.01){dragScrollDelta+=deliberateDelta;apply(lastClientX);}
           autoLastTs=ts;
           autoRaf=requestAnimationFrame(autoScroll);
         }else autoLastTs=0;

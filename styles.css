@@ -3086,3 +3086,32 @@ body.workspace-chord-rider #chordPartControls.setup-collapsed{
 body.workspace-chord-rider #chordPartControls.setup-collapsed > .entry-row{
   margin-top:4px!important;
 }
+
+
+/* v3.3.8 — CRP capo controls in one row + stable final MIDI duration handle. */
+.capo-shape-mode-row{
+  width:100%;
+  flex:1 0 100%;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) minmax(0,1.1fr);
+  gap:12px;
+  align-items:end;
+}
+.capo-shape-mode-row > label{min-width:0;width:100%;}
+.capo-shape-mode-row select,
+.capo-shape-mode-row #transposeBtn{width:100%;min-width:0;}
+.capo-shape-mode-row #transposeBtn{white-space:nowrap;}
+.crp-midi-roll-wrap{overflow-anchor:none;}
+@media(max-width:700px){
+  .capo-shape-mode-row{grid-template-columns:minmax(0,.9fr) minmax(0,1.15fr) minmax(0,1.15fr);gap:8px;}
+  .capo-shape-mode-row > label{font-size:.74rem;}
+  .capo-shape-mode-row select,
+  .capo-shape-mode-row #transposeBtn{padding-left:8px;padding-right:8px;font-size:.82rem;}
+  .capo-shape-mode-row #transposeBtn{min-width:0!important;}
+}
+@media(max-width:390px){
+  .capo-shape-mode-row{gap:6px;grid-template-columns:minmax(0,.86fr) minmax(0,1.16fr) minmax(0,1.18fr);}
+  .capo-shape-mode-row > label{font-size:.68rem;gap:5px;}
+  .capo-shape-mode-row select,
+  .capo-shape-mode-row #transposeBtn{padding-left:6px;padding-right:6px;font-size:.75rem;}
+}
