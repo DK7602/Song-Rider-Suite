@@ -52,10 +52,12 @@
     const a=active(), busy=!!(playing||starting);
     const leadBtn=$('leadPlaybackBtn');
     const vocalBtn=$('vocalMasterPlayBtn');
-    const leadHere=busy&&playbackScope?.kind==='lead'&&String(playbackScope.ownerId||'')===String(a?.id||'');
+    // Lead/Bass Play is the Baby DAW master transport for the parts checked in
+    // the part strip. It is intentionally not a current-part-only preview.
+    const leadHere=busy&&!playbackScope;
     const vocalHere=busy&&playbackScope?.kind==='vocalMix'&&String(playbackScope.ownerId||'')===String(a?.id||'');
     if(leadBtn){
-      leadBtn.textContent=leadHere?'■ Stop':'▶ Play Part';
+      leadBtn.textContent=leadHere?'■ Stop':'▶ Play';
       leadBtn.classList.toggle('is-playing',leadHere);
       leadBtn.setAttribute('aria-pressed',leadHere?'true':'false');
     }
@@ -227,7 +229,7 @@
   }
   function renderLeadEditor(p=active()){
     if(!p||p.type!=='lead')return;
-    $('leadPartTitle').textContent=p.name;if($('leadRepeat'))$('leadRepeat').checked=p.repeat!==false;if($('leadSustain'))$('leadSustain').checked=p.sustain===true;
+    $('leadPartTitle').textContent=p.name;p.repeat=!!core.loop;if($('leadRepeat'))$('leadRepeat').checked=!!core.loop;if($('leadSustain'))$('leadSustain').checked=p.sustain===true;
     $('leadVolume').value=Math.round(p.volume*100);$('leadVolumeValue').textContent=`${Math.round(p.volume*100)}%`;
     document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.classList.toggle('active',b.dataset.leadInstrument===p.instrument));
     leadSoundOptions(p);$('leadGridOctave').value=String(p.gridOctave);$('leadResolution').value=String(p.resolution);$('leadBars').value=String(p.bars);
@@ -601,7 +603,7 @@
         cards.forEach((card,i)=>{if(!playing||generation!==playbackGeneration)return;const durBeats=core.cardDurationBeats?.(card,core.beats)||core.beats,b=chordBeat;chordBeat+=durBeats;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;const duration=Math.max(.18,durBeats*beatSec*.98);const notes=core.notesFor(card,p.data)||[];notes.forEach((n,j)=>playTracked(player,n,at+(p.data.instrument==='guitar'?j*.035:0),{duration,gain:.94}));scheduleHighlight((at-audioCtx.currentTime)*1000,p,i);});
       }else{
         const subdiv=p.resolution/4,stepBeats=1/subdiv;
-        const partBeats=Math.max(stepBeats,p.bars*4),firstCycle=p.repeat?Math.max(0,Math.floor(fromBeat/partBeats)):0,lastCycle=p.repeat?Math.floor((toBeat-1e-6)/partBeats):0;
+        const partBeats=Math.max(stepBeats,p.bars*4),repeatLead=playbackScope?.kind==='vocalMix'?p.repeat:!!core.loop,firstCycle=repeatLead?Math.max(0,Math.floor(fromBeat/partBeats)):0,lastCycle=repeatLead?Math.floor((toBeat-1e-6)/partBeats):0;
         for(let cyc=firstCycle;cyc<=lastCycle;cyc++)p.events.forEach(e=>{if(!playing||generation!==playbackGeneration)return;const local=e.step*stepBeats,b=local+cyc*partBeats;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;let midi=e.midi+(Number(p.octave)||0)*12;if(p.sound==='electric_bass_finger')midi-=12;const drawnBeats=leadDurationSteps(e)*stepBeats,duration=p.sustain&&drawnBeats<=stepBeats?Math.max(.12,beatSec*1.03):Math.max(.05,drawnBeats*beatSec*.98);playTracked(player,midiName(midi),at,{duration,gain:.92});scheduleLeadHighlight((at-audioCtx.currentTime)*1000,p,e.step);});
       }
     }
@@ -710,9 +712,13 @@
   function togglePlayback(){if(playing||starting)stopPlayback();else startPlayback();}
   function toggleLeadPartPlayback(){
     const p=active();if(!p||p.type!=='lead')return;
-    if((playing||starting)&&playbackScope?.kind==='lead'&&String(playbackScope.ownerId||'')===String(p.id)){stopPlayback();return;}
-    if(!p.events?.length){core.status('Add at least one Lead/Bass note first.');return;}
-    startPlayback({scope:{kind:'lead',ownerId:p.id,playableIds:[p.id],vocalIds:[],drums:false,backingGain:1,drumGain:0}});
+    // Play exactly the parts checked in the top Parts strip (plus drums when
+    // enabled), matching the main Baby DAW transport instead of soloing this part.
+    if(playing||starting){stopPlayback();return;}
+    const hasCheckedPlayable=parts.some(x=>x.enabled&&((x.type==='chord'&&partDurationBeats(x)>0)||(x.type==='lead'&&x.events?.length)||(x.type==='vocal'&&x.activeTakeId&&x.recordings?.some(r=>r.id===x.activeTakeId))));
+    const drumsOn=!!$('crpDrumsToggle')?.checked;
+    if(!hasCheckedPlayable&&!drumsOn){core.status('Check at least one part above, or turn on Drums, to play.');return;}
+    startPlayback();
   }
   function toggleVocalMasterPlayback(){
     const p=active();if(!p||p.type!=='vocal')return;
@@ -784,7 +790,16 @@
     $('addPartBtn')?.addEventListener('click',openModal);$('closePartModal')?.addEventListener('click',closeModal);document.querySelector('[data-close-part-modal]')?.addEventListener('click',closeModal);document.querySelectorAll('.part-choice').forEach(b=>b.addEventListener('click',()=>addPart(b.dataset.partType)));
     document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;p.instrument=b.dataset.leadInstrument;p.sound=(core.sounds[p.instrument]||[])[0]?.[0]||p.sound;invalidatePartPlayers(p);renderLeadEditor(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();});
     if($('leadPlaybackBtn'))$('leadPlaybackBtn').onclick=toggleLeadPartPlayback;
-    $('leadRepeat').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.repeat=e.target.checked;core.scheduleAutoSave();};
+    $('leadRepeat').onchange=e=>{
+      const p=active();if(p?.type!=='lead')return;
+      // This Repeat control mirrors the project/master repeat so the Lead/Bass
+      // Play button loops the entire checked mix, not only the current part.
+      p.repeat=e.target.checked;
+      const master=$('loopToggle');
+      if(master){master.checked=e.target.checked;master.dispatchEvent(new Event('change',{bubbles:true}));}
+      core.scheduleAutoSave();
+    };
+    $('loopToggle')?.addEventListener('change',()=>{const p=active();if(p?.type==='lead'){p.repeat=!!$('loopToggle').checked;if($('leadRepeat'))$('leadRepeat').checked=p.repeat;}});
     $('leadSustain').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sustain=e.target.checked;core.scheduleAutoSave();};
     $('leadSoundSelect').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sound=e.target.value;invalidatePartPlayers(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();};
     $('leadGridOctave').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.gridOctave=+e.target.value;renderLeadGrid(p);core.scheduleAutoSave();};

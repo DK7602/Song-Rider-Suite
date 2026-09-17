@@ -3054,3 +3054,14 @@ body.workspace-chord-rider .progression-line.midi-roll-line{display:block;min-wi
   .vocal-title-main{gap:8px;}
   .vocal-master-play-btn{min-width:100px;}
 }
+
+
+/* v3.3.6 — compact Lead/Bass master transport */
+.lead-play-options{flex-wrap:nowrap!important;gap:10px!important;}
+.lead-play-options .part-repeat-toggle{white-space:nowrap;flex:0 0 auto;}
+.lead-play-options .part-preview-btn{flex:0 0 auto;}
+@media(max-width:390px){
+  .lead-play-options{gap:7px!important;}
+  .lead-play-options .part-preview-btn{padding-left:10px;padding-right:10px;}
+  .lead-play-options .part-repeat-toggle{gap:5px;font-size:.79rem;}
+}
