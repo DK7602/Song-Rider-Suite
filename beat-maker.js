@@ -41,6 +41,7 @@
   let previewStep = 0;
   let previewNextTime = 0;
   let mainPlaying = false;
+  let mainGainScale = 1;
   let mainStep = 0;
   let mainNextTime = 0;
   let activeProjectId = null;
@@ -512,8 +513,8 @@
     const src=audioCtx.createBufferSource(), g=audioCtx.createGain(); src.buffer=buf; g.gain.value=beat.gain*DRUM_OUTPUT_SCALE*gain; src.connect(g).connect(audioCtx.destination); src.start(time);
   }
   async function audition(id,gain=.78){ try{await ensureDrums();hit(id,audioCtx.currentTime+.01,gain)}catch(e){console.error(e);status(`Drum error: ${e.message||e}`);} }
-  function scheduleCanonicalStep(absStep,time,barIndex){
-    const step=absStep%64; DRUMS.forEach(([id])=>{ if(beat.tracks[id][barIndex]?.includes(step)) hit(id,time,1); });
+  function scheduleCanonicalStep(absStep,time,barIndex,gainScale=1){
+    const step=absStep%64; DRUMS.forEach(([id])=>{ if(beat.tracks[id][barIndex]?.includes(step)) hit(id,time,gainScale); });
   }
   function stepSeconds(){ return (60/getBpm())/16; } // one 64th = quarter/16
   function startScheduler(kind){
@@ -523,10 +524,10 @@
       if(!audioCtx) return;
       while((kind==='preview'?previewNextTime:mainNextTime) < audioCtx.currentTime+lookAhead){
         if(kind==='preview'){
-          const bar=Math.floor(previewStep/64)%beat.bars; scheduleCanonicalStep(previewStep,previewNextTime,bar);
+          const bar=Math.floor(previewStep/64)%beat.bars; scheduleCanonicalStep(previewStep,previewNextTime,bar,1);
           markPlayingStep(bar,previewStep%64); previewStep++; previewNextTime+=stepSeconds();
         }else{
-          const bar=Math.floor(mainStep/64)%beat.bars; scheduleCanonicalStep(mainStep,mainNextTime,bar);
+          const bar=Math.floor(mainStep/64)%beat.bars; scheduleCanonicalStep(mainStep,mainNextTime,bar,mainGainScale);
           mainStep++; mainNextTime+=stepSeconds();
         }
       }
@@ -556,9 +557,10 @@
     };
     requestAnimationFrame(sync);
   }
-  function startMainDrums(delaySeconds=.01,startBeat=0){
+  function startMainDrums(delaySeconds=.01,startBeat=0,gainScale=1){
     if(!audioCtx||!beat.enabled) return;
     mainPlaying=true;
+    mainGainScale=Math.max(0,Math.min(1,Number(gainScale)||0));
     // 16 canonical drum steps per quarter-note beat (64 per 4/4 bar).
     // Starting from the same song beat keeps drums aligned when playback begins
     // from Line 2/3/etc. instead of always forcing the drums back to Bar 1.
@@ -566,7 +568,7 @@
     mainNextTime=audioCtx.currentTime+Math.max(.01,Number(delaySeconds)||.01);
     startScheduler('main');
   }
-  function stopMainDrums(){ mainPlaying=false; if(scheduler && !previewing){clearInterval(scheduler);scheduler=null;} }
+  function stopMainDrums(){ mainPlaying=false; mainGainScale=1; if(scheduler && !previewing){clearInterval(scheduler);scheduler=null;} }
 
   // If the chord progression stops itself (Repeat off), stop drums too.
   setInterval(()=>{ if(mainPlaying && $('playAllBtn') && !/Stop/i.test($('playAllBtn').textContent||'')) stopMainDrums(); },120);
@@ -587,11 +589,12 @@
     persist(){
       return persistBeatIntoProject();
     },
-    async startMainNow(delaySeconds=.01,startBeat=0){
+    async startMainNow(delaySeconds=.01,startBeat=0,gainScale=1){
       if(!beat.enabled || countHits()===0) return;
       stopPreview();
-      try{await ensureDrums();startMainDrums(delaySeconds,startBeat);}catch(e){console.error(e);}
+      try{await ensureDrums();startMainDrums(delaySeconds,startBeat,gainScale);}catch(e){console.error(e);}
     },
+    getDurationBeats(){ return beat.enabled&&countHits()>0 ? Math.max(4,(Number(beat.bars)||1)*4) : 0; },
     stopMainNow(){stopMainDrums();}
   };
 

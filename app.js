@@ -60,7 +60,7 @@
   function chordNotes(name,baseOct=4){const c=parseChord(name);if(!c)return[];return QUALITY[c.quality].map(iv=>{const n=NOTE_INDEX[c.root]+iv;return NOTES[n%12]+(baseOct+Math.floor(n/12));});}
   function midiOf(note){const m=String(note).match(/^([A-G])([#b]?)(-?\d+)$/);return m?(Number(m[3])+1)*12+NOTE_INDEX[m[1]+m[2]]:null;}
   function noteAtMidi(m){return NOTES[(m%12+12)%12]+(Math.floor(m/12)-1);}
-  const MIDI_BEAT_PX=24;
+  const MIDI_BEAT_PX=44; // wider beat spacing gives phone drags much finer duration control
   function cardDurationBeats(card,fallback=+$('beatsSelect')?.value||4){
     const n=Number(card?.durationBeats);
     return Number.isFinite(n)&&n>0?Math.max(.25,Math.min(64,Math.round(n*4)/4)):Math.max(.25,Number(fallback)||4);
@@ -602,22 +602,22 @@
         label.title=`${formatBeatDuration(next)} beats`;
         $('status').textContent=`${displayedValue(card)} duration: ${formatBeatDuration(next)} beat${next===1?'':'s'}`;
       };
-      // Precision edge-scroll while resizing. v3.3.3 scrolled by up to 18px
-      // every animation frame (>1000px/sec on a 60Hz phone), which made it
-      // nearly impossible to release on the intended beat. Use time-based,
-      // deliberately slow scrolling instead: ~24px/sec when entering the edge
-      // zone and up to ~72px/sec at the very edge.
+      // v3.3.5: phone precision pass. Wider beat spacing above handles normal finger
+      // movement; edge-scroll is intentionally very slow and slightly slower while
+      // shrinking left, which was the direction most likely to overshoot.
       let autoLastTs=0;
       const autoScroll=ts=>{
         autoRaf=0;
         const r=wrap.getBoundingClientRect();
-        const edgeRight=48,edgeLeft=88;
+        const edgeRight=52,edgeLeft=96;
         let direction=0,depth=0;
         if(lastClientX>r.right-edgeRight){direction=1;depth=Math.min(1,Math.max(0,(lastClientX-(r.right-edgeRight))/edgeRight));}
         else if(lastClientX<r.left+edgeLeft){direction=-1;depth=Math.min(1,Math.max(0,((r.left+edgeLeft)-lastClientX)/edgeLeft));}
         if(direction){
           const dt=autoLastTs?Math.min(40,Math.max(8,ts-autoLastTs)):16.67;
-          const pxPerSecond=24+(48*depth);
+          const minSpeed=direction<0?7:10;
+          const maxExtra=direction<0?13:16;
+          const pxPerSecond=minSpeed+(maxExtra*depth);
           const before=wrap.scrollLeft;
           wrap.scrollLeft=Math.max(0,Math.min(wrap.scrollWidth-wrap.clientWidth,before+direction*pxPerSecond*(dt/1000)));
           if(Math.abs(wrap.scrollLeft-before)>.01)apply(lastClientX);

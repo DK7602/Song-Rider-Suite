@@ -15,6 +15,7 @@
   let loadedChordPartId=null;
   let leadBarPage=0;
   let playing=false, starting=false, playbackGeneration=0;
+  let playbackScope=null; // null = normal enabled-part playback; otherwise a scoped Lead/Vocal preview
   let playbackClockStartAudioTime=0, playbackClockStartBeat=0, playbackClockBpm=92;
   let audioCtx=null, masterLimiter=null, cycleTimer=null;
   let playerCache=new Map(), partBuses=new Map(), highlightTimers=[], activeVoices=new Set(), vocalBufferCache=new Map(), activeVocalSources=new Set();
@@ -33,7 +34,7 @@
     return {id:uid(),type:'lead',name,enabled:true,repeat:true,sustain:false,volume:.8,instrument:'piano',sound:'acoustic_grand_piano',octave:0,gridOctave:3,resolution:16,bars:4,events:[]};
   }
   function vocalPart(name='Vocals 1'){
-    return {id:uid(),type:'vocal',name,enabled:true,repeat:true,volume:1,transcript:'',recordings:[],activeTakeId:null,backingPartIds:[],backingDrums:true,backingVolume:.8,fx:{eq:'clear',comp:'medium',reverb:.12,delay:0}};
+    return {id:uid(),type:'vocal',name,enabled:true,repeat:true,volume:1,transcript:'',recordings:[],activeTakeId:null,backingPartIds:parts.filter(x=>x.type==='chord'||x.type==='lead').filter(x=>x.enabled).map(x=>x.id),backingDrums:true,backingVolume:.8,fx:{eq:'clear',comp:'medium',reverb:.12,delay:0}};
   }
   function normalizePart(p,i){
     if(!p||!p.type)return null;
@@ -47,6 +48,23 @@
     const p=chordPart('Chords 1');parts=[p];activePartId=p.id;loadedChordPartId=p.id;
   }
   function active(){return parts.find(p=>p.id===activePartId)||parts[0]||null;}
+  function updatePartPlaybackButtons(){
+    const a=active(), busy=!!(playing||starting);
+    const leadBtn=$('leadPlaybackBtn');
+    const vocalBtn=$('vocalMasterPlayBtn');
+    const leadHere=busy&&playbackScope?.kind==='lead'&&String(playbackScope.ownerId||'')===String(a?.id||'');
+    const vocalHere=busy&&playbackScope?.kind==='vocalMix'&&String(playbackScope.ownerId||'')===String(a?.id||'');
+    if(leadBtn){
+      leadBtn.textContent=leadHere?'■ Stop':'▶ Play Part';
+      leadBtn.classList.toggle('is-playing',leadHere);
+      leadBtn.setAttribute('aria-pressed',leadHere?'true':'false');
+    }
+    if(vocalBtn){
+      vocalBtn.textContent=vocalHere?'■ Stop Mix':'▶ Play Mix';
+      vocalBtn.classList.toggle('is-playing',vocalHere);
+      vocalBtn.setAttribute('aria-pressed',vocalHere?'true':'false');
+    }
+  }
   function loadedChord(){return parts.find(p=>p.id===loadedChordPartId&&p.type==='chord')||null;}
   function syncLoadedChord(){
     const p=loadedChord();
@@ -215,6 +233,7 @@
     leadSoundOptions(p);$('leadGridOctave').value=String(p.gridOctave);$('leadResolution').value=String(p.resolution);$('leadBars').value=String(p.bars);
     leadBarPage=Math.max(0,Math.min(p.bars-1,leadBarPage));updateLeadBarUi(p);
     renderLeadGrid(p,{scrollToBar:true});
+    updatePartPlaybackButtons();
   }
   const LEAD_STEP_PX=26;
   function leadDurationSteps(e){return Math.max(1,Math.round(Number(e?.durationSteps)||1));}
@@ -257,20 +276,21 @@
         lastDur=next;moved=true;event.durationSteps=next;block.style.gridColumnEnd=`span ${next}`;
         core.status(`${midiName(event.midi)} duration: ${leadDurationLabel(p,next)}`);
       };
-      // Precision edge-scroll while stretching Lead/Bass notes. Keep the
-      // timeline moving slowly enough that a finger can stop on an exact grid
-      // step instead of racing across several beats. Time-based speed also
-      // keeps behavior consistent on 60/90/120Hz phones.
+      // v3.3.5 precision pass: deliberately slow edge travel. Shrinking toward
+      // the left is slower than growing right because that was easiest to overshoot
+      // on a phone. Direct note-grid dragging remains one full grid step per 26px.
       let autoLastTs=0;
       const autoScroll=ts=>{
         autoRaf=0;
-        const r=wrap.getBoundingClientRect(),edgeRight=48,edgeLeft=78;
+        const r=wrap.getBoundingClientRect(),edgeRight=52,edgeLeft=88;
         let direction=0,depth=0;
         if(lastClientX>r.right-edgeRight){direction=1;depth=Math.min(1,Math.max(0,(lastClientX-(r.right-edgeRight))/edgeRight));}
         else if(lastClientX<r.left+edgeLeft){direction=-1;depth=Math.min(1,Math.max(0,((r.left+edgeLeft)-lastClientX)/edgeLeft));}
         if(direction){
           const dt=autoLastTs?Math.min(40,Math.max(8,ts-autoLastTs)):16.67;
-          const pxPerSecond=22+(44*depth);
+          const minSpeed=direction<0?7:10;
+          const maxExtra=direction<0?13:18;
+          const pxPerSecond=minSpeed+(maxExtra*depth);
           const before=wrap.scrollLeft;
           wrap.scrollLeft=Math.max(0,Math.min(wrap.scrollWidth-wrap.clientWidth,before+direction*pxPerSecond*(dt/1000)));
           if(Math.abs(wrap.scrollLeft-before)>.01)apply(lastClientX);
@@ -390,10 +410,10 @@
   }
   async function transcribeActiveTake(){const p=active();if(!p||p.type!=='vocal')return;const take=p.recordings?.find(r=>r.id===p.activeTakeId);if(!take){core.status('Record or choose a vocal take first.');return;}const btn=$('vocalTranscribeBtn');try{if(btn){btn.disabled=true;btn.textContent='Transcribing…';}await transcribeTake(p,take);core.status('Vocal transcript updated from the cloud recording.');}catch(e){console.error(e);if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent=e.message||'Could not transcribe this take.';core.status(e.message||'Could not transcribe this take.');}finally{if(btn){btn.disabled=false;btn.textContent='Transcribe active take';}}}
   function fmtTime(sec){sec=Math.max(0,Number(sec)||0);const m=Math.floor(sec/60),s=sec-m*60;return `${String(m).padStart(2,'0')}:${s.toFixed(1).padStart(4,'0')}`;}
-  function renderVocalBacking(p){const box=$('vocalBackingParts');if(!box)return;const candidates=parts.filter(x=>x.id!==p.id&&(x.type==='chord'||x.type==='lead'));if(!p.backingPartIds?.length)p.backingPartIds=candidates.filter(x=>x.enabled).map(x=>x.id);box.innerHTML='';candidates.forEach(x=>{const lab=document.createElement('label');lab.className='vocal-backing-item';const chk=document.createElement('input');chk.type='checkbox';chk.checked=p.backingPartIds.includes(x.id);chk.onchange=()=>{p.backingPartIds=candidates.filter(c=>box.querySelector(`[data-back-id="${c.id}"]`)?.checked).map(c=>c.id);core.scheduleAutoSave();};chk.dataset.backId=x.id;const span=document.createElement('span');span.textContent=x.name;lab.append(chk,span);box.appendChild(lab);});if(!candidates.length)box.innerHTML='<span class="subtle tiny">Add a Chord/Note or Lead/Bass part for a headphone backing track.</span>';}
+  function renderVocalBacking(p){const box=$('vocalBackingParts');if(!box)return;const candidates=parts.filter(x=>x.id!==p.id&&(x.type==='chord'||x.type==='lead'));if(!Array.isArray(p.backingPartIds))p.backingPartIds=[];box.innerHTML='';candidates.forEach(x=>{const lab=document.createElement('label');lab.className='vocal-backing-item';const chk=document.createElement('input');chk.type='checkbox';chk.checked=p.backingPartIds.includes(x.id);chk.onchange=()=>{p.backingPartIds=candidates.filter(c=>box.querySelector(`[data-back-id="${c.id}"]`)?.checked).map(c=>c.id);core.scheduleAutoSave();};chk.dataset.backId=x.id;const span=document.createElement('span');span.textContent=x.name;lab.append(chk,span);box.appendChild(lab);});if(!candidates.length)box.innerHTML='<span class="subtle tiny">Add a Chord/Note or Lead/Bass part for a headphone backing track.</span>';}
   async function renderVocalTakes(p){const box=$('vocalTakes');if(!box)return;box.innerHTML='';if(!p.recordings.length){box.innerHTML='<div class="vocal-empty">No takes yet. Put on headphones and tap Record.</div>';return;}for(const take of [...p.recordings].reverse()){const row=document.createElement('div');row.className='vocal-take'+(p.activeTakeId===take.id?' active':'');const main=document.createElement('div');main.className='vocal-take-main';main.innerHTML=`<div class="vocal-take-name">${escapeHtml(take.name||'Vocal take')}<span class="cloud-badge ${take.cloud?'':'pending'}">${take.cloud?'☁ Cloud':'Device'}</span></div><div class="vocal-take-meta">${fmtTime(take.duration)} • ${take.sampleRate||48000} Hz WAV • ${new Date(take.createdAt).toLocaleString()}</div>`;const use=document.createElement('button');use.type='button';use.className='take-use';use.textContent=p.activeTakeId===take.id?'Using':'Use';use.onclick=()=>{p.activeTakeId=take.id;p.transcript=take.transcript||'';p.transcriptWords=take.transcriptWords||[];renderVocalTakes(p);if($('vocalTranscript'))$('vocalTranscript').value=p.transcript||'';core.scheduleAutoSave();};const play=document.createElement('button');play.type='button';play.textContent='▶';play.title='Preview take';play.onclick=()=>previewTake(p,take,play);const dl=document.createElement('button');dl.type='button';dl.className='take-download';dl.textContent='↓ WAV';dl.onclick=()=>downloadTake(take);const del=document.createElement('button');del.type='button';del.className='take-delete';del.textContent='×';del.title='Delete take';del.onclick=async()=>{if(!confirm(`Delete “${take.name}”?`))return;stopPreview();await vocalDbDelete(take.id).catch(()=>{});await deleteTakeCloud(take);vocalBufferCache.delete(take.id);p.recordings=p.recordings.filter(r=>r.id!==take.id);if(p.activeTakeId===take.id)p.activeTakeId=p.recordings.at(-1)?.id||null;renderVocalTakes(p);markPartsDirty();core.scheduleAutoSave();core.flushAutoSaveNow?.();};row.append(main,use,play,dl,del);box.appendChild(row);}}
   function renderVocalEditor(p=active()){
-    if(!p||p.type!=='vocal')return;$('vocalPartTitle').textContent=p.name;if($('vocalTranscript'))$('vocalTranscript').value=p.transcript||'';if($('vocalRepeat'))$('vocalRepeat').checked=p.repeat!==false;$('vocalVolume').value=Math.round(p.volume*100);$('vocalVolumeValue').textContent=`${Math.round(p.volume*100)}%`;renderVocalBacking(p);$('vocalBackingDrums').checked=p.backingDrums!==false;$('vocalBackingVolume').value=Math.round((p.backingVolume??.8)*100);$('vocalBackingVolumeValue').textContent=`${Math.round((p.backingVolume??.8)*100)}%`;$('vocalFxEq').value=p.fx?.eq||'clear';$('vocalFxComp').value=p.fx?.comp||'medium';$('vocalFxReverb').value=String(p.fx?.reverb??.12);$('vocalFxDelay').value=String(p.fx?.delay||0);renderVocalTakes(p);
+    if(!p||p.type!=='vocal')return;$('vocalPartTitle').textContent=p.name;if($('vocalTranscript'))$('vocalTranscript').value=p.transcript||'';if($('vocalRepeat'))$('vocalRepeat').checked=p.repeat!==false;$('vocalVolume').value=Math.round(p.volume*100);$('vocalVolumeValue').textContent=`${Math.round(p.volume*100)}%`;renderVocalBacking(p);$('vocalBackingDrums').checked=p.backingDrums!==false;$('vocalBackingVolume').value=Math.round((p.backingVolume??.8)*100);$('vocalBackingVolumeValue').textContent=`${Math.round((p.backingVolume??.8)*100)}%`;$('vocalFxEq').value=p.fx?.eq||'clear';$('vocalFxComp').value=p.fx?.comp||'medium';$('vocalFxReverb').value=String(p.fx?.reverb??.12);$('vocalFxDelay').value=String(p.fx?.delay||0);renderVocalTakes(p);updatePartPlaybackButtons();
   }
   async function ensureMic(){
     if(micStream?.active)return micStream;if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone recording is not available in this browser.');
@@ -452,15 +472,31 @@
     if(p.type==='lead')return p.bars*4;
     return 0;
   }
-  function enabledPlayable(){return parts.filter(p=>p.enabled&&(p.type==='chord'||p.type==='lead')&&partDurationBeats(p)>0);}
-  function enabledVocals(){return parts.filter(p=>p.enabled&&p.type==='vocal'&&p.activeTakeId&&p.recordings?.some(r=>r.id===p.activeTakeId));}
+  function enabledPlayable(){
+    const base=parts.filter(p=>(p.type==='chord'||p.type==='lead')&&partDurationBeats(p)>0);
+    if(playbackScope){
+      const ids=new Set(playbackScope.playableIds||[]);
+      return base.filter(p=>ids.has(p.id));
+    }
+    return base.filter(p=>p.enabled);
+  }
+  function enabledVocals(){
+    const base=parts.filter(p=>p.type==='vocal'&&p.activeTakeId&&p.recordings?.some(r=>r.id===p.activeTakeId));
+    if(playbackScope){
+      const ids=new Set(playbackScope.vocalIds||[]);
+      return base.filter(p=>ids.has(p.id));
+    }
+    return base.filter(p=>p.enabled);
+  }
   function vocalDurationBeats(p){const t=p.recordings?.find(r=>r.id===p.activeTakeId);return t?Math.max(0,(Number(t.duration)||0)*core.bpm/60):0;}
   function ensureAudio(){
     if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();
     if(!masterLimiter){masterLimiter=audioCtx.createDynamicsCompressor();masterLimiter.threshold.value=-2;masterLimiter.knee.value=0;masterLimiter.ratio.value=20;masterLimiter.attack.value=.003;masterLimiter.release.value=.12;masterLimiter.connect(audioCtx.destination);}
   }
   function busFor(p){
-    ensureAudio();let bus=partBuses.get(p.id);if(!bus){bus=audioCtx.createGain();bus.connect(masterLimiter);partBuses.set(p.id,bus);}bus.gain.value=(SOUND_GAIN[p.type==='chord'?p.data.sound:p.sound]||1)*p.volume*(p.type==='lead'?LEAD_OUTPUT_BOOST:1);return bus;
+    ensureAudio();let bus=partBuses.get(p.id);if(!bus){bus=audioCtx.createGain();bus.connect(masterLimiter);partBuses.set(p.id,bus);}
+    const scopeGain=playbackScope&&Array.isArray(playbackScope.playableIds)&&playbackScope.playableIds.includes(p.id)?Math.max(0,Math.min(1,Number(playbackScope.backingGain??1))):1;
+    bus.gain.value=(SOUND_GAIN[p.type==='chord'?p.data.sound:p.sound]||1)*p.volume*(p.type==='lead'?LEAD_OUTPUT_BOOST:1)*scopeGain;return bus;
   }
   async function playerFor(p){
     ensureAudio();const sound=p.type==='chord'?p.data.sound:p.sound,key=`${p.id}:${sound}`;if(playerCache.has(key))return playerCache.get(key);if(!window.Soundfont)throw new Error('Sound engine unavailable');
@@ -574,26 +610,44 @@
       await scheduleVocalSegment(p,startTime,fromBeat,toBeat,generation);
     }
   }
-  async function startPlayback(){
+  async function startPlayback(options={}){
+    const requestedScope=options?.scope||null;
     if(playing||starting)stopPlayback();
-    syncLoadedChord();const ps=enabledPlayable(),vs=enabledVocals();if(!ps.length&&!vs.length){core.status('Turn on a part with something in it first.');return;}
+    playbackScope=requestedScope;
+    updatePartPlaybackButtons();
+    syncLoadedChord();
+    const ps=enabledPlayable(),vs=enabledVocals();
+    const scopedDrums=playbackScope?playbackScope.drums===true:true;
+    const drumBeats=scopedDrums?Math.max(0,Number(window.CRPBeatMaker?.getDurationBeats?.()||0)):0;
+    if(!ps.length&&!vs.length&&drumBeats<=0){
+      const wasVocalMix=playbackScope?.kind==='vocalMix';
+      playbackScope=null;updatePartPlaybackButtons();
+      core.status(wasVocalMix?'Choose at least one backing part/drums or an active vocal take.':'There is nothing to play in this part yet.');
+      return;
+    }
     const generation=++playbackGeneration;
-    starting=true;
+    starting=true;updatePartPlaybackButtons();
     try{
       core.status('Loading parts…');ensureAudio();await Promise.all([preload(ps),...vs.map(v=>vocalBufferFor(v))]);
       if(generation!==playbackGeneration)return;
 
       // Keep every playback source on the same musical downbeat. Drums use a
-      // separate AudioContext, so both engines receive the same relative lead-in
-      // instead of drums starting immediately and the parts starting ~100 ms later.
+      // separate AudioContext, so both engines receive the same relative lead-in.
       const leadIn=.16;
-      const total=Math.max(...ps.map(partDurationBeats),...vs.map(vocalDurationBeats),4);
-      let cursorBeat=(active()?.type==='chord'&&active()?.enabled&&activePartId===loadedChordPartId)?Math.min(core.startBeat(),Math.max(0,total-0.001)):0;
+      const total=Math.max(...ps.map(partDurationBeats),...vs.map(vocalDurationBeats),drumBeats,4);
+      // Scoped Lead/Vocal preview buttons always begin at beat 1. The normal
+      // Chord transport still honors "play line in view".
+      let cursorBeat=(!playbackScope&&active()?.type==='chord'&&active()?.enabled&&activePartId===loadedChordPartId)?Math.min(core.startBeat(),Math.max(0,total-0.001)):0;
       const initialBeat=cursorBeat;
-      await window.CRPBeatMaker?.startMainNow?.(leadIn,initialBeat);
+      if(scopedDrums){
+        const drumGain=Math.max(0,Math.min(1,Number(playbackScope?.drumGain??1)));
+        await window.CRPBeatMaker?.startMainNow?.(leadIn,initialBeat,drumGain);
+      }else{
+        window.CRPBeatMaker?.stopMainNow?.();
+      }
       if(generation!==playbackGeneration)return;
 
-      starting=false;playing=true;core.setPlaying(true);core.status('');
+      starting=false;playing=true;core.setPlaying(true);core.status('');updatePartPlaybackButtons();
       if(generation!==playbackGeneration||!playing){window.CRPBeatMaker?.stopMainNow?.();return;}
 
       let nextAudioStart=audioCtx.currentTime+leadIn;
@@ -602,7 +656,7 @@
       playbackClockStartAudioTime=nextAudioStart;
       playbackClockStartBeat=initialBeat;
       playbackClockBpm=Math.max(40,Math.min(240,+core.bpm||92));
-      const chunkBeats=1; // rolling scheduler: enables live sound changes without losing timing
+      const chunkBeats=1;
       let vocalsScheduledForCycle=false;
 
       const scheduleNext=async()=>{
@@ -613,8 +667,7 @@
         const span=(toBeat-fromBeat)*beatSec;
         const start=nextAudioStart,end=start+span;
 
-        // Vocals stay as one continuous source for the remainder of each song cycle;
-        // chopping a recorded take into one-beat scheduler chunks can click at boundaries.
+        // Vocals stay as one continuous source for the remainder of each song cycle.
         if(!vocalsScheduledForCycle){
           for(const v of enabledVocals())await scheduleVocalSegment(v,start,fromBeat,total,generation);
           vocalsScheduledForCycle=true;
@@ -625,15 +678,14 @@
         nextAudioStart=end;
         cursorBeat=toBeat;
         if(cursorBeat>=total-1e-7){
-          if(core.loop){cursorBeat=0;vocalsScheduledForCycle=false;}
+          const loopSong=playbackScope?false:!!core.loop;
+          if(loopSong){cursorBeat=0;vocalsScheduledForCycle=false;}
           else{
             cycleTimer=setTimeout(()=>{if(generation===playbackGeneration)stopPlayback();},Math.max(10,(end-audioCtx.currentTime)*1000+35));
             return;
           }
         }
 
-        // Schedule the next beat before the current one reaches the speakers.
-        // Web Audio handles the exact timestamp; this timer only feeds the queue.
         const wakeMs=Math.max(8,(end-audioCtx.currentTime-.22)*1000);
         cycleTimer=setTimeout(scheduleNext,wakeMs);
       };
@@ -652,8 +704,26 @@
     document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');
     silenceScheduledAudio();
     core.setPlaying(false);window.CRPBeatMaker?.stopMainNow?.();
+    playbackScope=null;
+    updatePartPlaybackButtons();
   }
   function togglePlayback(){if(playing||starting)stopPlayback();else startPlayback();}
+  function toggleLeadPartPlayback(){
+    const p=active();if(!p||p.type!=='lead')return;
+    if((playing||starting)&&playbackScope?.kind==='lead'&&String(playbackScope.ownerId||'')===String(p.id)){stopPlayback();return;}
+    if(!p.events?.length){core.status('Add at least one Lead/Bass note first.');return;}
+    startPlayback({scope:{kind:'lead',ownerId:p.id,playableIds:[p.id],vocalIds:[],drums:false,backingGain:1,drumGain:0}});
+  }
+  function toggleVocalMasterPlayback(){
+    const p=active();if(!p||p.type!=='vocal')return;
+    if((playing||starting)&&playbackScope?.kind==='vocalMix'&&String(playbackScope.ownerId||'')===String(p.id)){stopPlayback();return;}
+    const playableIds=(p.backingPartIds||[]).filter(id=>parts.some(x=>x.id===id&&(x.type==='chord'||x.type==='lead')));
+    const hasActiveTake=!!(p.activeTakeId&&p.recordings?.some(r=>r.id===p.activeTakeId));
+    const drums=p.backingDrums!==false;
+    if(!playableIds.length&&!hasActiveTake&&!drums){core.status('Check a backing part/drums or choose an active vocal take first.');return;}
+    const gain=Math.max(0,Math.min(1,Number(p.backingVolume??.8)));
+    startPlayback({scope:{kind:'vocalMix',ownerId:p.id,playableIds,vocalIds:hasActiveTake?[p.id]:[],drums,backingGain:gain,drumGain:gain}});
+  }
 
   function crc32(bytes){let c=0xffffffff;for(const b of bytes){c^=b;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (c^0xffffffff)>>>0;}
   function le16(n){return new Uint8Array([n&255,(n>>>8)&255]);}function le32(n){return new Uint8Array([n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255]);}
@@ -713,6 +783,7 @@
     ensureInitial();setEditorMode(active()?.type||'chord');renderParts();
     $('addPartBtn')?.addEventListener('click',openModal);$('closePartModal')?.addEventListener('click',closeModal);document.querySelector('[data-close-part-modal]')?.addEventListener('click',closeModal);document.querySelectorAll('.part-choice').forEach(b=>b.addEventListener('click',()=>addPart(b.dataset.partType)));
     document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;p.instrument=b.dataset.leadInstrument;p.sound=(core.sounds[p.instrument]||[])[0]?.[0]||p.sound;invalidatePartPlayers(p);renderLeadEditor(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();});
+    if($('leadPlaybackBtn'))$('leadPlaybackBtn').onclick=toggleLeadPartPlayback;
     $('leadRepeat').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.repeat=e.target.checked;core.scheduleAutoSave();};
     $('leadSustain').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sustain=e.target.checked;core.scheduleAutoSave();};
     $('leadSoundSelect').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sound=e.target.value;invalidatePartPlayers(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();};
@@ -726,6 +797,7 @@
     $('leadVolume').oninput=e=>{const p=active();if(p?.type!=='lead')return;p.volume=+e.target.value/100;$('leadVolumeValue').textContent=`${e.target.value}%`;renderParts();core.scheduleAutoSave();};
     $('vocalVolume').oninput=e=>{const p=active();if(p?.type!=='vocal')return;p.volume=+e.target.value/100;$('vocalVolumeValue').textContent=`${e.target.value}%`;renderParts();core.scheduleAutoSave();};
     $('vocalArmMic').onclick=async()=>{if(recording)return;if(micStream?.active){await disableMic();core.status('Mic test off.');return;}try{await ensureMic();core.status('Mic test on. Aim for strong level without living at the far right of the meter.');}catch(e){core.status(e.message||'Could not access microphone.');}};
+    if($('vocalMasterPlayBtn'))$('vocalMasterPlayBtn').onclick=toggleVocalMasterPlayback;
     $('vocalRepeat').onchange=e=>{const p=active();if(p?.type!=='vocal')return;p.repeat=e.target.checked;core.scheduleAutoSave();};
     $('vocalRecordBtn').onclick=async()=>{await beginRecording();updateFloatRecorder();};$('vocalStopBtn').onclick=async()=>{await endRecording();updateFloatRecorder();};if($('vocalLyricsBtn'))$('vocalLyricsBtn').onclick=openLyricsOverlay;if($('srpLyricsCloseBtn'))$('srpLyricsCloseBtn').onclick=closeLyricsOverlay;if($('srpFloatRecord'))$('srpFloatRecord').onclick=async()=>{await beginRecording();updateFloatRecorder();};if($('srpFloatPause'))$('srpFloatPause').onclick=()=>{toggleRecordingPause();updateFloatRecorder();};if($('srpFloatStop'))$('srpFloatStop').onclick=async()=>{await endRecording();updateFloatRecorder();};
     window.addEventListener('message',(e)=>{

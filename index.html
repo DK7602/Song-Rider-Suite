@@ -9,7 +9,7 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.4-PRECISION-MIDI-DRAG" />
+  <link rel="stylesheet" href="styles.css?v=3.3.5-PLAYBACK-LINK-TITLE" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.4" />
 <link rel="stylesheet" href="branding-shell.css?v=3.1.0">
 </head>
@@ -150,7 +150,7 @@
         <div class="lead-editor-head">
           <div>
             <h3 id="leadPartTitle">Lead / Bass</h3>
-            <p class="subtle">Tap cells to place notes. Pitch names are real MIDI-style note/octave names.</p><div class="lead-play-options"><label class="part-repeat-toggle"><input id="leadRepeat" type="checkbox" checked><span>Repeat this part</span></label><label class="part-repeat-toggle"><input id="leadSustain" type="checkbox"><span>Sustain notes</span></label></div>
+            <p class="subtle">Tap cells to place notes. Pitch names are real MIDI-style note/octave names.</p><div class="lead-play-options"><button id="leadPlaybackBtn" class="part-preview-btn" type="button">▶ Play Part</button><label class="part-repeat-toggle"><input id="leadRepeat" type="checkbox" checked><span>Repeat this part</span></label><label class="part-repeat-toggle"><input id="leadSustain" type="checkbox"><span>Sustain notes</span></label></div>
           </div>
           <label class="part-volume-label">Volume <input id="leadVolume" type="range" min="0" max="100" value="80" /><span id="leadVolumeValue">80%</span></label>
         </div>
@@ -186,7 +186,7 @@
       <div id="vocalPartEditor" class="vocal-part-editor" hidden>
         <div class="vocal-editor-card">
           <div class="vocal-title-row">
-            <div><h3 id="vocalPartTitle">Vocals</h3><p class="subtle">Dry WAV master • effects stay non-destructive</p><label class="part-repeat-toggle"><input id="vocalRepeat" type="checkbox" checked><span>Repeat this part</span></label></div>
+            <div class="vocal-title-main"><div class="vocal-title-copy"><h3 id="vocalPartTitle">Vocals</h3><p class="subtle">Dry WAV master • effects stay non-destructive</p><label class="part-repeat-toggle"><input id="vocalRepeat" type="checkbox" checked><span>Repeat this part</span></label></div><button id="vocalMasterPlayBtn" class="part-preview-btn vocal-master-play-btn" type="button">▶ Play Mix</button></div>
             <label class="part-volume-label">Part volume <input id="vocalVolume" type="range" min="0" max="100" value="100" /><span id="vocalVolumeValue">100%</span></label>
           </div>
 
@@ -376,8 +376,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.4-PRECISION-MIDI-DRAG"></script>
-  <script src="parts.js?v=3.3.4-PRECISION-MIDI-DRAG"></script>
-  <script src="beat-maker.js?v=3.2.7-BEAT-RESTORE"></script>
+  <script src="app.js?v=3.3.5-PLAYBACK-LINK-TITLE"></script>
+  <script src="parts.js?v=3.3.5-PLAYBACK-LINK-TITLE"></script>
+  <script src="beat-maker.js?v=3.3.5-PLAYBACK-LINK-TITLE"></script>
 </body>
 </html>
