@@ -1,5 +1,7 @@
-const CACHE = 'song-rider-suite-v3.3.5-playback-link-title';
+const CACHE = 'song-rider-suite-v3.3.9-hq-branding';
 const ASSETS = [
+  './baby-daw-mic.png',
+  './baby-daw-head-chain-sticker.png',
   './song-rider/suite-header-master.png',
   './song-rider/branding-shell.css',
   './assets/suite-header-master.png',
