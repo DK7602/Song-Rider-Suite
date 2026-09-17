@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.0-link-scoped-transport';
+const CACHE = 'song-rider-suite-v3.3.1-midi-png-chooser';
 const ASSETS = [
   './song-rider/suite-header-master.png',
   './song-rider/branding-shell.css',
