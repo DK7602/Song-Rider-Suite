@@ -1,0 +1,10 @@
+Song Rider Suite v3.3.0 — Link-Scoped BPM / CAPO / STEP
+
+Fixed:
+- An unlinked SRP project no longer consumes BPM, CAPO or STEP changes from CRP/Baby DAW.
+- Editing BPM, CAPO or STEP in an unlinked SRP project no longer changes CRP/Baby DAW.
+- The shared transport record is accepted only when its CRP project id matches the exact active SRP<->CRP link pair.
+- Switching from a linked SRP project to an unlinked SRP project restores/keeps that SRP project's own saved transport values.
+- Linked SRP projects still keep the existing two-way BPM/CAPO/STEP sync with their paired CRP/Baby DAW project.
+
+Also bumped the service-worker cache so phones/PWAs fetch the corrected JavaScript.

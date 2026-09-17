@@ -1314,9 +1314,9 @@
   // v2.6.0: project-scoped canonical transport state. This is the ONLY authority for linked BPM/CAPO/STEP.
   const SRP_CANONICAL_PREFIX='crp-srp-canonical-v1:';
   const SRP_LINK_SESSION_KEY='crp-srp-link-session-v3';
-  // v3.1.0 TRANSPORT REBUILD: CRP, Baby DAW and SRP now share ONE global transport record.
-  // Project/link metadata is still used for chords, lyrics and project pairing, but it is no longer
-  // allowed to gate or choose BPM / CAPO / STEP. That project-id gate was the source of the drift.
+  // v3.3.0 LINK-SCOPED TRANSPORT: CRP/Baby DAW and SRP share BPM/CAPO/STEP only
+  // for the exact active linked project pair. An unrelated or unlinked SRP project must not
+  // read or overwrite another CRP/BD project's transport state.
   const SRS_TRANSPORT_KEY='song-rider-suite-transport-v6';
   function readSuiteTransport(){
     try{
@@ -1403,8 +1403,9 @@
       const canonical=readCanonicalSrp(id);
       const live=readLiveSrpMeta();
       const legacy=(canonical?{...(base||{}),...canonical,crpProjectId:id}:(live&&String(live.crpProjectId||'')===id?{...(base||{}),...live}:base));
-      // Suite transport wins for BPM/CAPO/STEP. Legacy metadata may still contribute key/transpose.
-      return suite?{...(legacy||{}),...suite,crpProjectId:id}:legacy;
+      // Suite transport wins only when it belongs to this exact linked CRP project.
+      const suiteForPair=(suite&&String(suite.crpProjectId||'')===id)?suite:null;
+      return suiteForPair?{...(legacy||{}),...suiteForPair,crpProjectId:id}:legacy;
     }catch{return null}
   }
   function writeSharedSrpMeta(projectId,meta){
@@ -1436,15 +1437,21 @@
   }
   function readHardSync(){
     try{
-      const id=activeSrpLinkId();
-      return readSuiteTransport()||readCanonicalSrp(id)||JSON.parse(localStorage.getItem(SRP_HARD_SYNC_KEY)||'null');
+      if(!currentProjectHasSrpLink())return null;
+      const id=String(state.currentProjectId||'');
+      if(!id)return null;
+      const suite=readSuiteTransport();
+      if(suite&&String(suite.crpProjectId||'')===id)return suite;
+      const canonical=readCanonicalSrp(id);
+      if(canonical)return canonical;
+      const legacy=JSON.parse(localStorage.getItem(SRP_HARD_SYNC_KEY)||'null');
+      return legacy&&String(legacy.projectId||legacy.crpProjectId||'')===id?legacy:null;
     }catch{return null}
   }
   function writeHardSync(source='crp',modeOverride){
-    if(IS_PLAYBACK_BRIDGE)return null;
+    if(IS_PLAYBACK_BRIDGE||!currentProjectHasSrpLink())return null;
     try{
-      const session=readSrpLinkSession();
-      const id=String(state.currentProjectId||session?.crpProjectId||localStorage.getItem('crp-active-project-id')||'');
+      const id=String(state.currentProjectId||'');
       if(!id)return null;
       const bpm=Math.max(40,Math.min(240,Number($('bpmInput')?.value)||92));
       const capo=Math.max(0,Math.min(12,Number(state.capo)||0));
@@ -1460,10 +1467,13 @@
   }
   let __hardSyncRev=-1;
   function applyHardSync(){
-    if(IS_PLAYBACK_BRIDGE)return false;
+    if(IS_PLAYBACK_BRIDGE||!currentProjectHasSrpLink())return false;
     try{
       const m=readHardSync();
       if(!m)return false;
+      const activeId=String(state.currentProjectId||'');
+      const metaId=String(m.crpProjectId||m.projectId||'');
+      if(!activeId || (metaId&&metaId!==activeId))return false;
       // Never overwrite a number field while the user is actively typing into it.
       // Leave the revision unapplied so the newest external value can still be consumed after blur.
       const active=document.activeElement;
