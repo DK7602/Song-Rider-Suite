@@ -1798,11 +1798,19 @@
   }
   function currentSetupWorkspace(){return document.body.classList.contains('workspace-baby-daw')?'baby-daw':'chord-rider'}
   function applySetupVisibility(){
-    const toolbar=document.querySelector('.primary-toolbar');
+    // The same chord setup toolbar is shared by CRP and Baby DAW.  Keep the
+    // workspace-specific preference, but apply it directly to the actual CRP
+    // toolbar with both a class and the native hidden state.  This avoids the
+    // higher-specificity part-editor rules from forcing the toolbar visible
+    // while the button says “Show”.
+    const toolbar=document.querySelector('#chordPartControls > .primary-toolbar');
     if(!toolbar)return;
     const mode=currentSetupWorkspace();
     const hidden=setupHiddenFor(mode);
     toolbar.classList.toggle('crp-controls-hidden',hidden);
+    toolbar.hidden=hidden;
+    const controls=$('chordPartControls');
+    controls?.classList.toggle('setup-collapsed',hidden);
 
     const crpToggle=$('toggleCrpControlsBtn');
     if(crpToggle){

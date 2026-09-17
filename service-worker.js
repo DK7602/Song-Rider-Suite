@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.6-checked-part-playback';
+const CACHE = 'song-rider-suite-v3.3.7-crp-show-hide-layout';
 const ASSETS = [
   './assets/chord-rider-pro-wordmark.png',
   './song-rider/suite-header-master.png',

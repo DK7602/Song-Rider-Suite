@@ -851,7 +851,7 @@
       msUntilNextBeat=beatMs;
     }
     return {playing:true,ready:true,bpm,beatMs,currentBeat,msUntilNextBeat};
-  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncCloudAudio,openStudioExport,refreshBabySetupToggle,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(c&&activePartId!==c.id)selectPart(c.id);else refreshBabySetupToggle();},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
+  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncCloudAudio,openStudioExport,refreshBabySetupToggle,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(!c){refreshBabySetupToggle();return;}if(activePartId!==c.id)selectPart(c.id);else{setEditorMode('chord');refreshBabySetupToggle();core.refreshSetupVisibility?.();}},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
   // app.js intentionally loads first to expose CRPCore. Tell it that the parts module now
   // exists so the active saved project can be rehydrated with ALL Baby DAW parts before any
   // workspace navigation/save is allowed to capture state.

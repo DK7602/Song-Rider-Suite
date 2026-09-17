@@ -3065,3 +3065,24 @@ body.workspace-chord-rider .progression-line.midi-roll-line{display:block;min-wi
   .lead-play-options .part-preview-btn{padding-left:10px;padding-right:10px;}
   .lead-play-options .part-repeat-toggle{gap:5px;font-size:.79rem;}
 }
+
+
+/* v3.3.7 — CRP Show/Hide authoritative collapse + layout repair.
+   The CRP page can inherit .part-hidden while moving between Baby DAW parts.
+   That older rule used display:revert!important and could override the setup
+   toggle, leaving the button on Show while the setup block stayed visible.
+   Native [hidden] + this final override make the collapsed state definitive. */
+#chordPartControls > .primary-toolbar[hidden],
+#chordPartControls > .primary-toolbar.crp-controls-hidden,
+body.workspace-chord-rider #chordPartControls.part-hidden > .primary-toolbar.crp-controls-hidden,
+body.workspace-chord-rider #chordPartControls.part-hidden > .primary-toolbar[hidden]{
+  display:none!important;
+}
+body.workspace-chord-rider #chordPartControls.setup-collapsed{
+  margin-top:0!important;
+  padding-top:0!important;
+  min-height:0!important;
+}
+body.workspace-chord-rider #chordPartControls.setup-collapsed > .entry-row{
+  margin-top:4px!important;
+}
