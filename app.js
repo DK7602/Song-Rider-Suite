@@ -1464,7 +1464,7 @@
     $('playAllBtn').onclick=playProgression;
     $('newProjectBtn').onclick=newProject;
     $('saveProjectBtn').onclick=saveProject;
-    $('exportBtn').onclick=e=>{e.stopPropagation();toggleExportMenu();};$('exportPdfBtn').onclick=openPdfExport;$('exportPngBtn').onclick=openPngExport;$('exportStudioBtn').onclick=()=>{closeExportMenu();window.CRPParts?.openStudioExport?.();};
+    $('exportBtn').onclick=e=>{e.stopPropagation();toggleExportMenu();};$('exportPdfBtn').onclick=openPdfExport;$('exportPngBtn').onclick=openPngExport;$('exportAudioBtn').onclick=()=>{closeExportMenu();window.CRPParts?.openAudioExport?.();};$('exportStudioBtn').onclick=()=>{closeExportMenu();window.CRPParts?.openStudioExport?.();};
     document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))closeExportMenu();});
 
     // Programmatic scrollIntoView does not generate touchmove/wheel events,

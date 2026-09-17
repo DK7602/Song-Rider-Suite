@@ -9,7 +9,7 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.13-AUTOTUNE-AUDIO-POLISH" />
+  <link rel="stylesheet" href="styles.css?v=3.3.14-AUTOTUNE-AUDIO-POLISH" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
 </head>
@@ -55,7 +55,7 @@
           <button class="seg" data-mode="note">Note</button>
         </div>
 
-        <label>
+        <label class="sound-control">
           Sound
           <select id="soundSelect"></select>
         </label>
@@ -279,6 +279,7 @@
           <div id="exportMenu" class="export-menu" hidden>
             <button id="exportPdfBtn" type="button">PDF chord sheet</button>
             <button id="exportPngBtn" type="button">PNG image</button>
+            <button id="exportAudioBtn" type="button">Audio mix (WAV)…</button>
             <button id="exportStudioBtn" type="button">Studio package…</button>
           </div>
         </div>
@@ -383,8 +384,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.13-AUDIO-POLISH"></script>
-  <script src="parts.js?v=3.3.13-AUTOTUNE"></script>
+  <script src="app.js?v=3.3.14-AUDIO-POLISH"></script>
+  <script src="parts.js?v=3.3.14-AUTOTUNE"></script>
   <script src="beat-maker.js?v=3.3.8-LAST-MIDI-DURATION-CAPO-ROW"></script>
 </body>
 </html>

@@ -3132,3 +3132,53 @@ body.workspace-chord-rider #chordPartControls.setup-collapsed > .entry-row{
 #vocalFxAutotuneValue{text-align:right!important;color:var(--accent)!important;}
 .vocal-autotune-control>.tiny{grid-column:1/-1!important;margin:0!important;}
 @media(max-width:720px){.vocal-effects-grid .vocal-autotune-control{grid-template-columns:1fr!important}.vocal-autotune-slider{grid-column:1!important}}
+
+
+/* v3.3.14 — authoritative CRP setup geometry.
+   Prevent stale/competing flex rules from expanding Sound/Octave/Sustain onto
+   separate rows. This grid is the final source of truth on phone, tablet, PC. */
+body.workspace-chord-rider .primary-toolbar{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 104px 72px!important;
+  gap:12px!important;
+  align-items:end!important;
+  width:100%!important;
+}
+body.workspace-chord-rider .primary-toolbar > #instrumentTabs,
+body.workspace-chord-rider .primary-toolbar > #modeTabs{
+  grid-column:1/-1!important;
+  width:100%!important;
+  min-width:0!important;
+}
+body.workspace-chord-rider .primary-toolbar > .sound-control{
+  grid-column:1!important;
+  width:100%!important;
+  min-width:0!important;
+}
+body.workspace-chord-rider .primary-toolbar > .sound-control #soundSelect{
+  width:100%!important;
+  min-width:0!important;
+}
+body.workspace-chord-rider .primary-toolbar > .octave-control{
+  grid-column:2!important;
+  width:104px!important;
+  min-width:104px!important;
+  justify-self:end!important;
+}
+body.workspace-chord-rider .primary-toolbar > .sustain-control{
+  grid-column:3!important;
+  width:72px!important;
+  min-width:72px!important;
+  justify-self:end!important;
+}
+body.workspace-chord-rider .primary-toolbar > .capo-shape-mode-row{
+  grid-column:1/-1!important;
+}
+@media(max-width:390px){
+  body.workspace-chord-rider .primary-toolbar{
+    grid-template-columns:minmax(0,1fr) 96px 62px!important;
+    gap:8px!important;
+  }
+  body.workspace-chord-rider .primary-toolbar > .octave-control{width:96px!important;min-width:96px!important;}
+  body.workspace-chord-rider .primary-toolbar > .sustain-control{width:62px!important;min-width:62px!important;}
+}

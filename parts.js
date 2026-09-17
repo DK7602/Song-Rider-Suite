@@ -538,7 +538,15 @@
   }
   function vocalDurationBeats(p){const t=p.recordings?.find(r=>r.id===p.activeTakeId);return t?Math.max(0,(Number(t.duration)||0)*core.bpm/60):0;}
   function ensureAudio(){
-    if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();
+    if(!audioCtx){
+      audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      audioCtx.addEventListener?.('statechange',()=>{
+        if((playing||starting)&&audioCtx?.state==='suspended'&&document.visibilityState==='visible'){
+          audioCtx.resume().catch(()=>{});
+        }
+      });
+    }
+    if(audioCtx.state==='suspended')audioCtx.resume().catch(()=>{});
     if(!masterLimiter){masterLimiter=audioCtx.createDynamicsCompressor();masterLimiter.threshold.value=-2;masterLimiter.knee.value=0;masterLimiter.ratio.value=20;masterLimiter.attack.value=.003;masterLimiter.release.value=.12;masterLimiter.connect(audioCtx.destination);}
   }
   function busFor(p){
@@ -704,7 +712,9 @@
       playbackClockStartAudioTime=nextAudioStart;
       playbackClockStartBeat=initialBeat;
       playbackClockBpm=Math.max(40,Math.min(240,+core.bpm||92));
-      const chunkBeats=1;
+      // Schedule several beats ahead so a busy UI/render/autosave frame cannot
+      // starve the audio graph and create an apparent random pause between beats.
+      const chunkBeats=Math.max(4,Math.min(8,Number(core.beats)||4));
       let vocalsScheduledForCycle=false;
 
       const scheduleNext=async()=>{
@@ -734,7 +744,10 @@
           }
         }
 
-        const wakeMs=Math.max(8,(end-audioCtx.currentTime-.22)*1000);
+        // Refill the queue well before the scheduled audio runs out. The old
+        // ~220ms look-ahead could miss its deadline on phones/PCs during layout
+        // work, causing a brief silence that sounded like playback paused.
+        const wakeMs=Math.max(8,(end-audioCtx.currentTime-.70)*1000);
         cycleTimer=setTimeout(scheduleNext,wakeMs);
       };
       scheduleNext();
@@ -756,6 +769,9 @@
     updatePartPlaybackButtons();
   }
   function togglePlayback(){if(playing||starting)stopPlayback();else startPlayback();}
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible'&&(playing||starting)&&audioCtx?.state==='suspended')audioCtx.resume().catch(()=>{});
+  });
   function toggleLeadPartPlayback(){
     const p=active();if(!p||p.type!=='lead')return;
     // Play exactly the parts checked in the top Parts strip (plus drums when
@@ -797,6 +813,107 @@
     const manifest={format:'Chord Rider Pro Studio Package',version:1,createdAt:new Date().toISOString(),project:{name:core.projectName,bpm:core.bpm,beats:core.beats},parts:selected.map(p=>{const q=clone(p);if(q.type==='vocal')q.recordings=(q.recordings||[]).map(r=>({...r,blob:undefined}));return q;})};if($('studioExportDrums')?.checked)manifest.beatMaker=window.CRPBeatMaker?.getBeat?.()||null;if($('studioExportNotes')?.checked)manifest.notes=core.projectNotes||'';
     const files=[{name:'project.json',data:new TextEncoder().encode(JSON.stringify(manifest,null,2))}];for(const p of selected.filter(x=>x.type==='chord'||x.type==='lead'))files.push({name:`midi/${safeFileName(p.name)}.mid`,data:partMidi(p)});if($('studioExportDrums')?.checked)files.push({name:'midi/Drums.mid',data:drumMidi(window.CRPBeatMaker?.getBeat?.())});for(const p of selected.filter(x=>x.type==='vocal')){const take=p.recordings?.find(r=>r.id===p.activeTakeId);if(!take)continue;const blob=await getTakeBlob(take);if(blob)files.push({name:`vocals/${safeFileName(p.name)}-${safeFileName(take.name)}.wav`,data:new Uint8Array(await blob.arrayBuffer())});}
     files.push({name:'README.txt',data:new TextEncoder().encode('Chord Rider Pro Studio Package\n\nproject.json contains only the parts you checked. Project notes are included only when their checkbox was selected. Selected vocal parts include the active dry WAV master. Chord/Note, Lead/Bass, and drums are also exported as Standard MIDI files in /midi for direct import into Cubase and other DAWs. Vocal parts include the active dry WAV master. project.json preserves Chord Rider editing data.\n')});const zip=await makeZip(files),a=document.createElement('a');a.href=URL.createObjectURL(zip);a.download=`${safeFileName(core.projectName)}-Studio-Export.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);closeStudioExport();core.status('Studio package exported.');
+  }
+
+
+  // v3.3.14 — one-file WAV mix export. The user chooses exactly which Chord,
+  // Lead/Bass, Vocal and Drum parts are rendered into the song mix.
+  const AUDIO_EXPORT_DRUMS={
+    kick1:'assets/drums/kick-1.wav',kick2:'assets/drums/kick-2.wav',kick3:'assets/drums/kick-3.wav',
+    snare1:'assets/drums/snare-1.wav',snare2:'assets/drums/snare-2.wav',snare3:'assets/drums/snare-3.wav',snare4:'assets/drums/snare-4.wav',snare5:'assets/drums/snare-5.wav',
+    chh:'assets/drums/closed-hat.wav',ohh:'assets/drums/open-hat.wav',tomHi:'assets/drums/tom-high.wav',tomMid:'assets/drums/tom-mid.wav',tomLow:'assets/drums/tom-low.wav',
+    clap:'assets/drums/clap.wav',rim:'assets/drums/rim.wav',shaker:'assets/drums/shaker.wav',tamb:'assets/drums/tambourine.wav',cowbell:'assets/drums/cowbell.wav',conga:'assets/drums/conga.wav'
+  };
+  const AUDIO_EXPORT_DRUM_SCALE=.18;
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  function closeAudioExport(){document.getElementById('audioExportModal')?.remove();}
+  function openAudioExport(){
+    closeAudioExport();syncLoadedChord();
+    const beat=window.CRPBeatMaker?.getBeat?.()||null;
+    const rows=parts.map(p=>{
+      const take=p.type==='vocal'?p.recordings?.find(r=>r.id===p.activeTakeId):null;
+      const unavailable=p.type==='vocal'&&!take;
+      const detail=p.type==='chord'?'Chord / Note':p.type==='lead'?'Lead / Bass':(take?'Active vocal take':'No active vocal take');
+      return `<label class="studio-export-row${unavailable?' is-disabled':''}"><input type="checkbox" data-audio-part="${p.id}" ${p.enabled!==false&&!unavailable?'checked':''} ${unavailable?'disabled':''}><span><strong>${escapeHtml(p.name)}</strong><br><span class="subtle tiny">${detail}</span></span></label>`;
+    }).join('');
+    const modal=document.createElement('div');modal.id='audioExportModal';modal.className='studio-export-modal';
+    modal.innerHTML=`<div class="studio-export-backdrop"></div><div class="studio-export-card"><h2>Export audio mix</h2><p class="subtle">Check only the parts you want in the finished WAV. Choose the music parts for an instrumental, or include Vocals for the full song.</p><div class="studio-export-list">${rows}<label class="studio-export-row"><input id="audioExportDrums" type="checkbox" ${beat?.enabled===false?'':'checked'}><span><strong>Drums</strong><br><span class="subtle tiny">Beat Maker audio</span></span></label></div><div class="studio-export-actions"><button id="audioExportCancel" type="button">Cancel</button><button id="audioExportGo" class="accent" type="button">Export WAV</button></div></div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('.studio-export-backdrop').onclick=closeAudioExport;
+    modal.querySelector('#audioExportCancel').onclick=closeAudioExport;
+    modal.querySelector('#audioExportGo').onclick=()=>exportAudioMix(modal);
+  }
+  function wavFromStereo(left,right,sampleRate){
+    const n=Math.min(left.length,right.length),buf=new ArrayBuffer(44+n*4),v=new DataView(buf),write=(o,str)=>{for(let i=0;i<str.length;i++)v.setUint8(o+i,str.charCodeAt(i));};
+    write(0,'RIFF');v.setUint32(4,36+n*4,true);write(8,'WAVE');write(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,2,true);v.setUint32(24,sampleRate,true);v.setUint32(28,sampleRate*4,true);v.setUint16(32,4,true);v.setUint16(34,16,true);write(36,'data');v.setUint32(40,n*4,true);
+    let o=44;for(let i=0;i<n;i++){const a=Math.max(-1,Math.min(1,left[i]||0)),b=Math.max(-1,Math.min(1,right[i]||0));v.setInt16(o,a<0?a*0x8000:a*0x7fff,true);o+=2;v.setInt16(o,b<0?b*0x8000:b*0x7fff,true);o+=2;}
+    return new Blob([buf],{type:'audio/wav'});
+  }
+  function concatFloatChunks(chunks,total){const out=new Float32Array(total);let o=0;for(const c of chunks){const n=Math.min(c.length,total-o);if(n<=0)break;out.set(c.subarray(0,n),o);o+=n;}return out;}
+  async function exportAudioMix(modal){
+    const ids=[...modal.querySelectorAll('[data-audio-part]:checked')].map(x=>x.dataset.audioPart),selected=parts.filter(p=>ids.includes(p.id)),drums=!!modal.querySelector('#audioExportDrums')?.checked;
+    if(!selected.length&&!drums){core.status('Choose at least one audio part to export.');return;}
+    if(!window.Soundfont&&selected.some(p=>p.type==='chord'||p.type==='lead')){core.status('Sound engine unavailable. Reload while online and try again.');return;}
+    const go=modal.querySelector('#audioExportGo');go.disabled=true;go.textContent='Preparing…';
+    stopPlayback();stopPreview();
+    const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx){core.status('Audio export is not supported in this browser.');go.disabled=false;go.textContent='Export WAV';return;}
+    let ctx=null;
+    try{
+      ctx=new Ctx({sampleRate:48000});if(ctx.state==='suspended')await ctx.resume();
+      const beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92));
+      const beat=window.CRPBeatMaker?.getBeat?.()||null;
+      let songSec=.25;
+      selected.forEach(p=>{if(p.type==='chord'||p.type==='lead')songSec=Math.max(songSec,partDurationBeats(p)*beatSec);else if(p.type==='vocal'){const t=p.recordings?.find(r=>r.id===p.activeTakeId);songSec=Math.max(songSec,Number(t?.duration)||0);}});
+      if(drums&&beat)songSec=Math.max(songSec,Math.max(1,Number(beat.bars)||1)*4*beatSec);
+      const tailSec=1.8,leadSec=.18;
+      const mix=ctx.createGain(),lim=ctx.createDynamicsCompressor();lim.threshold.value=-2;lim.knee.value=0;lim.ratio.value=20;lim.attack.value=.003;lim.release.value=.12;mix.connect(lim);
+      const proc=ctx.createScriptProcessor(4096,2,2),silent=ctx.createGain();silent.gain.value=0;lim.connect(proc);proc.connect(silent);silent.connect(ctx.destination);
+      const L=[],R=[];let captured=0,captureStart=ctx.currentTime;proc.onaudioprocess=e=>{const l=new Float32Array(e.inputBuffer.getChannelData(0)),r=new Float32Array(e.inputBuffer.numberOfChannels>1?e.inputBuffer.getChannelData(1):e.inputBuffer.getChannelData(0));L.push(l);R.push(r);captured+=l.length;};
+
+      go.textContent='Loading sounds…';
+      const playerMap=new Map();
+      for(const p of selected.filter(x=>x.type==='chord'||x.type==='lead')){
+        const sound=p.type==='chord'?p.data.sound:p.sound,bus=ctx.createGain();
+        bus.gain.value=(SOUND_GAIN[sound]||1)*p.volume*(p.type==='lead'?LEAD_OUTPUT_BOOST:1);bus.connect(mix);
+        const player=await Soundfont.instrument(ctx,sound,{format:'mp3',soundfont:'MusyngKite',destination:bus});playerMap.set(p.id,player);
+      }
+      const vocalBuffers=new Map();
+      for(const p of selected.filter(x=>x.type==='vocal')){const t=p.recordings?.find(r=>r.id===p.activeTakeId);if(!t)continue;const blob=await getTakeBlob(t);if(blob){const vb=await ctx.decodeAudioData(await blob.arrayBuffer());vocalBuffers.set(p.id,vb);songSec=Math.max(songSec,vb.duration);}}
+      if([...selected].some(p=>p.type==='vocal'&&Number(p.fx?.autotune)>0))await ensureAutotuneWorklet(ctx);
+      const drumBuffers=new Map();
+      if(drums&&beat){for(const [id,url] of Object.entries(AUDIO_EXPORT_DRUMS)){if(!(beat.tracks?.[id]||[]).some(a=>Array.isArray(a)&&a.length))continue;const res=await fetch(url);if(!res.ok)continue;drumBuffers.set(id,await ctx.decodeAudioData(await res.arrayBuffer()));}}
+
+      // Discard the silent processing buffers accumulated while remote soundfont
+      // samples and vocal/drum assets were loading. The exported WAV starts at
+      // the musical downbeat instead of containing seconds of load-time silence.
+      L.length=0;R.length=0;captured=0;captureStart=ctx.currentTime;
+      const startAt=ctx.currentTime+leadSec;
+      // Chord and Lead/Bass parts.
+      for(const p of selected.filter(x=>x.type==='chord'||x.type==='lead')){
+        const player=playerMap.get(p.id);if(!player)continue;
+        if(p.type==='chord'){
+          let b=0;for(const row of p.data.rows||[])for(const card of row){const durBeats=core.cardDurationBeats?.(card,core.beats)||core.beats,at=startAt+b*beatSec,base=durBeats*beatSec,duration=core.sustain?sustainedPartSeconds(p.data?.sound,base):Math.max(.18,base*.98),notes=core.notesFor(card,p.data)||[];notes.forEach((n,j)=>{try{player.play(n,at+(p.data.instrument==='guitar'?j*.035:0),{duration,gain:.94});}catch{}});b+=durBeats;}
+        }else{
+          const stepBeats=4/p.resolution;for(const e of p.events||[]){const at=startAt+e.step*stepBeats*beatSec;let midi=e.midi+(Number(p.octave)||0)*12;if(p.sound==='electric_bass_finger')midi-=12;const drawn=leadDurationSteps(e)*stepBeats,duration=p.sustain&&drawn<=stepBeats?sustainedPartSeconds(p.sound,beatSec):Math.max(.05,drawn*beatSec*.98);try{player.play(midiName(midi),at,{duration,gain:.92});}catch{}}
+        }
+      }
+      // Vocal parts with the same non-destructive FX chain used for playback.
+      for(const p of selected.filter(x=>x.type==='vocal')){
+        const buf=vocalBuffers.get(p.id);if(!buf)continue;
+        const scheduleVocal=(offsetSec=0)=>{const src=ctx.createBufferSource(),eq=ctx.createBiquadFilter(),comp=ctx.createDynamicsCompressor(),dry=ctx.createGain(),wet=ctx.createGain(),rev=ctx.createConvolver(),delay=ctx.createDelay(1),delayGain=ctx.createGain(),out=ctx.createGain(),fx=p.fx||{};src.buffer=buf;eq.type=fx.eq==='warm'?'lowshelf':fx.eq==='bright'?'highshelf':'peaking';eq.frequency.value=fx.eq==='warm'?180:fx.eq==='bright'?4500:2800;eq.gain.value=fx.eq==='flat'?0:fx.eq==='warm'?2:fx.eq==='bright'?2.5:1.5;const c=fx.comp||'medium';comp.threshold.value=c==='off'?0:c==='light'?-12:c==='heavy'?-24:-18;comp.ratio.value=c==='off'?1:c==='light'?2:c==='heavy'?6:3.5;comp.attack.value=.008;comp.release.value=.12;dry.gain.value=1;wet.gain.value=Number(fx.reverb||0);rev.buffer=impulse(ctx,fx.reverb>.25?1.6:fx.reverb>.15?1.1:.7);delay.delayTime.value=Number(fx.delay||0);delayGain.gain.value=fx.delay?0.22:0;out.gain.value=p.volume;const tune=makeAutotuneNode(ctx,p);src.connect(eq);eq.connect(comp);const post=tune||comp;if(tune)comp.connect(tune);post.connect(dry);dry.connect(out);post.connect(rev);rev.connect(wet);wet.connect(out);post.connect(delay);delay.connect(delayGain);delayGain.connect(out);out.connect(mix);src.start(startAt+offsetSec);};
+        scheduleVocal(0);if(p.repeat&&buf.duration>0){for(let t=buf.duration;t<songSec-.05;t+=buf.duration)scheduleVocal(t);}
+      }
+      // Drum pattern loops for the length of the selected song mix, matching normal playback.
+      if(drums&&beat&&drumBuffers.size){const stepSec=beatSec/16,totalSteps=Math.ceil(songSec/stepSec),bars=Math.max(1,Number(beat.bars)||1),gain=Math.max(0,Math.min(1,Number(beat.gain)||0))*AUDIO_EXPORT_DRUM_SCALE;for(let abs=0;abs<totalSteps;abs++){const bar=Math.floor(abs/64)%bars,step=abs%64,at=startAt+abs*stepSec;for(const [id,buf] of drumBuffers){if(!beat.tracks?.[id]?.[bar]?.includes(step))continue;const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=buf;g.gain.value=gain;src.connect(g).connect(mix);src.start(at);}}}
+
+      go.textContent='Rendering WAV…';
+      await sleep((leadSec+songSec+tailSec+.25)*1000);
+      proc.onaudioprocess=null;try{proc.disconnect();silent.disconnect();}catch{}
+      const trim=Math.max(0,Math.round((startAt-captureStart)*ctx.sampleRate)),wanted=Math.max(1,Math.round((songSec+tailSec)*ctx.sampleRate));
+      const allL=concatFloatChunks(L,captured),allR=concatFloatChunks(R,captured),left=allL.slice(trim,trim+wanted),right=allR.slice(trim,trim+wanted),wav=wavFromStereo(left,right,ctx.sampleRate);
+      const a=document.createElement('a');a.href=URL.createObjectURL(wav);a.download=`${safeFileName(core.projectName)}-Audio-Mix.wav`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);closeAudioExport();core.status('Audio mix exported as WAV.');
+    }catch(e){console.error('Audio export failed',e);core.status(e.message||'Could not export audio mix.');if(go){go.disabled=false;go.textContent='Export WAV';}}
+    finally{try{await ctx?.close();}catch{}}
   }
 
   function capture(){syncLoadedChord();partsUpdatedAt=Math.max(partsUpdatedAt,Date.now());const safe=parts.map(p=>{const q=clone(p);delete q._recordOldStates;delete q._recordOldVolumes;delete q._recordOldDrums;delete q._recordOldDrumVol;if(q.type==='vocal')q.recordings=(q.recordings||[]).map(({blob,...r})=>r);return q;});return {version:3,updatedAt:partsUpdatedAt,activePartId,items:safe};}
@@ -897,7 +1014,7 @@
       msUntilNextBeat=beatMs;
     }
     return {playing:true,ready:true,bpm,beatMs,currentBeat,msUntilNextBeat};
-  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncCloudAudio,openStudioExport,refreshBabySetupToggle,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(!c){refreshBabySetupToggle();return;}if(activePartId!==c.id)selectPart(c.id);else{setEditorMode('chord');refreshBabySetupToggle();core.refreshSetupVisibility?.();}},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
+  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncCloudAudio,openStudioExport,openAudioExport,refreshBabySetupToggle,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(!c){refreshBabySetupToggle();return;}if(activePartId!==c.id)selectPart(c.id);else{setEditorMode('chord');refreshBabySetupToggle();core.refreshSetupVisibility?.();}},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
   // app.js intentionally loads first to expose CRPCore. Tell it that the parts module now
   // exists so the active saved project can be rehydrated with ALL Baby DAW parts before any
   // workspace navigation/save is allowed to capture state.

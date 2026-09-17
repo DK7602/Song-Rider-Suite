@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.13-autotune-audio-polish';
+const CACHE = 'song-rider-suite-v3.3.14-playback-layout-audio-export';
 const ASSETS = [
   './vocal-autotune-worklet.js',
   './assets/chord-rider-pro-wordmark-hq2.png',
@@ -43,7 +43,7 @@ const ASSETS = [
   './song-rider/index.html',
   './song-rider/app.js'
 ];
-self.addEventListener('install', e => e.waitUntil((async()=>{await caches.open(CACHE).then(c=>c.addAll(ASSETS));await self.skipWaiting();})()));
+self.addEventListener('install', e => e.waitUntil((async()=>{const c=await caches.open(CACHE);await Promise.allSettled(ASSETS.map(url=>c.add(url)));await self.skipWaiting();})()));
 self.addEventListener('activate', e => e.waitUntil(Promise.all([self.clients.claim(), caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))])));
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || new URL(e.request.url).pathname.startsWith('/api/')) return;

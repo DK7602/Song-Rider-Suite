@@ -1,0 +1,5 @@
+v3.3.14
+- Playback scheduler now queues multiple beats ahead with a larger look-ahead and auto-resumes a suspended AudioContext while playback is active.
+- CRP Sound / Octave / Sustain layout is locked to one authoritative grid so stale competing CSS cannot expand it into separate rows.
+- Service worker installation no longer fails wholesale when an optional cached asset is missing.
+- Export menu now includes Audio mix (WAV). Choose any Chord/Note, Lead/Bass, Vocal, and Drums combination and export one mixed WAV.
