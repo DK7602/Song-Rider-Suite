@@ -3122,3 +3122,13 @@ body.workspace-chord-rider #chordPartControls.setup-collapsed > .entry-row{
   .line-badge{cursor:grab!important;}
   body.moving-line .line-badge,.progression-line.line-moving .line-badge{cursor:grabbing!important;}
 }
+
+/* v3.3.13 — key-linked vocal Auto-Tune control */
+.vocal-effects-grid .vocal-autotune-control{grid-column:1/-1!important;display:grid!important;grid-template-columns:minmax(150px,.8fr) minmax(180px,1.6fr)!important;align-items:center!important;gap:8px 14px!important;padding:10px 12px!important;border:1px solid #2f3b49!important;border-radius:12px!important;background:#0a0f15!important;}
+.vocal-autotune-heading{display:flex!important;flex-direction:column!important;gap:2px!important;font-weight:750!important;}
+.vocal-autotune-heading small{font-weight:500!important;}
+.vocal-autotune-slider{display:grid!important;grid-template-columns:minmax(0,1fr) 48px!important;align-items:center!important;gap:10px!important;}
+#vocalFxAutotune{width:100%!important;min-width:0!important;accent-color:var(--accent)!important;}
+#vocalFxAutotuneValue{text-align:right!important;color:var(--accent)!important;}
+.vocal-autotune-control>.tiny{grid-column:1/-1!important;margin:0!important;}
+@media(max-width:720px){.vocal-effects-grid .vocal-autotune-control{grid-template-columns:1fr!important}.vocal-autotune-slider{grid-column:1!important}}

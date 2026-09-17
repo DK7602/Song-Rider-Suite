@@ -210,12 +210,18 @@
     return card.type==='chord'?transposeChord(card.value,-state.capo):transposeRoot(card.value,-state.capo);
   }
 
+  const LONG_SUSTAIN_SOUNDS=new Set(['acoustic_grand_piano','electric_piano_1','acoustic_guitar_steel']);
+  function sustainedNoteSeconds(stepSeconds,sound=state.sound){
+    const seconds=Math.max(.05,Number(stepSeconds)||.05);
+    return LONG_SUSTAIN_SOUNDS.has(sound)?Math.max(.78,seconds*1.38+.18):Math.max(.45,seconds*1.08);
+  }
+
   function instrumentOutputGain(){
     // MusyngKite instrument samples are much quieter than the drum WAVs.
     // These multipliers normalize the four main chord instruments so they
     // remain clearly audible at ordinary phone/device volume.
     const gains={
-      acoustic_grand_piano:2.75,
+      acoustic_grand_piano:3.15,
       electric_piano_1:2.75,
       acoustic_guitar_steel:2.95,
       electric_guitar_clean:2.85,
@@ -662,7 +668,7 @@
     row.forEach((card,ci)=>{
       const head=document.createElement('div');head.className='crp-midi-step';head.dataset.cardIndex=String(ci);head.title='Tap name to audition • drag gold edge to change duration';
       const top=document.createElement('div');top.className='crp-midi-step-top';
-      const name=document.createElement('button');name.type='button';name.className='crp-midi-step-name';name.textContent=displayedValue(card);name.onclick=e=>{e.stopPropagation();state.selectedRow=ri;syncBuildInput();const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),secs=60/bpm*cardDurationBeats(card);playCard(card,state.sustain?Math.max(.4,secs*1.03):Math.max(.35,secs*.92));};
+      const name=document.createElement('button');name.type='button';name.className='crp-midi-step-name';name.textContent=displayedValue(card);name.onclick=e=>{e.stopPropagation();state.selectedRow=ri;syncBuildInput();const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),secs=60/bpm*cardDurationBeats(card);playCard(card,state.sustain?sustainedNoteSeconds(secs,state.sound):Math.max(.35,secs*.92));};
       const dur=document.createElement('span');dur.className='crp-midi-duration-label';dur.textContent=`${formatBeatDuration(cardDurationBeats(card))}b`;dur.title=`${formatBeatDuration(cardDurationBeats(card))} beats`;
       top.append(name,dur);
       const actions=document.createElement('span');actions.className='crp-midi-step-actions';
@@ -801,7 +807,7 @@
         const explicitDur=Number.isFinite(+card.durationBeats)&&+card.durationBeats>0?cardDurationBeats(card):null,durBadge=explicitDur?`<div class="card-duration">${formatBeatDuration(explicitDur)} beat${explicitDur===1?'':'s'}</div>`:'';
         el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}${durBadge}${visual}<div class="hint">${hint}</div>`;
         el.querySelector('.remove').onclick=e=>{e.stopPropagation();row.splice(ci,1);renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
-        el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove')){const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),stepSeconds=60/bpm*cardDurationBeats(card);playCard(card,state.sustain?Math.max(.4,stepSeconds*1.03):Math.max(.35,stepSeconds*.92));}};
+        el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove')){const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),stepSeconds=60/bpm*cardDurationBeats(card);playCard(card,state.sustain?sustainedNoteSeconds(stepSeconds,state.sound):Math.max(.35,stepSeconds*.92));}};
         el.addEventListener('dragstart',e=>{if(state.autoScroll){e.preventDefault();$('status').textContent='Turn Auto Scroll off to reorder cards.';return;}state.drag={row:ri,index:ci};e.dataTransfer.effectAllowed='move';el.classList.add('dragging');});
         el.addEventListener('dragend',()=>{el.classList.remove('dragging');state.drag=null;});
         el.addEventListener('dragover',e=>{if(!state.autoScroll)e.preventDefault();});
@@ -870,7 +876,7 @@
     b.classList.toggle('on',state.sustain);
     b.setAttribute('aria-pressed',String(state.sustain));
     b.textContent=state.sustain?'ON':'OFF';
-    b.title=state.sustain?'Sustain on — notes ring for the full beat':'Sustain off';
+    b.title=state.sustain?'Sustain on — piano, electric piano, and acoustic guitar ring longer':'Sustain off';
   }
 
   function playbackStartRow(){
@@ -923,7 +929,7 @@
       const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),item=list[idx++],durBeats=cardDurationBeats(item.c),ms=60000/bpm*durBeats;
       const stepSeconds=ms/1000;
       const noteSeconds=state.sustain
-        ? Math.max(.4,stepSeconds*1.03)
+        ? sustainedNoteSeconds(stepSeconds,state.sound)
         : Math.max(.35,stepSeconds*.92);
       await playCard(item.c,noteSeconds);
       // In mobile infinite-carousel mode there is a visual clone of the last line
@@ -1998,7 +2004,7 @@
     get beats(){return +$('beatsSelect').value||4},get bpm(){return +$('bpmInput').value||92},get loop(){return $('loopToggle').checked},
     get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
     startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).flat().reduce((n,c)=>n+cardDurationBeats(c),0);},
-    get autoScroll(){return !!state.autoScroll;},
+    get autoScroll(){return !!state.autoScroll;},get sustain(){return !!state.sustain;},
     followChordCard(cardIndex){
       let flat=Math.max(0,Number(cardIndex)||0),ri=0,ci=0,found=false;
       for(let r=0;r<state.rows.length;r++){if(flat<state.rows[r].length){ri=r;ci=flat;found=true;break;}flat-=state.rows[r].length;}

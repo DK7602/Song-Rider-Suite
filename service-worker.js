@@ -1,5 +1,6 @@
-const CACHE = 'song-rider-suite-v3.3.12-cropped-branding';
+const CACHE = 'song-rider-suite-v3.3.13-autotune-audio-polish';
 const ASSETS = [
+  './vocal-autotune-worklet.js',
   './assets/chord-rider-pro-wordmark-hq2.png',
   './assets/song-rider-pro-wordmark-hq.png',
   './assets/baby-daw-button-hq.png',
