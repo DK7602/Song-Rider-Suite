@@ -16690,14 +16690,17 @@ KEEP RHYME UI ABOVE KEYBOARD
   const CANONICAL_PREFIX='crp-srp-canonical-v1:';
   // v2.7.0: explicit pair link. Merely opening SRP is never a link.
   const LINK_SESSION_KEY='crp-srp-link-session-v3';
-  // v3.1.0 TRANSPORT REBUILD: one global same-origin record for BPM / CAPO / STEP.
-  // It intentionally does NOT depend on SRP link-session ids; project links remain for song data only.
+  // v3.3.0 LINK-SCOPED TRANSPORT: the same-origin BPM/CAPO/STEP record is shared
+  // only by the exact CRP/BD <-> SRP project pair that is actively linked. Unlinked SRP
+  // projects keep independent transport values and must neither publish to nor consume this bus.
   const SRS_TRANSPORT_KEY='song-rider-suite-transport-v6';
   function readSuiteTransport(){
     try{const m=readJson(SRS_TRANSPORT_KEY,null);return m&&typeof m==='object'?m:null}catch{return null}
   }
   function writeSuiteTransport(id,meta,source='srp'){
     try{
+      const sid=String(id||'');
+      if(!sid)return null;
       const prev=readSuiteTransport()||{};
       const session=readLinkSession?.();
       const next={
@@ -16705,7 +16708,7 @@ KEEP RHYME UI ABOVE KEYBOARD
         capo:Math.max(0,Math.min(12,Number(meta?.capo ?? prev.capo ?? state.capo)||0)),
         octave:Math.max(-2,Math.min(3,Number(meta?.octave ?? prev.octave ?? state.steps)||0)),
         pitchMode:(meta?.pitchMode==='step'||meta?.pitchMode==='capo')?meta.pitchMode:(prev.pitchMode==='step'?'step':'capo'),
-        crpProjectId:String(id||session?.crpProjectId||state.project?.linkedCrpProjectId||prev.crpProjectId||''),
+        crpProjectId:sid,
         source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()
       };
       writeJson(SRS_TRANSPORT_KEY,next);
@@ -16813,11 +16816,14 @@ KEEP RHYME UI ABOVE KEYBOARD
   }
   function readLiveMeta(){
     const id=activeUnifiedCrpId();
+    if(!id || !exactLinkForCurrentProject())return null;
     const canonical=readCanonicalMeta(id);
-    const unified=id?readJson(unifiedMetaKey(id),null):null;
-    const legacy=(canonical?{...canonical,crpProjectId:id}:(unified&&String(unified.crpProjectId||'')===id?unified:readJson(LIVE_META_KEY,null)));
+    const unified=readJson(unifiedMetaKey(id),null);
+    const globalLive=readJson(LIVE_META_KEY,null);
+    const legacy=(canonical?{...canonical,crpProjectId:id}:(unified&&String(unified.crpProjectId||'')===id?unified:(globalLive&&String(globalLive.crpProjectId||'')===id?globalLive:null)));
     const suite=readSuiteTransport();
-    return suite?{...(legacy||{}),...suite,crpProjectId:String(suite.crpProjectId||id||'')}:legacy;
+    const suiteForPair=(suite&&String(suite.crpProjectId||'')===String(id))?suite:null;
+    return suiteForPair?{...(legacy||{}),...suiteForPair,crpProjectId:String(id)}:legacy;
   }
   function writeLiveMeta(id,meta){
     if(!id)return null;
@@ -16833,10 +16839,22 @@ KEEP RHYME UI ABOVE KEYBOARD
     try{window.__CRP_SRP_META_CHANNEL?.postMessage(next)}catch{}
     return next;
   }
-  function readHardSync(){const id=activeUnifiedCrpId();return readSuiteTransport()||readCanonicalMeta(id)||readJson(HARD_SYNC_KEY,null)}
+  function readHardSync(){
+    if(!exactLinkForCurrentProject())return null;
+    const id=String(activeUnifiedCrpId()||'');
+    if(!id)return null;
+    const suite=readSuiteTransport();
+    if(suite&&String(suite.crpProjectId||'')===id)return suite;
+    const canonical=readCanonicalMeta(id);
+    if(canonical)return canonical;
+    const legacy=readJson(HARD_SYNC_KEY,null);
+    return legacy&&String(legacy.projectId||legacy.crpProjectId||'')===id?legacy:null;
+  }
   function writeHardSyncFromSrp(){
     try{
+      if(!exactLinkForCurrentProject())return null;
       const projectId=String(activeLinkedCrpId()||'');
+      if(!projectId)return null;
       const mode=state.transposeMode==='step'?'step':'capo';
       const raw=Number(el?.capoInput?.value);
       const bpm=Math.max(40,Math.min(240,Number(el?.bpmInput?.value)||Number(state.bpm)||95));
@@ -16858,7 +16876,12 @@ KEEP RHYME UI ABOVE KEYBOARD
   let __hardSyncRev=-1;
   function applyHardSyncToSrp(){
     try{
+      if(!exactLinkForCurrentProject())return false;
       const m=readHardSync();if(!m)return false;
+      const linkedId=String(activeLinkedCrpId()||'');
+      if(!linkedId)return false;
+      const metaId=String(m.crpProjectId||m.projectId||'');
+      if(metaId&&metaId!==linkedId)return false;
       // Do not let the background sync poll fight the user's active BPM/CAPO/STEP edit.
       // Crucially, do not mark this revision applied until the field is no longer focused.
       const active=document.activeElement;
@@ -16885,7 +16908,8 @@ KEEP RHYME UI ABOVE KEYBOARD
     const live=readLiveMeta();
     const legacy=(canonical?{...(base||{}),...canonical,crpProjectId:sid}:(live&&String(live.crpProjectId||'')===sid?{...(base||{}),...live}:base));
     const suite=readSuiteTransport();
-    return suite?{...(legacy||{}),...suite,crpProjectId:sid}:legacy;
+    const suiteForPair=(suite&&String(suite.crpProjectId||'')===sid)?suite:null;
+    return suiteForPair?{...(legacy||{}),...suiteForPair,crpProjectId:sid}:legacy;
   }
   function writeSharedMeta(id,meta){if(!id)return;const base=readJson(sharedMetaKey(id),{})||{};writeJson(sharedMetaKey(id),{...base,...meta,projectId:String(id),updatedAt:Date.now()});}
 
