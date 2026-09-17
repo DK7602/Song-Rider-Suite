@@ -1,5 +1,7 @@
-const CACHE = 'song-rider-suite-v3.3.8-last-midi-duration-capo-row';
+const CACHE = 'song-rider-suite-v3.3.9-hq-branding';
 const ASSETS = [
+  './assets/chord-rider-pro-wordmark-hq.png',
+  './assets/baby-daw-mic.png',
   './assets/chord-rider-pro-wordmark.png',
   './song-rider/suite-header-master.png',
   './song-rider/branding-shell.css',

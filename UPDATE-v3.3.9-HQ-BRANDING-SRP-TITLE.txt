@@ -1,0 +1,6 @@
+Song Rider Suite v3.3.9 — HQ Branding + SRP Title Match
+
+- CRP title rebuilt at 2x resolution; CHORD now uses the sharper source artwork and matches RIDER PRO more closely.
+- Baby DAW mode button rebuilt from the original high-resolution skull/chain + microphone art with live HTML text, preserving the same design while making it crisp like CRP/SRP.
+- SRP title on tablet/desktop now fills the available titlebar width up to the Hide/Show button, matching CRP. Mobile sizing is unchanged.
+- PWA cache bumped to v3.3.9.
