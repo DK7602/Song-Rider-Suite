@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.11-brand-assets';
+const CACHE = 'song-rider-suite-v3.3.12-cropped-branding';
 const ASSETS = [
   './song-rider-pro-wordmark-hq.png',
   './baby-daw-button-hq.png',
