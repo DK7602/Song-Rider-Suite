@@ -2494,9 +2494,14 @@ html.crp-integrated #capoStepToggle,html.crp-integrated #capoStepToggle.on{
 html.crp-integrated #topControlsRow .tinyField.key{width:48px!important;min-width:48px!important;height:40px!important;}
 html.crp-integrated #topControlsRow #keyOutput{width:48px!important;min-width:48px!important;max-width:48px!important;height:40px!important;padding:5px 2px!important;font-size:12px!important;}
 html.crp-integrated .srp-inline-link-btn{
-  min-width:0!important;width:100%!important;height:40px!important;padding:0 6px!important;border:1px solid #d8ae52!important;border-radius:10px!important;
-  background:#252b33!important;color:#f4d47d!important;font-size:11px!important;font-weight:900!important;line-height:1.05!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+  min-width:0!important;width:100%!important;height:40px!important;padding:2px 6px!important;border:1px solid #d8ae52!important;border-radius:10px!important;
+  background:#252b33!important;color:#f4d47d!important;font-size:11px!important;font-weight:900!important;line-height:1!important;
+  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;overflow:hidden!important;
 }
+html.crp-integrated .srp-inline-link-btn .srp-link-main,
+html.crp-integrated .srp-inline-link-btn .srp-link-project-name{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+html.crp-integrated .srp-inline-link-btn .srp-link-main{font-size:10.5px;font-weight:950;line-height:1;}
+html.crp-integrated .srp-inline-link-btn .srp-link-project-name{font-size:7.8px;font-weight:750;line-height:1;color:#fff3c7;opacity:.92;}
 html.crp-integrated .srp-inline-link-btn:hover{border-color:#efc85d!important;}
 
 /* Force every editable section heading to CRP gold, even while focused/editing. */
@@ -2520,7 +2525,7 @@ html.crp-integrated input.fullPerfPill:focus,html.crp-integrated input.songPartP
   html.crp-integrated #capoInput{width:39px!important;min-width:39px!important;max-width:39px!important;height:38px!important;}
   html.crp-integrated #capoStepToggle,html.crp-integrated #capoStepToggle.on{width:22px!important;min-width:22px!important;height:38px!important;font-size:9px!important;}
   html.crp-integrated #topControlsRow .tinyField.key,html.crp-integrated #topControlsRow #keyOutput{width:44px!important;min-width:44px!important;max-width:44px!important;height:38px!important;}
-  html.crp-integrated .srp-inline-link-btn{height:38px!important;font-size:10px!important;padding:0 4px!important;}
+  html.crp-integrated .srp-inline-link-btn{height:38px!important;font-size:10px!important;padding:2px 4px!important;gap:1px!important;} html.crp-integrated .srp-inline-link-btn .srp-link-project-name{font-size:7.2px!important;}
 }
 </style>
 
@@ -3227,7 +3232,7 @@ html.crp-integrated .crp-srp-shell>.workspace-mode-switch{
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <!-- cache-buster -->
-<script src="./app.js?v=3.2.9-PROJECT-SCOPED-LINK"></script>
+<script src="./app.js?v=3.3.5-PLAYBACK-LINK-TITLE"></script>
 
 
 <script>

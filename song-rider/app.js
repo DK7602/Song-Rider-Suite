@@ -17269,6 +17269,40 @@ KEEP RHYME UI ABOVE KEYBOARD
     try{renderSheetTitleBar();}catch{}
   }
 
+  function crpProjectNameForLink(crpId,payload=null){
+    const id=String(crpId||'');
+    if(!id)return '';
+    if(payload&&String(payload.crpProjectId||'')===id&&String(payload.name||'').trim())return String(payload.name).trim();
+    try{
+      const projects=readJson('crp-projects',[])||[];
+      const found=projects.find(x=>String(x?.id||'')===id);
+      if(String(found?.name||'').trim())return String(found.name).trim();
+    }catch{}
+    try{
+      const h=handoff();
+      if(String(h?.payload?.crpProjectId||'')===id&&String(h?.payload?.name||'').trim())return String(h.payload.name).trim();
+    }catch{}
+    return 'Linked CRP / BD';
+  }
+  function setCrpLinkButtonContent(button,{linked=false,name='',busy=false}={}){
+    if(!button)return;
+    button.hidden=false;
+    button.replaceChildren();
+    const main=document.createElement('span');
+    main.className='srp-link-main';
+    main.textContent=busy?'Linking…':(linked?'Unlink SRP':'Link SRP');
+    button.appendChild(main);
+    if(linked&&name){
+      const sub=document.createElement('span');
+      sub.className='srp-link-project-name';
+      sub.textContent=name;
+      button.appendChild(sub);
+      button.setAttribute('aria-label',`Unlink SRP from ${name}`);
+    }else{
+      button.setAttribute('aria-label',busy?'Linking Song Rider Pro project':'Link SRP project');
+    }
+  }
+
   function refreshCrpLinkUi(){
     if(!integrated)return;
     const rec=persistentLinkForSrpProject(state.project,false);
@@ -17277,16 +17311,16 @@ KEEP RHYME UI ABOVE KEYBOARD
     const b=document.getElementById('crpSrpLinkBtn');
     if(!rec && !payload?.crpProjectId){
       if(st)st.textContent='Save this CRP project first';
-      if(b){b.hidden=false;b.disabled=false;b.textContent='Link SRP';b.classList.remove('is-linked');b.title='Link this project to Song Rider Pro'}
+      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});b.classList.remove('is-linked');b.title='Link this project to Song Rider Pro'}
       return;
     }
     const linked=!!rec;
-    if(st)st.textContent=linked?`Linked • ${state.project?.name||'Song Rider project'}`:'Not linked';
+    const crpName=linked?crpProjectNameForLink(rec.crpProjectId,payload):'';
+    if(st)st.textContent=linked?`Linked • ${crpName}`:'Not linked';
     if(b){
-      b.hidden=false;
       b.disabled=false;
-      b.textContent=linked?'Unlink SRP':'Link SRP';
-      b.title=linked?'Unlink this Song Rider Pro project from its Chord Rider Pro project':'Link this SRP project to the CRP/Baby DAW project currently open';
+      setCrpLinkButtonContent(b,{linked,name:crpName});
+      b.title=linked?`Unlink this SRP project from ${crpName}`:'Link this SRP project to the CRP/Baby DAW project currently open';
       b.classList.toggle('is-linked',linked);
     }
   }
@@ -17300,12 +17334,12 @@ KEEP RHYME UI ABOVE KEYBOARD
     const st=document.getElementById('crpSrpLinkStatus');
     if(!payload?.crpProjectId){
       if(st)st.textContent='No saved CRP project was handed off. Return to Chord Rider, save it once, then open Song Rider again.';
-      if(b){b.disabled=false;b.textContent='Link SRP'}
+      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false})}
       return null;
     }
     const rec=forceCreate?null:savedRec;
     if(!forceCreate && (!rec || !state.project || String(rec.srpProjectId||'')!==String(state.project.id||''))){refreshCrpLinkUi();return null}
-    if(b){b.disabled=true;b.textContent='Linking…'}
+    if(b){b.disabled=true;setCrpLinkButtonContent(b,{busy:true})}
     const linked=importCrpStructure(payload,forceCreate,rec?.srpProjectId||'');
     if(linked){
       const all=links();
@@ -17322,12 +17356,13 @@ KEEP RHYME UI ABOVE KEYBOARD
       // refresh deterministic before either workspace has a chance to restore an older snapshot.
       syncMetaToCrp();
       writeHardSyncFromSrp();
-      if(st)st.textContent=`Linked • ${recNow.srpName}`;
-      if(b){b.hidden=false;b.textContent='Unlink SRP';b.disabled=false;b.classList.add('is-linked');b.title='Unlink this Song Rider Pro project from Chord Rider Pro'}
+      const linkedCrpName=crpProjectNameForLink(payload.crpProjectId,payload);
+      if(st)st.textContent=`Linked • ${linkedCrpName}`;
+      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:true,name:linkedCrpName});b.classList.add('is-linked');b.title=`Unlink this SRP project from ${linkedCrpName}`}
       setTimeout(refreshCrpLinkUi,900);
     }else{
       if(st)st.textContent='Link failed — tap Link SRP to try again.';
-      if(b){b.textContent='Link SRP';b.disabled=false}
+      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false})}
     }
     return linked;
   }
