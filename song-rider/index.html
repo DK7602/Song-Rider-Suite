@@ -2835,7 +2835,7 @@ html.crp-integrated .crp-srp-mode:nth-child(2) img{
 }
 </style>
 
-<link rel="stylesheet" href="./branding-shell.css?v=3.3.9">
+<link rel="stylesheet" href="./branding-shell.css?v=3.3.10">
 
 <style id="srpShellParityV290">
 html.crp-integrated .crp-srp-shell{
@@ -2849,6 +2849,57 @@ html.crp-integrated .crp-srp-shell>.app-header.suite-master-header{
 }
 html.crp-integrated .crp-srp-shell>.workspace-mode-switch{
   margin:0 auto!important;
+}
+</style>
+
+
+<style id="srpDesktopTitleFillV3310">
+/* v3.3.10 — desktop/tablet SRP title uses the entire title cell, matching CRP.
+   Mobile stays on the already-approved sizing. */
+@media (min-width:701px){
+  html.crp-integrated header .panel .panelTop{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 56px!important;
+    align-items:center!important;
+    column-gap:10px!important;
+    width:100%!important;
+  }
+  html.crp-integrated header .panel .panelTop>div:first-child{
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+  }
+  html.crp-integrated header .panel .panelTop .left{
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    padding:0!important;
+    margin:0!important;
+  }
+  html.crp-integrated header .panel .panelTop .left .srp-exact-wordmark{
+    display:block!important;
+    width:100%!important;
+    max-width:none!important;
+    height:auto!important;
+    max-height:none!important;
+    object-fit:contain!important;
+    object-position:left center!important;
+    margin:0!important;
+    padding:0!important;
+    filter:none!important;
+  }
+  html.crp-integrated header .panel .panelTop #togglePanelBtn{
+    grid-column:2!important;
+    justify-self:end!important;
+    width:56px!important;
+    min-width:56px!important;
+    max-width:56px!important;
+    height:38px!important;
+    min-height:38px!important;
+    margin:0!important;
+  }
 }
 </style>
 
@@ -2866,14 +2917,7 @@ html.crp-integrated .crp-srp-shell>.workspace-mode-switch{
         <span class="mode-copy"><strong>Chord Rider</strong><small>Chords + Beat</small></span>
       </a>
       <a class="workspace-mode-btn" href="/index.html?workspace=baby-daw">
-        <span class="baby-hq-layout" aria-hidden="true">
-          <span class="baby-hq-title">Baby<br>DAW</span>
-          <span class="baby-hq-art">
-            <img class="baby-hq-skull" src="./baby-daw-head-chain-sticker.png?v=3.3.9" alt="">
-            <img class="baby-hq-mic" src="./baby-daw-mic.png?v=3.3.9" alt="">
-          </span>
-          <span class="baby-hq-tagline">Lead, Bass, Vocals, Production</span>
-        </span>
+        <span class="baby-exact-art" aria-hidden="true"><img src="./baby-daw-button-hq.png?v=3.3.10" alt=""></span>
       </a>
       <a class="workspace-mode-btn active" href="/song-rider/index.html?crpMode=1" aria-current="page">
         <span class="mode-art rider-mode-art"><img src="./srp-rider-bones-sticker.png" alt=""></span>
@@ -2896,7 +2940,7 @@ html.crp-integrated .crp-srp-shell>.workspace-mode-switch{
       <div class="panelTop">
         <div style="display:flex; align-items:center; gap:10px;">
           <div class="left" aria-label="Song Rider Pro">
-            <img class="srp-exact-wordmark" src="./song-rider-pro-wordmark.png?v=2.9.3" alt="Song Rider Pro">
+            <img class="srp-exact-wordmark" src="./song-rider-pro-wordmark-hq.png?v=3.3.10" alt="Song Rider Pro">
           </div>
 
           <!-- ✅ Parked horse (size controlled by #horseParked CSS) -->
