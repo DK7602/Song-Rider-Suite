@@ -3619,3 +3619,121 @@ body.vox-box-open{overflow:hidden!important}
   .lead-controls .lead-sustain-control{min-width:62px!important}
   .lead-sustain-control .part-repeat-toggle{gap:5px!important;padding-left:6px!important;padding-right:6px!important}
 }
+
+/* =========================================================
+   v3.3.21 — compact Lead settings + Vox Box Pro polish
+   ========================================================= */
+.lead-controls{
+  grid-template-columns:minmax(160px,.9fr) minmax(220px,1.55fr)!important;
+  gap:10px!important;
+  align-items:end!important;
+  overflow:visible!important;
+}
+.lead-controls #leadInstrumentTabs,
+.lead-controls .lead-sound-control{min-width:0!important;}
+.lead-compact-settings-row{
+  grid-column:1 / -1;
+  display:grid;
+  grid-template-columns:minmax(74px,1fr) minmax(82px,1.08fr) minmax(60px,.78fr) minmax(72px,.88fr);
+  gap:8px;
+  width:min(100%,520px);
+  max-width:520px;
+  align-items:end;
+  min-width:0;
+}
+.lead-compact-settings-row>label{min-width:0!important;display:flex!important;flex-direction:column!important;gap:5px!important;}
+.lead-compact-settings-row>label>select{
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  box-sizing:border-box!important;
+  padding-left:10px!important;
+  padding-right:30px!important;
+}
+.lead-compact-settings-row .lead-sustain-control{min-width:0!important;}
+.lead-compact-settings-row .lead-sustain-control .part-repeat-toggle{
+  width:100%!important;
+  min-width:0!important;
+  box-sizing:border-box!important;
+  min-height:42px!important;
+  padding:7px 8px!important;
+  justify-content:center!important;
+  gap:6px!important;
+}
+.lead-compact-settings-row .lead-sustain-control .part-repeat-toggle input{
+  flex:0 0 20px!important;
+  width:20px!important;height:20px!important;
+}
+@media(max-width:900px){
+  .lead-controls{
+    grid-template-columns:minmax(0,.9fr) minmax(0,1.35fr)!important;
+    gap:8px!important;
+  }
+  .lead-controls #leadInstrumentTabs{grid-column:1!important;}
+  .lead-controls .lead-sound-control{grid-column:2!important;}
+  .lead-compact-settings-row{
+    grid-column:1 / -1!important;
+    width:min(100%,520px)!important;
+    max-width:520px!important;
+    grid-template-columns:minmax(64px,1fr) minmax(70px,1.08fr) minmax(52px,.75fr) minmax(64px,.9fr)!important;
+    gap:6px!important;
+  }
+  .lead-compact-settings-row>label{
+    grid-column:auto!important;
+    min-width:0!important;
+    font-size:clamp(.66rem,2.2vw,.82rem)!important;
+    white-space:nowrap;
+  }
+  .lead-compact-settings-row>label>select{height:42px!important;padding:7px 24px 7px 8px!important;font-size:.9rem!important;}
+  .lead-compact-settings-row .lead-sustain-control{grid-column:auto!important;min-width:0!important;}
+}
+@media(max-width:520px){
+  .lead-controls{gap:7px!important;}
+  .lead-compact-settings-row{
+    width:100%!important;
+    max-width:none!important;
+    grid-template-columns:minmax(62px,1.05fr) minmax(68px,1.08fr) minmax(50px,.72fr) minmax(61px,.86fr)!important;
+    gap:5px!important;
+  }
+  .lead-compact-settings-row>label{font-size:clamp(.62rem,2.75vw,.76rem)!important;}
+  .lead-compact-settings-row>label>select{height:40px!important;padding:6px 20px 6px 7px!important;font-size:.84rem!important;}
+  .lead-compact-settings-row .lead-sustain-control .part-repeat-toggle{min-height:40px!important;padding:5px 5px!important;gap:4px!important;font-size:.77rem!important;}
+  .lead-compact-settings-row .lead-sustain-control .part-repeat-toggle input{width:18px!important;height:18px!important;flex-basis:18px!important;}
+}
+@media(max-width:370px){
+  .lead-compact-settings-row{gap:4px!important;grid-template-columns:minmax(60px,1.05fr) minmax(65px,1.08fr) minmax(48px,.72fr) minmax(58px,.84fr)!important;}
+  .lead-compact-settings-row>label{font-size:.62rem!important;letter-spacing:-.01em!important;}
+  .lead-compact-settings-row>label>select{padding-left:6px!important;padding-right:17px!important;font-size:.8rem!important;}
+  .lead-compact-settings-row .lead-sustain-control .part-repeat-toggle span{font-size:.7rem!important;}
+}
+
+/* Vox Box track creation / naming. */
+.vox-track-label{justify-content:center!important;}
+.vox-track-name{
+  width:100%;min-width:0;box-sizing:border-box;
+  border:1px solid transparent!important;border-radius:7px!important;
+  background:transparent!important;color:#f2f4f7!important;-webkit-text-fill-color:#f2f4f7!important;
+  padding:4px 5px!important;font:900 .82rem/1.15 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif!important;
+  text-overflow:ellipsis;white-space:nowrap;overflow:hidden;
+}
+.vox-track-name:hover,.vox-track-name:focus{
+  border-color:#52606f!important;background:#0b1016!important;outline:none!important;
+  box-shadow:0 0 0 2px rgba(241,198,85,.12)!important;
+}
+.vox-track-meta{font-size:.67rem!important;color:#8f9aa6!important;padding:0 5px;}
+.vox-event.is-trimming{opacity:1!important;box-shadow:0 0 0 2px rgba(102,198,255,.28),0 7px 20px rgba(0,0,0,.38)!important;}
+.vox-event.is-trimming .vox-event-waveform{opacity:.96!important;}
+.vox-event-time{font-variant-numeric:tabular-nums;}
+@media(max-width:600px){
+  .vox-track-name{font-size:.72rem!important;padding:3px 4px!important;}
+  .vox-track-meta{font-size:.59rem!important;padding:0 4px;}
+}
+@media(max-width:900px){
+  .lead-controls .lead-compact-settings-row .lead-grid-octave-control,
+  .lead-controls .lead-compact-settings-row .lead-resolution-control,
+  .lead-controls .lead-compact-settings-row .lead-bars-control,
+  .lead-controls .lead-compact-settings-row .lead-sustain-control{
+    grid-column:auto!important;
+    min-width:0!important;
+  }
+}

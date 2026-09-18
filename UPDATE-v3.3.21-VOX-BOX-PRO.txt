@@ -1,0 +1,23 @@
+Song Rider Suite v3.3.21 — Compact Lead Controls + Gold SRP Pill + Vox Box Pro
+
+1. Baby DAW Lead/Bass controls
+- Grid octave, Resolution, Bars, and Sustain now share one compact settings row.
+- Numeric/select windows are intentionally compact instead of stretching across the editor.
+- Responsive grid is sized to stay inside the Lead/Bass card on phone, tablet, and desktop without horizontal page scrolling.
+
+2. Song Rider Pro Full Song section title
+- Full Song section title remains directly editable.
+- Added a final high-specificity gold pill treatment matching the editable card-page section-title pill.
+
+3. Vox Box Pro
+- Live crop preview: waveform content redraws while either crop edge is dragged, so the visible waveform shows the actual retained audio during the crop rather than stretching/compressing until release.
+- Live beat-range readout updates while moving/cropping.
+- Added + Vocal Track inside Vox Box for layering, doubles, harmonies, ad-libs, verse/chorus organization, etc.
+- New vocal tracks are full Baby DAW vocal parts with their own volume/effects and persist with the project.
+- Track names can be edited inline directly in the Vox Box track header.
+- Clips may still be dragged/copied/pasted between vocal tracks; their dry source take is preserved.
+- Track FX remain independent per vocal track; Selected Event FX remain independent per clip/event.
+- Existing Snap to Beat 1/4, 1/8, 1/16, 1/32, 1/64 and free placement are preserved.
+- Crop/split/move/copy remain non-destructive to the original dry WAV.
+
+Cache generation bumped to v3.3.21 so updated layout/code is not mixed with the previous v3.3.20 files.

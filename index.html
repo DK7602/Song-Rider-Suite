@@ -9,7 +9,7 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.20-VOXBOX" />
+  <link rel="stylesheet" href="styles.css?v=3.3.21-VOXBOX-PRO" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
   <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
@@ -177,10 +177,12 @@
             <button class="seg" data-lead-instrument="guitar" type="button">Guitar</button>
           </div>
           <label class="lead-sound-control">Sound<select id="leadSoundSelect"></select></label>
-          <label class="lead-grid-octave-control">Grid octave<select id="leadGridOctave"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
-          <label class="lead-resolution-control">Resolution<select id="leadResolution"><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
-          <label class="lead-sustain-control"><span>Sustain</span><span class="part-repeat-toggle"><input id="leadSustain" type="checkbox"><span>On</span></span></label>
-          <label class="lead-bars-control">Bars<select id="leadBars"><option>1</option><option>2</option><option selected>4</option><option>8</option><option>16</option></select></label>
+          <div class="lead-compact-settings-row" aria-label="Lead grid settings">
+            <label class="lead-grid-octave-control">Grid octave<select id="leadGridOctave"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
+            <label class="lead-resolution-control">Resolution<select id="leadResolution"><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
+            <label class="lead-bars-control">Bars<select id="leadBars"><option>1</option><option>2</option><option selected>4</option><option>8</option><option>16</option></select></label>
+            <label class="lead-sustain-control"><span>Sustain</span><span class="part-repeat-toggle"><input id="leadSustain" type="checkbox"><span>On</span></span></label>
+          </div>
         </div>
         <div class="lead-bar-nav">
           <button id="leadPrevBar" type="button">‹</button>
@@ -425,6 +427,7 @@
       </header>
 
       <div class="vox-box-tools">
+        <button id="voxAddTrackBtn" type="button">+ Vocal Track</button>
         <button id="voxAddActiveTakeBtn" type="button">+ Active Take</button>
         <button id="voxCropBtn" type="button">Crop</button>
         <button id="voxSplitBtn" type="button">Split at Playhead</button>
@@ -479,8 +482,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.20-VOXBOX"></script>
-  <script src="parts.js?v=3.3.20-VOXBOX"></script>
+  <script src="app.js?v=3.3.21-VOXBOX-PRO"></script>
+  <script src="parts.js?v=3.3.21-VOXBOX-PRO"></script>
   <script src="beat-maker.js?v=3.3.8-LAST-MIDI-DURATION-CAPO-ROW"></script>
 </body>
 </html>
