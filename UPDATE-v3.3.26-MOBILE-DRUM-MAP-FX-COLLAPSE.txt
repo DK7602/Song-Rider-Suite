@@ -1,0 +1,8 @@
+Song Rider Suite v3.3.26 — Mobile Drum Map + Instrument Focus
+
+• Vox Box Drum Map now reserves the full vertical height of every drum row instead of using the old 180px track height. This prevents vocal clips/tracks from drawing over the lower drum rows on phones.
+• Drum names remain pinned immediately to the right of the track-title gutter while the timeline scrolls horizontally.
+• Selecting Beat, Chord/Note, Lead/Bass, a specific instrument event, or the Drum Map highlights that instrument track and collapses the Vocal Effects editor into a compact status strip.
+• Selecting a vocal track or vocal event restores the full Vocal Effects editor.
+• Drum Map focus is restored when Vox Box reopens with Drum Map persisted open.
+• Desktop/tablet Vox Box behavior and existing DAW editing features are preserved.
