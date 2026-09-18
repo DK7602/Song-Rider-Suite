@@ -579,6 +579,19 @@
     getBeat(){
       return JSON.parse(JSON.stringify(normalizeBeat(beat)));
     },
+    getDrumDefs(){
+      return DRUMS.map(([id,name])=>({id,name}));
+    },
+    setBeat(next,{persist=true}={}){
+      beat=normalizeBeat(next);
+      currentBar=clamp(currentBar,0,beat.bars-1);
+      beatUpdatedAt=Date.now();
+      updateMainControls();
+      if($('crpBeatModal')?.classList.contains('open'))renderEditor();
+      if(persist)persistBeatIntoProject();
+      try{window.dispatchEvent(new CustomEvent('crp-beat-changed',{detail:{source:'vox-box'}}));}catch{}
+      return JSON.parse(JSON.stringify(beat));
+    },
     getUpdatedAt(){ return Number(beatUpdatedAt)||0; },
     loadProject(project){
       // Passing null means New/blank project. Reset the sequencer and discard any

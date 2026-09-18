@@ -937,21 +937,35 @@
   }
 
   function updateAutoScrollButton(){
-    const b=$('autoScrollBtn'); if(!b)return;
-    b.classList.toggle('on',state.autoScroll);
-    b.setAttribute('aria-pressed',String(state.autoScroll));
-    b.setAttribute('title',state.autoScroll?'Auto scroll on':'Auto scroll off');
-    b.setAttribute('aria-label',state.autoScroll?'Auto scroll on':'Auto scroll off');
-    b.textContent='↕';
+    const b=$('autoScrollBtn');
+    if(b){
+      b.classList.toggle('on',state.autoScroll);
+      b.setAttribute('aria-pressed',String(state.autoScroll));
+      b.setAttribute('title',state.autoScroll?'Auto scroll on':'Auto scroll off');
+      b.setAttribute('aria-label',state.autoScroll?'Auto scroll on':'Auto scroll off');
+      b.textContent='↕';
+    }
+    const lead=$('leadAutoScrollBtn');
+    if(lead){
+      lead.classList.toggle('on',state.autoScroll);
+      lead.setAttribute('aria-pressed',String(state.autoScroll));
+      lead.setAttribute('title',state.autoScroll?'Lead/Bass auto scroll on':'Follow the playing Lead/Bass note');
+      lead.textContent=state.autoScroll?'↕ Auto On':'↕ Auto';
+    }
     applyProgressionEditLock();
+  }
+
+  function setAutoScroll(on,{manual=false}={}){
+    state.autoScroll=!!on;
+    localStorage.setItem('crp-auto-scroll',state.autoScroll?'1':'0');
+    updateAutoScrollButton();
+    if(manual&&!state.autoScroll&&$('status'))$('status').textContent='Auto scroll off — manual navigation detected.';
+    return state.autoScroll;
   }
 
   function disableAutoScrollForManualScroll(){
     if(!state.autoScroll)return;
-    state.autoScroll=false;
-    localStorage.setItem('crp-auto-scroll','0');
-    updateAutoScrollButton();
-    $('status').textContent='Auto scroll off — manual scrolling detected.';
+    setAutoScroll(false,{manual:true});
   }
 
   function updateSustainButton(){
@@ -1540,7 +1554,7 @@
     updateSustainButton();
     $('capoSelect').onchange=e=>{state.capo=+e.target.value;if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:'capo'});publishLiveSrpMeta('crp');writeHardSync('crp','capo');renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;publishLiveSrpMeta('crp');renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();};
     $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();scheduleAutoSave();};
-    $('autoScrollBtn').onclick=()=>{state.autoScroll=!state.autoScroll;localStorage.setItem('crp-auto-scroll',state.autoScroll?'1':'0');updateAutoScrollButton();};
+    $('autoScrollBtn').onclick=()=>setAutoScroll(!state.autoScroll);
     $('midiViewBtn').onclick=()=>{state.cardView=state.cardView==='midi'?'diagram':'midi';localStorage.setItem('crp-card-view',state.cardView);updateCardViewButton();renderRows();};
     updateAutoScrollButton();updateCardViewButton();
     let lastMobileCarousel=isMobileCarousel(),resizeTimer=null;
@@ -1569,6 +1583,13 @@
     window.addEventListener('wheel',()=>{
       if(state.playing&&state.autoScroll)disableAutoScrollForManualScroll();
     },{passive:true});
+    // Any deliberate click/tap inside the progression or MIDI table hands control
+    // back to the user immediately. Programmatic follow-scroll never fires pointerdown.
+    for(const el of [$('progression'),$('midiRollTableWrap')].filter(Boolean)){
+      el.addEventListener('pointerdown',()=>{
+        if(state.playing&&state.autoScroll)disableAutoScrollForManualScroll();
+      },{passive:true});
+    }
     // Full-project autosave: only active after the project has been manually saved once.
     // BPM is intentionally excluded from input-time autosave. scheduleAutoSave() publishes the
     // SRP handoff immediately, so including BPM here leaked partial mobile keystrokes ("4", "12")
@@ -2089,6 +2110,7 @@
     get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
     startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).flat().reduce((n,c)=>n+cardDurationBeats(c),0);},
     get autoScroll(){return !!state.autoScroll;},get sustain(){return !!state.sustain;},
+    setAutoScroll(on){return setAutoScroll(on);},disableAutoScroll(){disableAutoScrollForManualScroll();},updateAutoScrollUi:updateAutoScrollButton,
     followChordCard(cardIndex){
       let flat=Math.max(0,Number(cardIndex)||0),ri=0,ci=0,found=false;
       for(let r=0;r<state.rows.length;r++){if(flat<state.rows[r].length){ri=r;ci=flat;found=true;break;}flat-=state.rows[r].length;}

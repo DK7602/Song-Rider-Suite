@@ -9,7 +9,7 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.23-LIVE-AUDIO-GRID-VIEW" />
+  <link rel="stylesheet" href="styles.css?v=3.3.24-VOX-TRANSPORT-MULTI-AUTOSCROLL" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
   <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
@@ -201,7 +201,7 @@
               <div id="leadNotesFit" class="lead-harmony-chips lead-note-fit-chips"><span class="lead-harmony-empty">—</span></div>
             </div>
           </div>
-          <div class="lead-play-options lead-play-options-lower"><button id="leadPlaybackBtn" class="part-preview-btn" type="button">▶ Play</button><label class="part-repeat-toggle"><input id="leadRepeat" type="checkbox" checked><span>Repeat</span></label></div>
+          <div class="lead-play-options lead-play-options-lower"><button id="leadPlaybackBtn" class="part-preview-btn" type="button">▶ Play</button><label class="part-repeat-toggle"><input id="leadRepeat" type="checkbox" checked><span>Repeat</span></label><button id="leadAutoScrollBtn" class="lead-auto-scroll-btn" type="button" aria-pressed="false" title="Follow the playing Lead/Bass note">↕ Auto</button></div>
           <div class="lead-bar-tools"><button id="leadCopyBar" type="button">Copy</button><button id="leadPasteBar" type="button" disabled>Paste</button><button id="leadClearBar" type="button">Clear</button></div>
         </div>
         <div id="leadGridWrap" class="lead-grid-wrap"><div id="leadGrid" class="lead-grid"></div></div>
@@ -432,12 +432,16 @@
       <div class="vox-box-tools">
         <button id="voxAddTrackBtn" type="button">+ Vocal Track</button>
         <button id="voxAddActiveTakeBtn" type="button">+ Active Take</button>
+        <label class="vox-tool-check"><input id="voxShowInstrumentals" type="checkbox"><span>Instrumentals</span></label>
         <button id="voxCropBtn" type="button">Crop</button>
         <button id="voxSplitBtn" type="button">Split at Playhead</button>
+        <button id="voxMultiSelectBtn" type="button" aria-pressed="false">Multi Select</button>
         <button id="voxCopyBtn" type="button">Copy</button>
         <button id="voxCutBtn" type="button">Cut</button>
         <button id="voxPasteBtn" type="button" disabled>Paste</button>
         <button id="voxDeleteBtn" type="button">Delete</button>
+        <button id="voxUndoBtn" type="button" disabled title="Undo Vox Box edit">Undo</button>
+        <button id="voxRedoBtn" type="button" disabled title="Redo Vox Box edit">Redo</button>
         <span id="voxBoxStatus" class="subtle tiny">Tap a track to place the playhead. Drag events left/right or between vocal tracks.</span>
       </div>
 
@@ -447,6 +451,20 @@
           <div id="voxTracks" class="vox-tracks"></div>
           <div id="voxPlayhead" class="vox-playhead" aria-hidden="true"><span></span></div>
         </div>
+      </div>
+
+      <div id="voxFloatingTransport" class="vox-floating-transport" role="toolbar" aria-label="Vox Box transport">
+        <button id="voxTransportDrag" class="vox-transport-drag" type="button" title="Drag transport">⠿</button>
+        <button id="voxToStartBtn" type="button" title="Go to beginning" aria-label="Go to beginning">|◀</button>
+        <button id="voxRewindBtn" type="button" title="Rewind 4 beats" aria-label="Rewind">◀◀</button>
+        <button id="voxFastForwardBtn" type="button" title="Fast forward 4 beats" aria-label="Fast forward">▶▶</button>
+        <button id="voxToEndBtn" type="button" title="Go to end" aria-label="Go to end">▶|</button>
+        <button id="voxStopTransportBtn" type="button" title="Stop" aria-label="Stop">■</button>
+        <button id="voxPlayTransportBtn" class="accent" type="button" title="Play" aria-label="Play">▶</button>
+        <button id="voxPauseTransportBtn" type="button" title="Pause" aria-label="Pause">Ⅱ</button>
+        <button id="voxRecordTransportBtn" class="vox-record-transport" type="button" title="Record into selected vocal track" aria-label="Record">●</button>
+        <button id="voxAutoScrollBtn" type="button" aria-pressed="true" title="Follow playhead">↔ Auto</button>
+        <button id="voxLyricsTransportBtn" type="button" title="Open Song Rider Pro lyrics">Lyrics</button>
       </div>
 
       <section class="vox-inspector" aria-label="Vocal event effects">
@@ -485,8 +503,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.23-LIVE-AUDIO-GRID-VIEW"></script>
-  <script src="parts.js?v=3.3.23-LIVE-AUDIO-GRID-VIEW"></script>
-  <script src="beat-maker.js?v=3.3.8-LAST-MIDI-DURATION-CAPO-ROW"></script>
+  <script src="app.js?v=3.3.24-VOX-TRANSPORT-MULTI-AUTOSCROLL"></script>
+  <script src="parts.js?v=3.3.24-VOX-TRANSPORT-MULTI-AUTOSCROLL"></script>
+  <script src="beat-maker.js?v=3.3.24-VOX-TRANSPORT-MULTI-AUTOSCROLL"></script>
 </body>
 </html>

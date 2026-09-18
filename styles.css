@@ -3352,7 +3352,14 @@ body.workspace-baby-daw #songEndEditor:not([hidden]){
   box-shadow:0 3px 10px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.45)!important;
 }
 
-body.vox-box-open{overflow:hidden!important}
+body.vox-box-open{overflow:hidden!important;width:100vw!important;max-width:100vw!important}
+/* Vox Box is a fixed full-screen workspace. Remove the hidden Baby DAW shell
+   from layout while it is open so tablet widths cannot inherit desktop-only
+   minimum widths and create a phantom page-level horizontal scrollbar. */
+body.vox-box-open>.app-header,
+body.vox-box-open>#workspaceModeSwitch,
+body.vox-box-open>.app-shell,
+body.vox-box-open>footer{display:none!important}
 .vox-box-page{
   position:fixed;
   inset:0;
@@ -3808,4 +3815,159 @@ body.vox-box-open{overflow:hidden!important}
 }
 @media(max-width:720px){
   .lead-grid-view-toggle{display:none!important;}
+}
+
+/* =========================================================
+   v3.3.24 — Vox Box transport, multi-select, instruments,
+   undo/redo and Baby DAW auto-follow
+   ========================================================= */
+.lead-auto-scroll-btn{
+  min-height:40px;
+  padding:7px 11px!important;
+  border:1px solid #4b5967!important;
+  border-radius:11px!important;
+  background:#151c25!important;
+  color:#eef2f6!important;
+  font-weight:850!important;
+  white-space:nowrap;
+}
+.lead-auto-scroll-btn.on{
+  color:#111!important;
+  background:linear-gradient(180deg,#f8d66d,#e7b53c)!important;
+  border-color:#d4a02e!important;
+  box-shadow:0 0 0 2px rgba(241,198,85,.16)!important;
+}
+.vox-tool-check{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-height:38px;
+  padding:6px 9px;
+  border:1px solid #3b4653;
+  border-radius:9px;
+  background:#151c25;
+  color:#dce2e9;
+  font-weight:800;
+  font-size:.78rem;
+  white-space:nowrap;
+}
+.vox-tool-check input{width:18px;height:18px;accent-color:var(--accent);margin:0;}
+.vox-instrument-track{background:rgba(84,112,142,.035)!important;}
+.vox-instrument-label{background:#101720!important;}
+.vox-track-enable{display:flex;align-items:center;gap:7px;min-width:0;color:#f2f4f7;}
+.vox-track-enable input{width:17px;height:17px;flex:0 0 17px;accent-color:var(--accent);margin:0;}
+.vox-track-enable strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.vox-instrument-lane{background-color:rgba(78,111,143,.025)!important;}
+.vox-instrument-event{
+  position:absolute;
+  top:30px;
+  height:54px;
+  min-width:10px;
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:3px 6px;
+  overflow:hidden;
+  border:1px solid #63819d;
+  border-radius:4px;
+  background:linear-gradient(180deg,#46627c,#30475c);
+  color:#f4f7fa;
+  font-size:.68rem;
+  font-weight:850;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  box-shadow:0 3px 9px rgba(0,0,0,.28);
+  cursor:grab;
+  user-select:none;
+  touch-action:none;
+}
+.vox-instrument-event:active{cursor:grabbing;}
+.vox-instrument-event.is-dragging{opacity:.86;z-index:22;}
+.vox-instrument-event.is-selected{
+  border-color:#66c6ff!important;
+  box-shadow:0 0 0 2px rgba(102,198,255,.28),0 5px 14px rgba(0,0,0,.35)!important;
+}
+.vox-chord-event{background:linear-gradient(180deg,#5579a3,#365776);border-color:#7da4c9;}
+.vox-lead-event{background:linear-gradient(180deg,#7560a5,#4e4176);border-color:#9b86c8;}
+.vox-drum-event{top:38px;height:38px;padding:2px 3px;background:linear-gradient(180deg,#3c7561,#285344);border-color:#65a58d;font-size:.56rem;writing-mode:vertical-rl;text-orientation:mixed;}
+.vox-floating-transport{
+  position:fixed;
+  z-index:5200;
+  left:50%;
+  bottom:18%;
+  transform:translateX(-50%);
+  display:flex;
+  align-items:center;
+  gap:5px;
+  width:max-content;
+  max-width:calc(100vw - 12px);
+  padding:7px 8px;
+  border:1px solid rgba(241,198,85,.88);
+  border-radius:12px;
+  background:rgba(12,17,23,.95);
+  box-shadow:0 10px 34px rgba(0,0,0,.48),0 0 0 1px rgba(255,255,255,.04) inset;
+  backdrop-filter:blur(10px);
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+}
+.vox-floating-transport button{
+  flex:0 0 auto;
+  min-width:38px;
+  min-height:36px;
+  padding:6px 8px!important;
+  border-radius:8px!important;
+  font-weight:900!important;
+  line-height:1!important;
+}
+.vox-floating-transport .vox-transport-drag{
+  min-width:30px;
+  width:30px;
+  cursor:grab;
+  color:#f1c655!important;
+  background:#202833!important;
+  touch-action:none;
+}
+.vox-floating-transport .vox-transport-drag:active{cursor:grabbing;}
+.vox-floating-transport .is-active{box-shadow:0 0 0 2px rgba(241,198,85,.2) inset;border-color:var(--accent)!important;}
+.vox-record-transport{color:#ff7168!important;font-size:1.05rem!important;}
+.vox-record-transport.recording{background:#c43832!important;color:#fff!important;border-color:#ff756d!important;animation:voxRecPulse 1s ease-in-out infinite;min-width:58px;}
+@keyframes voxRecPulse{50%{box-shadow:0 0 0 5px rgba(255,92,82,.12)}}
+#voxAutoScrollBtn.is-active{background:linear-gradient(180deg,#f8d66d,#e7b53c)!important;color:#111!important;border-color:#d4a02e!important;}
+#voxLyricsTransportBtn{padding-left:10px!important;padding-right:10px!important;}
+.vox-playhead span{pointer-events:auto;cursor:ew-resize;touch-action:none;}
+.vox-playhead span::after{content:"";position:absolute;left:-14px;top:-10px;width:28px;height:30px;}
+#voxMultiSelectBtn.is-active{background:var(--accent)!important;color:#111!important;border-color:var(--accent)!important;}
+
+@media(max-width:600px){
+  .lead-play-options-lower{flex-wrap:wrap!important;}
+  .lead-auto-scroll-btn{min-height:38px;padding:6px 9px!important;font-size:.78rem!important;}
+  .vox-tool-check{min-height:33px;padding:5px 7px;font-size:.72rem;}
+  .vox-tool-check input{width:16px;height:16px;}
+  .vox-instrument-event{top:25px;height:48px;font-size:.6rem;padding:2px 4px;}
+  .vox-drum-event{top:31px;height:36px;font-size:.5rem;}
+  .vox-floating-transport{
+    gap:3px;
+    padding:5px;
+    border-radius:10px;
+    width:calc(100vw - 8px);
+    max-width:calc(100vw - 8px);
+    flex-wrap:wrap;
+    justify-content:center;
+    overflow-x:hidden;
+    overflow-y:visible;
+    bottom:max(12px,env(safe-area-inset-bottom));
+  }
+  .vox-floating-transport button{min-width:34px;min-height:34px;padding:4px 4px!important;font-size:.72rem!important;}
+  .vox-floating-transport .vox-transport-drag{min-width:28px;width:28px;padding-left:1px!important;padding-right:1px!important;}
+  #voxAutoScrollBtn{min-width:52px;}
+  #voxLyricsTransportBtn{min-width:48px;padding-left:4px!important;padding-right:4px!important;}
+}
+@media(max-width:340px){
+  .vox-floating-transport{gap:2px;padding:4px 3px;}
+  .vox-floating-transport button{min-width:31px;padding-left:2px!important;padding-right:2px!important;font-size:.68rem!important;}
+  .vox-floating-transport .vox-transport-drag{min-width:25px;width:25px;}
+  #voxAutoScrollBtn{min-width:47px;}
+  #voxLyricsTransportBtn{min-width:45px;}
 }
