@@ -1,0 +1,9 @@
+Song Rider Suite v3.3.25 — Vox Box Deep DAW Editing
+
+- Added clickable Drum Map grid inside Vox Box.
+- Added long-press track title reordering with persisted Vox Box track order.
+- Added draggable left/right event edges for Lead/Bass and Chord/Note events.
+- Added Cursor / Playhead mode switch in the track-title gutter.
+- Improved Multi Select across vocal and instrument events; group move/copy/cut/paste/delete.
+- Instrument edits persist immediately back to Baby DAW / Chord Rider state.
+- Preserved Snap to Beat / free placement behavior for event moves and edge edits.

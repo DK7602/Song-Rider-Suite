@@ -3971,3 +3971,38 @@ body.vox-box-open>footer{display:none!important}
   #voxAutoScrollBtn{min-width:47px;}
   #voxLyricsTransportBtn{min-width:45px;}
 }
+
+
+/* =========================================================
+   v3.3.25 — Vox Box deep DAW editing
+   ========================================================= */
+.vox-tool-mode-btn{
+  position:sticky;left:6px;top:5px;z-index:90;display:block;width:max-content;margin:5px 0 -36px 5px;
+  min-width:86px;min-height:31px;padding:5px 9px!important;border-radius:8px!important;
+  background:#18212b!important;border:1px solid #465566!important;color:#eef3f7!important;font-weight:900!important;
+  box-shadow:0 4px 14px rgba(0,0,0,.28);touch-action:manipulation;
+}
+.vox-tool-mode-btn.is-active{background:linear-gradient(180deg,#f8d66d,#e7b53c)!important;color:#111!important;border-color:#d4a02e!important;}
+.vox-track-reorder-handle{cursor:grab;touch-action:pan-x;user-select:none;}
+.vox-track-row.is-reordering{opacity:.76;outline:2px solid rgba(241,198,85,.8);z-index:80;box-shadow:0 10px 28px rgba(0,0,0,.45);}
+.vox-inst-handle{position:absolute;top:0;bottom:0;width:12px;z-index:6;display:none;background:linear-gradient(90deg,rgba(255,255,255,.06),rgba(102,198,255,.22));cursor:ew-resize;touch-action:none;}
+.vox-inst-handle.left{left:0;border-right:1px solid rgba(255,255,255,.35);border-radius:4px 0 0 4px;}
+.vox-inst-handle.right{right:0;border-left:1px solid rgba(255,255,255,.35);border-radius:0 4px 4px 0;}
+.vox-instrument-event.is-selected .vox-inst-handle,.vox-instrument-event:hover .vox-inst-handle{display:block;}
+.vox-instrument-event.is-selected .vox-inst-handle{background:rgba(102,198,255,.28);}
+.vox-drum-map-row{height:auto!important;min-height:180px;background:#0c131b!important;}
+.vox-drum-map-row .vox-track-label{align-self:stretch;justify-content:flex-start!important;padding-top:12px!important;}
+.vox-drum-map-lane{position:absolute;inset:0;margin-left:0;min-height:180px;overflow:visible;background:#0b1118;border-top:1px solid #27323d;border-bottom:1px solid #27323d;}
+.vox-drum-map-grid{display:grid;grid-template-columns:92px repeat(var(--vox-drum-cols),minmax(14px,1fr));grid-auto-rows:22px;min-width:max-content;align-items:stretch;}
+.vox-drum-map-name{position:sticky;left:0;z-index:4;display:flex;align-items:center;padding:0 6px;background:#111923;border-right:1px solid #33404c;color:#dbe3eb;font-size:.65rem;font-weight:800;white-space:nowrap;}
+.vox-drum-cell{min-width:14px;width:14px;height:22px;padding:0!important;border-radius:0!important;border:0!important;border-right:1px solid rgba(255,255,255,.055)!important;border-bottom:1px solid rgba(255,255,255,.04)!important;background:#151e27!important;box-shadow:none!important;}
+.vox-drum-cell:nth-child(4n+1){background:#18232e!important;}
+.vox-drum-cell.bar-start{border-left:1px solid #607080!important;}
+.vox-drum-cell.on{background:#f1c655!important;box-shadow:inset 0 0 0 2px rgba(0,0,0,.22)!important;}
+#voxDrumMapBtn.is-active,#voxMultiSelectBtn.is-active{background:linear-gradient(180deg,#f8d66d,#e7b53c)!important;color:#111!important;border-color:#d4a02e!important;}
+@media(max-width:600px){
+ .vox-tool-mode-btn{min-width:74px;min-height:29px;font-size:.7rem!important;padding:4px 6px!important;}
+ .vox-inst-handle{width:16px;}
+ .vox-drum-map-grid{grid-template-columns:76px repeat(var(--vox-drum-cols),14px);}
+ .vox-drum-map-name{font-size:.58rem;padding:0 4px;}
+}

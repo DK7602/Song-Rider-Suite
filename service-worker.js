@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.24-vox-transport-multi-autoscroll';
+const CACHE = 'song-rider-suite-v3.3.25-vox-transport-multi-autoscroll';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
   './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css',

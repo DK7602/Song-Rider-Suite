@@ -1,0 +1,27 @@
+Song Rider Suite v3.3.24 — Vox Box Transport / Multi-Edit / Instrumentals / AutoScroll
+2026-09-18
+
+Vox Box
+- Added draggable floating transport, persistent position and viewport clamping.
+- Transport order: beginning, rewind, fast-forward, end, stop, play, pause, record, AutoScroll, Lyrics.
+- Responsive transport wraps on narrow phones so every control remains visible without horizontal scrolling.
+- Added live record into the selected vocal track from the current Vox Box playhead position.
+- Added click/drag playhead seeking. During live playback, seeking restarts the shared scheduler from the requested beat and publishes the new position immediately.
+- Added Multi Select for vocal events. Copy/Cut/Paste/Delete and Event FX can operate on the selected group; grouped clips move together.
+- Added Instrumentals checkbox. Vox Box can show/edit Beat events plus Chord/Note and Lead/Bass events in the timeline.
+- Added Undo/Redo covering vocal edits, instrumental timing edits and beat edits.
+- Added Vox Box AutoScroll. It follows playback/recording and disengages when the user manually navigates the timeline.
+- Lyrics opens the existing Song Rider Pro full-song lyric overlay.
+- Hidden underlying Baby DAW shell is removed from layout while Vox Box is open, preventing phantom tablet horizontal overflow.
+
+Baby DAW
+- Shared AutoScroll now follows Chord/Note cards and Lead/Bass MIDI playback.
+- Manual pointer/wheel/touch navigation disengages AutoScroll for both Chord/Note and Lead/Bass views.
+
+Verification
+- Root and Song Rider JavaScript syntax checked with Node.
+- Root and Song Rider HTML checked for duplicate IDs: none.
+- CSS brace balance checked.
+- Root service-worker precache paths checked: all present.
+- Browser interaction test suite: 33/33 checks passed at 320, 360, 390, 768 and 1440 px, including multi-edit, FX, copy/paste, undo/redo, beat-event dragging, transport dragging, Lyrics link, live seek, manual AutoScroll disengage and horizontal-overflow checks.
+- Browser automation environment has no physical microphone, so real microphone capture/audio quality must be verified on a device; the no-mic path was also verified to fail gracefully.
