@@ -3737,3 +3737,8 @@ body.vox-box-open{overflow:hidden!important}
     min-width:0!important;
   }
 }
+
+
+/* v3.3.22 — three-way Piano / Guitar / Misc instrument selectors. */
+#instrumentTabs .seg,#leadInstrumentTabs .seg{flex:1 1 0;min-width:0;text-align:center;}
+@media(max-width:520px){#leadInstrumentTabs .seg{padding-left:7px;padding-right:7px;font-size:.86rem;}}

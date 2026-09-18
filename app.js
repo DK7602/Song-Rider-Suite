@@ -11,10 +11,104 @@
     m7b5:[0,3,6,10], aug:[0,4,8]
   };
 
+  // v3.3.22 — expanded pro instrument palette. All standard entries use the same
+  // sampled General-MIDI SoundFont engine as the original Piano/Guitar sounds.
+  // The two virtual presets (Wah Wah Electric + Funky Worm) keep sampled sources
+  // and add a light WebAudio filter sweep instead of replacing them with oscillators.
   const SOUNDS = {
-    piano:[['acoustic_grand_piano','Piano'],['electric_piano_1','Electric Piano'],['synth_strings_1','Synth'],['electric_bass_finger','Bass']],
-    guitar:[['acoustic_guitar_steel','Acoustic'],['electric_guitar_clean','Electric'],['electric_bass_finger','Bass']]
+    piano:[
+      ['acoustic_grand_piano','Piano'],
+      ['bright_acoustic_piano','Bright Grand'],
+      ['electric_grand_piano','Electric Grand'],
+      ['electric_piano_1','Electric Piano'],
+      ['electric_piano_2','Vintage E-Piano'],
+      ['synth_strings_1','Synth'],
+      ['pad_2_warm','Warm Synth Pad'],
+      ['pad_3_polysynth','Poly Synth'],
+      ['lead_2_sawtooth','Saw Synth'],
+      ['electric_bass_finger','Bass']
+    ],
+    guitar:[
+      ['acoustic_guitar_steel','Acoustic'],
+      ['acoustic_guitar_nylon','Acoustic Nylon'],
+      ['electric_guitar_clean','Electric'],
+      ['electric_guitar_jazz','Jazz Electric'],
+      ['electric_guitar_muted','Muted Electric'],
+      ['overdriven_guitar','Crunch Electric'],
+      ['distortion_guitar','Drive Electric'],
+      ['wah_wah_guitar','Wah Wah Electric'],
+      ['electric_bass_finger','Bass']
+    ],
+    misc:[
+      ['tenor_sax','Sax'],
+      ['alto_sax','Alto Sax'],
+      ['french_horn','Horn'],
+      ['brass_section','Brass Section'],
+      ['trumpet','Trumpet'],
+      ['trombone','Trombone'],
+      ['tuba','Tuba'],
+      ['flute','Flute'],
+      ['clavinet','Clavinet'],
+      ['funky_worm','Funky Worm'],
+      ['drawbar_organ','Funk Organ'],
+      ['vibraphone','Vibraphone'],
+      ['marimba','Marimba'],
+      ['whistle','G-Funk Whistle'],
+      ['synth_brass_1','Synth Brass']
+    ]
   };
+
+  const VALID_INSTRUMENTS=new Set(Object.keys(SOUNDS));
+  const SOUND_PRESETS={
+    wah_wah_guitar:{source:'overdriven_guitar',fx:'wah'},
+    funky_worm:{source:'lead_5_charang',fx:'worm'}
+  };
+  const SOUND_OUTPUT_GAIN={
+    acoustic_grand_piano:3.15,bright_acoustic_piano:3.00,electric_grand_piano:2.85,electric_piano_1:2.75,electric_piano_2:2.55,
+    synth_strings_1:1.10,pad_2_warm:1.18,pad_3_polysynth:1.20,lead_2_sawtooth:1.18,electric_bass_finger:1.10,
+    acoustic_guitar_steel:2.95,acoustic_guitar_nylon:2.95,electric_guitar_clean:2.85,electric_guitar_jazz:2.75,electric_guitar_muted:2.85,
+    overdriven_guitar:2.10,distortion_guitar:1.85,wah_wah_guitar:2.05,
+    tenor_sax:2.05,alto_sax:2.00,french_horn:1.95,brass_section:1.55,trumpet:1.85,trombone:1.90,tuba:2.00,flute:2.10,
+    clavinet:2.35,funky_worm:1.35,drawbar_organ:1.55,vibraphone:1.90,marimba:1.90,whistle:1.90,synth_brass_1:1.45
+  };
+  function normalizeInstrument(value){return VALID_INSTRUMENTS.has(value)?value:'piano';}
+  function soundPreset(sound){const base=SOUND_PRESETS[sound]||{};return {id:sound,source:base.source||sound,fx:base.fx||'none'};}
+  function soundOutputGain(sound){return SOUND_OUTPUT_GAIN[sound]||SOUND_OUTPUT_GAIN[soundPreset(sound).source]||1.0;}
+  function isBassSound(sound){return /(?:^|_)bass(?:_|$)/.test(String(sound||''))||String(sound||'')==='electric_bass_finger';}
+  async function loadSoundfontInstrument(ctx,sound,destination){
+    if(!window.Soundfont)throw new Error('Sound engine unavailable');
+    const preset=soundPreset(sound),opts={format:'mp3',soundfont:'MusyngKite',destination};
+    try{return await Soundfont.instrument(ctx,preset.source,opts);}
+    catch(firstError){
+      // A few GM patches differ between the MusyngKite and FluidR3 manifests.
+      // FluidR3 is a transparent fallback so every menu choice remains playable.
+      console.warn(`MusyngKite could not load ${preset.source}; trying FluidR3_GM.`,firstError);
+      return Soundfont.instrument(ctx,preset.source,{...opts,soundfont:'FluidR3_GM'});
+    }
+  }
+  function createInstrumentFxChain(ctx,destination){
+    const input=ctx.createGain(),dry=ctx.createGain(),filter=ctx.createBiquadFilter(),wet=ctx.createGain();
+    input.connect(dry);dry.connect(destination);input.connect(filter);filter.connect(wet);wet.connect(destination);
+    filter.type='lowpass';filter.frequency.value=19000;filter.Q.value=.7;dry.gain.value=1;wet.gain.value=0;
+    let lfo=null,depth=null,currentFx='none';
+    function ensureLfo(){
+      if(lfo)return;
+      lfo=ctx.createOscillator();depth=ctx.createGain();lfo.type='sine';lfo.frequency.value=1.8;depth.gain.value=0;lfo.connect(depth);depth.connect(filter.frequency);lfo.start();
+    }
+    function smooth(param,value,time=.025){const now=ctx.currentTime;try{param.cancelScheduledValues(now);param.setTargetAtTime(value,now,time);}catch{param.value=value;}}
+    function setSound(sound){
+      const fx=soundPreset(sound).fx;if(fx===currentFx&&fx==='none')return;currentFx=fx;
+      if(fx==='wah'){
+        ensureLfo();smooth(dry.gain,.58);smooth(wet.gain,.74);smooth(filter.frequency,1550);smooth(filter.Q,8,.04);smooth(lfo.frequency,1.65,.04);smooth(depth.gain,1050,.04);
+      }else if(fx==='worm'){
+        ensureLfo();smooth(dry.gain,.32);smooth(wet.gain,.92);smooth(filter.frequency,1325);smooth(filter.Q,10,.04);smooth(lfo.frequency,2.25,.04);smooth(depth.gain,950,.04);
+      }else{
+        if(depth)smooth(depth.gain,0,.025);smooth(filter.frequency,19000);smooth(filter.Q,.7,.03);smooth(dry.gain,1);smooth(wet.gain,0);
+      }
+    }
+    function disconnect(){try{lfo?.stop();}catch{}for(const n of [input,dry,filter,wet,depth,lfo])try{n?.disconnect();}catch{}}
+    return {input,setSound,disconnect};
+  }
 
   const GUITAR_SHAPES = {
     C:[null,3,2,0,1,0], Cm:[null,3,5,5,4,3], C7:[null,3,2,3,1,0], Cmaj7:[null,3,2,0,0,0],
@@ -28,10 +122,10 @@
 
   const savedInstrument = localStorage.getItem('crp-last-instrument');
   const state = {
-    instrument: savedInstrument === 'guitar' ? 'guitar' : 'piano',
+    instrument: normalizeInstrument(savedInstrument),
     mode: localStorage.getItem('crp-last-mode') === 'note' ? 'note' : 'chord',
     sound:'', octave:0, capo:0, neck:'open', transpose:false,
-    instrumentBus:null, instrumentLimiter:null,
+    instrumentBus:null, instrumentLimiter:null, instrumentFxChain:null,
     rows:[[]], selectedRow:0, playing:false, timer:null,
     audioCtx:null, player:null, playerName:'', currentProjectId:null, drag:null, lineDrag:null,
     autoScroll:localStorage.getItem('crp-auto-scroll')==='1',
@@ -210,28 +304,15 @@
     return card.type==='chord'?transposeChord(card.value,-state.capo):transposeRoot(card.value,-state.capo);
   }
 
-  const LONG_SUSTAIN_SOUNDS=new Set(['acoustic_grand_piano','electric_piano_1','acoustic_guitar_steel']);
+  const LONG_SUSTAIN_SOUNDS=new Set(['acoustic_grand_piano','bright_acoustic_piano','electric_grand_piano','electric_piano_1','electric_piano_2','acoustic_guitar_steel','acoustic_guitar_nylon','pad_2_warm','pad_3_polysynth','synth_strings_1','drawbar_organ']);
   function sustainedNoteSeconds(stepSeconds,sound=state.sound){
     const seconds=Math.max(.05,Number(stepSeconds)||.05);
     return LONG_SUSTAIN_SOUNDS.has(sound)?Math.max(.78,seconds*1.38+.18):Math.max(.45,seconds*1.08);
   }
 
-  function instrumentOutputGain(){
-    // MusyngKite instrument samples are much quieter than the drum WAVs.
-    // These multipliers normalize the four main chord instruments so they
-    // remain clearly audible at ordinary phone/device volume.
-    const gains={
-      acoustic_grand_piano:3.15,
-      electric_piano_1:2.75,
-      acoustic_guitar_steel:2.95,
-      electric_guitar_clean:2.85,
-      synth_strings_1:1.10,
-      electric_bass_finger:1.10
-    };
-    return gains[state.sound]||1.0;
-  }
+  function instrumentOutputGain(){return soundOutputGain(state.sound);}
   function ensureInstrumentBus(){
-    if(state.instrumentBus&&state.instrumentLimiter)return;
+    if(state.instrumentBus&&state.instrumentLimiter&&state.instrumentFxChain)return;
     const bus=state.audioCtx.createGain();
     const limiter=state.audioCtx.createDynamicsCompressor();
     limiter.threshold.value=-3;
@@ -239,31 +320,33 @@
     limiter.ratio.value=20;
     limiter.attack.value=.003;
     limiter.release.value=.12;
-    bus.connect(limiter).connect(state.audioCtx.destination);
-    state.instrumentBus=bus;
-    state.instrumentLimiter=limiter;
+    limiter.connect(state.audioCtx.destination);
+    const fx=createInstrumentFxChain(state.audioCtx,limiter);bus.connect(fx.input);
+    state.instrumentBus=bus;state.instrumentLimiter=limiter;state.instrumentFxChain=fx;
   }
   function ensureAudio(){
     if(!state.audioCtx)state.audioCtx=new (window.AudioContext||window.webkitAudioContext)();
     if(state.audioCtx.state==='suspended')state.audioCtx.resume();
     ensureInstrumentBus();
-    state.instrumentBus.gain.value=instrumentOutputGain();
+    state.instrumentFxChain?.setSound(state.sound);
+    const now=state.audioCtx.currentTime,target=instrumentOutputGain();
+    try{if(typeof state.instrumentBus.gain.cancelAndHoldAtTime==='function')state.instrumentBus.gain.cancelAndHoldAtTime(now);else state.instrumentBus.gain.cancelScheduledValues(now);state.instrumentBus.gain.setTargetAtTime(target,now,.018);}catch{state.instrumentBus.gain.value=target;}
     if(state.player&&state.playerName===state.sound)return Promise.resolve(state.player);
     if(!window.Soundfont)return Promise.reject(new Error('Sound engine unavailable'));
     $('status').textContent='Loading instrument samples…';
-    return Soundfont.instrument(state.audioCtx,state.sound,{format:'mp3',soundfont:'MusyngKite',destination:state.instrumentBus}).then(p=>{state.player=p;state.playerName=state.sound;$('status').textContent='';return p;});
+    return loadSoundfontInstrument(state.audioCtx,state.sound,state.instrumentBus).then(p=>{state.player=p;state.playerName=state.sound;$('status').textContent='';return p;}).catch(err=>{$('status').textContent='Could not load that instrument.';throw err;});
   }
   function automaticMidiNotesForCard(card){
     const val=displayedValue(card);let notes;
     if(card.type==='note'){
-      const oct=(state.instrument==='piano'?4:3)+state.octave;
+      const oct=(state.instrument==='guitar'?3:4)+state.octave;
       notes=[midiOf(val+oct)].filter(x=>x!=null);
     }else if(state.instrument==='guitar'){
       const frets=guitarShapeForCard(card),opens=[40,45,50,55,59,64];
       notes=frets.map((f,i)=>f==null?null:opens[i]+f+state.capo+state.octave*12).filter(x=>x!=null);
       if(!notes.length)notes=chordNotes(val,3+state.octave).map(midiOf).filter(x=>x!=null);
     }else notes=pianoMidisForCard(card);
-    if(state.sound==='electric_bass_finger')notes=notes.slice(0,card.type==='note'?1:3).map(m=>m-12);
+    if(isBassSound(state.sound))notes=notes.slice(0,card.type==='note'?1:3).map(m=>m-12);
     return [...new Set(notes.map(Number).filter(Number.isFinite))].sort((a,b)=>a-b);
   }
   function midiNotesForCard(card){
@@ -803,7 +886,7 @@
       row.forEach((card,ci)=>{
         const el=document.createElement('div');el.className='chord-card'+(card.type==='note'?' note-card':'');el.draggable=!state.autoScroll;
         const shown=displayedValue(card),sub=subtitle(card),hint=state.autoScroll?'Tap to play • Auto Scroll locks reordering':'Tap to play • hold & drag to move';
-        const visual=`<div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div>`;
+        const visual=`<div class="diagram">${state.instrument==='guitar'?guitarSvg(card):pianoSvg(card)}</div>`;
         const explicitDur=Number.isFinite(+card.durationBeats)&&+card.durationBeats>0?cardDurationBeats(card):null,durBadge=explicitDur?`<div class="card-duration">${formatBeatDuration(explicitDur)} beat${explicitDur===1?'':'s'}</div>`:'';
         el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}${durBadge}${visual}<div class="hint">${hint}</div>`;
         el.querySelector('.remove').onclick=e=>{e.stopPropagation();row.splice(ci,1);renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
@@ -1197,7 +1280,7 @@
       ? `“${p.name}” moved to Archive.`
       : `“${p.name}” restored to Projects.`;
   }
-  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;p=recoverNavigationSnapshot(p);upsertLocal(p);const __srpSession=readSrpLinkSession();const shared=(__srpSession&&String(__srpSession.crpProjectId||'')===String(id))?readSharedSrpMeta(id):null;if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=p.instrument||'piano';state.mode=p.mode||'chord';state.sound=p.sound||SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
+  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;p=recoverNavigationSnapshot(p);upsertLocal(p);const __srpSession=readSrpLinkSession();const shared=(__srpSession&&String(__srpSession.crpProjectId||'')===String(id))?readSharedSrpMeta(id):null;if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=normalizeInstrument(p.instrument);state.mode=p.mode||'chord';state.sound=(SOUNDS[state.instrument]||SOUNDS.piano).some(x=>x[0]===p.sound)?p.sound:SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
   function renderProjects(){
     const w=$('projectList');
@@ -1361,7 +1444,7 @@
     row.forEach(card=>{
       const cell=document.createElement('div');cell.className='export-chord-slot';
       const shown=displayedValue(card),sub=subtitle(card);
-      cell.innerHTML=`<div class="export-card-name">${card.type==='note'?'♪ ':''}${esc(shown)}</div><div class="export-card-subtitle">${esc(sub||' ')}</div>${canDiagram?`<div class="diagram">${state.instrument==='piano'?pianoSvg(card):guitarSvg(card)}</div>`:''}`;
+      cell.innerHTML=`<div class="export-card-name">${card.type==='note'?'♪ ':''}${esc(shown)}</div><div class="export-card-subtitle">${esc(sub||' ')}</div>${canDiagram?`<div class="diagram">${state.instrument==='guitar'?guitarSvg(card):pianoSvg(card)}</div>`:''}`;
       slots.appendChild(cell);
     });
     lane.appendChild(slots);sec.appendChild(lane);
@@ -1541,7 +1624,7 @@
     // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
     // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.
     if(!IS_PLAYBACK_BRIDGE) checkAccount();
-    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.21-VOXBOX-PRO').catch(()=>{});
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.22-PRO-INSTRUMENTS').catch(()=>{});
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
@@ -1981,9 +2064,9 @@
   }
   function coreApply(snapshot){
     if(!snapshot)return;
-    state.instrument=snapshot.instrument==='guitar'?'guitar':'piano';
+    state.instrument=normalizeInstrument(snapshot.instrument);
     state.mode=snapshot.mode==='note'?'note':'chord';
-    state.sound=snapshot.sound||SOUNDS[state.instrument][0][0];
+    state.sound=(SOUNDS[state.instrument]||SOUNDS.piano).some(x=>x[0]===snapshot.sound)?snapshot.sound:SOUNDS[state.instrument][0][0];
     state.octave=Number(snapshot.octave)||0;state.capo=Number(snapshot.capo)||0;
     state.neck=['open','triad','barre','power','shell','inversion','color'].includes(snapshot.neck)?snapshot.neck:'open';
     state.transpose=!!snapshot.transpose;state.rows=JSON.parse(JSON.stringify(snapshot.rows||[[]]));if(!state.rows.length)state.rows=[[]];state.selectedRow=0;
@@ -1993,14 +2076,14 @@
   function coreNotesFor(card,snapshot){
     const saved=coreSnapshot();
     try{
-      if(snapshot){state.instrument=snapshot.instrument||'piano';state.mode=snapshot.mode||'chord';state.sound=snapshot.sound||SOUNDS[state.instrument][0][0];state.octave=Number(snapshot.octave)||0;state.capo=Number(snapshot.capo)||0;state.neck=snapshot.neck||'open';state.transpose=!!snapshot.transpose;}
+      if(snapshot){state.instrument=normalizeInstrument(snapshot.instrument);state.mode=snapshot.mode||'chord';state.sound=(SOUNDS[state.instrument]||SOUNDS.piano).some(x=>x[0]===snapshot.sound)?snapshot.sound:SOUNDS[state.instrument][0][0];state.octave=Number(snapshot.octave)||0;state.capo=Number(snapshot.capo)||0;state.neck=snapshot.neck||'open';state.transpose=!!snapshot.transpose;}
       return midiNotesForCard(card).map(noteAtMidi);
     } finally {
       state.instrument=saved.instrument;state.mode=saved.mode;state.sound=saved.sound;state.octave=saved.octave;state.capo=saved.capo;state.neck=saved.neck;state.transpose=saved.transpose;state.rows=saved.rows;
     }
   }
   window.CRPCore={
-    snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,cardDurationBeats,
+    snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,cardDurationBeats,soundPreset,soundOutputGain,isBassSound,loadSoundfontInstrument,createInstrumentFxChain,normalizeInstrument,
     scheduleAutoSave,flushAutoSaveNow,renderAll,syncBuildInput,publishSrpHandoff,loadProjectById:loadProject,
     get beats(){return +$('beatsSelect').value||4},get bpm(){return +$('bpmInput').value||92},get loop(){return $('loopToggle').checked},
     get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
