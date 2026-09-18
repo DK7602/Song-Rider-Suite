@@ -9965,18 +9965,22 @@ if(state.currentSection === "Full"){
     const rightLine = document.createElement("div");
     rightLine.className = "fullBreakLine";
 
-    // v2.2.6: rebuilt section heading as a real CRP gold button.
-    // Tapping it opens a simple rename prompt, avoiding mobile/theme input styling entirely.
-    const pill = document.createElement("button");
-    pill.type = "button";
-    pill.className = "crpSectionTitlePill";
-    const refreshSectionPill = () => { pill.textContent = String(b.title || "Song Part").trim() || "Song Part"; };
-    refreshSectionPill();
-    bindTap(pill, () => {
-      const current = String(b.title || "").trim();
-      const next = window.prompt("Section title", current || "Song Part");
-      if(next === null) return;
-      b.title = String(next || "").trim();
+    // v3.3.20: Full Song section titles edit directly inside the gold pill,
+    // matching the card-page title control. No browser prompt/pop-up.
+    const pill = document.createElement("input");
+    pill.type = "text";
+    pill.className = "crpSectionTitlePill crpSectionTitleInput";
+    pill.placeholder = "Section title";
+    pill.value = String(b.title || "").trim();
+    pill.setAttribute("aria-label", "Section title");
+    pill.addEventListener("pointerdown", (e) => e.stopPropagation());
+    pill.addEventListener("click", (e) => e.stopPropagation());
+    pill.addEventListener("keydown", (e) => {
+      if(e.key === "Enter"){ e.preventDefault(); pill.blur(); }
+    });
+    let pillTitleTimer = null;
+    const saveInlinePillTitle = () => {
+      b.title = String(pill.value || "").trim();
       editProject("pillTitle", () => {
         ensurePageMeta();
         if(!state.project.sectionTitles) state.project.sectionTitles = {};
@@ -9986,11 +9990,19 @@ if(state.currentSection === "Full"){
           else { try{ delete state.project.sectionTitles[sec]; }catch{} }
         }
       });
-      refreshSectionPill();
       quickSaveFullText();
+      commitDebounced();
+    };
+    pill.addEventListener("input", () => {
+      b.title = String(pill.value || "");
+      clearTimeout(pillTitleTimer);
+      pillTitleTimer = setTimeout(saveInlinePillTitle, 180);
+    });
+    pill.addEventListener("blur", () => {
+      clearTimeout(pillTitleTimer);
+      saveInlinePillTitle();
       renderTabs();
       renderSheetTitleBar();
-      commitDebounced();
     });
 
     head.appendChild(leftLine);
