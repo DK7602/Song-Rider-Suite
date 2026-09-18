@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.16-shell-layout-songend';
+const CACHE = 'song-rider-suite-v3.3.17-song-end-media-session';
 const ASSETS = [
   './vocal-autotune-worklet.js',
   './song-rider-pro-wordmark-hq.png',
