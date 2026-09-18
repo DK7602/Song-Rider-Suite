@@ -2916,13 +2916,21 @@ html.crp-integrated .crp-srp-shell>.workspace-mode-switch{
 
 <style id="srp3320InlineFullTitle">
 /* v3.3.20 — Full Song section title is edited directly in the gold pill. */
-html.crp-integrated .crpSectionTitlePill.crpSectionTitleInput{
+html.crp-integrated body .fullSectionHead input[type="text"].crpSectionTitlePill.crpSectionTitleInput{
+  appearance:none!important;-webkit-appearance:none!important;
   cursor:text!important;
   caret-color:#111!important;
   outline:none!important;
   box-sizing:border-box!important;
+  background:#efc85d!important;
+  background-color:#efc85d!important;
+  background-image:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;
+  color:#111!important;-webkit-text-fill-color:#111!important;
+  border:1px solid #d6aa3f!important;border-radius:999px!important;
+  font-weight:1000!important;text-shadow:none!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 4px 12px rgba(0,0,0,.28)!important;
 }
-html.crp-integrated .crpSectionTitlePill.crpSectionTitleInput:focus{
+html.crp-integrated body .fullSectionHead input[type="text"].crpSectionTitlePill.crpSectionTitleInput:focus{
   border-color:#ffe39a!important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.58),0 0 0 3px rgba(239,200,93,.24),0 4px 12px rgba(0,0,0,.28)!important;
 }
@@ -3307,7 +3315,7 @@ html.crp-integrated .crpSectionTitlePill.crpSectionTitleInput:focus{
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <!-- cache-buster -->
-<script src="./app.js?v=3.3.20-INLINE-TITLE"></script>
+<script src="./app.js?v=3.3.21-VOXBOX-PRO"></script>
 
 
 <script>
@@ -3439,3 +3447,4 @@ html.crp-integrated .sheetHeader input.headingPill{
   }
 }
 </style>
+
