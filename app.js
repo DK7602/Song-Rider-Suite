@@ -1064,6 +1064,7 @@
     // in-memory playback copy over the real Baby DAW project.
     if(IS_PLAYBACK_BRIDGE)return;
     window.CRPParts?.syncActiveChord?.();
+    window.CRPParts?.liveEditRefresh?.();
     publishSrpHandoff();
     // Brand-new/unnamed projects wait for the first manual Save.
     if(!state.currentProjectId)return;

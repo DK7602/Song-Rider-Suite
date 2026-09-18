@@ -3242,3 +3242,48 @@ body.workspace-baby-daw #songEndEditor:not([hidden]){
 #vocalFxAutotune::-moz-range-track{height:6px!important;border-radius:999px!important;background:#555d67!important;border:1px solid #707781!important;}
 #vocalFxAutotune::-moz-range-progress{height:6px!important;border-radius:999px!important;background:var(--accent)!important;}
 #vocalFxAutotune::-moz-range-thumb{width:24px!important;height:24px!important;border-radius:50%!important;background:var(--accent)!important;border:2px solid #1a2029!important;box-shadow:0 1px 4px rgba(0,0,0,.5)!important;}
+
+
+/* v3.3.17 — Song End slider/ticks + compact transport row. */
+body.workspace-baby-daw #songEndEditor:not([hidden]){
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  gap:11px!important;
+  padding:12px 14px 14px!important;
+}
+.song-end-topline{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto auto!important;
+  align-items:center!important;
+  gap:8px!important;
+  width:100%!important;
+}
+.song-end-topline .song-end-copy{min-width:0!important;}
+.song-end-topline button{min-width:70px!important;min-height:38px!important;}
+.song-end-slider-block{display:flex!important;align-items:center!important;gap:12px!important;width:100%!important;min-width:0!important;}
+.song-end-slider-wrap{position:relative!important;flex:1 1 auto!important;min-width:0!important;height:38px!important;display:flex!important;align-items:center!important;}
+.song-end-bar-ticks{position:absolute!important;left:12px!important;right:12px!important;top:6px!important;bottom:6px!important;pointer-events:none!important;z-index:1!important;}
+.song-end-bar-ticks span{position:absolute!important;top:0!important;bottom:0!important;width:1px!important;background:rgba(244,194,78,.58)!important;transform:translateX(-.5px)!important;}
+#songEndSlider{
+  --song-end-progress:100%;
+  -webkit-appearance:none!important;appearance:none!important;
+  position:relative!important;z-index:2!important;
+  width:100%!important;height:38px!important;margin:0!important;padding:0 12px!important;
+  background:transparent!important;cursor:pointer!important;touch-action:pan-y!important;
+}
+#songEndSlider::-webkit-slider-runnable-track{height:7px!important;border-radius:999px!important;border:1px solid #68717c!important;background:linear-gradient(to right,var(--accent) 0,var(--accent) var(--song-end-progress),#3b444f var(--song-end-progress),#3b444f 100%)!important;}
+#songEndSlider::-webkit-slider-thumb{-webkit-appearance:none!important;appearance:none!important;width:25px!important;height:25px!important;border-radius:50%!important;margin-top:-10px!important;background:var(--accent)!important;border:2px solid #171d25!important;box-shadow:0 2px 5px rgba(0,0,0,.55)!important;}
+#songEndSlider::-moz-range-track{height:7px!important;border-radius:999px!important;border:1px solid #68717c!important;background:#3b444f!important;}
+#songEndSlider::-moz-range-progress{height:7px!important;border-radius:999px!important;background:var(--accent)!important;}
+#songEndSlider::-moz-range-thumb{width:25px!important;height:25px!important;border-radius:50%!important;background:var(--accent)!important;border:2px solid #171d25!important;box-shadow:0 2px 5px rgba(0,0,0,.55)!important;}
+.song-end-snap{display:inline-flex!important;align-items:center!important;gap:7px!important;white-space:nowrap!important;font-weight:700!important;color:#dfe4ea!important;min-height:38px!important;}
+.song-end-snap input{width:20px!important;height:20px!important;accent-color:var(--accent)!important;}
+#songEndClearBtn{width:100%!important;min-height:40px!important;}
+.song-end-hint{width:100%!important;}
+@media(max-width:760px){
+  .song-end-topline{grid-template-columns:minmax(0,1fr) auto auto!important;gap:7px!important;}
+  .song-end-topline button{min-width:64px!important;padding:7px 8px!important;}
+  .song-end-slider-block{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:8px!important;}
+  .song-end-snap{font-size:.84rem!important;}
+}

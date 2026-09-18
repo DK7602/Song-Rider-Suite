@@ -17,8 +17,9 @@
   let playing=false, starting=false, playbackGeneration=0;
   let playbackScope=null; // null = normal enabled-part playback; otherwise a scoped Lead/Vocal preview
   let playbackClockStartAudioTime=0, playbackClockStartBeat=0, playbackClockBpm=92, playbackTotalBeats=0;
-  let songEndBeat=null, songEndUiTimer=null;
-  const SONG_END_OPEN_KEY='crp-song-end-open-v1';
+  let songEndBeat=null, songEndUiTimer=null, songEndSnapToBar=true;
+  const SONG_END_OPEN_KEY='crp-song-end-open-v1', SONG_END_SNAP_KEY='crp-song-end-snap-bar-v1';
+  let liveEditTimer=null, mediaPositionTimer=null, mediaKeepAlive=null, mediaKeepAliveUrl='', mediaPausedBeat=0, mediaActionsInstalled=false;
   let audioCtx=null, masterLimiter=null, cycleTimer=null;
   let playerCache=new Map(), partBuses=new Map(), highlightTimers=[], activeVoices=new Set(), vocalBufferCache=new Map(), activeVocalSources=new Set();
   let micStream=null,micCtx=null,micSource=null,micAnalyser=null,micProcessor=null,micSilentGain=null,micMeterRaf=0;
@@ -96,7 +97,6 @@
   }
 
   function selectPart(id){
-    if(playing||starting)stopPlayback();
     syncLoadedChord();
     const p=parts.find(x=>x.id===id);if(!p)return;
     activePartId=id;
@@ -568,6 +568,26 @@
     if(playbackTotalBeats>0)beat=((beat%playbackTotalBeats)+playbackTotalBeats)%playbackTotalBeats;
     return beat;
   }
+  function songEndBarBeats(){ return 4; }
+  function snappedSongEndBeat(value,natural){
+    const n=Math.max(.05,Number(natural)||.05),v=Math.max(.05,Math.min(n,Number(value)||n));
+    if(!songEndSnapToBar)return v;
+    const bar=songEndBarBeats();
+    const maxBar=Math.floor(n/bar)*bar;
+    let snapped=Math.round(v/bar)*bar;
+    if(snapped<bar)snapped=Math.min(bar,n);
+    if(maxBar>0)snapped=Math.min(maxBar,snapped);
+    if(n-maxBar>1e-5 && Math.abs(v-n)<Math.abs(v-snapped))snapped=n;
+    return Math.max(.05,Math.min(n,snapped));
+  }
+  function renderSongEndTicks(natural){
+    const box=$('songEndBarTicks');if(!box)return;
+    const n=Math.max(0,Number(natural)||0),bar=songEndBarBeats(),key=`${n.toFixed(4)}:${bar}`;
+    if(box.dataset.tickKey===key)return;
+    box.dataset.tickKey=key;box.innerHTML='';
+    if(n<=0)return;
+    for(let b=bar;b<n-1e-5;b+=bar){const mark=document.createElement('span');mark.style.left=`${(b/n)*100}%`;box.appendChild(mark);}
+  }
   function renderSongEndEditor(){
     const box=$('songEndEditor');if(!box)return;
     const natural=naturalSongDurationBeats(),custom=Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0;
@@ -576,10 +596,21 @@
     if($('songEndValue'))$('songEndValue').textContent=endLabel;
     if($('songEndSummaryValue'))$('songEndSummaryValue').textContent=endLabel;
     const playhead=currentCycleBeat();
-    if($('songPlayheadValue'))$('songPlayheadValue').textContent=`Playhead ${formatSongTime(songEndSeconds(playhead??0))}`;
+    if($('songPlayheadValue'))$('songPlayheadValue').textContent=`Playhead ${formatSongTime(songEndSeconds(playhead??mediaPausedBeat??0))}`;
     if($('songEndMinusBtn'))$('songEndMinusBtn').disabled=natural<=0;
     if($('songEndPlusBtn'))$('songEndPlusBtn').disabled=natural<=0;
     if($('songEndClearBtn'))$('songEndClearBtn').disabled=!custom;
+    const slider=$('songEndSlider');
+    if(slider){
+      slider.disabled=natural<=0;
+      slider.min='0.05';slider.max=String(Math.max(.05,natural));slider.step='0.01';
+      const value=Math.max(.05,Math.min(Math.max(.05,natural),custom?end:Math.max(.05,natural)));
+      if(document.activeElement!==slider)slider.value=String(value);
+      const pct=natural>0?(value/natural)*100:100;slider.style.setProperty('--song-end-progress',`${Math.max(0,Math.min(100,pct))}%`);
+    }
+    if($('songEndSnapBar'))$('songEndSnapBar').checked=!!songEndSnapToBar;
+    renderSongEndTicks(natural);
+    if(!(playing||starting))updateMediaPosition();
   }
   function setSongEndPanelOpen(open,persist=true){
     const panel=$('songEndPanel'),editor=$('songEndEditor'),btn=$('songEndToggleBtn');
@@ -592,36 +623,93 @@
   }
   function initSongEndPanel(){
     let open=false;
-    try{open=localStorage.getItem(SONG_END_OPEN_KEY)==='1'}catch{}
+    try{open=localStorage.getItem(SONG_END_OPEN_KEY)==='1';songEndSnapToBar=localStorage.getItem(SONG_END_SNAP_KEY)!=='0';}catch{}
     setSongEndPanelOpen(open,false);
     const btn=$('songEndToggleBtn');
     if(btn)btn.onclick=()=>setSongEndPanelOpen(btn.getAttribute('aria-expanded')!=='true');
   }
-  function setSongEndAtPlayhead(){
-    const beat=currentCycleBeat();
-    if(beat==null){core.status('Start playback, then tap Set End Here at the cutoff point.');return;}
-    const natural=naturalSongDurationBeats();
-    songEndBeat=Math.max(.05,Math.min(Math.max(.05,natural),beat));
-    markPartsDirty();renderSongEndEditor();core.scheduleAutoSave();
-    const shown=formatSongTime(songEndSeconds(songEndBeat));
-    stopPlayback();
-    core.status(`Song end set to ${shown}.`);
+  function setSongEndFromSlider(value,save=true){
+    const natural=naturalSongDurationBeats();if(natural<=0)return;
+    songEndBeat=snappedSongEndBeat(value,natural);
+    markPartsDirty();renderSongEndEditor();
+    liveEditRefresh();
+    if(save)core.scheduleAutoSave();
   }
   function nudgeSongEnd(seconds){
     const natural=naturalSongDurationBeats();if(natural<=0)return;
     const bpm=Math.max(40,Math.min(240,Number(core.bpm)||92));
     const base=Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):natural;
+    // +/-0.1s is always a true fine adjustment, even when Snap to Bar is checked.
     songEndBeat=Math.max(.05,Math.min(natural,base+Number(seconds||0)*bpm/60));
-    markPartsDirty();renderSongEndEditor();core.scheduleAutoSave();
+    markPartsDirty();renderSongEndEditor();liveEditRefresh();core.scheduleAutoSave();
   }
-  function clearSongEnd(){songEndBeat=null;markPartsDirty();renderSongEndEditor();core.scheduleAutoSave();core.status('Song end reset to the full project.');}
+  function clearSongEnd(){songEndBeat=null;markPartsDirty();renderSongEndEditor();liveEditRefresh();core.scheduleAutoSave();core.status('Song end restored to the full project.');}
+
+  function makeSilentWavUrl(){
+    try{
+      const rate=8000,samples=rate,buffer=new ArrayBuffer(44+samples*2),view=new DataView(buffer),write=(o,s)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));};
+      write(0,'RIFF');view.setUint32(4,36+samples*2,true);write(8,'WAVE');write(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,rate,true);view.setUint32(28,rate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);write(36,'data');view.setUint32(40,samples*2,true);
+      return URL.createObjectURL(new Blob([buffer],{type:'audio/wav'}));
+    }catch{return '';}
+  }
+  function ensureMediaSession(){
+    if(!('mediaSession' in navigator))return false;
+    try{
+      if(!mediaKeepAlive){
+        mediaKeepAliveUrl=makeSilentWavUrl();
+        mediaKeepAlive=new Audio(mediaKeepAliveUrl);mediaKeepAlive.loop=true;mediaKeepAlive.preload='auto';mediaKeepAlive.volume=.01;mediaKeepAlive.playsInline=true;
+      }
+      if(!mediaActionsInstalled){
+        const set=(name,fn)=>{try{navigator.mediaSession.setActionHandler(name,fn);}catch{}};
+        set('play',()=>{audioCtx?.resume?.().catch(()=>{});if(!(playing||starting))startPlayback({fromBeat:Math.max(0,mediaPausedBeat||0)});});
+        set('pause',()=>{const b=currentCycleBeat();if(Number.isFinite(b))mediaPausedBeat=b;stopPlayback({mediaPause:true});});
+        set('stop',()=>{mediaPausedBeat=0;stopPlayback();});
+        set('seekbackward',d=>seekPlaybackSeconds(-Math.max(1,Number(d?.seekOffset)||5)));
+        set('seekforward',d=>seekPlaybackSeconds(Math.max(1,Number(d?.seekOffset)||5)));
+        set('seekto',d=>{if(Number.isFinite(Number(d?.seekTime)))seekPlaybackToSeconds(Number(d.seekTime));});
+        set('previoustrack',()=>seekPlaybackToSeconds(0));
+        mediaActionsInstalled=true;
+      }
+      return true;
+    }catch(e){console.warn('Media Session unavailable',e);return false;}
+  }
+  function updateMediaMetadata(){
+    if(!ensureMediaSession())return;
+    try{navigator.mediaSession.metadata=new MediaMetadata({title:core.projectName||'Song Rider Suite',artist:'Song Rider Suite',album:'Baby DAW',artwork:[{src:new URL('assets/icon-192.png',location.href).href,sizes:'192x192',type:'image/png'}]});}catch{}
+  }
+  function mediaDurationBeats(){const natural=naturalSongDurationBeats();return Math.max(.05,effectiveSongEndBeats(natural)||natural||.05);}
+  function updateMediaPosition(){
+    if(!('mediaSession' in navigator)||typeof navigator.mediaSession.setPositionState!=='function')return;
+    try{
+      const totalBeats=Math.max(.05,playbackTotalBeats||mediaDurationBeats()),bpm=Math.max(40,Math.min(240,+playbackClockBpm||+core.bpm||92)),duration=Math.max(.1,totalBeats*60/bpm);
+      const beat=(playing||starting)?(currentCycleBeat()??playbackClockStartBeat??0):Math.max(0,mediaPausedBeat||0),position=Math.max(0,Math.min(duration-.001,beat*60/bpm));
+      navigator.mediaSession.setPositionState({duration,playbackRate:1,position});
+    }catch{}
+  }
+  function setMediaPlaying(on){
+    if(!ensureMediaSession())return;
+    updateMediaMetadata();
+    try{navigator.mediaSession.playbackState=on?'playing':'paused';}catch{}
+    if(on){mediaKeepAlive?.play?.().catch(()=>{});clearInterval(mediaPositionTimer);mediaPositionTimer=setInterval(updateMediaPosition,500);}else{try{mediaKeepAlive?.pause?.();}catch{}clearInterval(mediaPositionTimer);mediaPositionTimer=null;}
+    updateMediaPosition();
+  }
+  function seekPlaybackToBeat(beat){
+    const total=mediaDurationBeats(),target=Math.max(0,Math.min(Math.max(0,total-.001),Number(beat)||0));mediaPausedBeat=target;
+    if(playing||starting){const scope=playbackScope?clone(playbackScope):null;startPlayback({scope,fromBeat:target,preserveUi:true,liveRestart:true});}
+    else updateMediaPosition();
+  }
+  function seekPlaybackToSeconds(seconds){const bpm=Math.max(40,Math.min(240,+core.bpm||92));seekPlaybackToBeat(Math.max(0,Number(seconds)||0)*bpm/60);}
+  function seekPlaybackSeconds(delta){const bpm=Math.max(40,Math.min(240,+core.bpm||92)),base=(playing||starting)?(currentCycleBeat()??0):(mediaPausedBeat||0);seekPlaybackToBeat(base+(Number(delta)||0)*bpm/60);}
+  function liveEditRefresh(){
+    if(!(playing||starting)){updateMediaMetadata();updateMediaPosition();return;}
+    clearTimeout(liveEditTimer);
+    liveEditTimer=setTimeout(()=>{if(!(playing||starting))return;const beat=currentCycleBeat()??playbackClockStartBeat??0,scope=playbackScope?clone(playbackScope):null;startPlayback({scope,fromBeat:beat,preserveUi:true,liveRestart:true});},150);
+  }
   function ensureAudio(){
     if(!audioCtx){
       audioCtx=new (window.AudioContext||window.webkitAudioContext)();
       audioCtx.addEventListener?.('statechange',()=>{
-        if((playing||starting)&&audioCtx?.state==='suspended'&&document.visibilityState==='visible'){
-          audioCtx.resume().catch(()=>{});
-        }
+        if((playing||starting)&&audioCtx?.state==='suspended'){audioCtx.resume().catch(()=>{});} 
       });
     }
     if(audioCtx.state==='suspended')audioCtx.resume().catch(()=>{});
@@ -745,8 +833,8 @@
     }
   }
   async function startPlayback(options={}){
-    const requestedScope=options?.scope||null;
-    if(playing||starting)stopPlayback();
+    const requestedScope=options?.scope||null, preserveUi=!!options?.preserveUi;
+    if(playing||starting)stopPlayback({preserveUi,preserveScope:preserveUi,preserveMedia:preserveUi});
     playbackScope=requestedScope;
     updatePartPlaybackButtons();
     syncLoadedChord();
@@ -759,6 +847,10 @@
       core.status(wasVocalMix?'Choose at least one backing part/drums or an active vocal take.':'There is nothing to play in this part yet.');
       return;
     }
+    // Start the silent media-session carrier while the original Play tap still has
+    // user activation. This makes Android/Chrome much more likely to expose the
+    // lock-screen/notification transport and seek slider for our WebAudio mix.
+    ensureMediaSession();updateMediaMetadata();mediaKeepAlive?.play?.().catch(()=>{});
     const generation=++playbackGeneration;
     starting=true;updatePartPlaybackButtons();
     try{
@@ -767,14 +859,14 @@
 
       // Keep every playback source on the same musical downbeat. Drums use a
       // separate AudioContext, so both engines receive the same relative lead-in.
-      const leadIn=.16;
+      const leadIn=options?.liveRestart?.035:.16;
       const naturalTotal=Math.max(...ps.map(partDurationBeats),...vs.map(vocalDurationBeats),drumBeats,4);
       const total=effectiveSongEndBeats(naturalTotal);
       playbackTotalBeats=total;
       // Scoped Lead/Vocal preview buttons always begin at beat 1. The normal
       // Chord transport still honors "play line in view". If the visible line
       // begins past a custom song end, restart from beat 1 instead of silently ending.
-      let cursorBeat=(!playbackScope&&active()?.type==='chord'&&active()?.enabled&&activePartId===loadedChordPartId)?Math.min(core.startBeat(),Math.max(0,total-0.001)):0;
+      let cursorBeat=Number.isFinite(Number(options?.fromBeat))?Math.max(0,Number(options.fromBeat)):((!playbackScope&&active()?.type==='chord'&&active()?.enabled&&activePartId===loadedChordPartId)?Math.min(core.startBeat(),Math.max(0,total-0.001)):0);
       if(cursorBeat>=total-.001)cursorBeat=0;
       const initialBeat=cursorBeat;
       if(scopedDrums){
@@ -785,7 +877,7 @@
       }
       if(generation!==playbackGeneration)return;
 
-      starting=false;playing=true;core.setPlaying(true);core.status('');updatePartPlaybackButtons();
+      starting=false;playing=true;mediaPausedBeat=initialBeat;core.setPlaying(true);core.status('');updatePartPlaybackButtons();setMediaPlaying(true);
       if(generation!==playbackGeneration||!playing){window.CRPBeatMaker?.stopMainNow?.();return;}
 
       let nextAudioStart=audioCtx.currentTime+leadIn;
@@ -838,7 +930,8 @@
       console.error(e);core.status(e.message||'Could not start playback.');stopPlayback();
     }
   }
-  function stopPlayback(){
+  function stopPlayback(options={}){
+    const priorBeat=currentCycleBeat();
     ++playbackGeneration;starting=false;playing=false;
     playbackClockStartAudioTime=0;
     playbackTotalBeats=0;
@@ -846,14 +939,18 @@
     highlightTimers.forEach(clearTimeout);highlightTimers=[];
     document.querySelectorAll('.lead-cell.playing,.lead-note-block.playing').forEach(c=>c.classList.remove('playing'));
     document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');
-    silenceScheduledAudio();
-    core.setPlaying(false);window.CRPBeatMaker?.stopMainNow?.();
-    playbackScope=null;
-    updatePartPlaybackButtons();
+    silenceScheduledAudio();window.CRPBeatMaker?.stopMainNow?.();
+    if(options?.mediaPause&&Number.isFinite(priorBeat))mediaPausedBeat=priorBeat;
+    else if(!options?.preserveMedia&&!options?.mediaPause)mediaPausedBeat=0;
+    if(!options?.preserveUi)core.setPlaying(false);
+    if(!options?.preserveScope)playbackScope=null;
+    if(!options?.preserveUi)updatePartPlaybackButtons();
+    if(!options?.preserveMedia)setMediaPlaying(false);
   }
   function togglePlayback(){if(playing||starting)stopPlayback();else startPlayback();}
   document.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible'&&(playing||starting)&&audioCtx?.state==='suspended')audioCtx.resume().catch(()=>{});
+    if((playing||starting)&&audioCtx?.state==='suspended')audioCtx.resume().catch(()=>{});
+    if(playing||starting){ensureMediaSession();mediaKeepAlive?.play?.().catch(()=>{});updateMediaPosition();}
   });
   function toggleLeadPartPlayback(){
     const p=active();if(!p||p.type!=='lead')return;
@@ -1042,12 +1139,16 @@
   }
 
   function wire(){
-    ensureInitial();setEditorMode(active()?.type||'chord');renderParts();initSongEndPanel();
-    if($('songEndSetBtn'))$('songEndSetBtn').onclick=setSongEndAtPlayhead;
+    ensureInitial();setEditorMode(active()?.type||'chord');renderParts();initSongEndPanel();ensureMediaSession();updateMediaMetadata();renderSongEndEditor();
     if($('songEndMinusBtn'))$('songEndMinusBtn').onclick=()=>nudgeSongEnd(-.1);
     if($('songEndPlusBtn'))$('songEndPlusBtn').onclick=()=>nudgeSongEnd(.1);
     if($('songEndClearBtn'))$('songEndClearBtn').onclick=clearSongEnd;
-    $('bpmInput')?.addEventListener('input',renderSongEndEditor);
+    if($('songEndSlider')){
+      $('songEndSlider').addEventListener('input',e=>setSongEndFromSlider(e.target.value,false));
+      $('songEndSlider').addEventListener('change',e=>{setSongEndFromSlider(e.target.value,true);});
+    }
+    if($('songEndSnapBar'))$('songEndSnapBar').onchange=e=>{songEndSnapToBar=!!e.target.checked;try{localStorage.setItem(SONG_END_SNAP_KEY,songEndSnapToBar?'1':'0')}catch{}const natural=naturalSongDurationBeats();if(songEndSnapToBar&&Number.isFinite(Number(songEndBeat))&&natural>0)songEndBeat=snappedSongEndBeat(songEndBeat,natural);renderSongEndEditor();liveEditRefresh();core.scheduleAutoSave();};
+    $('bpmInput')?.addEventListener('input',()=>{renderSongEndEditor();updateMediaMetadata();liveEditRefresh();});
     if(songEndUiTimer)clearInterval(songEndUiTimer);songEndUiTimer=setInterval(renderSongEndEditor,120);
     $('addPartBtn')?.addEventListener('click',openModal);$('closePartModal')?.addEventListener('click',closeModal);document.querySelector('[data-close-part-modal]')?.addEventListener('click',closeModal);document.querySelectorAll('.part-choice').forEach(b=>b.addEventListener('click',()=>addPart(b.dataset.partType)));
     document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;p.instrument=b.dataset.leadInstrument;p.sound=(core.sounds[p.instrument]||[])[0]?.[0]||p.sound;invalidatePartPlayers(p);renderLeadEditor(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();});
@@ -1092,7 +1193,7 @@
     for(const id of ['vocalFxEq','vocalFxComp','vocalFxReverb','vocalFxDelay'])$(id).onchange=()=>{const p=active();if(p?.type!=='vocal')return;p.fx={eq:$('vocalFxEq').value,comp:$('vocalFxComp').value,reverb:+$('vocalFxReverb').value,delay:+$('vocalFxDelay').value,autotune:Math.max(0,Math.min(100,Number($('vocalFxAutotune')?.value)||0))};core.scheduleAutoSave();};if($('vocalFxAutotune'))$('vocalFxAutotune').oninput=e=>{const p=active();if(p?.type!=='vocal')return;p.fx={...(p.fx||{}),autotune:Math.max(0,Math.min(100,Number(e.target.value)||0))};paintAutotuneSlider();if($('vocalFxAutotuneValue'))$('vocalFxAutotuneValue').textContent=`${Math.round(p.fx.autotune)}%`;if($('vocalAutotuneKey'))$('vocalAutotuneKey').textContent=vocalAutotuneScale().label;core.scheduleAutoSave();};
   }
 
-  window.CRPParts={handlesPlayback:true,togglePlayback,startPlayback,isPlaying:()=>playing||starting,getPlaybackTiming(){
+  window.CRPParts={handlesPlayback:true,togglePlayback,startPlayback,liveEditRefresh,seekPlaybackToBeat,seekPlaybackToSeconds,isPlaying:()=>playing||starting,getPlaybackTiming(){
     const bpm=Math.max(40,Math.min(240,+playbackClockBpm||+core.bpm||92));
     const beatMs=60000/bpm;
     const transportActive=!!(playing||starting);
