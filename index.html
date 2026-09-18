@@ -9,7 +9,7 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.19-STABILITY" />
+  <link rel="stylesheet" href="styles.css?v=3.3.20-VOXBOX" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
   <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
@@ -167,7 +167,7 @@
         <div class="lead-editor-head">
           <div>
             <h3 id="leadPartTitle">Lead / Bass</h3>
-            <p class="subtle">Tap cells to place notes. Pitch names are real MIDI-style note/octave names.</p><div class="lead-play-options"><button id="leadPlaybackBtn" class="part-preview-btn" type="button">▶ Play</button><label class="part-repeat-toggle"><input id="leadRepeat" type="checkbox" checked><span>Repeat</span></label><label class="part-repeat-toggle"><input id="leadSustain" type="checkbox"><span>Sustain</span></label></div>
+            <p class="subtle">Tap cells to place notes. Pitch names are real MIDI-style note/octave names.</p>
           </div>
           <label class="part-volume-label">Volume <input id="leadVolume" type="range" min="0" max="100" value="80" /><span id="leadVolumeValue">80%</span></label>
         </div>
@@ -176,10 +176,11 @@
             <button class="seg active" data-lead-instrument="piano" type="button">Piano</button>
             <button class="seg" data-lead-instrument="guitar" type="button">Guitar</button>
           </div>
-          <label>Sound<select id="leadSoundSelect"></select></label>
-          <label>Grid octave<select id="leadGridOctave"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
-          <label>Resolution<select id="leadResolution"><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
-          <label>Bars<select id="leadBars"><option>1</option><option>2</option><option selected>4</option><option>8</option><option>16</option></select></label>
+          <label class="lead-sound-control">Sound<select id="leadSoundSelect"></select></label>
+          <label class="lead-grid-octave-control">Grid octave<select id="leadGridOctave"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
+          <label class="lead-resolution-control">Resolution<select id="leadResolution"><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
+          <label class="lead-sustain-control"><span>Sustain</span><span class="part-repeat-toggle"><input id="leadSustain" type="checkbox"><span>On</span></span></label>
+          <label class="lead-bars-control">Bars<select id="leadBars"><option>1</option><option>2</option><option selected>4</option><option>8</option><option>16</option></select></label>
         </div>
         <div class="lead-bar-nav">
           <button id="leadPrevBar" type="button">‹</button>
@@ -195,6 +196,7 @@
               <div id="leadNotesFit" class="lead-harmony-chips lead-note-fit-chips"><span class="lead-harmony-empty">—</span></div>
             </div>
           </div>
+          <div class="lead-play-options lead-play-options-lower"><button id="leadPlaybackBtn" class="part-preview-btn" type="button">▶ Play</button><label class="part-repeat-toggle"><input id="leadRepeat" type="checkbox" checked><span>Repeat</span></label></div>
           <div class="lead-bar-tools"><button id="leadCopyBar" type="button">Copy</button><button id="leadPasteBar" type="button" disabled>Paste</button><button id="leadClearBar" type="button">Clear</button></div>
         </div>
         <div id="leadGridWrap" class="lead-grid-wrap"><div id="leadGrid" class="lead-grid"></div></div>
@@ -239,7 +241,7 @@
           </section>
 
           <section class="vocal-panel vocal-effects">
-            <div class="vocal-panel-heading"><h4>Vocal effects</h4><span class="subtle tiny">Editable anytime • dry recording is preserved</span></div>
+            <div class="vocal-panel-heading vocal-effects-heading"><div class="vocal-effects-title"><h4>Vocal Effects</h4><span class="subtle tiny">Editable anytime • dry recording is preserved</span></div><button id="voxBoxBtn" class="vox-box-launch" type="button">Vox Box</button></div>
             <div class="vocal-effects-grid">
               <label>EQ<select id="vocalFxEq"><option value="flat">Natural</option><option value="clear" selected>Clear</option><option value="warm">Warm</option><option value="bright">Bright</option></select></label>
               <label>Compression<select id="vocalFxComp"><option value="off">Off</option><option value="light">Light</option><option value="medium" selected>Medium</option><option value="heavy">Heavy</option></select></label>
@@ -410,6 +412,55 @@
   </div>
 
 
+  <div id="voxBoxPage" class="vox-box-page" hidden aria-hidden="true">
+    <div class="vox-box-shell">
+      <header class="vox-box-header">
+        <div class="vox-box-brand"><strong>VOX BOX</strong><span>Vocal Event Editor</span></div>
+        <div class="vox-box-header-actions">
+          <button id="voxBoxPlayBtn" class="accent" type="button">▶ Play</button>
+          <label class="vox-snap-toggle"><input id="voxSnapToBeat" type="checkbox" checked><span>Snap to Beat</span></label>
+          <label class="vox-snap-resolution"><span>Grid</span><select id="voxSnapResolution"><option value="4">1/4</option><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
+          <button id="voxBoxCloseBtn" type="button">Done</button>
+        </div>
+      </header>
+
+      <div class="vox-box-tools">
+        <button id="voxAddActiveTakeBtn" type="button">+ Active Take</button>
+        <button id="voxCropBtn" type="button">Crop</button>
+        <button id="voxSplitBtn" type="button">Split at Playhead</button>
+        <button id="voxCopyBtn" type="button">Copy</button>
+        <button id="voxCutBtn" type="button">Cut</button>
+        <button id="voxPasteBtn" type="button" disabled>Paste</button>
+        <button id="voxDeleteBtn" type="button">Delete</button>
+        <span id="voxBoxStatus" class="subtle tiny">Tap a track to place the playhead. Drag events left/right or between vocal tracks.</span>
+      </div>
+
+      <div id="voxTimelineScroller" class="vox-timeline-scroller">
+        <div id="voxTimelineInner" class="vox-timeline-inner">
+          <div id="voxRuler" class="vox-ruler" aria-label="Vocal timeline ruler"></div>
+          <div id="voxTracks" class="vox-tracks"></div>
+          <div id="voxPlayhead" class="vox-playhead" aria-hidden="true"><span></span></div>
+        </div>
+      </div>
+
+      <section class="vox-inspector" aria-label="Vocal event effects">
+        <div class="vox-inspector-heading">
+          <div><strong id="voxInspectorTitle">Track Effects</strong><span id="voxInspectorMeta" class="subtle tiny">Select a vocal track or event.</span></div>
+          <label>Apply to<select id="voxFxTarget"><option value="track">Track</option><option value="event">Selected Event</option></select></label>
+        </div>
+        <div class="vox-fx-grid">
+          <label>Volume<input id="voxFxVolume" type="range" min="0" max="150" step="1" value="100"><strong id="voxFxVolumeValue">100%</strong></label>
+          <label>EQ<select id="voxFxEq"><option value="flat">Natural</option><option value="clear">Clear</option><option value="warm">Warm</option><option value="bright">Bright</option></select></label>
+          <label>Compression<select id="voxFxComp"><option value="off">Off</option><option value="light">Light</option><option value="medium">Medium</option><option value="heavy">Heavy</option></select></label>
+          <label>Reverb<select id="voxFxReverb"><option value="0">Off</option><option value="0.12">Small</option><option value="0.22">Medium</option><option value="0.34">Large</option></select></label>
+          <label>Delay<select id="voxFxDelay"><option value="0">Off</option><option value="0.10">Slap</option><option value="0.18">1/8</option><option value="0.28">1/4</option></select></label>
+          <label>Auto-Tune<input id="voxFxAutotune" type="range" min="0" max="100" step="1" value="0"><strong id="voxFxAutotuneValue">0%</strong></label>
+        </div>
+        <div class="vox-inspector-actions"><button id="voxResetEventFxBtn" type="button">Reset Event FX to Track</button><span class="subtle tiny">Track FX edit the whole vocal part. Event FX can override just one clip.</span></div>
+      </section>
+    </div>
+  </div>
+
   <div id="srpLyricsOverlay" class="srp-lyrics-overlay" hidden>
     <div class="srp-lyrics-overlay-head">
       <strong>Song Rider Pro — Full Song View</strong>
@@ -428,8 +479,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.19-STABILITY"></script>
-  <script src="parts.js?v=3.3.19-STABILITY"></script>
+  <script src="app.js?v=3.3.20-VOXBOX"></script>
+  <script src="parts.js?v=3.3.20-VOXBOX"></script>
   <script src="beat-maker.js?v=3.3.8-LAST-MIDI-DURATION-CAPO-ROW"></script>
 </body>
 </html>

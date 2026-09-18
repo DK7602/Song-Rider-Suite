@@ -3311,3 +3311,311 @@ body.workspace-baby-daw #songEndEditor:not([hidden]){
   .song-end-topline .song-end-snap{font-size:.68rem!important;gap:3px!important;min-height:30px!important;}
   .song-end-topline .song-end-snap input{width:17px!important;height:17px!important;flex-basis:17px!important;}
 }
+
+/* =========================================================
+   v3.3.20 — Baby DAW transport polish + Vox Box editor
+   ========================================================= */
+.lead-controls{
+  grid-template-columns:1.15fr 1.4fr .9fr .9fr .8fr .8fr!important;
+  align-items:end!important;
+}
+.lead-sustain-control .part-repeat-toggle{
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:8px;
+  border:1px solid #3b4654;
+  border-radius:11px;
+  background:#0d1219;
+  padding:8px 10px;
+}
+.lead-sustain-control .part-repeat-toggle input{width:20px;height:20px;accent-color:var(--accent)}
+.lead-play-options-lower{
+  flex:1 0 100%;
+  order:8;
+  width:100%;
+  margin:4px 0 0!important;
+  padding:8px 0 2px;
+  border-top:1px solid rgba(255,255,255,.05);
+}
+.lead-bar-tools{order:9}
+.vocal-effects-heading{align-items:center!important}
+.vocal-effects-title{min-width:0;display:flex;flex-direction:column;gap:3px}
+.vocal-effects-title h4{margin:0!important}
+.vox-box-launch{
+  flex:0 0 auto;
+  font-weight:900!important;
+  color:#111!important;
+  background:linear-gradient(180deg,#f8d66d,#e7b53c)!important;
+  border:1px solid #d4a02e!important;
+  box-shadow:0 3px 10px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.45)!important;
+}
+
+body.vox-box-open{overflow:hidden!important}
+.vox-box-page{
+  position:fixed;
+  inset:0;
+  z-index:5000;
+  background:#090c10;
+  color:#eef2f7;
+  padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);
+}
+.vox-box-page[hidden]{display:none!important}
+.vox-box-shell{
+  height:100%;
+  display:grid;
+  grid-template-rows:auto auto minmax(240px,1fr) auto;
+  min-height:0;
+  background:linear-gradient(180deg,#121820 0%,#0b1016 100%);
+}
+.vox-box-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:12px 16px;
+  border-bottom:1px solid #2e3844;
+  background:#10151c;
+  box-shadow:0 4px 16px rgba(0,0,0,.28);
+}
+.vox-box-brand{display:flex;flex-direction:column;line-height:1}
+.vox-box-brand strong{font-size:1.45rem;letter-spacing:.08em;color:#f1c655}
+.vox-box-brand span{margin-top:5px;font-size:.75rem;color:#929daa;font-weight:700;letter-spacing:.03em}
+.vox-box-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.vox-box-header-actions>button,.vox-box-tools>button{min-height:38px;padding:8px 12px}
+.vox-snap-toggle{display:flex;align-items:center;gap:7px;font-weight:800;white-space:nowrap}
+.vox-snap-toggle input{width:20px;height:20px;accent-color:var(--accent)}
+.vox-snap-resolution{display:flex;align-items:center;gap:6px;color:#aeb7c3;font-size:.82rem;font-weight:800}
+.vox-snap-resolution select{min-width:76px;padding:7px 28px 7px 8px}
+.vox-box-tools{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+  padding:9px 12px;
+  background:#0d1218;
+  border-bottom:1px solid #27313c;
+}
+.vox-box-tools .is-active{background:var(--accent)!important;color:#111!important;border-color:var(--accent)!important}
+#voxBoxStatus{margin-left:auto;max-width:420px;text-align:right}
+.vox-timeline-scroller{
+  overflow:auto;
+  min-height:0;
+  position:relative;
+  background:#171b20;
+  overscroll-behavior:contain;
+  touch-action:pan-x pan-y;
+}
+.vox-timeline-inner{
+  position:relative;
+  min-height:100%;
+  width:max-content;
+  min-width:100%;
+  padding-left:132px;
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px) 0 0/56px 100%,
+    #171b20;
+}
+.vox-ruler{
+  height:46px;
+  position:sticky;
+  top:0;
+  z-index:15;
+  border-bottom:1px solid #38424e;
+  background:#292e35;
+  min-width:100%;
+  cursor:crosshair;
+}
+.vox-ruler-beat{
+  position:absolute;
+  bottom:0;
+  height:14px;
+  width:1px;
+  background:#8d96a0;
+  opacity:.7;
+}
+.vox-ruler-beat.major{height:26px;background:#d7dde3;opacity:.9}
+.vox-ruler-label{
+  position:absolute;
+  top:6px;
+  transform:translateX(-50%);
+  font-size:.72rem;
+  font-weight:800;
+  color:#d6dbe0;
+  white-space:nowrap;
+}
+.vox-tracks{position:relative;z-index:2}
+.vox-track-row{
+  position:relative;
+  height:122px;
+  border-bottom:1px solid #30363d;
+  background:rgba(255,255,255,.015);
+}
+.vox-track-row.is-target{background:rgba(241,198,85,.055)}
+.vox-track-label{
+  position:sticky;
+  left:0;
+  z-index:11;
+  width:132px;
+  height:100%;
+  margin-left:-132px;
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:5px;
+  padding:10px 12px;
+  border-right:1px solid #39434f;
+  background:#11161d;
+  color:#f2f4f7;
+  box-shadow:5px 0 12px rgba(0,0,0,.2);
+}
+.vox-track-label strong{font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vox-track-label span{font-size:.69rem;color:#8f9aa6}
+.vox-track-lane{
+  position:absolute;
+  inset:0;
+  cursor:crosshair;
+  background:repeating-linear-gradient(90deg,transparent 0,transparent 55px,rgba(255,255,255,.055) 55px,rgba(255,255,255,.055) 56px);
+}
+.vox-track-row:nth-child(even) .vox-track-lane{background-color:rgba(255,255,255,.018)}
+.vox-event{
+  position:absolute;
+  top:17px;
+  height:88px;
+  min-width:24px;
+  border:2px solid #d49738;
+  border-radius:4px;
+  background:linear-gradient(180deg,#db873d,#c87732);
+  box-shadow:0 4px 12px rgba(0,0,0,.28);
+  overflow:hidden;
+  user-select:none;
+  touch-action:none;
+  cursor:grab;
+}
+.vox-event:active{cursor:grabbing}
+.vox-event.is-selected{border-color:#66c6ff;box-shadow:0 0 0 2px rgba(102,198,255,.22),0 6px 18px rgba(0,0,0,.35)}
+.vox-event.is-dragging{opacity:.9;z-index:20}
+.vox-event-top{
+  position:absolute;
+  left:7px;right:7px;top:4px;
+  z-index:3;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:7px;
+  pointer-events:none;
+  color:#fff;
+  text-shadow:0 1px 2px rgba(0,0,0,.65);
+}
+.vox-event-name{font-size:.7rem;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vox-event-time{font-size:.61rem;opacity:.88;white-space:nowrap}
+.vox-event-waveform{position:absolute;inset:24px 5px 7px;width:calc(100% - 10px);height:56px;opacity:.82;pointer-events:none}
+.vox-trim-handle{
+  position:absolute;
+  top:0;bottom:0;
+  width:12px;
+  z-index:6;
+  display:none;
+  background:rgba(255,255,255,.16);
+  cursor:ew-resize;
+}
+.vox-trim-handle.left{left:0;border-right:1px solid rgba(255,255,255,.35)}
+.vox-trim-handle.right{right:0;border-left:1px solid rgba(255,255,255,.35)}
+.vox-box-page.crop-mode .vox-event.is-selected .vox-trim-handle,.vox-event.is-selected:hover .vox-trim-handle{display:block}
+.vox-playhead{
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:2px;
+  background:#67c7ff;
+  z-index:25;
+  pointer-events:none;
+  box-shadow:0 0 6px rgba(103,199,255,.65);
+}
+.vox-playhead span{
+  position:absolute;
+  top:0;
+  left:50%;
+  transform:translate(-50%,-1px);
+  width:0;height:0;
+  border-left:7px solid transparent;
+  border-right:7px solid transparent;
+  border-top:10px solid #67c7ff;
+}
+.vox-inspector{
+  border-top:1px solid #36414d;
+  background:#0c1117;
+  padding:10px 14px 12px;
+  max-height:36vh;
+  overflow:auto;
+}
+.vox-inspector-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px}
+.vox-inspector-heading>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.vox-inspector-heading>label{display:flex;align-items:center;gap:7px;white-space:nowrap;color:#abb5c1;font-size:.78rem;font-weight:800}
+.vox-inspector-heading select{padding:7px 30px 7px 9px}
+.vox-fx-grid{display:grid;grid-template-columns:1.5fr repeat(5,minmax(110px,1fr));gap:8px;align-items:end}
+.vox-fx-grid label{display:flex;flex-direction:column;gap:5px;font-size:.76rem;color:#aeb8c4;font-weight:800;min-width:0}
+.vox-fx-grid input[type=range]{width:100%;min-width:100px}
+.vox-fx-grid strong{font-size:.72rem;color:#f1c655}
+.vox-inspector-actions{display:flex;align-items:center;gap:10px;margin-top:9px;flex-wrap:wrap}
+.vox-inspector-actions button{padding:7px 10px}
+.vox-box-page button:disabled,.vox-box-page select:disabled,.vox-box-page input:disabled{opacity:.42;cursor:not-allowed}
+
+@media(max-width:900px){
+  .lead-controls{grid-template-columns:1fr 1fr!important}
+  .vox-box-shell{grid-template-rows:auto auto minmax(220px,1fr) auto}
+  .vox-box-header{align-items:flex-start;flex-direction:column}
+  .vox-box-header-actions{justify-content:flex-start;width:100%}
+  #voxBoxStatus{width:100%;max-width:none;margin-left:0;text-align:left}
+  .vox-fx-grid{grid-template-columns:1fr 1fr 1fr}
+}
+@media(max-width:600px){
+  .lead-bar-nav{align-items:center!important}
+  .lead-play-options-lower{order:8!important;border-top:0;padding-top:4px!important}
+  .lead-bar-tools{order:9!important;width:100%!important}
+  .vocal-effects-heading{flex-wrap:nowrap!important}
+  .vocal-effects-title .subtle{font-size:.68rem}
+  .vox-box-page{font-size:14px}
+  .vox-box-header{padding:8px 10px;gap:8px}
+  .vox-box-brand strong{font-size:1.12rem}
+  .vox-box-header-actions{gap:6px}
+  .vox-box-header-actions>button{min-height:34px;padding:6px 9px}
+  .vox-snap-toggle{font-size:.78rem}
+  .vox-snap-resolution>span{display:none}
+  .vox-snap-resolution select{min-width:68px}
+  .vox-box-tools{padding:7px 8px;gap:5px}
+  .vox-box-tools>button{min-height:33px;padding:6px 8px;font-size:.76rem}
+  .vox-timeline-inner{padding-left:96px;background-size:44px 100%}
+  .vox-track-label{width:96px;margin-left:-96px;padding:8px}
+  .vox-track-row{height:104px}
+  .vox-track-lane{background-size:44px 100%}
+  .vox-event{top:14px;height:76px}
+  .vox-event-waveform{inset:22px 4px 5px;height:47px}
+  .vox-inspector{padding:8px 9px;max-height:42vh}
+  .vox-inspector-heading{align-items:flex-start;flex-direction:column;gap:6px}
+  .vox-fx-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:390px){
+  .vox-box-header-actions{display:grid;grid-template-columns:auto auto 1fr auto;width:100%}
+  .vox-snap-toggle{font-size:.72rem}
+  .vox-fx-grid{grid-template-columns:1fr}
+}
+
+/* v3.3.20 phone placement: Sustain shares the Grid octave / Resolution row. */
+@media(max-width:900px){
+  .lead-controls{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto!important}
+  .lead-controls #leadInstrumentTabs{grid-column:1/2!important}
+  .lead-controls .lead-sound-control{grid-column:2/4!important}
+  .lead-controls .lead-grid-octave-control{grid-column:1!important}
+  .lead-controls .lead-resolution-control{grid-column:2!important}
+  .lead-controls .lead-sustain-control{grid-column:3!important;min-width:68px!important}
+  .lead-controls .lead-bars-control{grid-column:1/2!important}
+  .lead-sustain-control .part-repeat-toggle{min-height:42px!important;justify-content:center!important;padding-left:8px!important;padding-right:8px!important}
+}
+@media(max-width:390px){
+  .lead-controls{column-gap:7px!important}
+  .lead-controls .lead-sustain-control{min-width:62px!important}
+  .lead-sustain-control .part-repeat-toggle{gap:5px!important;padding-left:6px!important;padding-right:6px!important}
+}

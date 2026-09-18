@@ -42,6 +42,8 @@
   let recording=false,recordingPaused=false,recordChunks=[],recordSampleRate=48000,recordStartedAt=0,recordPausedAt=0,recordPausedTotal=0,recordTimer=null,currentPreview=null;
   let leadBarClipboard=null, speechRec=null, speechBase='';
   let partsUpdatedAt=0;
+  let voxBoxOpen=false,voxCropMode=false,voxSelected=null,voxTargetPartId=null,voxClipboard=null,voxPlayheadBeat=0,voxRenderToken=0;
+  const VOX_SNAP_KEY='crp-vox-snap-v1',VOX_RES_KEY='crp-vox-resolution-v1';
   function markPartsDirty(){ partsUpdatedAt=Date.now(); return partsUpdatedAt; }
 
   function chordPart(name='Chords 1', data=null){
@@ -53,20 +55,66 @@
     return {id:uid(),type:'lead',name,enabled:true,repeat:true,sustain:false,volume:.8,instrument:'piano',sound:'acoustic_grand_piano',octave:0,gridOctave:3,resolution:16,bars:4,events:[]};
   }
   function vocalPart(name='Vocals 1'){
-    return {id:uid(),type:'vocal',name,enabled:true,repeat:true,volume:1,transcript:'',recordings:[],activeTakeId:null,backingPartIds:parts.filter(x=>x.type==='chord'||x.type==='lead').filter(x=>x.enabled).map(x=>x.id),backingDrums:true,backingVolume:.8,fx:{eq:'clear',comp:'medium',reverb:.12,delay:0,autotune:0}};
+    return {id:uid(),type:'vocal',name,enabled:true,repeat:true,volume:1,transcript:'',recordings:[],activeTakeId:null,voxEvents:[],backingPartIds:parts.filter(x=>x.type==='chord'||x.type==='lead').filter(x=>x.enabled).map(x=>x.id),backingDrums:true,backingVolume:.8,fx:{eq:'clear',comp:'medium',reverb:.12,delay:0,autotune:0}};
+  }
+  function normalizeVocalFx(fx,fallback=null){
+    const f=fx||fallback||{};
+    return {eq:f.eq||'clear',comp:f.comp||'medium',reverb:Number(f.reverb??.12),delay:Number(f.delay||0),autotune:Math.max(0,Math.min(100,Number(f.autotune)||0))};
+  }
+  function normalizeVoxEvent(e,p=null){
+    if(!e)return null;
+    const takeId=String(e.takeId||p?.activeTakeId||'');
+    if(!takeId)return null;
+    const trimEndRaw=Number(e.trimEndSec);
+    return {
+      id:e.id||uid(),takeId,sourcePartId:String(e.sourcePartId||p?.id||''),
+      startBeat:Math.max(0,Number(e.startBeat)||0),trimStartSec:Math.max(0,Number(e.trimStartSec)||0),
+      trimEndSec:Number.isFinite(trimEndRaw)&&trimEndRaw>0?trimEndRaw:null,
+      volume:Number.isFinite(Number(e.volume))?Math.max(0,Math.min(1.5,Number(e.volume))):1,
+      fx:e.fx?normalizeVocalFx(e.fx):null
+    };
   }
   function normalizePart(p,i){
     if(!p||!p.type)return null;
     const base={id:p.id||uid(),name:p.name||`${p.type==='chord'?'Chords':p.type==='lead'?'Lead':'Vocals'} ${i+1}`,enabled:p.enabled!==false,volume:Number.isFinite(+p.volume)?Math.max(0,Math.min(1,+p.volume)):.85};
     if(p.type==='chord')return {...base,type:'chord',data:clone(p.data||core.snapshot())};
     if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,sustain:p.sustain===true,instrument:p.instrument==='guitar'?'guitar':'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(16,+p.bars||4)),events:normalizeLeadEvents(p.events)};
-    return {...base,type:'vocal',repeat:p.repeat!==false,transcript:String(p.transcript||''),transcriptWords:Array.isArray(p.transcriptWords)?p.transcriptWords:[],recordings:Array.isArray(p.recordings)?p.recordings.map(r=>({...r,blob:null})):[],activeTakeId:p.activeTakeId||null,backingPartIds:Array.isArray(p.backingPartIds)?p.backingPartIds:[],backingDrums:p.backingDrums!==false,backingVolume:Number.isFinite(+p.backingVolume)?Math.max(0,Math.min(1,+p.backingVolume)):.8,fx:{eq:p.fx?.eq||'clear',comp:p.fx?.comp||'medium',reverb:Number(p.fx?.reverb??.12),delay:Number(p.fx?.delay||0),autotune:Math.max(0,Math.min(100,Number(p.fx?.autotune)||0))}};
+    const voxEvents=Array.isArray(p.voxEvents)?p.voxEvents.map(e=>normalizeVoxEvent(e,p)).filter(Boolean):[];
+    return {...base,type:'vocal',repeat:p.repeat!==false,transcript:String(p.transcript||''),transcriptWords:Array.isArray(p.transcriptWords)?p.transcriptWords:[],recordings:Array.isArray(p.recordings)?p.recordings.map(r=>({...r,blob:null})):[],activeTakeId:p.activeTakeId||null,voxEvents,backingPartIds:Array.isArray(p.backingPartIds)?p.backingPartIds:[],backingDrums:p.backingDrums!==false,backingVolume:Number.isFinite(+p.backingVolume)?Math.max(0,Math.min(1,+p.backingVolume)):.8,fx:{eq:p.fx?.eq||'clear',comp:p.fx?.comp||'medium',reverb:Number(p.fx?.reverb??.12),delay:Number(p.fx?.delay||0),autotune:Math.max(0,Math.min(100,Number(p.fx?.autotune)||0))}};
   }
   function ensureInitial(){
     if(parts.length)return;
     const p=chordPart('Chords 1');parts=[p];activePartId=p.id;loadedChordPartId=p.id;
   }
   function active(){return parts.find(p=>p.id===activePartId)||parts[0]||null;}
+  function allVocalParts(){return parts.filter(p=>p.type==='vocal');}
+  function findVocalTake(takeId,sourcePartId=''){
+    const sid=String(sourcePartId||''),tid=String(takeId||'');
+    const source=parts.find(p=>p.type==='vocal'&&String(p.id)===sid);
+    const direct=source?.recordings?.find(r=>String(r.id)===tid);
+    if(direct)return {part:source,take:direct};
+    for(const p of allVocalParts()){const take=p.recordings?.find(r=>String(r.id)===tid);if(take)return {part:p,take};}
+    return null;
+  }
+  function voxEventTake(e){return findVocalTake(e?.takeId,e?.sourcePartId)?.take||null;}
+  function voxEventDurationSeconds(e){
+    const take=voxEventTake(e);if(!take)return 0;
+    const full=Math.max(0,Number(take.duration)||0),start=Math.max(0,Math.min(full,Number(e.trimStartSec)||0));
+    const end=Math.max(start,Math.min(full,Number.isFinite(Number(e.trimEndSec))&&Number(e.trimEndSec)>0?Number(e.trimEndSec):full));
+    return Math.max(0,end-start);
+  }
+  function voxEventDurationBeats(e,bpm=core.bpm){return voxEventDurationSeconds(e)*Math.max(40,Math.min(240,Number(bpm)||92))/60;}
+  function voxTrackEvents(p){return p?.type==='vocal'&&Array.isArray(p.voxEvents)?p.voxEvents.filter(e=>voxEventTake(e)&&voxEventDurationSeconds(e)>.01):[];}
+  function vocalHasPlayableAudio(p){return !!(voxTrackEvents(p).length||(p?.activeTakeId&&p?.recordings?.some(r=>r.id===p.activeTakeId)));}
+  function effectiveVocalFx(p,e=null){return e?.fx?normalizeVocalFx(e.fx,p?.fx):normalizeVocalFx(p?.fx);}
+  function ensureVoxEventForActiveTake(p,startBeat=0){
+    if(!p||p.type!=='vocal'||!p.activeTakeId||!p.recordings?.some(r=>r.id===p.activeTakeId))return null;
+    if(!Array.isArray(p.voxEvents))p.voxEvents=[];
+    const existing=p.voxEvents.find(e=>e.takeId===p.activeTakeId&&Math.abs((Number(e.startBeat)||0)-Number(startBeat||0))<1e-6);
+    if(existing)return existing;
+    const ev=normalizeVoxEvent({id:uid(),takeId:p.activeTakeId,sourcePartId:p.id,startBeat,trimStartSec:0,trimEndSec:null,volume:1,fx:null},p);
+    p.voxEvents.push(ev);return ev;
+  }
   function updatePartPlaybackButtons(){
     const a=active(), busy=!!(playing||starting);
     const leadBtn=$('leadPlaybackBtn');
@@ -85,6 +133,8 @@
       vocalBtn.classList.toggle('is-playing',vocalHere);
       vocalBtn.setAttribute('aria-pressed',vocalHere?'true':'false');
     }
+    const voxBtn=$('voxBoxPlayBtn');
+    if(voxBtn){voxBtn.textContent=busy?'■ Stop':'▶ Play';voxBtn.classList.toggle('is-playing',busy);voxBtn.setAttribute('aria-pressed',busy?'true':'false');}
   }
   function loadedChord(){return parts.find(p=>p.id===loadedChordPartId&&p.type==='chord')||null;}
   function syncLoadedChord(){
@@ -228,8 +278,9 @@
     autotuneLoadingContexts.set(ctx,promise);
     return promise;
   }
-  function makeAutotuneNode(ctx,p){
-    const amount=Math.max(0,Math.min(100,Number(p?.fx?.autotune)||0));
+  function makeAutotuneNode(ctx,p,fxOverride=null){
+    const fx=fxOverride||p?.fx||{};
+    const amount=Math.max(0,Math.min(100,Number(fx.autotune)||0));
     const scale=vocalAutotuneScale();
     if(!autotuneReadyContexts.has(ctx)||typeof AudioWorkletNode==='undefined')return null;
     try{
@@ -491,7 +542,7 @@
   function fmtTime(sec){sec=Math.max(0,Number(sec)||0);const m=Math.floor(sec/60),s=sec-m*60;return `${String(m).padStart(2,'0')}:${s.toFixed(1).padStart(4,'0')}`;}
   function renderVocalBacking(p){const box=$('vocalBackingParts');if(!box)return;const candidates=parts.filter(x=>x.id!==p.id&&(x.type==='chord'||x.type==='lead'));if(!Array.isArray(p.backingPartIds))p.backingPartIds=[];box.innerHTML='';candidates.forEach(x=>{const lab=document.createElement('label');lab.className='vocal-backing-item';const chk=document.createElement('input');chk.type='checkbox';chk.checked=p.backingPartIds.includes(x.id);chk.onchange=()=>{p.backingPartIds=candidates.filter(c=>box.querySelector(`[data-back-id="${c.id}"]`)?.checked).map(c=>c.id);core.scheduleAutoSave();};chk.dataset.backId=x.id;const span=document.createElement('span');span.textContent=x.name;lab.append(chk,span);box.appendChild(lab);});if(!candidates.length)box.innerHTML='<span class="subtle tiny">Add a Chord/Note or Lead/Bass part for a headphone backing track.</span>';}
   function paintAutotuneSlider(){const s=$('vocalFxAutotune');if(s)s.style.setProperty('--tune-fill',`${Math.max(0,Math.min(100,Number(s.value)||0))}%`);}
-  async function renderVocalTakes(p){const box=$('vocalTakes');if(!box)return;box.innerHTML='';if(!p.recordings.length){box.innerHTML='<div class="vocal-empty">No takes yet. Put on headphones and tap Record.</div>';return;}for(const take of [...p.recordings].reverse()){const row=document.createElement('div');row.className='vocal-take'+(p.activeTakeId===take.id?' active':'');const main=document.createElement('div');main.className='vocal-take-main';main.innerHTML=`<div class="vocal-take-name">${escapeHtml(take.name||'Vocal take')}<span class="cloud-badge ${take.cloud?'':'pending'}">${take.cloud?'☁ Cloud':'Device'}</span></div><div class="vocal-take-meta">${fmtTime(take.duration)} • ${take.sampleRate||48000} Hz WAV • ${new Date(take.createdAt).toLocaleString()}</div>`;const use=document.createElement('button');use.type='button';use.className='take-use';use.textContent=p.activeTakeId===take.id?'Using':'Use';use.onclick=()=>{p.activeTakeId=take.id;p.transcript=take.transcript||'';p.transcriptWords=take.transcriptWords||[];renderVocalTakes(p);if($('vocalTranscript'))$('vocalTranscript').value=p.transcript||'';core.scheduleAutoSave();};const play=document.createElement('button');play.type='button';play.textContent='▶';play.title='Preview take';play.onclick=()=>previewTake(p,take,play);const dl=document.createElement('button');dl.type='button';dl.className='take-download';dl.textContent='↓ WAV';dl.onclick=()=>downloadTake(take);const del=document.createElement('button');del.type='button';del.className='take-delete';del.textContent='×';del.title='Delete take';del.onclick=async()=>{if(!confirm(`Delete “${take.name}”?`))return;stopPreview();await vocalDbDelete(take.id).catch(()=>{});await deleteTakeCloud(take);vocalBufferCache.delete(take.id);p.recordings=p.recordings.filter(r=>r.id!==take.id);if(p.activeTakeId===take.id)p.activeTakeId=p.recordings.at(-1)?.id||null;renderVocalTakes(p);markPartsDirty();core.scheduleAutoSave();core.flushAutoSaveNow?.();};row.append(main,use,play,dl,del);box.appendChild(row);}}
+  async function renderVocalTakes(p){const box=$('vocalTakes');if(!box)return;box.innerHTML='';if(!p.recordings.length){box.innerHTML='<div class="vocal-empty">No takes yet. Put on headphones and tap Record.</div>';return;}for(const take of [...p.recordings].reverse()){const row=document.createElement('div');row.className='vocal-take'+(p.activeTakeId===take.id?' active':'');const main=document.createElement('div');main.className='vocal-take-main';main.innerHTML=`<div class="vocal-take-name">${escapeHtml(take.name||'Vocal take')}<span class="cloud-badge ${take.cloud?'':'pending'}">${take.cloud?'☁ Cloud':'Device'}</span></div><div class="vocal-take-meta">${fmtTime(take.duration)} • ${take.sampleRate||48000} Hz WAV • ${new Date(take.createdAt).toLocaleString()}</div>`;const use=document.createElement('button');use.type='button';use.className='take-use';use.textContent=p.activeTakeId===take.id?'Using':'Use';use.onclick=()=>{p.activeTakeId=take.id;p.transcript=take.transcript||'';p.transcriptWords=take.transcriptWords||[];renderVocalTakes(p);if($('vocalTranscript'))$('vocalTranscript').value=p.transcript||'';core.scheduleAutoSave();};const play=document.createElement('button');play.type='button';play.textContent='▶';play.title='Preview take';play.onclick=()=>previewTake(p,take,play);const dl=document.createElement('button');dl.type='button';dl.className='take-download';dl.textContent='↓ WAV';dl.onclick=()=>downloadTake(take);const del=document.createElement('button');del.type='button';del.className='take-delete';del.textContent='×';del.title='Delete take';del.onclick=async()=>{if(!confirm(`Delete “${take.name}”?`))return;stopPreview();await vocalDbDelete(take.id).catch(()=>{});await deleteTakeCloud(take);vocalBufferCache.delete(take.id);p.recordings=p.recordings.filter(r=>r.id!==take.id);for(const vp of allVocalParts())vp.voxEvents=(vp.voxEvents||[]).filter(e=>e.takeId!==take.id);if(p.activeTakeId===take.id)p.activeTakeId=p.recordings.at(-1)?.id||null;if(voxSelected&&voxSelected.eventId&&!(parts.find(x=>x.id===voxSelected.partId)?.voxEvents||[]).some(e=>e.id===voxSelected.eventId))voxSelected=null;renderVocalTakes(p);if(voxBoxOpen)renderVoxBox();markPartsDirty();core.scheduleAutoSave();core.flushAutoSaveNow?.();};row.append(main,use,play,dl,del);box.appendChild(row);}}
   function renderVocalEditor(p=active()){
     if(!p||p.type!=='vocal')return;$('vocalPartTitle').textContent=p.name;if($('vocalTranscript'))$('vocalTranscript').value=p.transcript||'';if($('vocalRepeat'))$('vocalRepeat').checked=p.repeat!==false;$('vocalVolume').value=Math.round(p.volume*100);$('vocalVolumeValue').textContent=`${Math.round(p.volume*100)}%`;renderVocalBacking(p);$('vocalBackingDrums').checked=p.backingDrums!==false;$('vocalBackingVolume').value=Math.round((p.backingVolume??.8)*100);$('vocalBackingVolumeValue').textContent=`${Math.round((p.backingVolume??.8)*100)}%`;$('vocalFxEq').value=p.fx?.eq||'clear';$('vocalFxComp').value=p.fx?.comp||'medium';$('vocalFxReverb').value=String(p.fx?.reverb??.12);$('vocalFxDelay').value=String(p.fx?.delay||0);if($('vocalFxAutotune'))$('vocalFxAutotune').value=String(Math.round(Number(p.fx?.autotune)||0));paintAutotuneSlider();if($('vocalFxAutotuneValue'))$('vocalFxAutotuneValue').textContent=`${Math.round(Number(p.fx?.autotune)||0)}%`;if($('vocalAutotuneKey'))$('vocalAutotuneKey').textContent=vocalAutotuneScale().label;renderVocalTakes(p);updatePartPlaybackButtons();
   }
@@ -525,7 +576,7 @@
   }
   async function endRecording(){
     const p=active();if(!p||p.type!=='vocal'||!recording)return;if(recordingPaused&&recordPausedAt){recordPausedTotal+=performance.now()-recordPausedAt;}recordingPaused=false;recordPausedAt=0;recording=false;stopSpeechToText();clearInterval(recordTimer);recordTimer=null;$('vocalRecordBtn').classList.remove('recording');$('vocalRecordBtn').disabled=false;$('vocalStopBtn').disabled=true;window.CRPParts?.stopPlayback?.();micProcessor?.disconnect();micSilentGain?.disconnect();if(micProcessor)micProcessor.onaudioprocess=null;micProcessor=null;micSilentGain=null;
-    if(p._recordOldStates){for(const x of parts)x.enabled=p._recordOldStates.get(x.id)??x.enabled;delete p._recordOldStates;}if(p._recordOldVolumes){for(const x of parts)x.volume=p._recordOldVolumes.get(x.id)??x.volume;delete p._recordOldVolumes;}const drumToggle=$('crpDrumsToggle');if(drumToggle&&p._recordOldDrums!==undefined){drumToggle.checked=p._recordOldDrums;drumToggle.dispatchEvent(new Event('change'));delete p._recordOldDrums;}const drumVol=$('crpDrumVolume');if(drumVol&&p._recordOldDrumVol!==undefined){drumVol.value=p._recordOldDrumVol;drumVol.dispatchEvent(new Event('input'));delete p._recordOldDrumVol;}renderParts();const duration=Math.max(0,(performance.now()-recordStartedAt-recordPausedTotal)/1000);$('vocalTimer').textContent=fmtTime(duration);if(duration<.25||!recordChunks.length){core.status('Recording was too short.');return;}const blob=floatToWav(recordChunks,recordSampleRate),id=uid(),take={id,name:`Take ${p.recordings.length+1}`,createdAt:new Date().toISOString(),duration,sampleRate:recordSampleRate,size:blob.size};try{await vocalDbPut(id,blob);vocalBufferCache.delete(id);p.recordings.push(take);p.activeTakeId=id;p.transcript='';p.transcriptWords=[];core.scheduleAutoSave();await renderVocalTakes(p);if(core.loggedIn&&core.currentProjectId){try{if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Uploading and transcribing new take…';await uploadTakeToCloud(take,blob,core.currentProjectId);await transcribeTake(p,take,{quiet:true});core.status(`Saved ${take.name} to cloud and transcribed it.`);}catch(te){console.warn('Automatic cloud transcription pending',te);if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent=`Take is safe. ${te.message||'Tap Transcribe active take after saving.'}`;core.status(`Saved ${take.name}. Cloud transcription can be retried with Transcribe active take.`);}}else{if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Take is safe. Save/sign in, then tap Transcribe active take.';core.status(core.loggedIn?`Saved ${take.name} locally. Save the project to enable cloud transcription.`:`Saved ${take.name} locally. Sign in and save to use cloud transcription.`);}}catch(e){console.error(e);core.status('Take was recorded but could not be stored on this device.');}
+    if(p._recordOldStates){for(const x of parts)x.enabled=p._recordOldStates.get(x.id)??x.enabled;delete p._recordOldStates;}if(p._recordOldVolumes){for(const x of parts)x.volume=p._recordOldVolumes.get(x.id)??x.volume;delete p._recordOldVolumes;}const drumToggle=$('crpDrumsToggle');if(drumToggle&&p._recordOldDrums!==undefined){drumToggle.checked=p._recordOldDrums;drumToggle.dispatchEvent(new Event('change'));delete p._recordOldDrums;}const drumVol=$('crpDrumVolume');if(drumVol&&p._recordOldDrumVol!==undefined){drumVol.value=p._recordOldDrumVol;drumVol.dispatchEvent(new Event('input'));delete p._recordOldDrumVol;}renderParts();const duration=Math.max(0,(performance.now()-recordStartedAt-recordPausedTotal)/1000);$('vocalTimer').textContent=fmtTime(duration);if(duration<.25||!recordChunks.length){core.status('Recording was too short.');return;}const blob=floatToWav(recordChunks,recordSampleRate),id=uid(),take={id,name:`Take ${p.recordings.length+1}`,createdAt:new Date().toISOString(),duration,sampleRate:recordSampleRate,size:blob.size};try{await vocalDbPut(id,blob);vocalBufferCache.delete(id);p.recordings.push(take);p.activeTakeId=id;if(!(p.voxEvents||[]).length)ensureVoxEventForActiveTake(p,0);p.transcript='';p.transcriptWords=[];markPartsDirty();core.scheduleAutoSave();await renderVocalTakes(p);if(core.loggedIn&&core.currentProjectId){try{if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Uploading and transcribing new take…';await uploadTakeToCloud(take,blob,core.currentProjectId);await transcribeTake(p,take,{quiet:true});core.status(`Saved ${take.name} to cloud and transcribed it.`);}catch(te){console.warn('Automatic cloud transcription pending',te);if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent=`Take is safe. ${te.message||'Tap Transcribe active take after saving.'}`;core.status(`Saved ${take.name}. Cloud transcription can be retried with Transcribe active take.`);}}else{if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Take is safe. Save/sign in, then tap Transcribe active take.';core.status(core.loggedIn?`Saved ${take.name} locally. Save the project to enable cloud transcription.`:`Saved ${take.name} locally. Sign in and save to use cloud transcription.`);}}catch(e){console.error(e);core.status('Take was recorded but could not be stored on this device.');}
   }
   function toggleRecordingPause(){
     if(!recording)return false;
@@ -572,14 +623,18 @@
     return base.filter(p=>p.enabled);
   }
   function enabledVocals(){
-    const base=parts.filter(p=>p.type==='vocal'&&p.activeTakeId&&p.recordings?.some(r=>r.id===p.activeTakeId));
+    const base=parts.filter(p=>p.type==='vocal'&&vocalHasPlayableAudio(p));
     if(playbackScope){
       const ids=new Set(playbackScope.vocalIds||[]);
       return base.filter(p=>ids.has(p.id));
     }
     return base.filter(p=>p.enabled);
   }
-  function vocalDurationBeats(p){const t=p.recordings?.find(r=>r.id===p.activeTakeId);return t?Math.max(0,(Number(t.duration)||0)*core.bpm/60):0;}
+  function vocalDurationBeats(p){
+    const events=voxTrackEvents(p);
+    if(events.length)return Math.max(0,...events.map(e=>(Number(e.startBeat)||0)+voxEventDurationBeats(e)));
+    const t=p.recordings?.find(r=>r.id===p.activeTakeId);return t?Math.max(0,(Number(t.duration)||0)*core.bpm/60):0;
+  }
 
   function naturalSongDurationBeats(){
     const musical=parts.filter(p=>p.type==='chord'||p.type==='lead').map(partDurationBeats);
@@ -757,9 +812,12 @@
   }
   function applyVocalFxLive(p){
     const set=liveVocalFxNodes.get(p?.id);if(!set?.size||!audioCtx)return;
-    const fx=p.fx||{},now=audioCtx.currentTime,scale=vocalAutotuneScale();
+    const now=audioCtx.currentTime,scale=vocalAutotuneScale();
     for(const item of [...set]){
       const n=item.nodes;if(!n)continue;
+      const ev=item.eventId?(p.voxEvents||[]).find(e=>String(e.id)===String(item.eventId)):null;
+      const fx=effectiveVocalFx(p,ev);
+      const clipVolume=ev?Math.max(0,Math.min(1.5,Number(ev.volume)||0)):1;
       try{
         n.eq.type=fx.eq==='warm'?'lowshelf':fx.eq==='bright'?'highshelf':'peaking';
         n.eq.frequency.setTargetAtTime(fx.eq==='warm'?180:fx.eq==='bright'?4500:2800,now,.02);
@@ -770,7 +828,7 @@
         n.wet.gain.setTargetAtTime(Number(fx.reverb||0),now,.03);
         n.delay.delayTime.setTargetAtTime(Number(fx.delay||0),now,.03);
         n.delayGain.gain.setTargetAtTime(fx.delay?0.22:0,now,.03);
-        n.out.gain.setTargetAtTime(Math.max(0,Math.min(1.5,Number(p.volume)||0)),now,.025);
+        n.out.gain.setTargetAtTime(Math.max(0,Math.min(1.5,(Number(p.volume)||0)*clipVolume)),now,.025);
         n.tune?.port?.postMessage({amount:Math.max(0,Math.min(100,Number(fx.autotune)||0)),allowedPcs:scale.allowedPcs||[]});
       }catch{}
     }
@@ -842,29 +900,72 @@
       core.status('Could not preview that note.');
     }
   }
-  async function vocalBufferFor(p){
-    const take=p.recordings?.find(r=>r.id===p.activeTakeId);if(!take)return null;
+  async function vocalBufferForTake(takeId,sourcePartId=''){
+    const found=findVocalTake(takeId,sourcePartId),take=found?.take;if(!take)return null;
     if(vocalBufferCache.has(take.id))return vocalBufferCache.get(take.id);
     const promise=(async()=>{const blob=await getTakeBlob(take);if(!blob)return null;ensureAudio();return await audioCtx.decodeAudioData(await blob.arrayBuffer());})();
     vocalBufferCache.set(take.id,promise);
     try{return await promise;}catch(e){vocalBufferCache.delete(take.id);throw e;}
   }
-  function connectVocalFx(p,src){
+  async function vocalBufferFor(p){
+    if(!p||p.type!=='vocal')return null;
+    const first=voxTrackEvents(p)[0];
+    if(first)return vocalBufferForTake(first.takeId,first.sourcePartId);
+    return p.activeTakeId?vocalBufferForTake(p.activeTakeId,p.id):null;
+  }
+  async function preloadVocalBuffers(p){
+    const events=voxTrackEvents(p);
+    if(events.length)return Promise.all(events.map(e=>vocalBufferForTake(e.takeId,e.sourcePartId)));
+    return p.activeTakeId?Promise.all([vocalBufferForTake(p.activeTakeId,p.id)]):[];
+  }
+  function connectVocalFx(p,src,event=null){
     ensureAudio();const eq=audioCtx.createBiquadFilter(),comp=audioCtx.createDynamicsCompressor(),dry=audioCtx.createGain(),wet=audioCtx.createGain(),rev=audioCtx.createConvolver(),delay=audioCtx.createDelay(1),delayGain=audioCtx.createGain(),out=audioCtx.createGain();
-    const fx=p.fx||{};eq.type=fx.eq==='warm'?'lowshelf':fx.eq==='bright'?'highshelf':'peaking';eq.frequency.value=fx.eq==='warm'?180:fx.eq==='bright'?4500:2800;eq.gain.value=fx.eq==='flat'?0:fx.eq==='warm'?2:fx.eq==='bright'?2.5:1.5;
+    const fx=effectiveVocalFx(p,event);eq.type=fx.eq==='warm'?'lowshelf':fx.eq==='bright'?'highshelf':'peaking';eq.frequency.value=fx.eq==='warm'?180:fx.eq==='bright'?4500:2800;eq.gain.value=fx.eq==='flat'?0:fx.eq==='warm'?2:fx.eq==='bright'?2.5:1.5;
     const c=fx.comp||'medium';comp.threshold.value=c==='off'?0:c==='light'?-12:c==='heavy'?-24:-18;comp.ratio.value=c==='off'?1:c==='light'?2:c==='heavy'?6:3.5;comp.attack.value=.008;comp.release.value=.12;
-    dry.gain.value=1;wet.gain.value=Number(fx.reverb||0);rev.buffer=impulse(audioCtx,1.25);delay.delayTime.value=Number(fx.delay||0);delayGain.gain.value=fx.delay?0.22:0;out.gain.value=p.volume;
-    const tune=makeAutotuneNode(audioCtx,p);src.connect(eq);eq.connect(comp);const post=tune||comp;if(tune)comp.connect(tune);post.connect(dry);dry.connect(out);post.connect(rev);rev.connect(wet);wet.connect(out);post.connect(delay);delay.connect(delayGain);delayGain.connect(out);out.connect(masterLimiter);
+    dry.gain.value=1;wet.gain.value=Number(fx.reverb||0);rev.buffer=impulse(audioCtx,1.25);delay.delayTime.value=Number(fx.delay||0);delayGain.gain.value=fx.delay?0.22:0;out.gain.value=Math.max(0,Math.min(1.5,(Number(p.volume)||0)*(event?Math.max(0,Math.min(1.5,Number(event.volume)||0)):1)));
+    const tune=makeAutotuneNode(audioCtx,p,fx);src.connect(eq);eq.connect(comp);const post=tune||comp;if(tune)comp.connect(tune);post.connect(dry);dry.connect(out);post.connect(rev);rev.connect(wet);wet.connect(out);post.connect(delay);delay.connect(delayGain);delayGain.connect(out);out.connect(masterLimiter);
     const nodes={eq,comp,tune,dry,wet,rev,delay,delayGain,out};
     let set=liveVocalFxNodes.get(p.id);if(!set){set=new Set();liveVocalFxNodes.set(p.id,set);}
-    const item={src,nodes};set.add(item);applyVocalFxLive(p);
+    const item={src,nodes,eventId:event?.id||null};set.add(item);applyVocalFxLive(p);
     return item;
   }
+  async function scheduleVocalSource(p,event,buffer,startTime,fromBeat,toBeat,generation,absoluteStartBeat){
+    if(!buffer||!playing||generation!==playbackGeneration)return;
+    const beatSec=60/core.bpm;
+    const trimStart=Math.max(0,Math.min(buffer.duration,Number(event?.trimStartSec)||0));
+    const trimEnd=Math.max(trimStart,Math.min(buffer.duration,Number.isFinite(Number(event?.trimEndSec))&&Number(event.trimEndSec)>0?Number(event.trimEndSec):buffer.duration));
+    const eventDurationBeats=Math.max(.0001,(trimEnd-trimStart)/beatSec);
+    const eventStart=Number(absoluteStartBeat)||0,eventEnd=eventStart+eventDurationBeats;
+    const clipStart=Math.max(fromBeat,eventStart),clipEnd=Math.min(toBeat,eventEnd);if(clipEnd<=clipStart)return;
+    const offsetSec=trimStart+(clipStart-eventStart)*beatSec,dur=Math.min((clipEnd-clipStart)*beatSec,Math.max(0,trimEnd-offsetSec));if(dur<=.005)return;
+    const at=startTime+(clipStart-fromBeat)*beatSec,src=audioCtx.createBufferSource();src.buffer=buffer;
+    const liveItem=connectVocalFx(p,src,event);activeVocalSources.add(src);src.onended=()=>{activeVocalSources.delete(src);const set=liveVocalFxNodes.get(p.id);set?.delete(liveItem);if(set&&!set.size)liveVocalFxNodes.delete(p.id);};
+    try{src.start(at,offsetSec,dur);}catch(e){activeVocalSources.delete(src);try{src.disconnect();}catch{}console.warn('Could not schedule vocal event',e);}
+  }
   async function scheduleVocalSegment(p,startTime,fromBeat,toBeat,generation){
-    if(!playing||generation!==playbackGeneration)return;const buf=await vocalBufferFor(p);if(!buf||!playing||generation!==playbackGeneration)return;await ensureAutotuneWorklet(audioCtx);
+    if(!playing||generation!==playbackGeneration)return;await ensureAutotuneWorklet(audioCtx);
+    const events=voxTrackEvents(p);
+    if(events.length){
+      const buffers=new Map();
+      for(const e of events){const key=`${e.sourcePartId}:${e.takeId}`;if(!buffers.has(key))buffers.set(key,await vocalBufferForTake(e.takeId,e.sourcePartId));}
+      const period=Math.max(.001,...events.map(e=>(Number(e.startBeat)||0)+voxEventDurationBeats(e)));
+      const firstCycle=p.repeat?Math.max(0,Math.floor(fromBeat/period)-1):0;
+      const lastCycle=p.repeat?Math.max(0,Math.floor((toBeat-1e-6)/period)):0;
+      for(let cyc=firstCycle;cyc<=lastCycle;cyc++){
+        for(const e of events){
+          if(!playing||generation!==playbackGeneration)return;
+          const key=`${e.sourcePartId}:${e.takeId}`,buf=buffers.get(key);
+          await scheduleVocalSource(p,e,buf,startTime,fromBeat,toBeat,generation,(Number(e.startBeat)||0)+cyc*period);
+        }
+      }
+      return;
+    }
+    const take=p.recordings?.find(r=>r.id===p.activeTakeId);if(!take)return;
+    const buf=await vocalBufferForTake(take.id,p.id);if(!buf||!playing||generation!==playbackGeneration)return;
     const beatSec=60/core.bpm,vocalBeats=Math.max(.001,buf.duration/beatSec);
-    const scheduleOne=(cycleStartBeat)=>{const clipStart=Math.max(fromBeat,cycleStartBeat),clipEnd=Math.min(toBeat,cycleStartBeat+vocalBeats);if(clipEnd<=clipStart)return;const offsetSec=(clipStart-cycleStartBeat)*beatSec,dur=(clipEnd-clipStart)*beatSec,at=startTime+(clipStart-fromBeat)*beatSec;const src=audioCtx.createBufferSource();src.buffer=buf;const liveItem=connectVocalFx(p,src);activeVocalSources.add(src);src.onended=()=>{activeVocalSources.delete(src);const set=liveVocalFxNodes.get(p.id);set?.delete(liveItem);if(set&&!set.size)liveVocalFxNodes.delete(p.id);};try{src.start(at,offsetSec,Math.min(dur,buf.duration-offsetSec));}catch(e){activeVocalSources.delete(src);try{src.disconnect();}catch{}console.warn('Could not schedule vocal',e);}};
-    if(p.repeat){const first=Math.max(0,Math.floor(fromBeat/vocalBeats));const last=Math.floor((toBeat-1e-6)/vocalBeats);for(let c=first;c<=last;c++)scheduleOne(c*vocalBeats);}else scheduleOne(0);
+    const fallback={id:null,trimStartSec:0,trimEndSec:buf.duration,volume:1,fx:null};
+    const first=p.repeat?Math.max(0,Math.floor(fromBeat/vocalBeats)):0,last=p.repeat?Math.floor((toBeat-1e-6)/vocalBeats):0;
+    for(let c=first;c<=last;c++)await scheduleVocalSource(p,fallback,buf,startTime,fromBeat,toBeat,generation,c*vocalBeats);
   }
   function scheduleHighlight(delayMs,p,cardIndex){
     if(p.id!==activePartId||p.type!=='chord')return;
@@ -951,7 +1052,7 @@
     const generation=++playbackGeneration;
     starting=true;updatePartPlaybackButtons();
     try{
-      core.status('Loading parts…');ensureAudio();if(vs.length)await ensureAutotuneWorklet(audioCtx);await Promise.all([preload(ps),...vs.map(v=>vocalBufferFor(v))]);
+      core.status('Loading parts…');ensureAudio();if(vs.length)await ensureAutotuneWorklet(audioCtx);await Promise.all([preload(ps),...vs.map(v=>preloadVocalBuffers(v))]);
       if(generation!==playbackGeneration)return;
 
       // Keep every playback source on the same musical downbeat. Drums use a
@@ -1061,7 +1162,7 @@
     // Play exactly the parts checked in the top Parts strip (plus drums when
     // enabled), matching the main Baby DAW transport instead of soloing this part.
     if(playing||starting){stopPlayback();return;}
-    const hasCheckedPlayable=parts.some(x=>x.enabled&&((x.type==='chord'&&partDurationBeats(x)>0)||(x.type==='lead'&&x.events?.length)||(x.type==='vocal'&&x.activeTakeId&&x.recordings?.some(r=>r.id===x.activeTakeId))));
+    const hasCheckedPlayable=parts.some(x=>x.enabled&&((x.type==='chord'&&partDurationBeats(x)>0)||(x.type==='lead'&&x.events?.length)||(x.type==='vocal'&&vocalHasPlayableAudio(x))));
     const drumsOn=!!$('crpDrumsToggle')?.checked;
     if(!hasCheckedPlayable&&!drumsOn){core.status('Check at least one part above, or turn on Drums, to play.');return;}
     startPlayback();
@@ -1070,9 +1171,9 @@
     const p=active();if(!p||p.type!=='vocal')return;
     if((playing||starting)&&playbackScope?.kind==='vocalMix'&&String(playbackScope.ownerId||'')===String(p.id)){stopPlayback();return;}
     const playableIds=(p.backingPartIds||[]).filter(id=>parts.some(x=>x.id===id&&(x.type==='chord'||x.type==='lead')));
-    const hasActiveTake=!!(p.activeTakeId&&p.recordings?.some(r=>r.id===p.activeTakeId));
+    const hasActiveTake=vocalHasPlayableAudio(p);
     const drums=p.backingDrums!==false;
-    if(!playableIds.length&&!hasActiveTake&&!drums){core.status('Check a backing part/drums or choose an active vocal take first.');return;}
+    if(!playableIds.length&&!hasActiveTake&&!drums){core.status('Check a backing part/drums or choose/add a vocal event first.');return;}
     const gain=Math.max(0,Math.min(1,Number(p.backingVolume??.8)));
     startPlayback({scope:{kind:'vocalMix',ownerId:p.id,playableIds,vocalIds:hasActiveTake?[p.id]:[],drums,backingGain:gain,drumGain:gain}});
   }
@@ -1090,13 +1191,13 @@
   function closeStudioExport(){document.getElementById('studioExportModal')?.remove();}
   function openStudioExport(){
     closeStudioExport();syncLoadedChord();const modal=document.createElement('div');modal.id='studioExportModal';modal.className='studio-export-modal';const rows=parts.map(p=>`<label class="studio-export-row"><input type="checkbox" data-export-part="${p.id}" checked><span><strong>${escapeHtml(p.name)}</strong><br><span class="subtle tiny">${p.type==='chord'?'Chord / Note':p.type==='lead'?'Lead / Bass':'Vocals'}</span></span></label>`).join('');
-    modal.innerHTML=`<div class="studio-export-backdrop"></div><div class="studio-export-card"><h2>Studio export</h2><p class="subtle">Choose exactly what leaves the project. Musical parts export as editable Chord Rider data; selected vocal parts include their active dry WAV.</p><div class="studio-export-list">${rows}<label class="studio-export-row"><input id="studioExportDrums" type="checkbox" checked><span><strong>Drums</strong><br><span class="subtle tiny">Beat Maker pattern</span></span></label><label class="studio-export-row"><input id="studioExportNotes" type="checkbox"><span><strong>Project notes</strong><br><span class="subtle tiny">Only included when checked</span></span></label></div><div class="studio-export-actions"><button id="studioExportCancel" type="button">Cancel</button><button id="studioExportGo" class="accent" type="button">Export ZIP</button></div></div>`;document.body.appendChild(modal);modal.querySelector('.studio-export-backdrop').onclick=closeStudioExport;modal.querySelector('#studioExportCancel').onclick=closeStudioExport;modal.querySelector('#studioExportGo').onclick=exportStudioPackage;
+    modal.innerHTML=`<div class="studio-export-backdrop"></div><div class="studio-export-card"><h2>Studio export</h2><p class="subtle">Choose exactly what leaves the project. Musical parts export as editable Chord Rider data; selected vocal parts include every dry WAV used by Vox Box.</p><div class="studio-export-list">${rows}<label class="studio-export-row"><input id="studioExportDrums" type="checkbox" checked><span><strong>Drums</strong><br><span class="subtle tiny">Beat Maker pattern</span></span></label><label class="studio-export-row"><input id="studioExportNotes" type="checkbox"><span><strong>Project notes</strong><br><span class="subtle tiny">Only included when checked</span></span></label></div><div class="studio-export-actions"><button id="studioExportCancel" type="button">Cancel</button><button id="studioExportGo" class="accent" type="button">Export ZIP</button></div></div>`;document.body.appendChild(modal);modal.querySelector('.studio-export-backdrop').onclick=closeStudioExport;modal.querySelector('#studioExportCancel').onclick=closeStudioExport;modal.querySelector('#studioExportGo').onclick=exportStudioPackage;
   }
   async function exportStudioPackage(){
     const modal=$('studioExportModal');if(!modal)return;const ids=[...modal.querySelectorAll('[data-export-part]:checked')].map(x=>x.dataset.exportPart),selected=parts.filter(p=>ids.includes(p.id));if(!selected.length&&!$('studioExportDrums')?.checked&&!$('studioExportNotes')?.checked){core.status('Choose at least one thing to export.');return;}
     const manifest={format:'Chord Rider Pro Studio Package',version:1,createdAt:new Date().toISOString(),project:{name:core.projectName,bpm:core.bpm,beats:core.beats,songEndBeat:Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):null},parts:selected.map(p=>{const q=clone(p);if(q.type==='vocal')q.recordings=(q.recordings||[]).map(r=>({...r,blob:undefined}));return q;})};if($('studioExportDrums')?.checked)manifest.beatMaker=window.CRPBeatMaker?.getBeat?.()||null;if($('studioExportNotes')?.checked)manifest.notes=core.projectNotes||'';
-    const files=[{name:'project.json',data:new TextEncoder().encode(JSON.stringify(manifest,null,2))}];for(const p of selected.filter(x=>x.type==='chord'||x.type==='lead'))files.push({name:`midi/${safeFileName(p.name)}.mid`,data:partMidi(p)});if($('studioExportDrums')?.checked)files.push({name:'midi/Drums.mid',data:drumMidi(window.CRPBeatMaker?.getBeat?.())});for(const p of selected.filter(x=>x.type==='vocal')){const take=p.recordings?.find(r=>r.id===p.activeTakeId);if(!take)continue;const blob=await getTakeBlob(take);if(blob)files.push({name:`vocals/${safeFileName(p.name)}-${safeFileName(take.name)}.wav`,data:new Uint8Array(await blob.arrayBuffer())});}
-    files.push({name:'README.txt',data:new TextEncoder().encode('Chord Rider Pro Studio Package\n\nproject.json contains only the parts you checked. Project notes are included only when their checkbox was selected. Selected vocal parts include the active dry WAV master. Chord/Note, Lead/Bass, and drums are also exported as Standard MIDI files in /midi for direct import into Cubase and other DAWs. Vocal parts include the active dry WAV master. project.json preserves Chord Rider editing data.\n')});const zip=await makeZip(files),a=document.createElement('a');a.href=URL.createObjectURL(zip);a.download=`${safeFileName(core.projectName)}-Studio-Export.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);closeStudioExport();core.status('Studio package exported.');
+    const files=[{name:'project.json',data:new TextEncoder().encode(JSON.stringify(manifest,null,2))}];for(const p of selected.filter(x=>x.type==='chord'||x.type==='lead'))files.push({name:`midi/${safeFileName(p.name)}.mid`,data:partMidi(p)});if($('studioExportDrums')?.checked)files.push({name:'midi/Drums.mid',data:drumMidi(window.CRPBeatMaker?.getBeat?.())});for(const p of selected.filter(x=>x.type==='vocal')){const refs=voxTrackEvents(p).length?voxTrackEvents(p).map(e=>({takeId:e.takeId,sourcePartId:e.sourcePartId})):(p.activeTakeId?[{takeId:p.activeTakeId,sourcePartId:p.id}]:[]),seen=new Set();for(const ref of refs){if(seen.has(ref.takeId))continue;seen.add(ref.takeId);const found=findVocalTake(ref.takeId,ref.sourcePartId),take=found?.take;if(!take)continue;const blob=await getTakeBlob(take);if(blob)files.push({name:`vocals/${safeFileName(p.name)}-${safeFileName(take.name)}-${String(take.id).slice(0,8)}.wav`,data:new Uint8Array(await blob.arrayBuffer())});}}
+    files.push({name:'README.txt',data:new TextEncoder().encode('Chord Rider Pro Studio Package\n\nproject.json contains only the parts you checked. Project notes are included only when their checkbox was selected. Selected vocal parts include every dry WAV referenced by Vox Box. Chord/Note, Lead/Bass, and drums are also exported as Standard MIDI files in /midi for direct import into Cubase and other DAWs. project.json preserves Vox Box event placement, trims, clip FX, and Chord Rider editing data.\n')});const zip=await makeZip(files),a=document.createElement('a');a.href=URL.createObjectURL(zip);a.download=`${safeFileName(core.projectName)}-Studio-Export.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);closeStudioExport();core.status('Studio package exported.');
   }
 
 
@@ -1115,9 +1216,9 @@
     closeAudioExport();syncLoadedChord();
     const beat=window.CRPBeatMaker?.getBeat?.()||null;
     const rows=parts.map(p=>{
-      const take=p.type==='vocal'?p.recordings?.find(r=>r.id===p.activeTakeId):null;
-      const unavailable=p.type==='vocal'&&!take;
-      const detail=p.type==='chord'?'Chord / Note':p.type==='lead'?'Lead / Bass':(take?'Active vocal take':'No active vocal take');
+      const hasVocal=p.type==='vocal'?vocalHasPlayableAudio(p):false;
+      const unavailable=p.type==='vocal'&&!hasVocal;
+      const detail=p.type==='chord'?'Chord / Note':p.type==='lead'?'Lead / Bass':(hasVocal?(voxTrackEvents(p).length?'Vox Box arrangement':'Active vocal take'):'No vocal audio');
       return `<label class="studio-export-row${unavailable?' is-disabled':''}"><input type="checkbox" data-audio-part="${p.id}" ${p.enabled!==false&&!unavailable?'checked':''} ${unavailable?'disabled':''}><span><strong>${escapeHtml(p.name)}</strong><br><span class="subtle tiny">${detail}</span></span></label>`;
     }).join('');
     const modal=document.createElement('div');modal.id='audioExportModal';modal.className='studio-export-modal';
@@ -1147,7 +1248,7 @@
       const beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92));
       const beat=window.CRPBeatMaker?.getBeat?.()||null;
       let songSec=.25;
-      selected.forEach(p=>{if(p.type==='chord'||p.type==='lead')songSec=Math.max(songSec,partDurationBeats(p)*beatSec);else if(p.type==='vocal'){const t=p.recordings?.find(r=>r.id===p.activeTakeId);songSec=Math.max(songSec,Number(t?.duration)||0);}});
+      selected.forEach(p=>{if(p.type==='chord'||p.type==='lead')songSec=Math.max(songSec,partDurationBeats(p)*beatSec);else if(p.type==='vocal')songSec=Math.max(songSec,vocalDurationBeats(p)*beatSec);});
       if(drums&&beat)songSec=Math.max(songSec,Math.max(1,Number(beat.bars)||1)*4*beatSec);
       const customEnd=Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0;
       if(customEnd)songSec=Math.max(.05,Math.min(songSec,Number(songEndBeat)*beatSec));
@@ -1164,8 +1265,8 @@
         const player=await Soundfont.instrument(ctx,sound,{format:'mp3',soundfont:'MusyngKite',destination:bus});playerMap.set(p.id,player);
       }
       const vocalBuffers=new Map();
-      for(const p of selected.filter(x=>x.type==='vocal')){const t=p.recordings?.find(r=>r.id===p.activeTakeId);if(!t)continue;const blob=await getTakeBlob(t);if(blob){const vb=await ctx.decodeAudioData(await blob.arrayBuffer());vocalBuffers.set(p.id,vb);songSec=Math.max(songSec,vb.duration);}}
-      if([...selected].some(p=>p.type==='vocal'&&Number(p.fx?.autotune)>0))await ensureAutotuneWorklet(ctx);
+      for(const p of selected.filter(x=>x.type==='vocal')){const refs=voxTrackEvents(p).length?voxTrackEvents(p).map(e=>({takeId:e.takeId,sourcePartId:e.sourcePartId})):(p.activeTakeId?[{takeId:p.activeTakeId,sourcePartId:p.id}]:[]);for(const ref of refs){const key=`${ref.sourcePartId}:${ref.takeId}`;if(vocalBuffers.has(key))continue;const found=findVocalTake(ref.takeId,ref.sourcePartId),take=found?.take;if(!take)continue;const blob=await getTakeBlob(take);if(blob)vocalBuffers.set(key,await ctx.decodeAudioData(await blob.arrayBuffer()));}}
+      if([...selected].some(p=>p.type==='vocal'&&(Number(p.fx?.autotune)>0||voxTrackEvents(p).some(e=>Number(e.fx?.autotune)>0))))await ensureAutotuneWorklet(ctx);
       const drumBuffers=new Map();
       if(drums&&beat){for(const [id,url] of Object.entries(AUDIO_EXPORT_DRUMS)){if(!(beat.tracks?.[id]||[]).some(a=>Array.isArray(a)&&a.length))continue;const res=await fetch(url);if(!res.ok)continue;drumBuffers.set(id,await ctx.decodeAudioData(await res.arrayBuffer()));}}
 
@@ -1189,11 +1290,17 @@
           const stepBeats=4/p.resolution;for(const e of p.events||[]){const at=startAt+e.step*stepBeats*beatSec;let midi=e.midi+(Number(p.octave)||0)*12;if(p.sound==='electric_bass_finger')midi-=12;const drawn=leadDurationSteps(e)*stepBeats,duration=p.sustain&&drawn<=stepBeats?sustainedPartSeconds(p.sound,beatSec):Math.max(.05,drawn*beatSec*.98);try{player.play(midiName(midi),at,{duration,gain:.92});}catch{}}
         }
       }
-      // Vocal parts with the same non-destructive FX chain used for playback.
+      // Vocal parts: render the Vox Box arrangement (placement, trims and clip FX).
       for(const p of selected.filter(x=>x.type==='vocal')){
-        const buf=vocalBuffers.get(p.id);if(!buf)continue;
-        const scheduleVocal=(offsetSec=0)=>{const src=ctx.createBufferSource(),eq=ctx.createBiquadFilter(),comp=ctx.createDynamicsCompressor(),dry=ctx.createGain(),wet=ctx.createGain(),rev=ctx.createConvolver(),delay=ctx.createDelay(1),delayGain=ctx.createGain(),out=ctx.createGain(),fx=p.fx||{};src.buffer=buf;eq.type=fx.eq==='warm'?'lowshelf':fx.eq==='bright'?'highshelf':'peaking';eq.frequency.value=fx.eq==='warm'?180:fx.eq==='bright'?4500:2800;eq.gain.value=fx.eq==='flat'?0:fx.eq==='warm'?2:fx.eq==='bright'?2.5:1.5;const c=fx.comp||'medium';comp.threshold.value=c==='off'?0:c==='light'?-12:c==='heavy'?-24:-18;comp.ratio.value=c==='off'?1:c==='light'?2:c==='heavy'?6:3.5;comp.attack.value=.008;comp.release.value=.12;dry.gain.value=1;wet.gain.value=Number(fx.reverb||0);rev.buffer=impulse(ctx,fx.reverb>.25?1.6:fx.reverb>.15?1.1:.7);delay.delayTime.value=Number(fx.delay||0);delayGain.gain.value=fx.delay?0.22:0;out.gain.value=p.volume;const tune=makeAutotuneNode(ctx,p);src.connect(eq);eq.connect(comp);const post=tune||comp;if(tune)comp.connect(tune);post.connect(dry);dry.connect(out);post.connect(rev);rev.connect(wet);wet.connect(out);post.connect(delay);delay.connect(delayGain);delayGain.connect(out);out.connect(mix);src.start(startAt+offsetSec);};
-        scheduleVocal(0);if(p.repeat&&buf.duration>0){for(let t=buf.duration;t<songSec-.05;t+=buf.duration)scheduleVocal(t);}
+        const makeExportFx=(src,fx,volume)=>{const eq=ctx.createBiquadFilter(),comp=ctx.createDynamicsCompressor(),dry=ctx.createGain(),wet=ctx.createGain(),rev=ctx.createConvolver(),delay=ctx.createDelay(1),delayGain=ctx.createGain(),out=ctx.createGain();eq.type=fx.eq==='warm'?'lowshelf':fx.eq==='bright'?'highshelf':'peaking';eq.frequency.value=fx.eq==='warm'?180:fx.eq==='bright'?4500:2800;eq.gain.value=fx.eq==='flat'?0:fx.eq==='warm'?2:fx.eq==='bright'?2.5:1.5;const c=fx.comp||'medium';comp.threshold.value=c==='off'?0:c==='light'?-12:c==='heavy'?-24:-18;comp.ratio.value=c==='off'?1:c==='light'?2:c==='heavy'?6:3.5;comp.attack.value=.008;comp.release.value=.12;dry.gain.value=1;wet.gain.value=Number(fx.reverb||0);rev.buffer=impulse(ctx,fx.reverb>.25?1.6:fx.reverb>.15?1.1:.7);delay.delayTime.value=Number(fx.delay||0);delayGain.gain.value=fx.delay?0.22:0;out.gain.value=Math.max(0,Math.min(1.5,volume));const tune=makeAutotuneNode(ctx,p,fx);src.connect(eq);eq.connect(comp);const post=tune||comp;if(tune)comp.connect(tune);post.connect(dry);dry.connect(out);post.connect(rev);rev.connect(wet);wet.connect(out);post.connect(delay);delay.connect(delayGain);delayGain.connect(out);out.connect(mix);};
+        const events=voxTrackEvents(p);
+        if(events.length){
+          const period=Math.max(.001,...events.map(e=>(Number(e.startBeat)||0)+voxEventDurationBeats(e)));
+          const cycles=p.repeat?Math.max(1,Math.ceil((songSec/beatSec)/period)):1;
+          for(let cyc=0;cyc<cycles;cyc++)for(const e of events){const key=`${e.sourcePartId}:${e.takeId}`,buf=vocalBuffers.get(key);if(!buf)continue;const trimStart=Math.max(0,Math.min(buf.duration,Number(e.trimStartSec)||0)),trimEnd=Math.max(trimStart,Math.min(buf.duration,Number.isFinite(Number(e.trimEndSec))&&Number(e.trimEndSec)>0?Number(e.trimEndSec):buf.duration)),dur=Math.max(0,trimEnd-trimStart),when=(Number(e.startBeat)||0)*beatSec+cyc*period*beatSec;if(dur<=.005||when>=songSec)continue;const playDur=Math.min(dur,songSec-when);if(playDur<=.005)continue;const src=ctx.createBufferSource();src.buffer=buf;makeExportFx(src,effectiveVocalFx(p,e),(Number(p.volume)||0)*Math.max(0,Math.min(1.5,Number(e.volume)||0)));src.start(startAt+when,trimStart,playDur);}
+        }else if(p.activeTakeId){
+          const key=`${p.id}:${p.activeTakeId}`,buf=vocalBuffers.get(key);if(!buf)continue;const schedule=(when=0)=>{if(when>=songSec)return;const src=ctx.createBufferSource();src.buffer=buf;makeExportFx(src,effectiveVocalFx(p),Number(p.volume)||0);src.start(startAt+when,0,Math.min(buf.duration,songSec-when));};schedule(0);if(p.repeat&&buf.duration>0)for(let t=buf.duration;t<songSec-.05;t+=buf.duration)schedule(t);
+        }
       }
       // Drum pattern loops for the length of the selected song mix, matching normal playback.
       if(drums&&beat&&drumBuffers.size){const stepSec=beatSec/16,totalSteps=Math.ceil(songSec/stepSec),bars=Math.max(1,Number(beat.bars)||1),gain=Math.max(0,Math.min(1,Number(beat.gain)||0))*AUDIO_EXPORT_DRUM_SCALE;for(let abs=0;abs<totalSteps;abs++){const bar=Math.floor(abs/64)%bars,step=abs%64,at=startAt+abs*stepSec;for(const [id,buf] of drumBuffers){if(!beat.tracks?.[id]?.[bar]?.includes(step))continue;const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=buf;g.gain.value=gain;src.connect(g).connect(mix);src.start(at);}}}
@@ -1242,8 +1349,134 @@
     st.disabled=!recording;
   }
 
+  // =========================
+  // Vox Box — non-destructive vocal event editor (v3.3.20)
+  // =========================
+  function voxPpb(){return window.innerWidth<=600?44:56;}
+  function voxLabelWidth(){return window.innerWidth<=600?96:132;}
+  function voxBeatStep(){const den=Math.max(4,Math.min(64,Number($('voxSnapResolution')?.value)||16));return 4/den;}
+  function voxSnapEnabled(){return !!$('voxSnapToBeat')?.checked;}
+  function quantizeVoxBeat(beat){const b=Math.max(0,Number(beat)||0);if(!voxSnapEnabled())return Math.round(b*1000)/1000;const st=voxBeatStep();return Math.max(0,Math.round(b/st)*st);}
+  function voxSelectedPair(){
+    if(!voxSelected)return {part:null,event:null};
+    const part=parts.find(p=>p.type==='vocal'&&String(p.id)===String(voxSelected.partId));
+    const event=part?.voxEvents?.find(e=>String(e.id)===String(voxSelected.eventId))||null;
+    return {part,event};
+  }
+  function voxTargetPart(){return parts.find(p=>p.type==='vocal'&&String(p.id)===String(voxTargetPartId))||voxSelectedPair().part||allVocalParts()[0]||null;}
+  function voxTimelineBeats(){const natural=Math.max(0,naturalSongDurationBeats()),maxEvent=Math.max(0,...allVocalParts().flatMap(p=>voxTrackEvents(p).map(e=>(Number(e.startBeat)||0)+voxEventDurationBeats(e))));return Math.max(16,Math.ceil((Math.max(natural,maxEvent,voxPlayheadBeat+1)+4)/4)*4);}
+  function voxStatus(msg){if($('voxBoxStatus'))$('voxBoxStatus').textContent=msg||'';}
+  function persistVoxEdits(){markPartsDirty();playbackTotalBeats=mediaDurationBeats();renderSongEndEditor();core.scheduleAutoSave();}
+  function setVoxSelection(part,event=null){voxTargetPartId=part?.id||voxTargetPartId;voxSelected=event&&part?{partId:part.id,eventId:event.id}:null;renderVoxInspector();}
+  function voxEventBounds(e){const start=Math.max(0,Number(e?.startBeat)||0),dur=Math.max(.001,voxEventDurationBeats(e));return {start,end:start+dur,dur};}
+  function updateVoxPlayhead(beat,scrollIntoView=false){
+    voxPlayheadBeat=Math.max(0,Math.min(voxTimelineBeats(),Number(beat)||0));
+    // The sticky track-name gutter lives in the timeline's left padding. Keep
+    // the playhead aligned with beat 0 rather than drawing it over the labels.
+    const x=voxLabelWidth()+voxPlayheadBeat*voxPpb(),ph=$('voxPlayhead');if(ph)ph.style.left=`${x}px`;
+    if(scrollIntoView){const sc=$('voxTimelineScroller');if(sc){const left=sc.scrollLeft,right=left+sc.clientWidth-140;if(x<left+voxLabelWidth()+20)sc.scrollLeft=Math.max(0,x-voxLabelWidth()-30);else if(x>right)sc.scrollLeft=Math.max(0,x-sc.clientWidth+190);}}
+  }
+  async function drawVoxWaveform(canvas,event,token){
+    if(!canvas?.isConnected||token!==voxRenderToken)return;
+    try{
+      const buf=await vocalBufferForTake(event.takeId,event.sourcePartId);if(!buf||!canvas.isConnected||token!==voxRenderToken)return;
+      const rect=canvas.getBoundingClientRect(),dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1)),w=Math.max(20,Math.round(rect.width*dpr)),h=Math.max(20,Math.round(rect.height*dpr));
+      canvas.width=w;canvas.height=h;const g=canvas.getContext('2d');if(!g)return;g.clearRect(0,0,w,h);g.strokeStyle='rgba(42,36,27,.72)';g.lineWidth=Math.max(1,dpr);
+      const data=buf.getChannelData(0),startSec=Math.max(0,Number(event.trimStartSec)||0),endSec=Math.min(buf.duration,Number.isFinite(Number(event.trimEndSec))&&Number(event.trimEndSec)>0?Number(event.trimEndSec):buf.duration),i0=Math.max(0,Math.floor(startSec*buf.sampleRate)),i1=Math.min(data.length,Math.ceil(endSec*buf.sampleRate)),span=Math.max(1,i1-i0),mid=h/2;
+      g.beginPath();for(let x=0;x<w;x++){const a=i0+Math.floor(x/w*span),b=Math.min(i1,a+Math.max(1,Math.ceil(span/w)));let lo=1,hi=-1;for(let i=a;i<b;i++){const v=data[i]||0;if(v<lo)lo=v;if(v>hi)hi=v;}g.moveTo(x,mid-hi*mid*.82);g.lineTo(x,mid-lo*mid*.82);}g.stroke();
+    }catch(err){console.warn('Could not draw Vox Box waveform',err);}
+  }
+  function renderVoxInspector(){
+    const part=voxTargetPart(),pair=voxSelectedPair(),event=pair.event,fxTarget=$('voxFxTarget');if(!part)return;
+    if(fxTarget){const opt=fxTarget.querySelector('option[value="event"]');if(opt)opt.disabled=!event;if(!event&&fxTarget.value==='event')fxTarget.value='track';}
+    const useEvent=!!(event&&fxTarget?.value==='event'),fx=useEvent?effectiveVocalFx(part,event):effectiveVocalFx(part),vol=useEvent?Math.max(0,Math.min(1.5,Number(event.volume)||0)):Math.max(0,Math.min(1.5,Number(part.volume)||0));
+    if($('voxInspectorTitle'))$('voxInspectorTitle').textContent=useEvent?'Event Effects':'Track Effects';
+    if($('voxInspectorMeta'))$('voxInspectorMeta').textContent=useEvent?`${part.name} • ${voxEventTake(event)?.name||'Vocal event'}${event.fx?' • override':' • using track FX'}`:`${part.name} • affects all events without an override`;
+    if($('voxFxVolume'))$('voxFxVolume').value=String(Math.round(vol*100));if($('voxFxVolumeValue'))$('voxFxVolumeValue').textContent=`${Math.round(vol*100)}%`;
+    if($('voxFxEq'))$('voxFxEq').value=fx.eq;if($('voxFxComp'))$('voxFxComp').value=fx.comp;if($('voxFxReverb'))$('voxFxReverb').value=String(fx.reverb);if($('voxFxDelay'))$('voxFxDelay').value=String(fx.delay);if($('voxFxAutotune'))$('voxFxAutotune').value=String(Math.round(Number(fx.autotune)||0));if($('voxFxAutotuneValue'))$('voxFxAutotuneValue').textContent=`${Math.round(Number(fx.autotune)||0)}%`;
+    if($('voxResetEventFxBtn'))$('voxResetEventFxBtn').disabled=!(event&&event.fx);
+    for(const id of ['voxCropBtn','voxSplitBtn','voxCopyBtn','voxCutBtn','voxDeleteBtn'])if($(id))$(id).disabled=!event;
+    if($('voxPasteBtn'))$('voxPasteBtn').disabled=!voxClipboard;
+  }
+  function renderVoxBox(){
+    if(!voxBoxOpen)return;const vocals=allVocalParts(),tracks=$('voxTracks'),ruler=$('voxRuler'),inner=$('voxTimelineInner');if(!tracks||!ruler||!inner)return;
+    const token=++voxRenderToken,ppb=voxPpb(),beats=voxTimelineBeats(),width=Math.max(720,Math.ceil(beats*ppb));inner.style.width=`${width}px`;ruler.style.width=`${width}px`;ruler.innerHTML='';tracks.innerHTML='';
+    for(let b=0;b<=Math.ceil(beats);b++){const tick=document.createElement('span');tick.className='vox-ruler-beat'+(b%4===0?' major':'');tick.style.left=`${b*ppb}px`;ruler.appendChild(tick);if(b%4===0){const lab=document.createElement('span');lab.className='vox-ruler-label';lab.style.left=`${b*ppb}px`;lab.textContent=String(b+1);ruler.appendChild(lab);}}
+    const clickBeat=(e,base)=>{const rect=base.getBoundingClientRect();return quantizeVoxBeat((e.clientX-rect.left)/ppb);};
+    ruler.onclick=e=>{updateVoxPlayhead(clickBeat(e,ruler),true);renderVoxInspector();};
+    if(!vocals.length){tracks.innerHTML='<div class="vocal-empty" style="padding:40px">Add a Vocals part in Baby DAW first.</div>';renderVoxInspector();return;}
+    if(!voxTargetPartId||!vocals.some(p=>p.id===voxTargetPartId))voxTargetPartId=(active()?.type==='vocal'?active().id:vocals[0].id);
+    for(const part of vocals){
+      const row=document.createElement('div');row.className='vox-track-row'+(String(part.id)===String(voxTargetPartId)?' is-target':'');row.style.width=`${width}px`;row.dataset.voxPartId=part.id;
+      const label=document.createElement('div');label.className='vox-track-label';label.innerHTML=`<strong>${escapeHtml(part.name)}</strong><span>${Math.round((Number(part.volume)||0)*100)}% • ${(part.voxEvents||[]).length} event${(part.voxEvents||[]).length===1?'':'s'}</span>`;
+      label.onclick=()=>{voxTargetPartId=part.id;voxSelected=null;renderVoxBox();};
+      const lane=document.createElement('div');lane.className='vox-track-lane';lane.dataset.voxPartId=part.id;lane.onclick=e=>{if(e.target!==lane)return;voxTargetPartId=part.id;voxSelected=null;updateVoxPlayhead(clickBeat(e,lane));renderVoxBox();};
+      for(const event of voxTrackEvents(part)){
+        const take=voxEventTake(event),bounds=voxEventBounds(event),ev=document.createElement('div');ev.className='vox-event'+(voxSelected&&String(voxSelected.partId)===String(part.id)&&String(voxSelected.eventId)===String(event.id)?' is-selected':'');ev.dataset.voxEventId=event.id;ev.style.left=`${bounds.start*ppb}px`;ev.style.width=`${Math.max(24,bounds.dur*ppb)}px`;
+        const top=document.createElement('div');top.className='vox-event-top';top.innerHTML=`<span class="vox-event-name">${escapeHtml(take?.name||'Vocal event')}</span><span class="vox-event-time">${bounds.start.toFixed(2)}b</span>`;
+        const canvas=document.createElement('canvas');canvas.className='vox-event-waveform';
+        const lh=document.createElement('span');lh.className='vox-trim-handle left';const rh=document.createElement('span');rh.className='vox-trim-handle right';
+        ev.append(top,canvas,lh,rh);ev.onclick=e=>{e.stopPropagation();setVoxSelection(part,event);renderVoxBox();};
+        ev.onpointerdown=e=>{if(e.target===lh||e.target===rh)return;beginVoxPointerEdit(e,part,event,ev,'move');};
+        lh.onpointerdown=e=>beginVoxPointerEdit(e,part,event,ev,'trim-left');rh.onpointerdown=e=>beginVoxPointerEdit(e,part,event,ev,'trim-right');
+        lane.appendChild(ev);requestAnimationFrame(()=>drawVoxWaveform(canvas,event,token));
+      }
+      row.append(label,lane);tracks.appendChild(row);
+    }
+    inner.classList.toggle('has-crop-mode',voxCropMode);$('voxBoxPage')?.classList.toggle('crop-mode',voxCropMode);if($('voxCropBtn'))$('voxCropBtn').classList.toggle('is-active',voxCropMode);updateVoxPlayhead(voxPlayheadBeat);renderVoxInspector();
+  }
+  function findVoxLaneAt(x,y){return document.elementsFromPoint?.(x,y)?.find(el=>el.classList?.contains('vox-track-lane'))||null;}
+  function beginVoxPointerEdit(e,part,event,el,mode){
+    if(e.button!==undefined&&e.button!==0)return;e.preventDefault();e.stopPropagation();setVoxSelection(part,event);const ppb=voxPpb(),beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92)),startX=e.clientX,origStart=Number(event.startBeat)||0,origTrimStart=Math.max(0,Number(event.trimStartSec)||0),take=voxEventTake(event),full=Math.max(0,Number(take?.duration)||0),origTrimEnd=Math.max(origTrimStart,Math.min(full,Number.isFinite(Number(event.trimEndSec))&&Number(event.trimEndSec)>0?Number(event.trimEndSec):full)),origEndBeat=origStart+(origTrimEnd-origTrimStart)/beatSec;let targetPartId=part.id;
+    el.classList.add('is-dragging');try{el.setPointerCapture(e.pointerId);}catch{}
+    const move=ev=>{ev.preventDefault();const dx=(ev.clientX-startX)/ppb;if(mode==='move'){event.startBeat=quantizeVoxBeat(origStart+dx);el.style.left=`${event.startBeat*ppb}px`;const lane=findVoxLaneAt(ev.clientX,ev.clientY);if(lane?.dataset.voxPartId)targetPartId=lane.dataset.voxPartId;document.querySelectorAll('.vox-track-row').forEach(r=>r.classList.toggle('is-target',String(r.dataset.voxPartId)===String(targetPartId)));}
+      else if(mode==='trim-left'){let target=quantizeVoxBeat(origStart+dx),delta=(target-origStart)*beatSec,newTrim=Math.max(0,Math.min(origTrimEnd-.03,origTrimStart+delta));event.trimStartSec=newTrim;event.startBeat=Math.max(0,origStart+(newTrim-origTrimStart)/beatSec);const dur=Math.max(.001,(origTrimEnd-newTrim)/beatSec);el.style.left=`${event.startBeat*ppb}px`;el.style.width=`${Math.max(24,dur*ppb)}px`;}
+      else{let targetEnd=quantizeVoxBeat(origEndBeat+dx),newEnd=origTrimStart+Math.max(.02,targetEnd-origStart)*beatSec;newEnd=Math.max(origTrimStart+.03,Math.min(full,newEnd));event.trimEndSec=newEnd;const dur=Math.max(.001,(newEnd-origTrimStart)/beatSec);el.style.width=`${Math.max(24,dur*ppb)}px`;}}
+    const up=ev=>{try{el.releasePointerCapture(ev.pointerId);}catch{}el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',up);el.removeEventListener('pointercancel',up);el.classList.remove('is-dragging');if(mode==='move'&&String(targetPartId)!==String(part.id)){const dest=parts.find(p=>p.type==='vocal'&&String(p.id)===String(targetPartId));if(dest){part.voxEvents=(part.voxEvents||[]).filter(x=>x.id!==event.id);dest.voxEvents=dest.voxEvents||[];dest.voxEvents.push(event);voxSelected={partId:dest.id,eventId:event.id};voxTargetPartId=dest.id;}}persistVoxEdits();renderVoxBox();};
+    el.addEventListener('pointermove',move,{passive:false});el.addEventListener('pointerup',up,{passive:false});el.addEventListener('pointercancel',up,{passive:false});
+  }
+  function openVoxBox(){
+    const vocals=allVocalParts();if(!vocals.length){core.status('Add a Vocals part first.');return;}let changed=false;for(const p of vocals){if(!(p.voxEvents||[]).length&&p.activeTakeId&&p.recordings?.some(r=>r.id===p.activeTakeId)){ensureVoxEventForActiveTake(p,0);changed=true;}}
+    voxBoxOpen=true;voxTargetPartId=(active()?.type==='vocal'?active().id:vocals[0].id);voxSelected=null;voxCropMode=false;const page=$('voxBoxPage');if(page){page.hidden=false;page.setAttribute('aria-hidden','false');}document.body.classList.add('vox-box-open');try{$('voxSnapToBeat').checked=localStorage.getItem(VOX_SNAP_KEY)!=='0';$('voxSnapResolution').value=localStorage.getItem(VOX_RES_KEY)||'16';}catch{}if(changed)persistVoxEdits();renderVoxBox();
+  }
+  function closeVoxBox(){voxBoxOpen=false;const page=$('voxBoxPage');if(page){page.hidden=true;page.setAttribute('aria-hidden','true');}document.body.classList.remove('vox-box-open');const p=active();if(p?.type==='vocal')renderVocalEditor(p);}
+  function addActiveTakeToVox(){const p=voxTargetPart();if(!p?.activeTakeId||!p.recordings?.some(r=>r.id===p.activeTakeId)){voxStatus('Choose an active take on this vocal track first.');return;}p.voxEvents=p.voxEvents||[];const ev=normalizeVoxEvent({id:uid(),takeId:p.activeTakeId,sourcePartId:p.id,startBeat:quantizeVoxBeat(voxPlayheadBeat),trimStartSec:0,trimEndSec:null,volume:1,fx:null},p);p.voxEvents.push(ev);voxSelected={partId:p.id,eventId:ev.id};persistVoxEdits();renderVoxBox();voxStatus(`Added ${voxEventTake(ev)?.name||'active take'} at beat ${ev.startBeat.toFixed(2)}.`);}
+  function splitSelectedVox(){const {part,event}=voxSelectedPair();if(!part||!event)return;const b=voxEventBounds(event),split=quantizeVoxBeat(voxPlayheadBeat);if(split<=b.start+.01||split>=b.end-.01){voxStatus('Move the playhead inside the selected event, then Split.');return;}const beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92)),splitSec=(Number(event.trimStartSec)||0)+(split-b.start)*beatSec,oldEnd=event.trimEndSec;event.trimEndSec=splitSec;const right=clone(event);right.id=uid();right.startBeat=split;right.trimStartSec=splitSec;right.trimEndSec=oldEnd;const ix=part.voxEvents.findIndex(x=>x.id===event.id);part.voxEvents.splice(ix+1,0,right);voxSelected={partId:part.id,eventId:right.id};persistVoxEdits();renderVoxBox();voxStatus('Event split at the playhead.');}
+  function copySelectedVox(cut=false){const {part,event}=voxSelectedPair();if(!part||!event)return;voxClipboard={event:clone(event),sourcePartId:part.id};if(cut){part.voxEvents=part.voxEvents.filter(x=>x.id!==event.id);voxSelected=null;persistVoxEdits();renderVoxBox();voxStatus('Event cut. Tap a track/playhead position, then Paste.');}else{renderVoxInspector();voxStatus('Event copied. Tap a track/playhead position, then Paste.');}}
+  function pasteVox(){if(!voxClipboard)return;const p=voxTargetPart();if(!p)return;const ev=normalizeVoxEvent({...clone(voxClipboard.event),id:uid(),startBeat:quantizeVoxBeat(voxPlayheadBeat)},p);p.voxEvents=p.voxEvents||[];p.voxEvents.push(ev);voxSelected={partId:p.id,eventId:ev.id};persistVoxEdits();renderVoxBox();voxStatus(`Pasted event to ${p.name} at beat ${ev.startBeat.toFixed(2)}.`);}
+  function deleteSelectedVox(){const {part,event}=voxSelectedPair();if(!part||!event)return;part.voxEvents=part.voxEvents.filter(x=>x.id!==event.id);voxSelected=null;persistVoxEdits();renderVoxBox();voxStatus('Event deleted. The original dry take is still safe in Takes.');}
+  function updateVoxFxFromUi(kind){
+    const p=voxTargetPart(),pair=voxSelectedPair(),event=pair.event;if(!p)return;const eventMode=$('voxFxTarget')?.value==='event'&&event;let fx=eventMode?(event.fx||(event.fx=normalizeVocalFx(p.fx))):p.fx;
+    if(kind==='volume'){const v=Math.max(0,Math.min(1.5,(Number($('voxFxVolume')?.value)||0)/100));if(eventMode)event.volume=v;else p.volume=v;if($('voxFxVolumeValue'))$('voxFxVolumeValue').textContent=`${Math.round(v*100)}%`;if(!eventMode)updatePartMiniVolume(p);}
+    else if(kind==='autotune'){fx.autotune=Math.max(0,Math.min(100,Number($('voxFxAutotune')?.value)||0));if($('voxFxAutotuneValue'))$('voxFxAutotuneValue').textContent=`${Math.round(fx.autotune)}%`;}
+    else if(kind==='eq')fx.eq=$('voxFxEq').value;else if(kind==='comp')fx.comp=$('voxFxComp').value;else if(kind==='reverb')fx.reverb=Number($('voxFxReverb').value)||0;else if(kind==='delay')fx.delay=Number($('voxFxDelay').value)||0;
+    applyVocalFxLive(p);markPartsDirty();core.scheduleAutoSave();renderVoxInspector();
+  }
+  function resetSelectedVoxFx(){const {part,event}=voxSelectedPair();if(!part||!event)return;event.fx=null;event.volume=1;markPartsDirty();applyVocalFxLive(part);core.scheduleAutoSave();renderVoxInspector();voxStatus('Selected event now follows the track effects.');}
+
   function wire(){
     ensureInitial();setEditorMode(active()?.type||'chord');renderParts();initSongEndPanel();ensureMediaSession();updateMediaMetadata();renderSongEndEditor();
+    if($('voxBoxBtn'))$('voxBoxBtn').onclick=openVoxBox;
+    if($('voxBoxCloseBtn'))$('voxBoxCloseBtn').onclick=closeVoxBox;
+    if($('voxBoxPlayBtn'))$('voxBoxPlayBtn').onclick=()=>{if(playing||starting)stopPlayback();else startPlayback({fromBeat:voxPlayheadBeat});};
+    if($('voxSnapToBeat'))$('voxSnapToBeat').onchange=e=>{try{localStorage.setItem(VOX_SNAP_KEY,e.target.checked?'1':'0')}catch{}voxStatus(e.target.checked?`Snap on (${ $('voxSnapResolution')?.value||'16' })`:'Free drag enabled.');};
+    if($('voxSnapResolution'))$('voxSnapResolution').onchange=e=>{try{localStorage.setItem(VOX_RES_KEY,e.target.value)}catch{}voxStatus(`Snap grid set to 1/${e.target.value}.`);};
+    if($('voxAddActiveTakeBtn'))$('voxAddActiveTakeBtn').onclick=addActiveTakeToVox;
+    if($('voxCropBtn'))$('voxCropBtn').onclick=()=>{voxCropMode=!voxCropMode;renderVoxBox();voxStatus(voxCropMode?'Crop mode: drag the blue-selected event edges.':'Crop mode off.');};
+    if($('voxSplitBtn'))$('voxSplitBtn').onclick=splitSelectedVox;
+    if($('voxCopyBtn'))$('voxCopyBtn').onclick=()=>copySelectedVox(false);
+    if($('voxCutBtn'))$('voxCutBtn').onclick=()=>copySelectedVox(true);
+    if($('voxPasteBtn'))$('voxPasteBtn').onclick=pasteVox;
+    if($('voxDeleteBtn'))$('voxDeleteBtn').onclick=deleteSelectedVox;
+    if($('voxFxTarget'))$('voxFxTarget').onchange=renderVoxInspector;
+    if($('voxFxVolume'))$('voxFxVolume').oninput=()=>updateVoxFxFromUi('volume');
+    if($('voxFxEq'))$('voxFxEq').onchange=()=>updateVoxFxFromUi('eq');
+    if($('voxFxComp'))$('voxFxComp').onchange=()=>updateVoxFxFromUi('comp');
+    if($('voxFxReverb'))$('voxFxReverb').onchange=()=>updateVoxFxFromUi('reverb');
+    if($('voxFxDelay'))$('voxFxDelay').onchange=()=>updateVoxFxFromUi('delay');
+    if($('voxFxAutotune'))$('voxFxAutotune').oninput=()=>updateVoxFxFromUi('autotune');
+    if($('voxResetEventFxBtn'))$('voxResetEventFxBtn').onclick=resetSelectedVoxFx;
+    window.addEventListener('resize',()=>{if(voxBoxOpen)renderVoxBox();});
     if($('songEndMinusBtn'))$('songEndMinusBtn').onclick=()=>nudgeSongEnd(-.1);
     if($('songEndPlusBtn'))$('songEndPlusBtn').onclick=()=>nudgeSongEnd(.1);
     if($('songEndClearBtn'))$('songEndClearBtn').onclick=clearSongEnd;
@@ -1253,7 +1486,11 @@
     }
     if($('songEndSnapBar'))$('songEndSnapBar').onchange=e=>{songEndSnapToBar=!!e.target.checked;try{localStorage.setItem(SONG_END_SNAP_KEY,songEndSnapToBar?'1':'0')}catch{}const natural=naturalSongDurationBeats();if(songEndSnapToBar&&Number.isFinite(Number(songEndBeat))&&natural>0)songEndBeat=snappedSongEndBeat(songEndBeat,natural);renderSongEndEditor();liveEditRefresh();core.scheduleAutoSave();};
     $('bpmInput')?.addEventListener('input',()=>{renderSongEndEditor();updateMediaMetadata();liveEditRefresh();});
-    if(songEndUiTimer)clearInterval(songEndUiTimer);songEndUiTimer=setInterval(renderSongEndEditor,120);
+    if(songEndUiTimer)clearInterval(songEndUiTimer);songEndUiTimer=setInterval(()=>{
+      renderSongEndEditor();
+      if(voxBoxOpen&&(playing||starting)){const beat=currentCycleBeat();if(Number.isFinite(beat))updateVoxPlayhead(beat);}
+      if(voxBoxOpen)updatePartPlaybackButtons();
+    },120);
     $('addPartBtn')?.addEventListener('click',openModal);$('closePartModal')?.addEventListener('click',closeModal);document.querySelector('[data-close-part-modal]')?.addEventListener('click',closeModal);document.querySelectorAll('.part-choice').forEach(b=>b.addEventListener('click',()=>addPart(b.dataset.partType)));
     document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;p.instrument=b.dataset.leadInstrument;p.sound=(core.sounds[p.instrument]||[])[0]?.[0]||p.sound;invalidatePartPlayers(p);renderLeadEditor(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();});
     if($('leadPlaybackBtn'))$('leadPlaybackBtn').onclick=toggleLeadPartPlayback;
