@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.22-pro-instruments';
+const CACHE = 'song-rider-suite-v3.3.24-vox-transport-multi-autoscroll';
 const ASSETS = [
   './vocal-autotune-worklet.js',
   './song-rider-pro-wordmark-hq.png',
