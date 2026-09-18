@@ -30,6 +30,8 @@
   let activePartId=null;
   let loadedChordPartId=null;
   let leadBarPage=0;
+  let leadGridCollapsed=false;
+  try{leadGridCollapsed=localStorage.getItem('crp-lead-grid-collapsed-v1')==='1';}catch{}
   let playing=false, starting=false, playbackGeneration=0;
   let playbackScope=null; // null = normal enabled-part playback; otherwise a scoped Lead/Vocal preview
   let playbackClockStartAudioTime=0, playbackClockStartBeat=0, playbackClockBpm=92, playbackTotalBeats=0;
@@ -38,7 +40,7 @@
   let liveEditTimer=null, mediaPositionTimer=null, mediaKeepAlive=null, mediaKeepAliveUrl='', mediaPausedBeat=0, mediaActionsInstalled=false;
   let liveVocalFxNodes=new Map();
   let audioCtx=null, masterLimiter=null, cycleTimer=null;
-  let playerCache=new Map(), partBuses=new Map(), partInstrumentFx=new Map(), highlightTimers=[], activeVoices=new Set(), vocalBufferCache=new Map(), activeVocalSources=new Set();
+  let playerCache=new Map(), resolvedPlayerCache=new Map(), lastReadyPlayer=new Map(), playerSound=new WeakMap(), partBuses=new Map(), partInstrumentFx=new Map(), highlightTimers=[], activeVoices=new Set(), vocalBufferCache=new Map(), activeVocalSources=new Set();
   let micStream=null,micCtx=null,micSource=null,micAnalyser=null,micProcessor=null,micSilentGain=null,micMeterRaf=0;
   let recording=false,recordingPaused=false,recordChunks=[],recordSampleRate=48000,recordStartedAt=0,recordPausedAt=0,recordPausedTotal=0,recordTimer=null,currentPreview=null;
   let leadBarClipboard=null, speechRec=null, speechBase='';
@@ -203,7 +205,7 @@
     if(!row){row=document.createElement('div');row.id='activePartVolumeRow';row.className='active-part-volume-row';mgr.appendChild(row);}
     const p=active();if(!p){row.innerHTML='';return;}
     row.innerHTML=`<span>${escapeHtml(p.name)} volume</span><input id="activePartVolume" type="range" min="0" max="100" value="${Math.round(p.volume*100)}"><strong id="activePartVolumeValue">${Math.round(p.volume*100)}%</strong>`;
-    const slider=$('activePartVolume');const paintRange=el=>el?.style.setProperty('--range-fill',`${el.value}%`);paintRange(slider);slider.oninput=()=>{paintRange(slider);p.volume=+slider.value/100;$('activePartVolumeValue').textContent=`${slider.value}%`;const pill=[...document.querySelectorAll('.part-pill')].find(x=>x.querySelector('.part-open')?.textContent===p.name);if(pill)pill.querySelector('.part-mini-vol').textContent=`${slider.value}%`;if(p.type==='lead'&&$('leadVolume')){$('leadVolume').value=slider.value;$('leadVolumeValue').textContent=`${slider.value}%`;}if(p.type==='vocal'&&$('vocalVolume')){$('vocalVolume').value=slider.value;$('vocalVolumeValue').textContent=`${slider.value}%`;}core.scheduleAutoSave();};
+    const slider=$('activePartVolume');const paintRange=el=>el?.style.setProperty('--range-fill',`${el.value}%`);paintRange(slider);slider.oninput=()=>{paintRange(slider);p.volume=+slider.value/100;$('activePartVolumeValue').textContent=`${slider.value}%`;const pill=[...document.querySelectorAll('.part-pill')].find(x=>x.querySelector('.part-open')?.textContent===p.name);if(pill)pill.querySelector('.part-mini-vol').textContent=`${slider.value}%`;if(p.type==='lead'&&$('leadVolume')){$('leadVolume').value=slider.value;$('leadVolumeValue').textContent=`${slider.value}%`;}if(p.type==='vocal'&&$('vocalVolume')){$('vocalVolume').value=slider.value;$('vocalVolumeValue').textContent=`${slider.value}%`;applyVocalFxLive(p);}else if((playing||starting)&&partBuses.has(p.id))busFor(p,outputSoundFor(p));core.scheduleAutoSave();};
   }
   function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
 
@@ -228,6 +230,25 @@
     const options=core.sounds[p.instrument]||core.sounds.piano;select.innerHTML='';
     options.forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;select.appendChild(o);});
     if(!options.some(x=>x[0]===p.sound))p.sound=options[0][0];select.value=p.sound;
+  }
+  function renderLeadSoundControls(p){
+    if(!p||p.type!=='lead')return;
+    document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.classList.toggle('active',b.dataset.leadInstrument===p.instrument));
+    leadSoundOptions(p);
+  }
+  function desktopLeadGridView(){
+    return !!window.matchMedia?.('(min-width: 721px)').matches;
+  }
+  function updateLeadGridViewToggle(){
+    const editor=$('leadPartEditor'),btn=$('leadGridViewToggle');if(!editor)return;
+    const canToggle=desktopLeadGridView(),collapsed=canToggle&&leadGridCollapsed;
+    editor.classList.toggle('lead-grid-collapsed',collapsed);
+    if(btn){
+      btn.hidden=!canToggle;
+      btn.textContent=collapsed?'Expand Grid':'Collapse Grid';
+      btn.setAttribute('aria-pressed',String(collapsed));
+      btn.title=collapsed?'Expand the full MIDI grid':'Fit the MIDI grid to the screen with its own scroll window';
+    }
   }
   function midiName(m){return NOTE_NAMES[(m%12+12)%12]+(Math.floor(m/12)-1);}
   const HARMONY_NOTE_INDEX={C:0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A:9,'A#':10,Bb:10,B:11};
@@ -337,9 +358,9 @@
     if(!p||p.type!=='lead')return;
     $('leadPartTitle').textContent=p.name;p.repeat=!!core.loop;if($('leadRepeat'))$('leadRepeat').checked=!!core.loop;if($('leadSustain'))$('leadSustain').checked=p.sustain===true;
     $('leadVolume').value=Math.round(p.volume*100);$('leadVolumeValue').textContent=`${Math.round(p.volume*100)}%`;
-    document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.classList.toggle('active',b.dataset.leadInstrument===p.instrument));
-    leadSoundOptions(p);$('leadGridOctave').value=String(p.gridOctave);$('leadResolution').value=String(p.resolution);$('leadBars').value=String(p.bars);
+    renderLeadSoundControls(p);$('leadGridOctave').value=String(p.gridOctave);$('leadResolution').value=String(p.resolution);$('leadBars').value=String(p.bars);
     leadBarPage=Math.max(0,Math.min(p.bars-1,leadBarPage));updateLeadBarUi(p);
+    updateLeadGridViewToggle();
     renderLeadGrid(p,{scrollToBar:true});
     updatePartPlaybackButtons();
   }
@@ -807,9 +828,20 @@
   }
   function seekPlaybackToSeconds(seconds){const bpm=Math.max(40,Math.min(240,+core.bpm||92));seekPlaybackToBeat(Math.max(0,Number(seconds)||0)*bpm/60);}
   function seekPlaybackSeconds(delta){const bpm=Math.max(40,Math.min(240,+core.bpm||92)),base=(playing||starting)?(currentCycleBeat()??0):(mediaPausedBeat||0);seekPlaybackToBeat(base+(Number(delta)||0)*bpm/60);}
-  function desiredPartGain(p){
+  function requestedPartSound(p){
+    return p?.type==='chord'?p?.data?.sound:p?.sound;
+  }
+  function outputSoundFor(p){
+    const requested=requestedPartSound(p);
+    if(playing||starting){
+      const ready=lastReadyPlayer.get(p?.id);
+      if(ready?.sound)return ready.sound;
+    }
+    return requested;
+  }
+  function desiredPartGain(p,soundOverride=null){
     const scopeGain=playbackScope&&Array.isArray(playbackScope.playableIds)&&playbackScope.playableIds.includes(p.id)?Math.max(0,Math.min(1,Number(playbackScope.backingGain??1))):1;
-    return soundGain(p.type==='chord'?p.data.sound:p.sound)*p.volume*(p.type==='lead'?LEAD_OUTPUT_BOOST:1)*scopeGain;
+    return soundGain(soundOverride||requestedPartSound(p))*p.volume*(p.type==='lead'?LEAD_OUTPUT_BOOST:1)*scopeGain;
   }
   function applyVocalFxLive(p){
     const set=liveVocalFxNodes.get(p?.id);if(!set?.size||!audioCtx)return;
@@ -841,7 +873,7 @@
       const now=audioCtx?.currentTime||0;
       for(const p of parts){
         const bus=partBuses.get(p.id);
-        if(bus&&audioCtx){try{if(typeof bus.gain.cancelAndHoldAtTime==='function')bus.gain.cancelAndHoldAtTime(now);else bus.gain.cancelScheduledValues(now);bus.gain.setTargetAtTime(desiredPartGain(p),now,.018);}catch{}}
+        if(bus&&audioCtx){try{if(typeof bus.gain.cancelAndHoldAtTime==='function')bus.gain.cancelAndHoldAtTime(now);else bus.gain.cancelScheduledValues(now);bus.gain.setTargetAtTime(desiredPartGain(p,outputSoundFor(p)),now,.028);}catch{}}
         if(p.type==='vocal')applyVocalFxLive(p);
       }
       if(playing||starting){
@@ -862,34 +894,89 @@
     if(audioCtx.state==='suspended')audioCtx.resume().catch(()=>{});
     if(!masterLimiter){masterLimiter=audioCtx.createDynamicsCompressor();masterLimiter.threshold.value=-2;masterLimiter.knee.value=0;masterLimiter.ratio.value=20;masterLimiter.attack.value=.003;masterLimiter.release.value=.12;masterLimiter.connect(audioCtx.destination);}
   }
-  function busFor(p){
+  function ensurePartBus(p){
     ensureAudio();let bus=partBuses.get(p.id),fresh=false;
-    const sound=p.type==='chord'?p.data.sound:p.sound;
     if(!bus){
       bus=audioCtx.createGain();
       const fx=core.createInstrumentFxChain?.(audioCtx,masterLimiter);
       if(fx){bus.connect(fx.input);partInstrumentFx.set(p.id,fx);}else bus.connect(masterLimiter);
       partBuses.set(p.id,bus);fresh=true;
     }
+    return {bus,fresh};
+  }
+  function busFor(p,soundOverride=null){
+    const {bus,fresh}=ensurePartBus(p),sound=soundOverride||requestedPartSound(p);
     partInstrumentFx.get(p.id)?.setSound?.(sound);
-    const target=desiredPartGain(p),now=audioCtx.currentTime;
+    const target=desiredPartGain(p,sound),now=audioCtx.currentTime;
     try{
       if(fresh||!(playing||starting))bus.gain.value=target;
-      else{if(typeof bus.gain.cancelAndHoldAtTime==='function')bus.gain.cancelAndHoldAtTime(now);else bus.gain.cancelScheduledValues(now);bus.gain.setTargetAtTime(target,now,.02);}
+      else{if(typeof bus.gain.cancelAndHoldAtTime==='function')bus.gain.cancelAndHoldAtTime(now);else bus.gain.cancelScheduledValues(now);bus.gain.setTargetAtTime(target,now,.032);}
     }catch{bus.gain.value=target;}
     return bus;
   }
-  async function playerFor(p){
-    ensureAudio();const sound=p.type==='chord'?p.data.sound:p.sound,key=`${p.id}:${sound}`;if(playerCache.has(key))return playerCache.get(key);if(!window.Soundfont)throw new Error('Sound engine unavailable');
-    const promise=(core.loadSoundfontInstrument?core.loadSoundfontInstrument(audioCtx,sound,busFor(p)):Soundfont.instrument(audioCtx,sound,{format:'mp3',soundfont:'MusyngKite',destination:busFor(p)}));playerCache.set(key,promise);return promise;
+  async function playerFor(p,{forceCurrent=false}={}){
+    ensureAudio();
+    const sound=requestedPartSound(p),key=`${p.id}:${sound}`;
+    if(resolvedPlayerCache.has(key)){
+      const ready=resolvedPlayerCache.get(key);
+      lastReadyPlayer.set(p.id,{sound,player:ready});
+      return ready;
+    }
+    if(!window.Soundfont)throw new Error('Sound engine unavailable');
+
+    let promise=playerCache.get(key);
+    if(!promise){
+      // Load new samples onto the existing silent part bus without touching the
+      // currently audible FX/gain. During playback the old, ready player keeps
+      // feeding the scheduler until this promise has completely decoded.
+      const destination=ensurePartBus(p).bus;
+      promise=Promise.resolve(core.loadSoundfontInstrument
+        ?core.loadSoundfontInstrument(audioCtx,sound,destination)
+        :Soundfont.instrument(audioCtx,sound,{format:'mp3',soundfont:'MusyngKite',destination})
+      ).then(player=>{
+        resolvedPlayerCache.set(key,player);
+        try{playerSound.set(player,sound);}catch{}
+        if(requestedPartSound(p)===sound||!lastReadyPlayer.has(p.id))lastReadyPlayer.set(p.id,{sound,player});
+        return player;
+      }).catch(err=>{
+        playerCache.delete(key);resolvedPlayerCache.delete(key);
+        throw err;
+      });
+      playerCache.set(key,promise);
+    }
+
+    const fallback=lastReadyPlayer.get(p.id);
+    if(!forceCurrent&&(playing||starting)&&fallback?.player&&fallback.sound!==sound){
+      // Do not let sample fetch/decode block the rolling audio scheduler on
+      // phones. The current sound continues cleanly, then the new sound takes
+      // over at the next scheduler chunk after it is fully ready.
+      promise.catch(err=>console.warn('Live sound preload failed',err));
+      return fallback.player;
+    }
+    return promise;
   }
-  async function preload(ps){await Promise.all(ps.map(p=>playerFor(p)));}
-  function invalidatePartPlayers(p){for(const key of [...playerCache.keys()])if(key.startsWith(`${p.id}:`))playerCache.delete(key);}
-  function warmLivePlayer(p){if(!p||!playing)return;playerFor(p).catch(e=>console.warn('Live sound preload failed',e));}
+  async function preload(ps){await Promise.all(ps.map(p=>playerFor(p,{forceCurrent:true})));}
+  function invalidatePartPlayers(p,{hard=false}={}){
+    // Sound changes are keyed by sound name, so we do NOT throw away the last
+    // ready player while the transport is running. It is our glitch-free bridge.
+    if((playing||starting)&&!hard)return;
+    for(const key of [...playerCache.keys()])if(key.startsWith(`${p.id}:`))playerCache.delete(key);
+    for(const key of [...resolvedPlayerCache.keys()])if(key.startsWith(`${p.id}:`))resolvedPlayerCache.delete(key);
+    lastReadyPlayer.delete(p.id);
+  }
+  function warmLivePlayer(p){
+    if(!p||!(playing||starting))return;
+    // Starts the new sample load but returns immediately through the ready-player
+    // fallback; no transport restart and no scheduler stall.
+    playerFor(p).catch(e=>console.warn('Live sound preload failed',e));
+  }
   function syncCoreLive(){
     syncLoadedChord();
     const p=loadedChord();
-    if(p){invalidatePartPlayers(p);warmLivePlayer(p);busFor(p);}
+    if(p){
+      warmLivePlayer(p);
+      if(!(playing||starting))busFor(p,requestedPartSound(p));
+    }
     if(active()?.type==='lead')renderLeadHarmony();
   }
   async function auditionLeadNote(p,midi){
@@ -1014,7 +1101,7 @@
     for(const bus of partBuses.values()){try{bus.gain.cancelScheduledValues(audioCtx?.currentTime||0);bus.gain.value=0;bus.disconnect();}catch{}}
     for(const fx of partInstrumentFx.values())try{fx?.disconnect?.();}catch{}
     partInstrumentFx.clear();partBuses.clear();
-    playerCache.clear();
+    playerCache.clear();resolvedPlayerCache.clear();lastReadyPlayer.clear();playerSound=new WeakMap();
     if(masterLimiter){try{masterLimiter.disconnect();}catch{}masterLimiter=null;}
   }
   async function scheduleSegment(startTime,fromBeat,toBeat,generation,withVocals=true){
@@ -1023,14 +1110,15 @@
       if(!playing||generation!==playbackGeneration)return;
       const player=await playerFor(p);
       if(!playing||generation!==playbackGeneration)return;
-      busFor(p);
+      const scheduledSound=playerSound.get(player)||outputSoundFor(p)||requestedPartSound(p);
+      busFor(p,scheduledSound);
       if(p.type==='chord'){
         const cards=(p.data.rows||[]).flat();let chordBeat=0;
-        cards.forEach((card,i)=>{if(!playing||generation!==playbackGeneration)return;const durBeats=core.cardDurationBeats?.(card,core.beats)||core.beats,b=chordBeat;chordBeat+=durBeats;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;const baseDur=durBeats*beatSec,duration=core.sustain?sustainedPartSeconds(p.data?.sound,baseDur):Math.max(.18,baseDur*.98);const notes=core.notesFor(card,p.data)||[];notes.forEach((n,j)=>playTracked(player,n,at+(p.data.instrument==='guitar'?j*.035:0),{duration,gain:.94}));scheduleHighlight((at-audioCtx.currentTime)*1000,p,i);});
+        cards.forEach((card,i)=>{if(!playing||generation!==playbackGeneration)return;const durBeats=core.cardDurationBeats?.(card,core.beats)||core.beats,b=chordBeat;chordBeat+=durBeats;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;const baseDur=durBeats*beatSec,duration=core.sustain?sustainedPartSeconds(scheduledSound,baseDur):Math.max(.18,baseDur*.98);const notes=core.notesFor(card,p.data)||[];notes.forEach((n,j)=>playTracked(player,n,at+(p.data.instrument==='guitar'?j*.035:0),{duration,gain:.94}));scheduleHighlight((at-audioCtx.currentTime)*1000,p,i);});
       }else{
         const subdiv=p.resolution/4,stepBeats=1/subdiv;
         const partBeats=Math.max(stepBeats,p.bars*4),repeatLead=playbackScope?.kind==='vocalMix'?p.repeat:!!core.loop,firstCycle=repeatLead?Math.max(0,Math.floor(fromBeat/partBeats)):0,lastCycle=repeatLead?Math.floor((toBeat-1e-6)/partBeats):0;
-        for(let cyc=firstCycle;cyc<=lastCycle;cyc++)p.events.forEach(e=>{if(!playing||generation!==playbackGeneration)return;const local=e.step*stepBeats,b=local+cyc*partBeats;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;let midi=e.midi+(Number(p.octave)||0)*12;if(core.isBassSound?.(p.sound)||p.sound==='electric_bass_finger')midi-=12;const drawnBeats=leadDurationSteps(e)*stepBeats,duration=p.sustain&&drawnBeats<=stepBeats?sustainedPartSeconds(p.sound,beatSec):Math.max(.05,drawnBeats*beatSec*.98);playTracked(player,midiName(midi),at,{duration,gain:.92});scheduleLeadHighlight((at-audioCtx.currentTime)*1000,p,e.step);});
+        for(let cyc=firstCycle;cyc<=lastCycle;cyc++)p.events.forEach(e=>{if(!playing||generation!==playbackGeneration)return;const local=e.step*stepBeats,b=local+cyc*partBeats;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;let midi=e.midi+(Number(p.octave)||0)*12;if(core.isBassSound?.(scheduledSound)||scheduledSound==='electric_bass_finger')midi-=12;const drawnBeats=leadDurationSteps(e)*stepBeats,duration=p.sustain&&drawnBeats<=stepBeats?sustainedPartSeconds(scheduledSound,beatSec):Math.max(.05,drawnBeats*beatSec*.98);playTracked(player,midiName(midi),at,{duration,gain:.92});scheduleLeadHighlight((at-audioCtx.currentTime)*1000,p,e.step);});
       }
     }
     if(withVocals)for(const p of enabledVocals()){
@@ -1098,14 +1186,16 @@
       playbackClockStartAudioTime=nextAudioStart;
       playbackClockStartBeat=initialBeat;
       playbackClockBpm=Math.max(40,Math.min(240,+core.bpm||92));
-      // Schedule several beats ahead so a busy UI/render/autosave frame cannot
-      // starve the audio graph and create an apparent random pause between beats.
-      const chunkBeats=1; // one-beat rolling scheduler: edits land live without transport restarts
+      // Keep roughly 0.65-0.7 seconds of WebAudio safely scheduled ahead.
+      // This is intentionally time-based rather than a fixed number of beats:
+      // phones get enough render headroom for SoundFont decode/UI work, while
+      // instrument/sound edits still land quickly at the next scheduler chunk.
       let vocalsScheduledForCycle=false;
 
       const scheduleNext=async()=>{
         if(!playing||generation!==playbackGeneration)return;
         const beatSec=60/Math.max(40,Math.min(240,+core.bpm||92));
+        const chunkBeats=Math.max(1,Math.min(2.5,.68/beatSec));
         total=computePlaybackTotal();playbackTotalBeats=total;
         if(cursorBeat>=total-.001)cursorBeat=0;
         const fromBeat=cursorBeat;
@@ -1132,10 +1222,11 @@
           }
         }
 
-        // Refill the queue well before the scheduled audio runs out. The old
-        // ~220ms look-ahead could miss its deadline on phones/PCs during layout
-        // work, causing a brief silence that sounded like playback paused.
-        const wakeMs=Math.max(8,(end-audioCtx.currentTime-.28)*1000);
+        // Refill while a healthy amount of already-scheduled audio is still
+        // playing. That buffer is what lets mobile switch/decode instruments
+        // without the mix crackling, starving, or restarting.
+        const wakeAhead=Math.min(.50,Math.max(.30,span*.68));
+        const wakeMs=Math.max(8,(end-audioCtx.currentTime-wakeAhead)*1000);
         cycleTimer=setTimeout(scheduleNext,wakeMs);
       };
       scheduleNext();
@@ -1512,7 +1603,7 @@
     if($('voxFxDelay'))$('voxFxDelay').onchange=()=>updateVoxFxFromUi('delay');
     if($('voxFxAutotune'))$('voxFxAutotune').oninput=()=>updateVoxFxFromUi('autotune');
     if($('voxResetEventFxBtn'))$('voxResetEventFxBtn').onclick=resetSelectedVoxFx;
-    window.addEventListener('resize',()=>{if(voxBoxOpen)renderVoxBox();});
+    window.addEventListener('resize',()=>{updateLeadGridViewToggle();if(voxBoxOpen)renderVoxBox();});
     if($('songEndMinusBtn'))$('songEndMinusBtn').onclick=()=>nudgeSongEnd(-.1);
     if($('songEndPlusBtn'))$('songEndPlusBtn').onclick=()=>nudgeSongEnd(.1);
     if($('songEndClearBtn'))$('songEndClearBtn').onclick=clearSongEnd;
@@ -1528,7 +1619,7 @@
       if(voxBoxOpen)updatePartPlaybackButtons();
     },120);
     $('addPartBtn')?.addEventListener('click',openModal);$('closePartModal')?.addEventListener('click',closeModal);document.querySelector('[data-close-part-modal]')?.addEventListener('click',closeModal);document.querySelectorAll('.part-choice').forEach(b=>b.addEventListener('click',()=>addPart(b.dataset.partType)));
-    document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;p.instrument=b.dataset.leadInstrument;p.sound=(core.sounds[p.instrument]||[])[0]?.[0]||p.sound;invalidatePartPlayers(p);renderLeadEditor(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();});
+    document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;p.instrument=b.dataset.leadInstrument;p.sound=(core.sounds[p.instrument]||[])[0]?.[0]||p.sound;renderLeadSoundControls(p);warmLivePlayer(p);core.scheduleAutoSave();});
     if($('leadPlaybackBtn'))$('leadPlaybackBtn').onclick=toggleLeadPartPlayback;
     $('leadRepeat').onchange=e=>{
       const p=active();if(p?.type!=='lead')return;
@@ -1541,7 +1632,8 @@
     };
     $('loopToggle')?.addEventListener('change',()=>{const p=active();if(p?.type==='lead'){p.repeat=!!$('loopToggle').checked;if($('leadRepeat'))$('leadRepeat').checked=p.repeat;}});
     $('leadSustain').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sustain=e.target.checked;core.scheduleAutoSave();};
-    $('leadSoundSelect').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sound=e.target.value;invalidatePartPlayers(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();};
+    $('leadSoundSelect').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sound=e.target.value;warmLivePlayer(p);core.scheduleAutoSave();};
+    if($('leadGridViewToggle'))$('leadGridViewToggle').onclick=()=>{if(!desktopLeadGridView())return;leadGridCollapsed=!leadGridCollapsed;try{localStorage.setItem('crp-lead-grid-collapsed-v1',leadGridCollapsed?'1':'0');}catch{}updateLeadGridViewToggle();const p=active();if(p?.type==='lead')requestAnimationFrame(()=>scrollLeadGridToBar(p,false));};
     $('leadGridOctave').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.gridOctave=+e.target.value;renderLeadGrid(p);core.scheduleAutoSave();};
     $('leadResolution').onchange=e=>{const p=active();if(p?.type!=='lead')return;const old=p.resolution,neu=+e.target.value;if(old!==neu&&p.events.length&&!confirm('Changing resolution keeps notes at their step numbers, so their timing may shift. Continue?')){e.target.value=String(old);return;}p.resolution=neu;renderLeadEditor(p);core.scheduleAutoSave();};
     $('leadBars').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.bars=+e.target.value;const maxSteps=leadTotalSteps(p);p.events=p.events.filter(x=>x.step<maxSteps).map(x=>({...x,durationSteps:Math.min(leadDurationSteps(x),Math.max(1,maxSteps-x.step))}));leadBarPage=Math.min(leadBarPage,p.bars-1);markPartsDirty();renderLeadEditor(p);core.scheduleAutoSave();};
@@ -1549,7 +1641,7 @@
     $('beatsSelect')?.addEventListener('change',()=>{if(active()?.type==='lead')renderLeadHarmony();});
     $('leadCopyBar').onclick=copyLeadBar;$('leadPasteBar').onclick=pasteLeadBar;
     $('leadClearBar').onclick=()=>{const p=active();if(p?.type!=='lead')return;const spb=p.resolution,start=leadBarPage*spb,end=start+spb;if(confirm(`Clear bar ${leadBarPage+1}?`)){p.events=p.events.filter(e=>e.step<start||e.step>=end);markPartsDirty();renderLeadGrid(p);core.scheduleAutoSave();}};
-    $('leadVolume').oninput=e=>{const p=active();if(p?.type!=='lead')return;p.volume=+e.target.value/100;$('leadVolumeValue').textContent=`${e.target.value}%`;updatePartMiniVolume(p);core.scheduleAutoSave();};
+    $('leadVolume').oninput=e=>{const p=active();if(p?.type!=='lead')return;p.volume=+e.target.value/100;$('leadVolumeValue').textContent=`${e.target.value}%`;updatePartMiniVolume(p);if((playing||starting)&&partBuses.has(p.id))busFor(p,outputSoundFor(p));core.scheduleAutoSave();};
     $('vocalVolume').oninput=e=>{const p=active();if(p?.type!=='vocal')return;p.volume=+e.target.value/100;$('vocalVolumeValue').textContent=`${e.target.value}%`;applyVocalFxLive(p);updatePartMiniVolume(p);core.scheduleAutoSave();};
     $('vocalArmMic').onclick=async()=>{if(recording)return;if(micStream?.active){await disableMic();core.status('Mic test off.');return;}try{await ensureMic();core.status('Mic test on. Aim for strong level without living at the far right of the meter.');}catch(e){core.status(e.message||'Could not access microphone.');}};
     if($('vocalMasterPlayBtn'))$('vocalMasterPlayBtn').onclick=toggleVocalMasterPlayback;

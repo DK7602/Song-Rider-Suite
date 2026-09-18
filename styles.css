@@ -3742,3 +3742,70 @@ body.vox-box-open{overflow:hidden!important}
 /* v3.3.22 — three-way Piano / Guitar / Misc instrument selectors. */
 #instrumentTabs .seg,#leadInstrumentTabs .seg{flex:1 1 0;min-width:0;text-align:center;}
 @media(max-width:520px){#leadInstrumentTabs .seg{padding-left:7px;padding-right:7px;font-size:.86rem;}}
+
+
+/* =========================================================
+   v3.3.23 — desktop/tablet Lead/Bass grid view toggle
+   Mobile (<=720px) intentionally keeps the existing layout unchanged.
+   ========================================================= */
+.lead-grid-view-toggle{
+  display:none;
+}
+@media(min-width:721px){
+  .lead-compact-settings-row{
+    width:min(100%,690px)!important;
+    max-width:690px!important;
+    grid-template-columns:minmax(74px,92px) minmax(82px,104px) minmax(60px,78px) minmax(72px,96px) minmax(112px,132px)!important;
+    align-items:end!important;
+  }
+  .lead-grid-view-toggle{
+    display:flex!important;
+    align-items:center;
+    justify-content:center;
+    align-self:end;
+    min-width:0!important;
+    width:100%;
+    height:42px;
+    padding:7px 10px!important;
+    border:1px solid #4a5664!important;
+    border-radius:11px!important;
+    background:#151c25!important;
+    color:#eef1f5!important;
+    font-weight:800!important;
+    font-size:.82rem!important;
+    line-height:1.05!important;
+    white-space:nowrap;
+  }
+  .lead-grid-view-toggle:hover,
+  .lead-grid-view-toggle[aria-pressed="true"]{
+    border-color:var(--accent)!important;
+    box-shadow:0 0 0 1px rgba(241,198,85,.18) inset;
+  }
+
+  /* Collapsed mode prevents the MIDI roll's intrinsic width from widening the
+     Baby DAW page. The grid stays full-size inside its own scrollable viewport. */
+  #leadPartEditor.lead-grid-collapsed{
+    min-width:0!important;
+    max-width:100%!important;
+    overflow:hidden!important;
+    contain:inline-size;
+  }
+  #leadPartEditor.lead-grid-collapsed .lead-grid-wrap{
+    display:block!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    overflow-x:auto!important;
+    overflow-y:auto!important;
+    overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  #leadPartEditor.lead-grid-collapsed .lead-grid{
+    width:max-content!important;
+    min-width:max-content!important;
+    max-width:none!important;
+  }
+}
+@media(max-width:720px){
+  .lead-grid-view-toggle{display:none!important;}
+}
