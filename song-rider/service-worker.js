@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.21-voxbox-pro';
+const CACHE = 'song-rider-suite-v3.3.22-pro-instruments';
 const ASSETS = [
   './vocal-autotune-worklet.js',
   './song-rider-pro-wordmark-hq.png',
