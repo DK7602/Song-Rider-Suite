@@ -1,12 +1,12 @@
-/* v3.3.16 — authoritative shared chord setup geometry. Loaded last. */
+/* v3.3.19 — authoritative CRP setup geometry. Keep this file tiny and deterministic. */
 #chordPartControls > .primary-toolbar{
   display:grid!important;grid-template-columns:minmax(0,1fr) 104px 72px!important;
-  gap:12px!important;align-items:end!important;width:100%!important;min-width:0!important;
+  grid-auto-flow:row!important;grid-auto-rows:max-content!important;
+  gap:12px!important;align-items:end!important;align-content:start!important;
+  width:100%!important;min-width:0!important;
 }
-#chordPartControls > .primary-toolbar[hidden],
-#chordPartControls > .primary-toolbar.crp-controls-hidden{display:none!important;}
-#chordPartControls > .primary-toolbar > #instrumentTabs,
-#chordPartControls > .primary-toolbar > #modeTabs{grid-column:1/-1!important;width:100%!important;min-width:0!important;}
+#chordPartControls > .primary-toolbar[hidden],#chordPartControls > .primary-toolbar.crp-controls-hidden{display:none!important;}
+#chordPartControls > .primary-toolbar > #instrumentTabs,#chordPartControls > .primary-toolbar > #modeTabs{grid-column:1/-1!important;width:100%!important;min-width:0!important;}
 #chordPartControls > .primary-toolbar > .sound-control{grid-column:1!important;width:100%!important;min-width:0!important;}
 #chordPartControls > .primary-toolbar > .sound-control #soundSelect{width:100%!important;min-width:0!important;}
 #chordPartControls > .primary-toolbar > .octave-control{grid-column:2!important;width:104px!important;min-width:104px!important;justify-self:end!important;}

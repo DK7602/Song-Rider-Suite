@@ -9,11 +9,24 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.18-SHELL-LAYOUT-END-PANEL" />
+  <link rel="stylesheet" href="styles.css?v=3.3.19-STABILITY" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
   <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
-  <link rel="stylesheet" href="crp-layout-lock.css?v=3.3.16">
+  <link rel="stylesheet" href="crp-layout-lock.css?v=3.3.19-STABILITY">
+  <!-- v3.3.19 critical CRP layout fallback. Duplicates only the tiny setup grid
+       so a stale/missed external stylesheet cannot restore the stretched layout. -->
+  <style id="crp-critical-layout-v3-3-19">
+    #chordPartControls>.primary-toolbar{display:grid!important;grid-template-columns:minmax(0,1fr) 104px 72px!important;grid-auto-flow:row!important;grid-auto-rows:max-content!important;gap:12px!important;align-items:end!important;align-content:start!important;width:100%!important;min-width:0!important}
+    #chordPartControls>.primary-toolbar[hidden],#chordPartControls>.primary-toolbar.crp-controls-hidden{display:none!important}
+    #chordPartControls>.primary-toolbar>#instrumentTabs,#chordPartControls>.primary-toolbar>#modeTabs{grid-column:1/-1!important;width:100%!important;min-width:0!important}
+    #chordPartControls>.primary-toolbar>.sound-control{grid-column:1!important;width:100%!important;min-width:0!important}
+    #chordPartControls>.primary-toolbar>.sound-control #soundSelect{width:100%!important;min-width:0!important}
+    #chordPartControls>.primary-toolbar>.octave-control{grid-column:2!important;width:104px!important;min-width:104px!important;justify-self:end!important}
+    #chordPartControls>.primary-toolbar>.sustain-control{grid-column:3!important;width:72px!important;min-width:72px!important;justify-self:end!important}
+    #chordPartControls>.primary-toolbar>.capo-shape-mode-row{grid-column:1/-1!important;width:100%!important}
+    @media(max-width:390px){#chordPartControls>.primary-toolbar{grid-template-columns:minmax(0,1fr) 96px 62px!important;gap:8px!important}#chordPartControls>.primary-toolbar>.octave-control{width:96px!important;min-width:96px!important}#chordPartControls>.primary-toolbar>.sustain-control{width:62px!important;min-width:62px!important}}
+  </style>
 </head>
 <body>
   <header class="app-header suite-master-header"><img src="assets/suite-header-new.png?v=3.3.12" alt="Song Rider Suite — Ride the progression. See it. Hear it. Build it."></header>
@@ -415,8 +428,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.18-SHELL-LAYOUT-END-PANEL"></script>
-  <script src="parts.js?v=3.3.18-SHELL-LAYOUT-END-PANEL"></script>
+  <script src="app.js?v=3.3.19-STABILITY"></script>
+  <script src="parts.js?v=3.3.19-STABILITY"></script>
   <script src="beat-maker.js?v=3.3.8-LAST-MIDI-DURATION-CAPO-ROW"></script>
 </body>
 </html>

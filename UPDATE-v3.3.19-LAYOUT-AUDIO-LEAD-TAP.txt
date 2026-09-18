@@ -1,0 +1,19 @@
+Song Rider Suite v3.3.19 — Layout / live-audio / Lead tap stability
+Date: 2026-09-18
+
+1) CRP layout
+- The compact CRP Sound + Octave + Sustain row is enforced by the lock stylesheet plus a tiny inline critical fallback in index.html.
+- CRP CSS/JS URLs were version-bumped so Chrome cannot reuse the older stretched layout response.
+- The service worker uses a new cache generation, clears prior Suite caches, and bypasses the browser HTTP cache for HTML/CSS/JS before offline fallback.
+
+2) Static/crackle while live-editing playback
+- Adding a Lead/Bass note during active playback no longer fires a second audition voice over the running arrangement.
+- Live part-gain changes use a short WebAudio ramp instead of an abrupt gain jump.
+- Lead/Vocal volume sliders no longer rebuild the entire Parts strip on every slider tick, reducing main-thread spikes while playback is scheduling.
+
+3) Lead/Bass note delete tap
+- A stationary tap on the note-duration handle now deletes the note; dragging still resizes it.
+- One tap removes duplicate same-step/same-pitch events left by an older build.
+- Loaded Lead/Bass events are deduplicated while preserving the longest drawn duration.
+
+Existing v3.3.18 Song End, Media Session, Auto-Tune, SRP link/playback, and BPM/Capo/Step sync logic are preserved.
