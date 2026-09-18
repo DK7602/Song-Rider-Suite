@@ -9,7 +9,7 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.17-SHELL-LAYOUT-END-PANEL" />
+  <link rel="stylesheet" href="styles.css?v=3.3.18-SHELL-LAYOUT-END-PANEL" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
   <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
@@ -278,15 +278,17 @@
             <span id="songEndValue">Full song</span>
             <small id="songPlayheadValue" class="subtle">Playhead 00:00.0</small>
           </div>
-          <button id="songEndMinusBtn" type="button" title="Move song end 0.1 second earlier">−0.1s</button>
-          <button id="songEndPlusBtn" type="button" title="Move song end 0.1 second later">+0.1s</button>
+          <div class="song-end-inline-controls" aria-label="Song end fine controls">
+            <button id="songEndMinusBtn" class="song-end-nudge" type="button" title="Move song end 0.1 second earlier">−0.1s</button>
+            <button id="songEndPlusBtn" class="song-end-nudge" type="button" title="Move song end 0.1 second later">+0.1s</button>
+            <label class="song-end-snap"><input id="songEndSnapBar" type="checkbox" checked> <span>Snap to Bar</span></label>
+          </div>
         </div>
         <div class="song-end-slider-block">
           <div class="song-end-slider-wrap">
             <div id="songEndBarTicks" class="song-end-bar-ticks" aria-hidden="true"></div>
             <input id="songEndSlider" type="range" min="0.05" max="1" step="0.01" value="1" aria-label="Song end position">
           </div>
-          <label class="song-end-snap"><input id="songEndSnapBar" type="checkbox" checked> <span>Snap to Bar</span></label>
         </div>
         <button id="songEndClearBtn" type="button">Restore Full Song</button>
         <small class="song-end-hint subtle">Drag the slider to set the exact ending. Gold lines mark each bar. Turn <b>Snap to Bar</b> off for free placement. Playback, notification seek, and WAV export use this cutoff.</small>
@@ -413,8 +415,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.16-SHELL-LAYOUT-END-PANEL"></script>
-  <script src="parts.js?v=3.3.17-SHELL-LAYOUT-END-PANEL"></script>
+  <script src="app.js?v=3.3.18-SHELL-LAYOUT-END-PANEL"></script>
+  <script src="parts.js?v=3.3.18-SHELL-LAYOUT-END-PANEL"></script>
   <script src="beat-maker.js?v=3.3.8-LAST-MIDI-DURATION-CAPO-ROW"></script>
 </body>
 </html>

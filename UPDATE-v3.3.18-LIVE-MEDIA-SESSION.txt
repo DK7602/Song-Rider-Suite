@@ -1,0 +1,6 @@
+v3.3.18
+- Compact Song End fine controls: -0.1s, +0.1s, and Snap to Bar sit beside Cutoff/Playhead.
+- Reworked Android/Chrome Media Session carrier as a long-form hidden HTML audio element so notification/lock-screen controls can publish reliably.
+- Media Session supports play, pause, stop, seek backward/forward, seek-to, metadata, and live position state.
+- Live editing no longer restarts the Baby DAW transport on autosave. Part volumes and vocal FX update in-place; musical changes roll into the scheduler without a pause.
+- Scheduler now rolls one beat at a time so instrument/note changes appear quickly while playback continues.
