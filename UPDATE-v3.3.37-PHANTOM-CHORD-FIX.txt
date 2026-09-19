@@ -1,0 +1,14 @@
+Song Rider Suite v3.3.37 — Track Master Phantom Chord/Note Fix
+
+ROOT CAUSE FIXED
+- A Track Master double-tap was correctly firing one add action, but the chord/note row insertion routine stored the new card twice in the final row.
+- Both stored entries shared the same voxId, so they rendered as stacked/phantom blocks and required repeated Delete presses.
+
+CHANGES
+1. Blank chord/note insertion now inserts the new card exactly once using the canonical destination-row insertion path.
+2. Existing saved projects are repaired on load by removing duplicate chord/note entries that share the same voxId.
+3. Track Master rendering also defensively removes any legacy duplicate voxId entries before building visible blocks.
+4. Existing v3.3.36 multi-track copy/paste, cross-track drag/drop, and unsaved-project protection are preserved.
+
+CACHE
+- Shell/service-worker cache bumped to v3.3.37 so Android/PWA installs replace the v3.3.36 JavaScript.

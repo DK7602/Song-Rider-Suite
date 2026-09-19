@@ -27,6 +27,29 @@
     return [...byKey.values()].sort((a,b)=>a.step-b.step||a.midi-b.midi);
   }
 
+
+  // v3.3.37 — repair duplicated chord-card identities. v3.3.35/36's Track Master
+  // blank-card insertion could append the same new card twice to the final row.
+  // Because both entries shared one voxId, they rendered as stacked/phantom blocks
+  // and required repeated Delete presses. Keep exactly one stored card per voxId.
+  function dedupeChordRows(data){
+    if(!data)return false;
+    if(!Array.isArray(data.rows)||!data.rows.length){data.rows=[[]];return false;}
+    const seenIds=new Set(),seenRefs=new Set();let changed=false;
+    data.rows=data.rows.map(raw=>{
+      const out=[];
+      for(const card of Array.isArray(raw)?raw:[]){
+        if(!card||typeof card!=='object'){out.push(card);continue;}
+        const id=String(card.voxId||'');
+        if(seenRefs.has(card)||(id&&seenIds.has(id))){changed=true;continue;}
+        seenRefs.add(card);if(id)seenIds.add(id);out.push(card);
+      }
+      return out;
+    });
+    if(!data.rows.length)data.rows=[[]];
+    return changed;
+  }
+
   let parts=[];
   let activePartId=null;
   let loadedChordPartId=null;
@@ -61,6 +84,7 @@
   function chordPart(name='Chords 1', data=null){
     const d=data?clone(data):core.snapshot();
     if(!d.rows?.length)d.rows=[[]];
+    dedupeChordRows(d);
     return {id:uid(),type:'chord',name,enabled:true,muted:false,solo:false,voxSetupEstablished:false,volume:.85,data:d};
   }
   function leadPart(name='Lead 1'){
@@ -89,7 +113,7 @@
   function normalizePart(p,i){
     if(!p||!p.type)return null;
     const base={id:p.id||uid(),name:p.name||`${p.type==='chord'?'Chords':p.type==='lead'?'Lead':'Vocals'} ${i+1}`,enabled:p.enabled!==false,muted:p.muted===true,solo:p.solo===true,voxSetupEstablished:p.voxSetupEstablished===true,volume:Number.isFinite(+p.volume)?Math.max(0,Math.min(1,+p.volume)):.85};
-    if(p.type==='chord')return {...base,type:'chord',data:clone(p.data||core.snapshot())};
+    if(p.type==='chord'){const data=clone(p.data||core.snapshot());dedupeChordRows(data);return {...base,type:'chord',data};}
     if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,sustain:p.sustain===true,instrument:['piano','guitar','misc'].includes(p.instrument)?p.instrument:'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(16,+p.bars||4)),events:normalizeLeadEvents(p.events)};
     const voxEvents=Array.isArray(p.voxEvents)?p.voxEvents.map(e=>normalizeVoxEvent(e,p)).filter(Boolean):[];
     return {...base,type:'vocal',repeat:p.repeat!==false,transcript:String(p.transcript||''),transcriptWords:Array.isArray(p.transcriptWords)?p.transcriptWords:[],recordings:Array.isArray(p.recordings)?p.recordings.map(r=>({...r,blob:null})):[],activeTakeId:p.activeTakeId||null,voxEvents,backingPartIds:Array.isArray(p.backingPartIds)?p.backingPartIds:[],backingDrums:p.backingDrums!==false,backingVolume:Number.isFinite(+p.backingVolume)?Math.max(0,Math.min(1,+p.backingVolume)):.8,fx:{eq:p.fx?.eq||'clear',comp:p.fx?.comp||'medium',reverb:Number(p.fx?.reverb??.12),delay:Number(p.fx?.delay||0),autotune:Math.max(0,Math.min(100,Number(p.fx?.autotune)||0))}};
@@ -1808,6 +1832,7 @@
   function leadEventDurationBeats(part,event){const stepBeats=4/Math.max(8,Number(part?.resolution)||16),exact=Number(event?.voxDurationBeats);return Number.isFinite(exact)&&exact>0?exact:Math.max(stepBeats,leadDurationSteps(event)*stepBeats);}
   function chordEventDurationBeats(part,card){const exact=Number(card?.voxDurationBeats);return Number.isFinite(exact)&&exact>0?exact:(core.cardDurationBeats?.(card,part?.data?.beats||core.beats)||core.beats);}
   function chordFlatItems(part){
+    dedupeChordRows(part?.data);
     const out=[];let cursor=0,flatIndex=0;for(let ri=0;ri<(part.data?.rows||[]).length;ri++){const row=part.data.rows[ri]||[];for(let ci=0;ci<row.length;ci++){const card=row[ci],dur=chordEventDurationBeats(part,card),raw=Number(card?.voxStartBeat),startBeat=Number.isFinite(raw)&&raw>=0?raw:cursor;out.push({card,rowIndex:ri,cardIndex:ci,flatIndex,startBeat,dur});cursor=Math.max(cursor,startBeat+dur);flatIndex++;}}return out;
   }
   function removeChordCardFromPart(part,card){
@@ -2003,9 +2028,9 @@
     const start=Math.max(0,quantizeVoxBeat(beat)),dur=1,card={voxId:uid(),voxBlank:true,type:mode==='note'?'note':'chord',value:'',durationBeats:dur,voxStartBeat:start,voxDurationBeats:dur};
     if(card.type==='note')card.midiNotes=[];
     if(!Array.isArray(part.data.rows)||!part.data.rows.length)part.data.rows=[[]];
-    const flat=part.data.rows.flat(),rowSizes=part.data.rows.map(r=>r.length);flat.push(card);flat.sort((a,b)=>(Number(a.voxStartBeat)||0)-(Number(b.voxStartBeat)||0));
-    if(!rowSizes.some(Boolean))part.data.rows=[[...flat]];
-    else{let i=0;part.data.rows=rowSizes.map((n,ri)=>{const take=ri===rowSizes.length-1?flat.slice(i):flat.slice(i,i+n);i+=n;return take;});if(i<flat.length)part.data.rows.at(-1).push(...flat.slice(i));}
+    // Insert once at the chronological destination. The previous row-rebuild path
+    // put the final-row remainder into that row and then appended it a second time.
+    insertChordCardIntoPart(part,card,start);
     return card;
   }
   function insertBlankLeadAtBeat(part,beat){
