@@ -4259,3 +4259,77 @@ body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
   .vox-drum-generator select{height:24px!important;font-size:.52rem!important;}
   .vox-drum-generator button{min-height:24px!important;font-size:.48rem!important;}
 }
+
+/* =========================================================
+   v3.3.32 — Vox Box Drum Map: true sticky title rail + exact beat geometry
+   ========================================================= */
+/* The old drum row used overflow:hidden on the row itself. That made the
+   negative-margin sticky label use the drum row as its own clipping/scroll
+   container, so the Drums header/names slid into the timeline and disappeared
+   during horizontal scrolling. Keep clipping on the lane only; never on the row. */
+.vox-drum-map-row{
+  overflow:visible!important;
+  isolation:isolate;
+}
+.vox-drum-map-row>.vox-drum-map-label{
+  position:sticky!important;
+  left:0!important;
+  margin-left:-132px!important;
+  width:132px!important;
+  min-width:132px!important;
+  max-width:132px!important;
+  z-index:45!important;
+  align-self:stretch!important;
+  box-shadow:5px 0 12px rgba(0,0,0,.38)!important;
+}
+/* The title rail contains ALL drum UI: title, generator controls and drum names.
+   The timeline lane begins at the same beat-zero origin as every other track. */
+.vox-drum-map-row>.vox-drum-map-lane{
+  position:absolute!important;
+  inset:0!important;
+  left:0!important;
+  right:0!important;
+  margin:0!important;
+  padding-top:var(--vox-drum-header-height,150px)!important;
+  overflow:hidden!important;
+  z-index:1!important;
+}
+.vox-drum-map-grid{
+  position:relative!important;
+  display:block!important;
+  margin:0!important;
+  padding:0!important;
+  min-width:0!important;
+  max-width:none!important;
+  overflow:visible!important;
+  background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.045) 0 1px,transparent 1px var(--vox-drum-cell-width)),
+    #111922!important;
+}
+/* Cells are positioned explicitly by JS: left = songBeat * pixelsPerBeat.
+   This avoids grid rounding/implicit-column offsets and locks each audible hit
+   to the exact same timeline coordinate used by chords, leads and vocals. */
+.vox-drum-map-grid>.vox-drum-cell{
+  position:absolute!important;
+  min-width:0!important;
+  max-width:none!important;
+  margin:0!important;
+  box-sizing:border-box!important;
+}
+.vox-drum-map-grid>.vox-drum-cell.beat-start{border-left:1px solid rgba(151,169,188,.56)!important;}
+.vox-drum-map-grid>.vox-drum-cell.bar-start{border-left:2px solid #8094a9!important;}
+.vox-drum-map-label .vox-drum-names{overflow:hidden!important;}
+
+@media(max-width:600px){
+  .vox-drum-map-row>.vox-drum-map-label{
+    margin-left:-96px!important;
+    width:96px!important;
+    min-width:96px!important;
+    max-width:96px!important;
+  }
+}
+.vox-drum-offgrid-hit{
+  z-index:4!important;
+  outline:1px solid rgba(255,238,158,.72)!important;
+  outline-offset:-1px!important;
+}

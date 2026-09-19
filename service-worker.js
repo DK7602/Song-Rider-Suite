@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.31-vox-drum-timeline-bpm';
+const CACHE = 'song-rider-suite-v3.3.32-vox-drum-rail-align';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
   './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css',

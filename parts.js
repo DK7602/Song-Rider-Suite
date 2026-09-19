@@ -1754,17 +1754,40 @@
     label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(null,label,e.clientX,e.clientY,{drums:true});};
 
     const lane=document.createElement('div');lane.className='vox-drum-map-lane';lane.onclick=e=>{if(e.target!==lane&&e.target!==grid)return;focusVoxInstrumentTrack('drum-map','Drums','drum-map');};
-    const grid=document.createElement('div');grid.className='vox-drum-map-grid';grid.style.width=`${cols*cellWidth}px`;
-    for(const d of defs){
+    // Use absolute timeline geometry for the drum editor instead of CSS grid flow.
+    // Every cell's X coordinate is derived from the exact same pixels-per-beat value
+    // as the ruler/chord/lead/vocal events, so a hit at beat N is guaranteed to sit
+    // directly beneath beat N even after long horizontal scrolls or fractional zooms.
+    const grid=document.createElement('div');grid.className='vox-drum-map-grid';grid.style.width=`${width}px`;grid.style.height=`${defs.length*drumRowHeight}px`;
+    defs.forEach((d,di)=>{
       for(let c=0;c<cols;c++){
-        const absoluteBeat=c*cellBeat,absoluteBar=Math.floor(c/res),patternBar=absoluteBar%patternBars,local=c%res,step=local*canonicalStep;
+        const absoluteBeat=c*cellBeat,absoluteBar=Math.floor(absoluteBeat/4),patternBar=absoluteBar%patternBars,local=c%res,step=local*canonicalStep;
         const on=(beat.tracks?.[d.id]?.[patternBar]||[]).some(x=>Number(x)===step),cell=document.createElement('button');cell.type='button';
         const quarterEvery=res/4;cell.className='vox-drum-cell'+(on?' on':'')+(local===0?' bar-start':(local%quarterEvery===0?' beat-start':''));
+        cell.style.left=`${absoluteBeat*ppb}px`;cell.style.top=`${di*drumRowHeight}px`;cell.style.width=`${cellWidth}px`;cell.style.height=`${drumRowHeight}px`;
+        cell.dataset.songBeat=String(absoluteBeat);cell.dataset.drumId=d.id;
         cell.title=`${d.name} • Song bar ${absoluteBar+1}, beat ${(local*4/res+1).toFixed(2)} • pattern bar ${patternBar+1}`;
-        cell.onclick=e=>{e.stopPropagation();voxInstrumentTrackFocus={kind:'drum-map',name:'Drums',key:'drum-map'};voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;const arr=b.tracks?.[d.id]?.[patternBar]||[],has=arr.some(x=>Number(x)===step);b.tracks[d.id][patternBar]=has?arr.filter(x=>Number(x)!==step):[...new Set([...arr,step])].sort((a,z)=>a-z);window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();voxStatus(`${d.name} ${has?'removed':'added'} at pattern bar ${patternBar+1}, beat ${(local*4/res+1).toFixed(2)}.`);};
+        cell.onclick=e=>{e.stopPropagation();voxInstrumentTrackFocus={kind:'drum-map',name:'Drums',key:'drum-map'};voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;const arr=b.tracks?.[d.id]?.[patternBar]||[],has=arr.some(x=>Number(x)===step);b.tracks[d.id][patternBar]=has?arr.filter(x=>Number(x)!==step):[...new Set([...arr,step])].sort((a,z)=>a-z);window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();voxStatus(`${d.name} ${has?'removed':'added'} at song beat ${(absoluteBeat+1).toFixed(2)} (pattern bar ${patternBar+1}).`);};
         grid.appendChild(cell);
       }
-    }
+      // A project can contain finer hits left behind after changing the Beat Maker
+      // resolution (for example a 1/32 hit while the editor is showing 1/16).
+      // Playback still schedules those canonical hits, so render them too rather
+      // than letting an audible drum hit disappear from Vox Box.
+      const songBars=Math.ceil(totalBeats/4);
+      for(let absoluteBar=0;absoluteBar<songBars;absoluteBar++){
+        const patternBar=absoluteBar%patternBars,hits=beat.tracks?.[d.id]?.[patternBar]||[];
+        for(const rawStep of hits){
+          const canonical=Number(rawStep);if(!Number.isInteger(canonical)||canonical<0||canonical>=64||canonical%canonicalStep===0)continue;
+          const absoluteBeat=absoluteBar*4+canonical/16;if(absoluteBeat>=totalBeats-.0001)continue;
+          const hit=document.createElement('button');hit.type='button';hit.className='vox-drum-cell vox-drum-offgrid-hit on';
+          hit.style.left=`${absoluteBeat*ppb}px`;hit.style.top=`${di*drumRowHeight}px`;hit.style.width=`${Math.max(5,Math.min(cellWidth,ppb/16))}px`;hit.style.height=`${drumRowHeight}px`;
+          hit.dataset.songBeat=String(absoluteBeat);hit.dataset.drumId=d.id;hit.title=`${d.name} • exact song beat ${(absoluteBeat+1).toFixed(3)} • finer saved hit`;
+          hit.onclick=e=>{e.stopPropagation();voxInstrumentTrackFocus={kind:'drum-map',name:'Drums',key:'drum-map'};voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;const arr=b.tracks?.[d.id]?.[patternBar]||[];b.tracks[d.id][patternBar]=arr.filter(x=>Number(x)!==canonical);window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();voxStatus(`${d.name} removed at exact song beat ${(absoluteBeat+1).toFixed(3)}.`);};
+          grid.appendChild(hit);
+        }
+      }
+    });
     lane.appendChild(grid);row.append(label,lane);tracks.appendChild(row);
   }
 

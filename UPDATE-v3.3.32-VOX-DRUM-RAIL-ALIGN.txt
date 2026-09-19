@@ -1,0 +1,10 @@
+Song Rider Suite v3.3.32
+
+Vox Box Drum Map repair
+- Fixed the root cause of the drum title rail sliding/disappearing: overflow clipping on the drum row disabled sticky positioning.
+- Drums, Style, Complexity, Randomize, Fill Last Bar and every drum name now live entirely in the same sticky left track-title rail as the other tracks.
+- The drum title rail remains visible while horizontally scrolling the song timeline.
+- Rebuilt drum cells with explicit song-time coordinates: left = absolute song beat × Vox Box pixels-per-beat.
+- Drum cells no longer depend on CSS grid flow/implicit columns, eliminating horizontal offsets and cumulative rounding drift.
+- The saved Beat Maker pattern repeats across the complete Vox Box song timeline. Editing any repeated hit updates the corresponding Beat Maker pattern step.
+- Existing Vox BPM header and floating transport remain unchanged.
