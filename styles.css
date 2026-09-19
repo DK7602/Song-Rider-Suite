@@ -4176,3 +4176,86 @@ body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
 .vox-drum-map-lane{margin-left:0!important;}
 .vox-drum-map-name{left:132px!important;}
 @media(max-width:600px){.vox-drum-map-lane{margin-left:0!important}.vox-drum-map-name{left:96px!important}}
+
+
+/* =========================================================
+   v3.3.31 — Vox Box drum timeline alignment + header BPM
+   ========================================================= */
+.vox-bpm-edit{
+  display:flex;align-items:center;gap:6px;min-height:38px;padding:4px 7px;
+  border:1px solid #3b4653;border-radius:9px;background:#151c25;color:#aeb8c3;
+  font-size:.72rem;font-weight:900;white-space:nowrap;
+}
+.vox-bpm-edit input{
+  width:62px;min-width:62px;height:30px;box-sizing:border-box;padding:4px 6px;
+  border:1px solid #465463;border-radius:7px;background:#090f15;color:#fff;
+  font:900 .88rem/1 system-ui,sans-serif;text-align:center;outline:none;
+}
+.vox-bpm-edit input:focus{border-color:#f1c655;box-shadow:0 0 0 2px rgba(241,198,85,.15);}
+
+/* Drum Map uses the ordinary sticky 132px/96px track-title rail.  The lane starts
+   exactly at beat zero; drum names no longer steal horizontal timeline space. */
+.vox-drum-map-row{
+  height:var(--vox-drum-map-height,568px)!important;
+  min-height:var(--vox-drum-map-height,568px)!important;
+  overflow:hidden!important;
+  background:#0c131b!important;
+}
+.vox-drum-map-label{
+  height:100%!important;min-height:100%!important;padding:0!important;gap:0!important;
+  display:grid!important;grid-template-rows:var(--vox-drum-header-height,150px) 1fr!important;
+  align-items:stretch!important;justify-content:stretch!important;overflow:hidden!important;
+  background:#101720!important;
+}
+.vox-drum-track-head{
+  min-height:0;padding:8px 8px 6px;box-sizing:border-box;display:flex;flex-direction:column;gap:3px;
+  border-bottom:1px solid #33404c;background:#101720;
+}
+.vox-drum-track-head>.vox-track-meta{padding-right:0!important;font-size:.62rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vox-drum-generator{display:grid!important;grid-template-columns:1fr 1fr!important;gap:3px 4px!important;width:100%!important;margin-top:2px!important;}
+.vox-drum-generator label{min-width:0!important;gap:1px!important;font-size:.52rem!important;}
+.vox-drum-generator select{width:100%!important;min-width:0!important;height:25px!important;padding:1px 3px!important;font-size:.57rem!important;}
+.vox-drum-gen-actions{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:3px;}
+.vox-drum-generator button{min-width:0!important;width:100%!important;min-height:25px!important;padding:2px 3px!important;font-size:.52rem!important;line-height:1.05!important;}
+.vox-drum-names{
+  display:grid;grid-template-rows:repeat(var(--vox-drum-row-count),var(--vox-drum-row-height,22px));
+  min-height:0;overflow:hidden;background:#111923;
+}
+.vox-drum-name{
+  height:var(--vox-drum-row-height,22px);min-height:var(--vox-drum-row-height,22px);box-sizing:border-box;
+  display:flex;align-items:center;padding:0 7px;border-bottom:1px solid rgba(255,255,255,.055);
+  color:#dbe3eb;font-size:.61rem;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.vox-drum-map-lane{
+  position:absolute!important;inset:0!important;margin-left:0!important;height:100%!important;min-height:0!important;
+  overflow:hidden!important;padding-top:var(--vox-drum-header-height,150px)!important;box-sizing:border-box!important;
+  background:#0b1118!important;border-top:0!important;border-bottom:1px solid #27323d!important;
+}
+.vox-drum-map-grid{
+  display:grid!important;
+  grid-template-columns:repeat(var(--vox-drum-cols),var(--vox-drum-cell-width))!important;
+  grid-auto-rows:var(--vox-drum-row-height,22px)!important;
+  align-content:start!important;min-width:0!important;max-width:none!important;height:auto!important;margin:0!important;
+}
+.vox-drum-map-name{display:none!important;}
+.vox-drum-cell{
+  width:var(--vox-drum-cell-width)!important;min-width:var(--vox-drum-cell-width)!important;
+  height:var(--vox-drum-row-height,22px)!important;min-height:var(--vox-drum-row-height,22px)!important;max-height:var(--vox-drum-row-height,22px)!important;
+  box-sizing:border-box!important;border-radius:0!important;border:0!important;
+  border-right:1px solid rgba(255,255,255,.045)!important;border-bottom:1px solid rgba(255,255,255,.045)!important;
+  background:#151e27!important;box-shadow:none!important;padding:0!important;
+}
+.vox-drum-cell.beat-start{border-left:1px solid rgba(151,169,188,.42)!important;}
+.vox-drum-cell.bar-start{border-left:1px solid #73869a!important;}
+.vox-drum-cell.on{background:#f1c655!important;box-shadow:inset 0 0 0 2px rgba(0,0,0,.23)!important;}
+
+@media(max-width:600px){
+  .vox-bpm-edit{min-height:34px;padding:3px 5px;font-size:.65rem;gap:4px;}
+  .vox-bpm-edit input{width:54px;min-width:54px;height:27px;font-size:.78rem;padding:3px 4px;}
+  .vox-drum-track-head{padding:6px 5px 4px;}
+  .vox-drum-name{padding:0 5px;font-size:.54rem;}
+  .vox-drum-generator{gap:2px 3px!important;}
+  .vox-drum-generator label{font-size:.48rem!important;}
+  .vox-drum-generator select{height:24px!important;font-size:.52rem!important;}
+  .vox-drum-generator button{min-height:24px!important;font-size:.48rem!important;}
+}

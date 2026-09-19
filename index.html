@@ -9,7 +9,7 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.30-VOX-CURSOR-DRUM-MAP-TRACK-MENU" />
+  <link rel="stylesheet" href="styles.css?v=3.3.31-VOX-DRUM-TIMELINE-BPM" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
   <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
@@ -424,7 +424,7 @@
       <header class="vox-box-header">
         <div class="vox-box-brand"><strong>VOX BOX</strong><span>Vocal Event Editor</span></div>
         <div class="vox-box-header-actions">
-          <button id="voxBoxPlayBtn" class="accent" type="button">▶ Play</button>
+          <label class="vox-bpm-edit" title="Song tempo"><span>BPM</span><input id="voxBpmInput" type="number" min="40" max="240" step="1" inputmode="numeric" aria-label="Vox Box BPM"></label>
           <label class="vox-snap-toggle"><input id="voxSnapToBeat" type="checkbox" checked><span>Snap to Beat</span></label>
           <label class="vox-snap-resolution"><span>Grid</span><select id="voxSnapResolution"><option value="4">1/4</option><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
           <button id="voxBoxCloseBtn" type="button">Done</button>
@@ -512,8 +512,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.30-VOX-CURSOR-DRUM-MAP-TRACK-MENU"></script>
-  <script src="parts.js?v=3.3.30-VOX-CURSOR-DRUM-MAP-TRACK-MENU"></script>
-  <script src="beat-maker.js?v=3.3.30-VOX-CURSOR-DRUM-MAP-TRACK-MENU"></script>
+  <script src="app.js?v=3.3.31-VOX-DRUM-TIMELINE-BPM"></script>
+  <script src="parts.js?v=3.3.31-VOX-DRUM-TIMELINE-BPM"></script>
+  <script src="beat-maker.js?v=3.3.31-VOX-DRUM-TIMELINE-BPM"></script>
 </body>
 </html>

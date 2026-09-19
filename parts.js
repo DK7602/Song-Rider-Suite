@@ -1717,27 +1717,57 @@
     flat.splice(old,1);let beat=0,idx=flat.length;for(let i=0;i<flat.length;i++){const dur=core.cardDurationBeats?.(flat[i],core.beats)||core.beats;if(targetBeat<beat+dur/2){idx=i;break;}beat+=dur;}flat.splice(idx,0,card);let pos=0;part.data.rows=lengths.map(len=>{const r=flat.slice(pos,pos+len);pos+=len;return r;});
   }
   function renderVoxDrumMap(tracks,width,ppb){
-    if(!voxShowInstrumentals)return;const beat=window.CRPBeatMaker?.getBeat?.();if(!beat)return;
-    const defs=window.CRPBeatMaker?.getDrumDefs?.()||[],res=[8,16,32,64].includes(+beat.resolution)?+beat.resolution:16,cols=Math.max(1,beat.bars*res),canonicalStep=64/res;
+    if(!voxShowInstrumentals)return;
+    const beat=window.CRPBeatMaker?.getBeat?.();if(!beat)return;
+    const defs=window.CRPBeatMaker?.getDrumDefs?.()||[];
+    const res=[8,16,32,64].includes(+beat.resolution)?+beat.resolution:16;
+    const patternBars=Math.max(1,Number(beat.bars)||1),canonicalStep=64/res;
+    // Vox Box is a song timeline, not merely the Beat Maker pattern editor.  Repeat
+    // the saved drum pattern across the complete visible song so each audible hit
+    // appears at the same horizontal beat position as chords, leads and vocals.
+    const totalBeats=Math.max(4,width/Math.max(1,ppb));
+    const cols=Math.max(1,Math.ceil(totalBeats*res/4));
+    const cellBeat=4/res,cellWidth=ppb*cellBeat;
+    const drumRowHeight=22,headerHeight=150,drumMapHeight=headerHeight+defs.length*drumRowHeight;
     const row=document.createElement('div');row.className='vox-track-row vox-drum-map-row';row.style.width=`${width}px`;row.dataset.voxTrackKey='drum-map';row.dataset.voxKind='drum-map';row.classList.toggle('is-instrument-focus',voxInstrumentTrackFocus?.key==='drum-map');
-    const drumRowHeight=22,drumMapHeight=Math.max(220,defs.length*drumRowHeight+2);row.style.setProperty('--vox-drum-map-height',`${drumMapHeight}px`);
-    const hitCount=Object.values(beat.tracks||{}).reduce((n,bars)=>n+(bars||[]).slice(0,beat.bars).reduce((m,a)=>m+(a?.length||0),0),0);
+    row.style.setProperty('--vox-drum-map-height',`${drumMapHeight}px`);row.style.setProperty('--vox-drum-header-height',`${headerHeight}px`);row.style.setProperty('--vox-drum-row-height',`${drumRowHeight}px`);row.style.setProperty('--vox-drum-row-count',String(defs.length));row.style.setProperty('--vox-drum-cols',String(cols));row.style.setProperty('--vox-drum-cell-width',`${cellWidth}px`);
+    const hitCount=Object.values(beat.tracks||{}).reduce((n,bars)=>n+(bars||[]).slice(0,patternBars).reduce((m,a)=>m+(a?.length||0),0),0);
+
+    // Everything descriptive about the Drum Map belongs in the same sticky track-title
+    // column as every other Vox Box track.  Drum names no longer consume timeline width.
     const label=document.createElement('div');label.className='vox-track-label vox-instrument-label vox-drum-map-label';
-    const enable=document.createElement('label');enable.className='vox-track-enable';const chk=document.createElement('input');chk.type='checkbox';chk.checked=beat.enabled!==false;chk.onpointerdown=e=>e.stopPropagation();chk.onchange=e=>{e.stopPropagation();voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;b.enabled=chk.checked;window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();};const strong=document.createElement('strong');strong.textContent='Drums';enable.append(chk,strong);
-    const meta=document.createElement('span');meta.textContent=`${beat.bars} bar${beat.bars===1?'':'s'} • ${hitCount} hits • Drum Map`;
-    const gen=document.createElement('div');gen.className='vox-drum-generator';gen.innerHTML=`<label>Style<select class="vox-drum-style"><option value="rock">Rock</option><option value="pop">Pop</option><option value="rap">Rap</option><option value="trap">Trap</option><option value="boombap">Boom Bap</option><option value="gfunk">G-Funk</option></select></label><label>Complexity<select class="vox-drum-complexity"><option value="simple">Simple</option><option value="medium">Medium</option><option value="busy">Busy</option></select></label><button type="button" class="vox-drum-randomize">Randomize</button><button type="button" class="vox-drum-fill">Fill Last Bar</button>`;
+    const head=document.createElement('div');head.className='vox-drum-track-head';
+    const enable=document.createElement('label');enable.className='vox-track-enable';
+    const chk=document.createElement('input');chk.type='checkbox';chk.checked=beat.enabled!==false;chk.onpointerdown=e=>e.stopPropagation();chk.onchange=e=>{e.stopPropagation();voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;b.enabled=chk.checked;window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();};
+    const strong=document.createElement('strong');strong.textContent='Drums';enable.append(chk,strong);
+    const meta=document.createElement('span');meta.className='vox-track-meta';meta.textContent=`${patternBars} bar${patternBars===1?'':'s'} • ${hitCount} hits`;
+    const gen=document.createElement('div');gen.className='vox-drum-generator';gen.innerHTML=`<label>Style<select class="vox-drum-style"><option value="rock">Rock</option><option value="pop">Pop</option><option value="rap">Rap</option><option value="trap">Trap</option><option value="boombap">Boom Bap</option><option value="gfunk">G-Funk</option></select></label><label>Complexity<select class="vox-drum-complexity"><option value="simple">Simple</option><option value="medium">Medium</option><option value="busy">Busy</option></select></label><div class="vox-drum-gen-actions"><button type="button" class="vox-drum-randomize">Randomize</button><button type="button" class="vox-drum-fill">Fill Last Bar</button></div>`;
     const style=gen.querySelector('.vox-drum-style'),complex=gen.querySelector('.vox-drum-complexity');try{style.value=localStorage.getItem('crp-vox-drum-style-v1')||'rap';complex.value=localStorage.getItem('crp-vox-drum-complexity-v1')||'medium';}catch{}
     for(const ctl of gen.querySelectorAll('select,button')){ctl.onpointerdown=e=>e.stopPropagation();ctl.onclick=e=>e.stopPropagation();}
     style.onchange=()=>{try{localStorage.setItem('crp-vox-drum-style-v1',style.value)}catch{}};complex.onchange=()=>{try{localStorage.setItem('crp-vox-drum-complexity-v1',complex.value)}catch{}};
     gen.querySelector('.vox-drum-randomize').onclick=e=>{e.stopPropagation();voxCheckpoint();window.CRPBeatMaker?.generateBeat?.({style:style.value,complexity:complex.value});persistVoxEdits();renderVoxBox();voxStatus(`${style.options[style.selectedIndex]?.text||style.value} drum pattern generated.`);};
     gen.querySelector('.vox-drum-fill').onclick=e=>{e.stopPropagation();voxCheckpoint();window.CRPBeatMaker?.fillLastBar?.({style:style.value,complexity:complex.value});persistVoxEdits();renderVoxBox();voxStatus('Fill added to the last drum bar.');};
-    label.append(enable,meta,gen);label.onclick=e=>{if(e.target.closest('button,input,select,label'))return;focusVoxInstrumentTrack('drum-map','Drums','drum-map');renderVoxInspector();};
+    head.append(enable,meta,gen);
+    const names=document.createElement('div');names.className='vox-drum-names';
+    for(const d of defs){const n=document.createElement('div');n.className='vox-drum-name';n.textContent=d.name;n.title=d.name;names.appendChild(n);}
+    label.append(head,names);label.onclick=e=>{if(e.target.closest('button,input,select,label'))return;focusVoxInstrumentTrack('drum-map','Drums','drum-map');renderVoxInspector();};
     label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(null,label,e.clientX,e.clientY,{drums:true});};
+
     const lane=document.createElement('div');lane.className='vox-drum-map-lane';lane.onclick=e=>{if(e.target!==lane&&e.target!==grid)return;focusVoxInstrumentTrack('drum-map','Drums','drum-map');};
-    const grid=document.createElement('div');grid.className='vox-drum-map-grid';grid.style.setProperty('--vox-drum-cols',String(cols));
-    for(const d of defs){const name=document.createElement('div');name.className='vox-drum-map-name';name.textContent=d.name;grid.appendChild(name);for(let c=0;c<cols;c++){const bar=Math.floor(c/res),local=c%res,step=local*canonicalStep,on=(beat.tracks?.[d.id]?.[bar]||[]).some(x=>Number(x)===step),cell=document.createElement('button');cell.type='button';cell.className='vox-drum-cell'+(on?' on':'')+(local===0?' bar-start':'');cell.title=`${d.name} • Bar ${bar+1} • ${(local*4/res+1).toFixed(2)} beat`;cell.onclick=e=>{e.stopPropagation();voxInstrumentTrackFocus={kind:'drum-map',name:'Drums',key:'drum-map'};voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;const arr=b.tracks[d.id][bar]||[],has=arr.some(x=>Number(x)===step);b.tracks[d.id][bar]=has?arr.filter(x=>Number(x)!==step):[...new Set([...arr,step])].sort((a,z)=>a-z);window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();voxStatus(`${d.name} ${has?'removed':'added'}.`);};grid.appendChild(cell);}}
+    const grid=document.createElement('div');grid.className='vox-drum-map-grid';grid.style.width=`${cols*cellWidth}px`;
+    for(const d of defs){
+      for(let c=0;c<cols;c++){
+        const absoluteBeat=c*cellBeat,absoluteBar=Math.floor(c/res),patternBar=absoluteBar%patternBars,local=c%res,step=local*canonicalStep;
+        const on=(beat.tracks?.[d.id]?.[patternBar]||[]).some(x=>Number(x)===step),cell=document.createElement('button');cell.type='button';
+        const quarterEvery=res/4;cell.className='vox-drum-cell'+(on?' on':'')+(local===0?' bar-start':(local%quarterEvery===0?' beat-start':''));
+        cell.title=`${d.name} • Song bar ${absoluteBar+1}, beat ${(local*4/res+1).toFixed(2)} • pattern bar ${patternBar+1}`;
+        cell.onclick=e=>{e.stopPropagation();voxInstrumentTrackFocus={kind:'drum-map',name:'Drums',key:'drum-map'};voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;const arr=b.tracks?.[d.id]?.[patternBar]||[],has=arr.some(x=>Number(x)===step);b.tracks[d.id][patternBar]=has?arr.filter(x=>Number(x)!==step):[...new Set([...arr,step])].sort((a,z)=>a-z);window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();voxStatus(`${d.name} ${has?'removed':'added'} at pattern bar ${patternBar+1}, beat ${(local*4/res+1).toFixed(2)}.`);};
+        grid.appendChild(cell);
+      }
+    }
     lane.appendChild(grid);row.append(label,lane);tracks.appendChild(row);
   }
+
   function instrumentClickSelection(sel,evEl,e){
     e.stopPropagation();if(evEl.__voxDragged){evEl.__voxDragged=false;return;}if(evEl.__voxPointerSelected){evEl.__voxPointerSelected=false;renderVoxSelectionClasses();return;}const add=e.ctrlKey||e.metaKey||e.shiftKey;setVoxInstrumentSelection(sel,{add,toggle:add});
   }
@@ -1949,7 +1979,22 @@
   }
   function resetSelectedVoxFx(){const selected=voxSelectionPairs();if(!selected.length)return;voxCheckpoint();const touched=new Set();for(const {part,event} of selected){event.fx=null;event.volume=1;touched.add(part);}for(const p of touched)applyVocalFxLive(p);markPartsDirty();core.scheduleAutoSave();renderVoxInspector();voxStatus(`${selected.length} selected event${selected.length===1?'':'s'} now follow track effects.`);}
 
+  function syncVoxBpmInput(){
+    const box=$('voxBpmInput');if(!box||document.activeElement===box)return;
+    const bpm=Math.max(40,Math.min(240,Math.round(Number(core.bpm)||92)));
+    if(String(box.value)!==String(bpm))box.value=String(bpm);
+  }
+  function commitVoxBpm(){
+    const box=$('voxBpmInput'),main=$('bpmInput');if(!box||!main)return;
+    const raw=Number(box.value);if(!Number.isFinite(raw)){syncVoxBpmInput();return;}
+    const bpm=Math.max(40,Math.min(240,Math.round(raw)));box.value=String(bpm);main.value=String(bpm);
+    // Reuse the Suite's existing BPM live-audio refresh + canonical sync path so
+    // CRP, Baby DAW and linked SRP all receive the same committed tempo.
+    main.dispatchEvent(new Event('input',{bubbles:true}));main.dispatchEvent(new Event('change',{bubbles:true}));
+    updateMediaMetadata();voxStatus(`BPM set to ${bpm}.`);
+  }
   function updateVoxTransportState(){
+    syncVoxBpmInput();
     const on=!!(playing||starting),rec=!!recording,paused=!!recordingPaused;
     if($('voxBoxPlayBtn'))$('voxBoxPlayBtn').textContent=on?'■ Stop':'▶ Play';if($('voxPlayTransportBtn')){$('voxPlayTransportBtn').classList.toggle('is-active',on);$('voxPlayTransportBtn').textContent=on?'▶':'▶';}
     if($('voxPauseTransportBtn'))$('voxPauseTransportBtn').classList.toggle('is-active',paused||(!on&&mediaPausedBeat>0));
@@ -1977,7 +2022,7 @@
       }
     }catch{}
     if($('voxBoxCloseBtn'))$('voxBoxCloseBtn').onclick=closeVoxBox;
-    if($('voxBoxPlayBtn'))$('voxBoxPlayBtn').onclick=()=>{if(playing||starting)voxTransportStop();else voxTransportPlay();};
+    if($('voxBpmInput')){syncVoxBpmInput();$('voxBpmInput').addEventListener('change',commitVoxBpm);$('voxBpmInput').addEventListener('blur',commitVoxBpm);$('voxBpmInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitVoxBpm();e.currentTarget.blur();}});}
     if($('voxSnapToBeat'))$('voxSnapToBeat').onchange=e=>{try{localStorage.setItem(VOX_SNAP_KEY,e.target.checked?'1':'0')}catch{}voxStatus(e.target.checked?`Snap on (1/${$('voxSnapResolution')?.value||'16'})`:'Free drag enabled.');};
     if($('voxSnapResolution'))$('voxSnapResolution').onchange=e=>{try{localStorage.setItem(VOX_RES_KEY,e.target.value)}catch{}voxStatus(`Snap grid set to 1/${e.target.value}.`);};
     if($('voxShowInstrumentals'))$('voxShowInstrumentals').onchange=e=>{voxShowInstrumentals=!!e.target.checked;try{localStorage.setItem(VOX_INST_KEY,voxShowInstrumentals?'1':'0')}catch{};voxInstrumentSelections=[];voxInstrumentSelection=null;if(!voxShowInstrumentals)voxInstrumentTrackFocus=null;renderVoxBox();voxStatus(voxShowInstrumentals?'Instrument tracks added. Edit Chord/Note and Lead/Bass events on the timeline; edit drums in the Drum Map at the bottom.':'Instrument tracks hidden.');};
