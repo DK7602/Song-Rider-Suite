@@ -9,7 +9,7 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.29-VOX-FX-TOGGLE-TRACK-REORDER" />
+  <link rel="stylesheet" href="styles.css?v=3.3.30-VOX-CURSOR-DRUM-MAP-TRACK-MENU" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
   <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
@@ -435,17 +435,19 @@
         <button id="voxAddTrackBtn" type="button">+ Vocal Track</button>
         <button id="voxAddActiveTakeBtn" type="button">+ Active Take</button>
         <label class="vox-tool-check"><input id="voxShowInstrumentals" type="checkbox"><span>Instrumentals</span></label>
-        <button id="voxDrumMapBtn" type="button" aria-pressed="false">Drum Map</button>
         <button id="voxCropBtn" type="button">Crop</button>
         <button id="voxSplitBtn" type="button">Split at Playhead</button>
-        <button id="voxMultiSelectBtn" type="button" aria-pressed="false">Multi Select</button>
         <button id="voxCopyBtn" type="button">Copy</button>
         <button id="voxCutBtn" type="button">Cut</button>
         <button id="voxPasteBtn" type="button" disabled>Paste</button>
         <button id="voxDeleteBtn" type="button">Delete</button>
         <button id="voxUndoBtn" type="button" disabled title="Undo Vox Box edit">Undo</button>
         <button id="voxRedoBtn" type="button" disabled title="Redo Vox Box edit">Redo</button>
-        <span id="voxBoxStatus" class="subtle tiny">Tap a track to place the playhead. Drag events left/right or between vocal tracks.</span>
+        <div id="voxHarmonyGuide" class="vox-harmony-guide" aria-live="polite">
+          <div><strong>Chords Used</strong><span id="voxChordsUsed">—</span></div>
+          <div><strong>Notes that fit</strong><span id="voxNotesFit">—</span></div>
+        </div>
+        <span id="voxBoxStatus" class="subtle tiny">Cursor: drag a box to select events. Ruler: click to move the playhead.</span>
       </div>
 
       <div id="voxTimelineScroller" class="vox-timeline-scroller">
@@ -510,8 +512,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.29-VOX-FX-TOGGLE-TRACK-REORDER"></script>
-  <script src="parts.js?v=3.3.29-VOX-FX-TOGGLE-TRACK-REORDER"></script>
-  <script src="beat-maker.js?v=3.3.29-VOX-FX-TOGGLE-TRACK-REORDER"></script>
+  <script src="app.js?v=3.3.30-VOX-CURSOR-DRUM-MAP-TRACK-MENU"></script>
+  <script src="parts.js?v=3.3.30-VOX-CURSOR-DRUM-MAP-TRACK-MENU"></script>
+  <script src="beat-maker.js?v=3.3.30-VOX-CURSOR-DRUM-MAP-TRACK-MENU"></script>
 </body>
 </html>

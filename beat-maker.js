@@ -582,6 +582,14 @@
     getDrumDefs(){
       return DRUMS.map(([id,name])=>({id,name}));
     },
+    generateBeat({style='rap',complexity='medium'}={}){
+      const st=$('crpBeatStyle'),cx=$('crpBeatComplexity');if(st&&[...st.options].some(o=>o.value===style))st.value=style;if(cx&&[...cx.options].some(o=>o.value===complexity))cx.value=complexity;
+      $('crpRandomizeBeat')?.click();return JSON.parse(JSON.stringify(normalizeBeat(beat)));
+    },
+    fillLastBar({style='rap',complexity='medium'}={}){
+      const st=$('crpBeatStyle'),cx=$('crpBeatComplexity');if(st&&[...st.options].some(o=>o.value===style))st.value=style;if(cx&&[...cx.options].some(o=>o.value===complexity))cx.value=complexity;
+      $('crpFillLastBar')?.click();return JSON.parse(JSON.stringify(normalizeBeat(beat)));
+    },
     setBeat(next,{persist=true}={}){
       beat=normalizeBeat(next);
       currentBar=clamp(currentBar,0,beat.bars-1);

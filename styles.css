@@ -3944,7 +3944,6 @@ body.vox-box-open>footer{display:none!important}
 #voxLyricsTransportBtn{padding-left:10px!important;padding-right:10px!important;}
 .vox-playhead span{pointer-events:auto;cursor:ew-resize;touch-action:none;}
 .vox-playhead span::after{content:"";position:absolute;left:-14px;top:-10px;width:28px;height:30px;}
-#voxMultiSelectBtn.is-active{background:var(--accent)!important;color:#111!important;border-color:var(--accent)!important;}
 
 @media(max-width:600px){
   .lead-play-options-lower{flex-wrap:wrap!important;}
@@ -4007,7 +4006,6 @@ body.vox-box-open>footer{display:none!important}
 .vox-drum-cell:nth-child(4n+1){background:#18232e!important;}
 .vox-drum-cell.bar-start{border-left:1px solid #607080!important;}
 .vox-drum-cell.on{background:#f1c655!important;box-shadow:inset 0 0 0 2px rgba(0,0,0,.22)!important;}
-#voxDrumMapBtn.is-active,#voxMultiSelectBtn.is-active{background:linear-gradient(180deg,#f8d66d,#e7b53c)!important;color:#111!important;border-color:#d4a02e!important;}
 /* v3.3.26 — instrument focus gives the timeline the room instead of leaving
    a disabled Vocal Effects editor open below it. Selecting a vocal restores it. */
 .vox-inspector.is-collapsed{
@@ -4087,3 +4085,94 @@ body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
   .vox-inspector-toggle{position:absolute!important;top:0;right:0;z-index:2;}
   .vox-inspector.is-collapsed .vox-inspector-heading-actions>label{display:none!important;}
 }
+
+/* =========================================================
+   v3.3.30 — Vox Box cursor workflow + bottom Drum Map
+   ========================================================= */
+.vox-box-page.cursor-mode .vox-track-lane,
+.vox-box-page.cursor-mode .vox-instrument-event,
+.vox-box-page.cursor-mode .vox-event{cursor:default!important;}
+.vox-box-page.cursor-mode .vox-inst-handle,
+.vox-box-page.cursor-mode .vox-trim-handle{cursor:ew-resize!important;}
+.vox-box-page.playhead-mode .vox-track-lane{cursor:crosshair;}
+.vox-box-page.playhead-mode .vox-instrument-event,
+.vox-box-page.playhead-mode .vox-event{cursor:grab;}
+.vox-box-page.playhead-mode .vox-instrument-event:active,
+.vox-box-page.playhead-mode .vox-event:active{cursor:grabbing;}
+.vox-marquee{
+  position:absolute;z-index:300;pointer-events:none;box-sizing:border-box;
+  border:1px solid #78d2ff;background:rgba(80,184,241,.14);
+  box-shadow:0 0 0 1px rgba(120,210,255,.12) inset;
+}
+.vox-inline-event-input{
+  position:absolute;inset:4px;z-index:40;min-width:0;width:calc(100% - 8px);height:calc(100% - 8px);
+  box-sizing:border-box;padding:2px 5px;border:1px solid #8ed8ff;border-radius:3px;
+  background:#09121b;color:#fff;font:800 .74rem/1.2 system-ui,sans-serif;text-align:center;outline:none;
+  box-shadow:0 0 0 2px rgba(102,198,255,.18);
+}
+.vox-track-menu-btn{
+  position:absolute;right:5px;top:5px;z-index:30;width:26px;height:26px;min-width:26px!important;min-height:26px!important;
+  padding:0!important;border-radius:6px!important;background:#1a2430!important;border:1px solid #3c4a59!important;color:#dce5ee!important;
+  font-weight:900!important;line-height:1!important;
+}
+.vox-track-label{position:sticky;}
+.vox-track-label>.vox-track-meta,.vox-track-label>span{padding-right:27px;}
+.vox-track-context-menu{
+  position:fixed;z-index:9000;display:flex;flex-direction:column;gap:3px;min-width:210px;padding:7px;
+  border:1px solid #465564;border-radius:9px;background:#0d141c;color:#eef3f7;
+  box-shadow:0 16px 44px rgba(0,0,0,.58);
+}
+.vox-track-context-menu button{width:100%;min-height:34px;padding:7px 10px!important;text-align:left;border-radius:6px!important;background:#18212b!important;color:#edf2f6!important;border:1px solid transparent!important;}
+.vox-track-context-menu button:hover{border-color:#63778b!important;background:#202c38!important;}
+.vox-track-context-menu button.danger{color:#ff9993!important;}
+.vox-track-dialog[hidden]{display:none!important;}
+.vox-track-dialog{position:fixed;inset:0;z-index:9200;display:grid;place-items:center;padding:14px;}
+.vox-track-dialog-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(3px);}
+.vox-track-dialog-card{position:relative;z-index:1;width:min(430px,calc(100vw - 28px));display:grid;gap:10px;padding:16px;border:1px solid #4b5a69;border-radius:14px;background:#101820;box-shadow:0 18px 60px rgba(0,0,0,.62);}
+.vox-track-dialog-card h3{margin:0 0 4px;color:#f2c95d;}
+.vox-track-dialog-card>label{display:grid;grid-template-columns:110px 1fr;gap:9px;align-items:center;font-weight:800;color:#d6dee7;}
+.vox-track-dialog-card input,.vox-track-dialog-card select{width:100%;min-width:0;min-height:38px;box-sizing:border-box;border:1px solid #43515f;border-radius:8px;background:#0b1118;color:#fff;padding:7px 9px;}
+.vox-track-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px;}
+.vox-track-dialog-actions .accent{background:linear-gradient(180deg,#f8d66d,#e7b53c)!important;color:#111!important;border-color:#d4a02e!important;}
+.vox-harmony-guide{
+  display:grid;gap:3px;min-width:250px;max-width:min(560px,45vw);padding:2px 8px;border-left:1px solid #384552;
+  color:#d5dde5;font-size:.69rem;line-height:1.2;
+}
+.vox-harmony-guide>div{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden;white-space:nowrap;}
+.vox-harmony-guide strong{flex:0 0 78px;color:#aebdca;font-size:.65rem;}
+.vox-harmony-guide span:not(.vox-harmony-chip){min-width:0;}
+.vox-harmony-chip{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:21px;padding:0 6px;margin-right:3px;border:1px solid #566575;border-radius:11px;background:#17212b;color:#f0f4f7;font-weight:900;}
+.vox-harmony-chip.chord{border-color:#b48a27;color:#f6d36a;background:#211b0d;}
+.vox-harmony-chip.note.chord-tone{border-color:#7d6ac0;background:#211c35;}
+.vox-harmony-chip.note.root-tone{background:#f1c655;color:#14100a;border-color:#f5d983;}
+.vox-drum-map-label{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:7px!important;overflow:visible!important;}
+.vox-drum-generator{display:grid;grid-template-columns:1fr;gap:5px;width:100%;margin-top:4px;}
+.vox-drum-generator label{display:grid;gap:2px;color:#9facb8;font-size:.58rem;font-weight:800;}
+.vox-drum-generator select{width:100%;min-width:0;height:27px;padding:2px 4px;border:1px solid #394755;border-radius:5px;background:#0b1118;color:#e9eef3;font-size:.62rem;}
+.vox-drum-generator button{width:100%;min-height:27px!important;padding:3px 4px!important;border-radius:5px!important;font-size:.58rem!important;line-height:1.1!important;white-space:normal;}
+.vox-drum-map-row{order:9999;}
+.vox-drum-map-lane{margin-left:132px!important;}
+.vox-drum-map-grid{grid-template-columns:92px repeat(var(--vox-drum-cols),14px)!important;}
+.vox-drum-map-name{left:0!important;}
+.vox-tool-mode-btn.is-active{cursor:default!important;}
+
+@media(max-width:760px){
+  .vox-harmony-guide{order:20;grid-column:1/-1;max-width:100%;width:100%;border-left:0;border-top:1px solid #33414e;padding:5px 2px 0;}
+  .vox-harmony-guide strong{flex-basis:72px;}
+  .vox-track-dialog-card>label{grid-template-columns:90px 1fr;}
+}
+@media(max-width:600px){
+  .vox-track-menu-btn{right:3px;top:3px;width:24px;height:24px;min-width:24px!important;min-height:24px!important;}
+  .vox-track-context-menu{min-width:min(220px,calc(100vw - 12px));}
+  .vox-harmony-guide{font-size:.62rem;}
+  .vox-harmony-chip{height:19px;min-width:20px;padding:0 5px;}
+  .vox-drum-map-lane{margin-left:96px!important;}
+  .vox-drum-map-grid{grid-template-columns:72px repeat(var(--vox-drum-cols),14px)!important;}
+  .vox-drum-generator select{height:25px;font-size:.56rem;}
+  .vox-drum-generator button{font-size:.54rem!important;}
+  .vox-track-dialog-card>label{grid-template-columns:1fr;gap:4px;}
+}
+/* Keep the Drum Map lane aligned with the same timeline origin as every other track. */
+.vox-drum-map-lane{margin-left:0!important;}
+.vox-drum-map-name{left:132px!important;}
+@media(max-width:600px){.vox-drum-map-lane{margin-left:0!important}.vox-drum-map-name{left:96px!important}}
