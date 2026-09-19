@@ -9,7 +9,7 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.28-WIDE-TRACK-MASTER" />
+  <link rel="stylesheet" href="styles.css?v=3.3.29-VOX-FX-TOGGLE-TRACK-REORDER" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
   <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
@@ -474,7 +474,10 @@
       <section class="vox-inspector" aria-label="Vocal event effects">
         <div class="vox-inspector-heading">
           <div><strong id="voxInspectorTitle">Track Effects</strong><span id="voxInspectorMeta" class="subtle tiny">Select a vocal track or event.</span></div>
-          <label>Apply to<select id="voxFxTarget"><option value="track">Track</option><option value="event">Selected Event</option></select></label>
+          <div class="vox-inspector-heading-actions">
+            <label>Apply to<select id="voxFxTarget"><option value="track">Track</option><option value="event">Selected Event</option></select></label>
+            <button id="voxInspectorToggleBtn" class="vox-inspector-toggle" type="button" aria-expanded="true" title="Hide Track Effects">Hide</button>
+          </div>
         </div>
         <div class="vox-fx-grid">
           <label>Volume<input id="voxFxVolume" type="range" min="0" max="150" step="1" value="100"><strong id="voxFxVolumeValue">100%</strong></label>
@@ -507,8 +510,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.28-WIDE-TRACK-MASTER"></script>
-  <script src="parts.js?v=3.3.28-WIDE-TRACK-MASTER"></script>
-  <script src="beat-maker.js?v=3.3.28-WIDE-TRACK-MASTER"></script>
+  <script src="app.js?v=3.3.29-VOX-FX-TOGGLE-TRACK-REORDER"></script>
+  <script src="parts.js?v=3.3.29-VOX-FX-TOGGLE-TRACK-REORDER"></script>
+  <script src="beat-maker.js?v=3.3.29-VOX-FX-TOGGLE-TRACK-REORDER"></script>
 </body>
 </html>

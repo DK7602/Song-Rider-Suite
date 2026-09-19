@@ -3560,7 +3560,10 @@ body.vox-box-open>footer{display:none!important}
 }
 .vox-inspector-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px}
 .vox-inspector-heading>div{display:flex;flex-direction:column;gap:3px;min-width:0}
-.vox-inspector-heading>label{display:flex;align-items:center;gap:7px;white-space:nowrap;color:#abb5c1;font-size:.78rem;font-weight:800}
+.vox-inspector-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-left:auto}
+.vox-inspector-heading-actions>label{display:flex;align-items:center;gap:7px;white-space:nowrap;color:#abb5c1;font-size:.78rem;font-weight:800}
+.vox-inspector-toggle{min-width:58px;min-height:34px;padding:6px 11px!important;border-color:#5b6672!important;background:#202833!important;color:#f2f4f7!important;font-weight:900!important}
+.vox-inspector-toggle:hover{border-color:#d3aa45!important}
 .vox-inspector-heading select{padding:7px 30px 7px 9px}
 .vox-fx-grid{display:grid;grid-template-columns:1.5fr repeat(5,minmax(110px,1fr));gap:8px;align-items:end}
 .vox-fx-grid label{display:flex;flex-direction:column;gap:5px;font-size:.76rem;color:#aeb8c4;font-weight:800;min-width:0}
@@ -3601,7 +3604,10 @@ body.vox-box-open>footer{display:none!important}
   .vox-event{top:14px;height:76px}
   .vox-event-waveform{inset:22px 4px 5px;height:47px}
   .vox-inspector{padding:8px 9px;max-height:42vh}
-  .vox-inspector-heading{align-items:flex-start;flex-direction:column;gap:6px}
+  .vox-inspector-heading{align-items:flex-start;flex-direction:row;gap:6px}
+  .vox-inspector-heading-actions{gap:6px;align-items:flex-start}
+  .vox-inspector-heading-actions>label{flex-direction:column;align-items:flex-start;gap:3px}
+  .vox-inspector-toggle{min-width:54px;min-height:32px;padding:5px 8px!important}
   .vox-fx-grid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:390px){
@@ -4011,7 +4017,7 @@ body.vox-box-open>footer{display:none!important}
   overflow:hidden!important;
 }
 .vox-inspector.is-collapsed .vox-inspector-heading{margin:0!important;min-height:34px;align-items:center!important;}
-.vox-inspector.is-collapsed .vox-inspector-heading>label,
+.vox-inspector.is-collapsed .vox-inspector-heading-actions>label,
 .vox-inspector.is-collapsed .vox-fx-grid,
 .vox-inspector.is-collapsed .vox-inspector-actions{display:none!important;}
 .vox-inspector.is-collapsed #voxInspectorMeta{display:block!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(900px,80vw);}
@@ -4056,4 +4062,28 @@ body.vox-box-open>footer{display:none!important}
 @media(max-width:700px){
   .track-master-nav-row{margin:5px 0 8px;padding:0 10px}
   .track-master-gold-btn{width:100%;max-width:none;min-height:38px;padding:7px 18px;border-radius:12px;font-size:.78rem}
+}
+
+
+/* =========================================================
+   v3.3.29 — Vox FX show/hide + reliable mobile track reorder
+   ========================================================= */
+.vox-track-reorder-handle{-webkit-touch-callout:none;touch-action:pan-x;overscroll-behavior:contain;}
+body.vox-track-reordering{overscroll-behavior:none;}
+body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
+.vox-inspector.is-collapsed .vox-inspector-heading-actions{margin-left:auto;}
+.vox-inspector.is-collapsed .vox-inspector-toggle{display:inline-flex!important;align-items:center;justify-content:center;}
+@media(max-width:600px){
+  .vox-inspector-heading{display:flex!important;flex-direction:row!important;align-items:flex-start!important;justify-content:space-between!important;}
+  .vox-inspector-heading>div:first-child{flex:1 1 auto;min-width:0;}
+  .vox-inspector-heading-actions{flex:0 0 auto;display:flex;align-items:flex-start;gap:6px;}
+  .vox-inspector.is-collapsed .vox-inspector-heading-actions>label{display:none!important;}
+}
+
+@media(max-width:600px){
+  .vox-inspector-heading{position:relative!important;display:block!important;padding-right:64px!important;min-height:48px;}
+  .vox-inspector-heading-actions{display:block!important;margin-left:0!important;}
+  .vox-inspector-heading-actions>label{margin-top:8px;display:flex!important;flex-direction:row!important;align-items:center!important;gap:7px!important;}
+  .vox-inspector-toggle{position:absolute!important;top:0;right:0;z-index:2;}
+  .vox-inspector.is-collapsed .vox-inspector-heading-actions>label{display:none!important;}
 }

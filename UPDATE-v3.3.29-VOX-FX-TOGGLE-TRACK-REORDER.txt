@@ -1,0 +1,7 @@
+Song Rider Suite v3.3.29
+
+- Added Show/Hide control at the upper-right of the Vox Box Track Effects inspector.
+- Instrument focus still auto-collapses the inspector; the Show button can temporarily reopen it.
+- Fixed mobile/tablet track reordering: long-press a track title until it highlights, then drag vertically. Reordering now uses track-row midpoint geometry instead of hit-testing through the elevated sticky row.
+- Track order continues to persist and sync back to Baby DAW part order.
+- Cache/version bumped so the updated controls load after deployment.
