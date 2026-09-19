@@ -47,6 +47,11 @@
   let leadBarClipboard=null, speechRec=null, speechBase='';
   let partsUpdatedAt=0;
   let voxBoxOpen=false,voxCropMode=false,voxSelected=null,voxSelections=[],voxInstrumentSelection=null,voxInstrumentSelections=[],voxInstrumentTrackFocus=null,voxTargetPartId=null,voxClipboard=null,voxPlayheadBeat=0,voxRenderToken=0,voxAutoScroll=true,voxShowInstrumentals=false,voxToolMode='playhead',voxUndoStack=[],voxRedoStack=[],voxInspectorManualOverride=null;
+  // v3.3.34 — mobile soft keyboards resize the visual viewport. A Vox inline
+  // editor must survive that height-only resize or Android immediately removes
+  // the input, blurs it, and collapses the keyboard. Track the layout width so
+  // only genuine width/orientation changes rebuild the timeline.
+  let voxLastLayoutWidth=Math.round(window.innerWidth||document.documentElement.clientWidth||0);
   const VOX_SNAP_KEY='crp-vox-snap-v1',VOX_RES_KEY='crp-vox-resolution-v1',VOX_AUTO_KEY='crp-vox-autoscroll-v1',VOX_INST_KEY='crp-vox-instrumentals-v1',VOX_TRANSPORT_POS_KEY='crp-vox-transport-pos-v1',VOX_TOOL_KEY='crp-vox-tool-v1',VOX_TRACK_ORDER_KEY='crp-vox-track-order-v1';
   function markPartsDirty(){ partsUpdatedAt=Date.now(); return partsUpdatedAt; }
 
@@ -1870,12 +1875,18 @@
     }catch(err){console.warn('Vox Box audition failed',err);}
   }
   function beginVoxInlineEventEdit(sel,el){
-    if(!sel||!el||sel.kind==='drum')return;el.querySelector('.vox-inline-event-input')?.remove();const input=document.createElement('input');input.className='vox-inline-event-input';input.type='text';input.autocomplete='off';input.spellcheck=false;const noteCard=sel.kind==='chord'&&(sel.part?.data?.mode==='note'||sel.card?.type==='note'),blank=sel.kind==='lead'?sel.event?.voxBlank===true:sel.card?.voxBlank===true;input.value=blank?'':(sel.kind==='lead'?midiName(sel.event.midi):(noteCard&&Number.isFinite(Number(sel.card?.midiNotes?.[0]))?midiName(Number(sel.card.midiNotes[0])):String(sel.card?.value||'')));input.placeholder=sel.kind==='lead'||noteCard?'Type note (ex. F#4)':'Type chord (ex. Bm7)';el.appendChild(input);requestAnimationFrame(()=>{input.focus();input.select();});
+    if(!sel||!el||sel.kind==='drum')return;
+    // Finish any other inline editor first, but never rebuild this event simply
+    // because the phone keyboard changed viewport height.
+    const prior=document.querySelector('.vox-inline-event-input');if(prior&&prior!==el.querySelector('.vox-inline-event-input'))prior.blur();
+    el.querySelector('.vox-inline-event-input')?.remove();const input=document.createElement('input');input.className='vox-inline-event-input';input.type='text';input.autocomplete='off';input.autocapitalize='off';input.enterKeyHint='done';input.spellcheck=false;const noteCard=sel.kind==='chord'&&(sel.part?.data?.mode==='note'||sel.card?.type==='note'),blank=sel.kind==='lead'?sel.event?.voxBlank===true:sel.card?.voxBlank===true;input.value=blank?'':(sel.kind==='lead'?midiName(sel.event.midi):(noteCard&&Number.isFinite(Number(sel.card?.midiNotes?.[0]))?midiName(Number(sel.card.midiNotes[0])):String(sel.card?.value||'')));input.placeholder=sel.kind==='lead'||noteCard?'Type note (ex. F#4)':'Type chord (ex. Bm7)';el.appendChild(input);
+    requestAnimationFrame(()=>{if(!input.isConnected)return;try{input.focus({preventScroll:true});}catch{input.focus();}try{input.setSelectionRange(0,input.value.length);}catch{}});
     let finished=false;const finish=async(commit=true)=>{if(finished)return;finished=true;const txt=input.value.trim();input.remove();if(!commit||!txt){renderVoxBox();return;}voxCheckpoint();
       if(sel.kind==='lead'){const oldOct=Math.floor((Number(sel.event.midi)||60)/12)-1,n=voxNoteFromText(txt,oldOct);if(!n){voxUndoStack.pop();updateVoxHistoryButtons();voxStatus('Type a note such as F#, D5, or Bb3.');renderVoxBox();return;}sel.event.midi=n.midi;delete sel.event.voxBlank;}
       else if(sel.kind==='chord'){const noteMode=sel.part.data?.mode==='note'||sel.card?.type==='note';if(noteMode){const n=voxNoteFromText(txt,defaultChordNoteOctave(sel.part,sel.card));if(!n){voxUndoStack.pop();updateVoxHistoryButtons();voxStatus('Type a note such as C#, A4, or Bb3.');renderVoxBox();return;}sel.card.type='note';sel.card.value=n.root;sel.card.midiNotes=[n.midi];delete sel.card.voxBlank;}else{const probe={...sel.card,type:'chord',value:txt};if(!(core.notesFor(probe,sel.part.data)||[]).length){voxUndoStack.pop();updateVoxHistoryButtons();voxStatus('That chord name was not recognized. Try D, Bm, F#m7, Cmaj7, etc.');renderVoxBox();return;}sel.card.type='chord';sel.card.value=txt;delete sel.card.midiNotes;delete sel.card.voxBlank;}}
       if(sel.kind==='chord'&&String(sel.part.id)===String(loadedChordPartId))core.apply(sel.part.data);persistVoxEdits();renderParts();renderVoxBox();await auditionVoxInstrument(sel);voxStatus(`${txt} updated and auditioned.`);};
-    input.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();finish(true);}else if(e.key==='Escape'){e.preventDefault();finish(false);}};input.onblur=()=>finish(true);input.onclick=e=>e.stopPropagation();input.onpointerdown=e=>e.stopPropagation();
+    input.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();input.blur();}else if(e.key==='Escape'){e.preventDefault();finished=true;input.remove();renderVoxBox();}};
+    input.onblur=()=>finish(true);input.onclick=e=>e.stopPropagation();input.onpointerdown=e=>e.stopPropagation();input.ondblclick=e=>e.stopPropagation();
   }
   function renderVoxHarmonyGuide(){
     const cb=$('voxChordsUsed'),nb=$('voxNotesFit');if(!cb||!nb)return;const focusId=String(voxInstrumentTrackFocus?.key||'').startsWith('part:')?String(voxInstrumentTrackFocus.key).slice(5):'',part=parts.find(p=>p.type==='chord'&&String(p.id)===focusId)||loadedChord()||parts.find(p=>p.type==='chord');if(!part){cb.textContent='—';nb.textContent='—';return;}
@@ -2225,7 +2236,18 @@
       voxScroller.addEventListener('touchmove',e=>{if(!voxAutoScroll||voxTouchX==null||!e.touches?.length)return;const dx=e.touches[0].clientX-voxTouchX,dy=e.touches[0].clientY-voxTouchY;if(Math.hypot(dx,dy)>10){voxTouchX=voxTouchY=null;disableVoxAutoScroll();}},{passive:true});
       voxScroller.addEventListener('touchend',()=>{voxTouchX=voxTouchY=null;},{passive:true});
     }
-    window.addEventListener('resize',()=>{updateLeadGridViewToggle();if(voxBoxOpen){renderVoxBox();requestAnimationFrame(()=>clampVoxTransportToViewport());}});
+    window.addEventListener('resize',()=>{
+      updateLeadGridViewToggle();if(!voxBoxOpen)return;
+      const width=Math.round(window.innerWidth||document.documentElement.clientWidth||0),widthChanged=Math.abs(width-voxLastLayoutWidth)>4;
+      voxLastLayoutWidth=width;
+      const inlineEditor=document.querySelector('.vox-inline-event-input');
+      const active=document.activeElement,voxFormFocus=!!(active&&active.closest?.('#voxBoxPage')&&active.matches?.('input,textarea,select,[contenteditable="true"]'));
+      // Android/iOS open/close the software keyboard by changing viewport height.
+      // Re-rendering here destroys the focused input and collapses the keyboard.
+      // Keep the live editor/form control intact; committed edits already redraw.
+      if(inlineEditor||voxFormFocus||!widthChanged){requestAnimationFrame(()=>clampVoxTransportToViewport());return;}
+      renderVoxBox();requestAnimationFrame(()=>clampVoxTransportToViewport());
+    });
     if($('songEndMinusBtn'))$('songEndMinusBtn').onclick=()=>nudgeSongEnd(-.1);
     if($('songEndPlusBtn'))$('songEndPlusBtn').onclick=()=>nudgeSongEnd(.1);
     if($('songEndClearBtn'))$('songEndClearBtn').onclick=clearSongEnd;
