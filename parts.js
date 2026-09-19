@@ -47,6 +47,9 @@
   let leadBarClipboard=null, speechRec=null, speechBase='';
   let partsUpdatedAt=0;
   let voxBoxOpen=false,voxCropMode=false,voxSelected=null,voxSelections=[],voxInstrumentSelection=null,voxInstrumentSelections=[],voxInstrumentTrackFocus=null,voxTargetPartId=null,voxClipboard=null,voxPlayheadBeat=0,voxRenderToken=0,voxAutoScroll=true,voxShowInstrumentals=false,voxToolMode='playhead',voxUndoStack=[],voxRedoStack=[],voxInspectorManualOverride=null;
+  // v3.3.36 — persists across Track Master rerenders so Android's synthesized dblclick/click
+  // cannot create or refocus a second phantom event after a touch double-tap.
+  let voxLaneAddGuard={partId:'',at:0,x:0,y:0};
   // v3.3.34 — mobile soft keyboards resize the visual viewport. A Vox inline
   // editor must survive that height-only resize or Android immediately removes
   // the input, blurs it, and collapses the keyboard. Track the layout width so
@@ -1807,6 +1810,35 @@
   function chordFlatItems(part){
     const out=[];let cursor=0,flatIndex=0;for(let ri=0;ri<(part.data?.rows||[]).length;ri++){const row=part.data.rows[ri]||[];for(let ci=0;ci<row.length;ci++){const card=row[ci],dur=chordEventDurationBeats(part,card),raw=Number(card?.voxStartBeat),startBeat=Number.isFinite(raw)&&raw>=0?raw:cursor;out.push({card,rowIndex:ri,cardIndex:ci,flatIndex,startBeat,dur});cursor=Math.max(cursor,startBeat+dur);flatIndex++;}}return out;
   }
+  function removeChordCardFromPart(part,card){
+    if(!part?.data?.rows)return false;const id=String(card?.voxId||'');
+    for(const row of part.data.rows){let i=row.indexOf(card);if(i<0&&id)i=row.findIndex(c=>String(c?.voxId||'')===id);if(i>=0){row.splice(i,1);return true;}}
+    return false;
+  }
+  function insertChordCardIntoPart(part,card,targetBeat){
+    if(!part||!card)return null;part.data=part.data||core.snapshot();if(!Array.isArray(part.data.rows)||!part.data.rows.length)part.data.rows=[[]];
+    const beat=Math.max(0,Math.round((Number(targetBeat)||0)*1000)/1000);card.voxStartBeat=beat;card.voxDurationBeats=Math.max(.03,Number(card.voxDurationBeats)||Number(card.durationBeats)||core.cardDurationBeats?.(card,part.data?.beats||core.beats)||core.beats);card.durationBeats=card.voxDurationBeats;
+    const items=chordFlatItems(part);let idx=items.length;for(let i=0;i<items.length;i++){if(beat<items[i].startBeat){idx=i;break;}}
+    let remaining=idx,done=false;for(const row of part.data.rows){if(remaining<=row.length){row.splice(remaining,0,card);done=true;break;}remaining-=row.length;}if(!done)part.data.rows.at(-1).push(card);return card;
+  }
+  function instrumentPartsForKind(kind){return parts.filter(p=>p.type===(kind==='chord'?'chord':'lead'));}
+  function focusedInstrumentPart(kind){
+    const key=String(voxInstrumentTrackFocus?.key||'');if(!key.startsWith('part:'))return null;const id=key.slice(5),p=parts.find(x=>String(x.id)===id);
+    return p&&p.type===(kind==='chord'?'chord':'lead')?p:null;
+  }
+  function serializeInstrumentClipboardItems(list,anchor){
+    const baseByKind={};
+    for(const kind of ['chord','lead']){const tracks=instrumentPartsForKind(kind),indexes=list.filter(s=>s.kind===kind).map(s=>tracks.indexOf(s.part)).filter(i=>i>=0);baseByKind[kind]=indexes.length?Math.min(...indexes):0;}
+    return list.map(s=>{const tracks=instrumentPartsForKind(s.kind),idx=Math.max(0,tracks.indexOf(s.part));return {kind:s.kind,deltaBeat:(Number(s.startBeat)||0)-anchor,sourcePartId:s.part?.id||null,trackOffset:idx-(baseByKind[s.kind]||0),event:s.event?clone(s.event):null,card:s.card?clone(s.card):null};});
+  }
+  function destinationInstrumentPartForClip(clip){
+    const kind=clip?.kind;if(!['chord','lead'].includes(kind))return null;const tracks=instrumentPartsForKind(kind),focus=focusedInstrumentPart(kind),source=parts.find(x=>x.type===(kind==='chord'?'chord':'lead')&&String(x.id)===String(clip?.sourcePartId))||null;
+    // Paste with no track change duplicates back onto the source track(s). Once the user
+    // explicitly focuses another compatible track, that track becomes the base destination.
+    if(String(voxInstrumentTrackFocus?.key||'')===String(voxClipboard?.focusKeyAtCopy||''))return source||tracks[0]||null;
+    if(focus&&tracks.length){const base=tracks.indexOf(focus),offset=Number(clip.trackOffset)||0;return tracks[Math.max(0,Math.min(tracks.length-1,base+offset))]||focus;}
+    return source||tracks[0]||null;
+  }
   function reorderChordCardToBeat(part,card,targetBeat){
     const rows=part.data?.rows||[];const lengths=rows.map(r=>r.length),flat=rows.flat();const old=flat.indexOf(card);if(old<0||flat.length<2)return;
     flat.splice(old,1);let beat=0,idx=flat.length;for(let i=0;i<flat.length;i++){const dur=core.cardDurationBeats?.(flat[i],core.beats)||core.beats;if(targetBeat<beat+dur/2){idx=i;break;}beat+=dur;}flat.splice(idx,0,card);let pos=0;part.data.rows=lengths.map(len=>{const r=flat.slice(pos,pos+len);pos+=len;return r;});
@@ -1916,7 +1948,7 @@
     // Finish any other inline editor first, but never rebuild this event simply
     // because the phone keyboard changed viewport height.
     const prior=document.querySelector('.vox-inline-event-input');if(prior&&prior!==el.querySelector('.vox-inline-event-input'))prior.blur();
-    el.querySelector('.vox-inline-event-input')?.remove();const input=document.createElement('input');input.className='vox-inline-event-input';input.type='text';input.autocomplete='off';input.autocapitalize='off';input.enterKeyHint='done';input.spellcheck=false;const noteCard=sel.kind==='chord'&&(sel.part?.data?.mode==='note'||sel.card?.type==='note'),blank=sel.kind==='lead'?sel.event?.voxBlank===true:sel.card?.voxBlank===true;input.value=blank?'':(sel.kind==='lead'?midiName(sel.event.midi):(noteCard&&Number.isFinite(Number(sel.card?.midiNotes?.[0]))?midiName(Number(sel.card.midiNotes[0])):String(sel.card?.value||'')));input.placeholder=sel.kind==='lead'||noteCard?'Type note (ex. F#4)':'Type chord (ex. Bm7)';el.appendChild(input);
+    el.querySelector('.vox-inline-event-input')?.remove();const input=document.createElement('input');input.className='vox-inline-event-input';input.type='text';input.autocomplete='off';input.autocapitalize='off';input.enterKeyHint='done';input.spellcheck=false;const noteCard=sel.kind==='chord'&&sel.card?.type==='note',blank=sel.kind==='lead'?sel.event?.voxBlank===true:sel.card?.voxBlank===true;input.value=blank?'':(sel.kind==='lead'?midiName(sel.event.midi):(noteCard&&Number.isFinite(Number(sel.card?.midiNotes?.[0]))?midiName(Number(sel.card.midiNotes[0])):String(sel.card?.value||'')));input.placeholder=sel.kind==='lead'||noteCard?'Type note (ex. F#4)':'Type chord (ex. Bm7)';el.appendChild(input);
     requestAnimationFrame(()=>{if(!input.isConnected)return;try{input.focus({preventScroll:true});}catch{input.focus();}try{input.setSelectionRange(0,input.value.length);}catch{}});
     let finished=false;const finish=async(commit=true)=>{if(finished)return;finished=true;const txt=input.value.trim();input.remove();if(!commit||!txt){renderVoxBox();return;}
       // Re-resolve by stable voxId at commit time. Autosave / history / other UI work
@@ -1926,7 +1958,7 @@
         const oldOct=Math.floor((Number(live.event.midi)||60)/12)-1,n=voxNoteFromText(txt,oldOct);if(!n){voxUndoStack.pop();updateVoxHistoryButtons();voxStatus('Type a note such as F#, D5, or Bb3.');renderVoxBox();return;}
         live.event.midi=n.midi;delete live.event.voxBlank;
       }else if(live.kind==='chord'){
-        const noteMode=live.part.data?.mode==='note'||live.card?.type==='note';
+        const noteMode=live.card?.type==='note';
         if(noteMode){const n=voxNoteFromText(txt,defaultChordNoteOctave(live.part,live.card));if(!n){voxUndoStack.pop();updateVoxHistoryButtons();voxStatus('Type a note such as C#, A4, or Bb3.');renderVoxBox();return;}live.card.type='note';live.card.value=n.root;live.card.midiNotes=[n.midi];delete live.card.voxBlank;}
         else{const probe={...live.card,type:'chord',value:txt};if(!(core.notesFor(probe,live.part.data)||[]).length){voxUndoStack.pop();updateVoxHistoryButtons();voxStatus('That chord name was not recognized. Try D, Bm, F#m7, Cmaj7, etc.');renderVoxBox();return;}live.card.type='chord';live.card.value=txt;delete live.card.midiNotes;delete live.card.voxBlank;}
         // Keep the event an explicit timeline block after the first text commit.
@@ -2030,14 +2062,21 @@
     if(!voxTrackSetupEstablished(part)){openVoxEventSetupDialog(part,beat);return;}
     createBlankVoxInstrumentEvent(part,beat,{mode:part.type==='chord'?(part.data?.mode||'chord'):'note',instrument:part.type==='chord'?part.data?.instrument:part.instrument,sound:part.type==='chord'?part.data?.sound:part.sound});
   }
+  function recentVoxLaneAdd(part,e,windowMs=780){
+    const g=voxLaneAddGuard,now=performance.now(),x=Number(e?.clientX)||0,y=Number(e?.clientY)||0;
+    return !!(g&&String(g.partId)===String(part?.id||'')&&now-Number(g.at||0)<windowMs&&Math.hypot(x-Number(g.x||0),y-Number(g.y||0))<42);
+  }
+  function commitVoxLaneDoubleAdd(part,beat,e){
+    if(recentVoxLaneAdd(part,e))return false;voxLaneAddGuard={partId:String(part?.id||''),at:performance.now(),x:Number(e?.clientX)||0,y:Number(e?.clientY)||0};addVoxInstrumentEventAt(part,beat);return true;
+  }
   function wireVoxLaneDoubleAdd(lane,part,clickBeat){
     if(!lane||!part)return;
-    // Desktop double-click and touch double-tap share one guarded path. Some mobile
-    // browsers synthesize a dblclick after our two pointerup taps; the short guard
-    // prevents that synthesized event from creating a second blank note/chord.
-    lane.ondblclick=e=>{if(e.target!==lane)return;if((lane.__voxTouchDoubleAddAt||0)+650>performance.now()){e.preventDefault();e.stopPropagation();return;}e.preventDefault();e.stopPropagation();addVoxInstrumentEventAt(part,clickBeat(e,lane));};
+    // The guard lives outside the lane DOM node because adding an event rerenders the lane.
+    // Android can send the synthesized dblclick/click to that *new* lane; a node-local flag
+    // disappears during the rerender and was the source of the phantom second/third blocks.
+    lane.ondblclick=e=>{if(e.target!==lane)return;e.preventDefault();e.stopPropagation();commitVoxLaneDoubleAdd(part,clickBeat(e,lane),e);};
     let lastTouch=0,lastX=0,lastY=0;
-    lane.addEventListener('pointerup',e=>{if(e.pointerType!=='touch'||e.target!==lane)return;const now=performance.now(),near=Math.hypot(e.clientX-lastX,e.clientY-lastY)<28;if(now-lastTouch<360&&near){e.preventDefault();e.stopPropagation();lastTouch=0;lane.__voxTouchDoubleAddAt=now;addVoxInstrumentEventAt(part,clickBeat(e,lane));}else{lastTouch=now;lastX=e.clientX;lastY=e.clientY;}},{passive:false});
+    lane.addEventListener('pointerup',e=>{if(e.pointerType!=='touch'||e.target!==lane)return;const now=performance.now(),near=Math.hypot(e.clientX-lastX,e.clientY-lastY)<28;if(now-lastTouch<360&&near){e.preventDefault();e.stopPropagation();lastTouch=0;commitVoxLaneDoubleAdd(part,clickBeat(e,lane),e);}else{lastTouch=now;lastX=e.clientX;lastY=e.clientY;}},{passive:false});
   }
 
   function renderVoxInstrumentTracks(tracks,width,ppb,clickBeat){
@@ -2045,13 +2084,13 @@
     for(const part of parts.filter(p=>p.type==='chord')){
       const items=chordFlatItems(part);const row=document.createElement('div');row.className='vox-track-row vox-instrument-track';row.style.width=`${width}px`;row.dataset.voxKind='chord';row.dataset.voxPartId=part.id;row.dataset.voxTrackKey=voxTrackTokenForPart(part);row.classList.toggle('is-instrument-focus',voxInstrumentTrackFocus?.key===voxTrackTokenForPart(part));
       const mode=part.data?.mode==='note'?'Note':'Chord';const label=makeVoxTrackLabel({name:part.name,meta:`${mode} • ${items.length} events`,checked:part.enabled,onChecked:on=>{voxCheckpoint();part.enabled=on;persistVoxEdits();renderParts();renderVoxBox();},kind:'chord',part});label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`);renderVoxInspector();};label.querySelector('strong')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`);renderVoxInspector();});label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(part,label,e.clientX,e.clientY);};
-      const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane';lane.dataset.voxKind='chord';lane.dataset.voxPartId=part.id;lane.onclick=e=>{if(e.target!==lane)return;focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`);if(voxToolMode==='playhead')voxSeekTo(clickBeat(e,lane),{manual:true});};wireVoxLaneDoubleAdd(lane,part,clickBeat);
+      const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane';lane.dataset.voxKind='chord';lane.dataset.voxPartId=part.id;lane.onclick=e=>{if(e.target!==lane)return;if(recentVoxLaneAdd(part,e)){e.preventDefault();e.stopPropagation();return;}focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`);if(voxToolMode==='playhead')voxSeekTo(clickBeat(e,lane),{manual:true});};wireVoxLaneDoubleAdd(lane,part,clickBeat);
       for(const item of items){if(!item.card.voxId)item.card.voxId=uid();const key=`chord:${part.id}:${item.card.voxId}`,ev=document.createElement('div');ev.className='vox-instrument-event vox-chord-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.dataset.voxPartId=part.id;ev.style.left=`${item.startBeat*ppb}px`;ev.style.width=`${Math.max(26,item.dur*ppb)}px`;ev.classList.toggle('is-blank',item.card?.voxBlank===true);ev.textContent=item.card?.voxBlank===true?`Type ${mode.toLowerCase()}`:String(item.card?.value||mode);ev.title=`${part.name} • ${item.card?.value||'event'} • beat ${item.startBeat.toFixed(2)}`;const sel={kind:'chord',key,part,card:item.card,startBeat:item.startBeat,dur:item.dur,flatIndex:item.flatIndex};ev.__voxSelection=sel;ev.onclick=e=>instrumentClickSelection(sel,ev,e);ev.ondblclick=e=>{e.preventDefault();e.stopPropagation();beginVoxInlineEventEdit(sel,ev);};ev.onpointerdown=e=>{if(e.target.classList.contains('vox-inst-handle')||e.target.classList.contains('vox-inline-event-input'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
     }
     for(const part of parts.filter(p=>p.type==='lead')){
       const row=document.createElement('div');row.className='vox-track-row vox-instrument-track';row.style.width=`${width}px`;row.dataset.voxKind='lead';row.dataset.voxPartId=part.id;row.dataset.voxTrackKey=voxTrackTokenForPart(part);row.classList.toggle('is-instrument-focus',voxInstrumentTrackFocus?.key===voxTrackTokenForPart(part));
       const label=makeVoxTrackLabel({name:part.name,meta:`Lead/Bass • ${part.events?.length||0} notes`,checked:part.enabled,onChecked:on=>{voxCheckpoint();part.enabled=on;persistVoxEdits();renderParts();renderVoxBox();},kind:'lead',part});label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`);renderVoxInspector();};label.querySelector('strong')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`);renderVoxInspector();});label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(part,label,e.clientX,e.clientY);};
-      const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane';lane.dataset.voxKind='lead';lane.dataset.voxPartId=part.id;lane.onclick=e=>{if(e.target!==lane)return;focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`);if(voxToolMode==='playhead')voxSeekTo(clickBeat(e,lane),{manual:true});};wireVoxLaneDoubleAdd(lane,part,clickBeat);
+      const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane';lane.dataset.voxKind='lead';lane.dataset.voxPartId=part.id;lane.onclick=e=>{if(e.target!==lane)return;if(recentVoxLaneAdd(part,e)){e.preventDefault();e.stopPropagation();return;}focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`);if(voxToolMode==='playhead')voxSeekTo(clickBeat(e,lane),{manual:true});};wireVoxLaneDoubleAdd(lane,part,clickBeat);
       for(const event of part.events||[]){if(!event.voxId)event.voxId=uid();const startBeat=leadEventStartBeat(part,event),dur=leadEventDurationBeats(part,event),key=`lead:${part.id}:${event.voxId}`,ev=document.createElement('div');ev.className='vox-instrument-event vox-lead-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.dataset.voxPartId=part.id;ev.style.left=`${startBeat*ppb}px`;ev.style.width=`${Math.max(22,dur*ppb)}px`;ev.classList.toggle('is-blank',event.voxBlank===true);ev.textContent=event.voxBlank===true?'Type note':midiName(event.midi);ev.title=`${part.name} • ${event.voxBlank===true?'blank note':midiName(event.midi)} • beat ${startBeat.toFixed(2)}`;const sel={kind:'lead',key,part,event,startBeat,dur};ev.__voxSelection=sel;ev.onclick=e=>instrumentClickSelection(sel,ev,e);ev.ondblclick=e=>{e.preventDefault();e.stopPropagation();beginVoxInlineEventEdit(sel,ev);};ev.onpointerdown=e=>{if(e.target.classList.contains('vox-inst-handle')||e.target.classList.contains('vox-inline-event-input'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
     }
     renderVoxDrumMap(tracks,width,ppb);
@@ -2069,7 +2108,7 @@
     renderVoxSelectionClasses();renderVoxInspector();
     voxCheckpoint();
     const ppb=voxPpb(),pointerId=e.pointerId,startX=e.clientX,orig=Number(sel.startBeat)||0,origDur=Math.max(.001,Number(sel.dur)||.25),origEnd=orig+origDur,minBeat=voxSnapEnabled()?voxBeatStep():.03;
-    let moved=false,targetLeadPart=sel.part,cleaned=false;
+    let moved=false,targetInstrumentPart=sel.part,cleaned=false;
     const moving=(mode==='move'?voxInstrumentSelectionList():[sel]).map(resolveVoxInstrumentSelection).filter(Boolean),starts=new Map(moving.map(x=>[String(x.key),Number(x.startBeat)||0]));
     const captureEl=e.currentTarget||el;
     el.classList.add('is-dragging');if(mode!=='move')el.classList.add('is-trimming');
@@ -2085,10 +2124,11 @@
           const next=Math.max(0,Math.round(((starts.get(String(item.key))||0)+delta)*1000)/1000),node=document.querySelector(`.vox-instrument-event[data-vox-key="${CSS.escape(String(item.key))}"]`);
           item.__voxPreviewBeat=next;if(node)node.style.left=`${next*ppb}px`;
         }
-        if(moving.length===1&&sel.kind==='lead'){
-          const lane=findVoxLaneAt(ev.clientX,ev.clientY);if(lane?.dataset.voxKind==='lead'){
-            const p=parts.find(x=>x.type==='lead'&&String(x.id)===String(lane.dataset.voxPartId));if(p)targetLeadPart=p;
+        if(moving.length===1&&['lead','chord'].includes(sel.kind)){
+          const lane=findVoxLaneAt(ev.clientX,ev.clientY);if(lane?.dataset.voxKind===sel.kind){
+            const type=sel.kind==='chord'?'chord':'lead',p=parts.find(x=>x.type===type&&String(x.id)===String(lane.dataset.voxPartId));if(p)targetInstrumentPart=p;
           }
+          document.querySelectorAll('.vox-instrument-track').forEach(r=>r.classList.toggle('is-target',String(r.dataset.voxPartId||'')===String(targetInstrumentPart?.id||'')));
         }
       }else if(sel.kind==='lead'){
         const p=sel.part,stepBeats=4/Math.max(8,Number(p.resolution)||16);
@@ -2115,24 +2155,31 @@
       if(cleaned)return;cleaned=true;
       window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',up,true);window.removeEventListener('pointercancel',up,true);
       try{captureEl.releasePointerCapture?.(pointerId)}catch{}
-      el.classList.remove('is-dragging','is-trimming');
+      el.classList.remove('is-dragging','is-trimming');document.querySelectorAll('.vox-instrument-track.is-target').forEach(r=>r.classList.remove('is-target'));
     };
     const up=ev=>{
       if(ev.pointerId!==pointerId)return;
       ev.preventDefault();ev.stopPropagation();cleanup();el.__voxDragged=moved;
       if(!moved){voxUndoStack.pop();updateVoxHistoryButtons();renderVoxSelectionClasses();renderVoxInspector();return;}
+      const movedSelections=[];
       if(mode==='move')for(const raw of moving){
         const item=resolveVoxInstrumentSelection(raw)||raw,targetBeat=Number(raw.__voxPreviewBeat);delete raw.__voxPreviewBeat;if(!Number.isFinite(targetBeat))continue;
         if(item.kind==='lead'&&item.part&&item.event){
-          const src=item.part,dst=(moving.length===1?(targetLeadPart||src):src),dur=leadEventDurationBeats(src,item.event);
-          if(dst!==src)src.events=src.events.filter(x=>x!==item.event);
-          const dstStepBeats=4/Math.max(8,Number(dst.resolution)||16),newEvent=dst===src?item.event:{...item.event,voxId:uid()};
+          const src=item.part,dst=(moving.length===1?(targetInstrumentPart||src):src),dur=leadEventDurationBeats(src,item.event);
+          if(dst!==src)src.events=(src.events||[]).filter(x=>x!==item.event&&String(x.voxId||'')!==String(item.event.voxId||''));
+          const dstStepBeats=4/Math.max(8,Number(dst.resolution)||16),newEvent=item.event;if(!newEvent.voxId)newEvent.voxId=uid();
           newEvent.voxStartBeat=targetBeat;newEvent.voxDurationBeats=dur;newEvent.step=Math.max(0,Math.round(targetBeat/dstStepBeats));newEvent.durationSteps=Math.max(1,Math.round(dur/dstStepBeats));
-          if(dst!==src)dst.events=normalizeLeadEvents([...(dst.events||[]),newEvent]);else dst.events=normalizeLeadEvents(dst.events);
+          dst.events=normalizeLeadEvents(dst===src?(dst.events||[]):[...(dst.events||[]),newEvent]);const stored=(dst.events||[]).find(x=>String(x.voxId||'')===String(newEvent.voxId||''))||newEvent;
+          movedSelections.push({kind:'lead',key:`lead:${dst.id}:${stored.voxId}`,part:dst,event:stored,startBeat:leadEventStartBeat(dst,stored),dur:leadEventDurationBeats(dst,stored)});
+          if(dst!==src)voxInstrumentTrackFocus={kind:'lead',name:dst.name,key:`part:${dst.id}`};
         }else if(item.kind==='chord'&&item.part&&item.card){
-          item.card.voxStartBeat=targetBeat;if(!Number.isFinite(Number(item.card.voxDurationBeats)))item.card.voxDurationBeats=Math.max(.001,Number(item.dur)||chordEventDurationBeats(item.part,item.card));item.card.durationBeats=item.card.voxDurationBeats;
+          const src=item.part,dst=(moving.length===1?(targetInstrumentPart||src):src),card=item.card;if(!card.voxId)card.voxId=uid();
+          if(dst!==src){removeChordCardFromPart(src,card);insertChordCardIntoPart(dst,card,targetBeat);voxInstrumentTrackFocus={kind:'chord',name:dst.name,key:`part:${dst.id}`};}
+          else{card.voxStartBeat=targetBeat;if(!Number.isFinite(Number(card.voxDurationBeats)))card.voxDurationBeats=Math.max(.001,Number(item.dur)||chordEventDurationBeats(src,card));card.durationBeats=card.voxDurationBeats;}
+          movedSelections.push({kind:'chord',key:`chord:${dst.id}:${card.voxId}`,part:dst,card,startBeat:targetBeat,dur:chordEventDurationBeats(dst,card)});
         }
       }
+      if(mode==='move'&&movedSelections.length){voxInstrumentSelections=movedSelections;voxInstrumentSelection=movedSelections[0]||null;}
       const loaded=loadedChord();if(loaded)core.apply(loaded.data);
       persistVoxEdits();renderParts();renderVoxBox();voxStatus(mode==='move'?(moving.length>1?`${moving.length} instrument events moved.`:'Instrument event moved.'):'Instrument event resized.');
     };
@@ -2212,7 +2259,7 @@
   function splitSelectedVox(){const selected=voxSelectionPairs();if(!selected.length)return;const split=quantizeVoxBeat(voxPlayheadBeat),valid=selected.filter(({event})=>{const b=voxEventBounds(event);return split>b.start+.01&&split<b.end-.01;});if(!valid.length){voxStatus('Move the playhead inside the selected event(s), then Split.');return;}voxCheckpoint();const beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92)),newSel=[];for(const {part,event} of valid){const b=voxEventBounds(event),splitSec=(Number(event.trimStartSec)||0)+(split-b.start)*beatSec,oldEnd=event.trimEndSec;event.trimEndSec=splitSec;const right=clone(event);right.id=uid();right.startBeat=split;right.trimStartSec=splitSec;right.trimEndSec=oldEnd;const ix=part.voxEvents.findIndex(x=>x.id===event.id);part.voxEvents.splice(ix+1,0,right);newSel.push({partId:part.id,eventId:right.id});}voxSelections=newSel;voxSelected=newSel[0]||null;persistVoxEdits();renderVoxBox();voxStatus(`${valid.length} event${valid.length===1?'':'s'} split at the playhead.`);}
   function copyInstrumentSelection(cut=false){
     const list=voxInstrumentSelectionList().slice().sort((a,b)=>(Number(a.startBeat)||0)-(Number(b.startBeat)||0));if(!list.length)return false;const anchor=Number(list[0].startBeat)||0;
-    voxClipboard={kind:'instrument-group',items:list.map(s=>({kind:s.kind,deltaBeat:(Number(s.startBeat)||0)-anchor,sourcePartId:s.part?.id||null,event:s.event?clone(s.event):null,card:s.card?clone(s.card):null}))};
+    voxClipboard={kind:'instrument-group',focusKeyAtCopy:String(voxInstrumentTrackFocus?.key||''),items:serializeInstrumentClipboardItems(list,anchor)};
     if(cut){voxCheckpoint();removeInstrumentSelectionNoCheckpoint(list);voxInstrumentSelections=[];voxInstrumentSelection=null;persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${list.length} instrument event${list.length===1?'':'s'} cut. First event will paste at the playhead.`);}else{renderVoxInspector();voxStatus(`${list.length} instrument event${list.length===1?'':'s'} copied. First event will paste at the playhead.`);}return true;
   }
   function removeInstrumentSelectionNoCheckpoint(list=voxInstrumentSelectionList()){
@@ -2232,29 +2279,29 @@
     if(!vocals.length&&!inst.length)return;
     const allStarts=[...vocals.map(x=>Number(x.event.startBeat)||0),...inst.map(x=>Number(x.startBeat)||0)],anchor=Math.min(...allStarts);
     if(vocals.length&&inst.length){
-      const vocalTracks=allVocalParts(),baseTrack=vocalTracks.indexOf(vocals[0].part);voxClipboard={kind:'mixed',vocalItems:vocals.map(({part,event})=>({event:clone(event),sourcePartId:part.id,deltaBeat:(Number(event.startBeat)||0)-anchor,trackOffset:vocalTracks.indexOf(part)-baseTrack})),instrumentItems:inst.map(s=>({kind:s.kind,deltaBeat:(Number(s.startBeat)||0)-anchor,sourcePartId:s.part?.id||null,event:s.event?clone(s.event):null,card:s.card?clone(s.card):null}))};
-    }else if(inst.length){voxClipboard={kind:'instrument-group',items:inst.map(s=>({kind:s.kind,deltaBeat:(Number(s.startBeat)||0)-anchor,sourcePartId:s.part?.id||null,event:s.event?clone(s.event):null,card:s.card?clone(s.card):null}))};}
+      const vocalTracks=allVocalParts(),baseTrack=vocalTracks.indexOf(vocals[0].part);voxClipboard={kind:'mixed',focusKeyAtCopy:String(voxInstrumentTrackFocus?.key||''),vocalItems:vocals.map(({part,event})=>({event:clone(event),sourcePartId:part.id,deltaBeat:(Number(event.startBeat)||0)-anchor,trackOffset:vocalTracks.indexOf(part)-baseTrack})),instrumentItems:serializeInstrumentClipboardItems(inst,anchor)};
+    }else if(inst.length){voxClipboard={kind:'instrument-group',focusKeyAtCopy:String(voxInstrumentTrackFocus?.key||''),items:serializeInstrumentClipboardItems(inst,anchor)};}
     else{const vocalTracks=allVocalParts(),baseTrack=vocalTracks.indexOf(vocals[0].part);voxClipboard={kind:'vocal',items:vocals.map(({part,event})=>({event:clone(event),sourcePartId:part.id,deltaBeat:(Number(event.startBeat)||0)-anchor,trackOffset:vocalTracks.indexOf(part)-baseTrack}))};}
     const count=vocals.length+inst.length;
     if(cut){voxCheckpoint();removeVocalSelectionNoCheckpoint(vocals);removeInstrumentSelectionNoCheckpoint(inst);voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${count} event${count===1?'':'s'} cut. The earliest event will paste at the playhead.`);}else{renderVoxInspector();voxStatus(`${count} event${count===1?'':'s'} copied. The earliest event will paste at the playhead.`);}
   }
-  function pasteOneInstrumentClip(clip,atBeat){
+  function pasteOneInstrumentClip(clip,atBeat,destinationPart=null){
     const targetBeat=Math.max(0,Math.round((Number(atBeat)||0)*1000)/1000);
     if(clip.kind==='lead'){
-      const p=parts.find(x=>x.type==='lead'&&String(x.id)===String(clip.sourcePartId))||parts.find(x=>x.type==='lead');if(!p)return null;const stepBeats=4/Math.max(8,Number(p.resolution)||16),e=clone(clip.event||{});e.voxId=uid();e.voxStartBeat=targetBeat;e.voxDurationBeats=Math.max(stepBeats,Number(e.voxDurationBeats)||Math.max(1,Number(e.durationSteps)||1)*stepBeats);e.step=Math.max(0,Math.round(targetBeat/stepBeats));e.durationSteps=Math.max(1,Math.round(e.voxDurationBeats/stepBeats));p.events=normalizeLeadEvents([...(p.events||[]),e]);const stored=p.events.find(x=>String(x.voxId)===String(e.voxId))||e;return {kind:'lead',key:`lead:${p.id}:${stored.voxId}`,part:p,event:stored,startBeat:leadEventStartBeat(p,stored),dur:leadEventDurationBeats(p,stored)};
+      const p=(destinationPart?.type==='lead'?destinationPart:null)||parts.find(x=>x.type==='lead'&&String(x.id)===String(clip.sourcePartId))||parts.find(x=>x.type==='lead');if(!p)return null;const stepBeats=4/Math.max(8,Number(p.resolution)||16),e=clone(clip.event||{});e.voxId=uid();e.voxStartBeat=targetBeat;e.voxDurationBeats=Math.max(stepBeats,Number(e.voxDurationBeats)||Math.max(1,Number(e.durationSteps)||1)*stepBeats);e.step=Math.max(0,Math.round(targetBeat/stepBeats));e.durationSteps=Math.max(1,Math.round(e.voxDurationBeats/stepBeats));p.events=normalizeLeadEvents([...(p.events||[]),e]);const stored=p.events.find(x=>String(x.voxId)===String(e.voxId))||e;return {kind:'lead',key:`lead:${p.id}:${stored.voxId}`,part:p,event:stored,startBeat:leadEventStartBeat(p,stored),dur:leadEventDurationBeats(p,stored)};
     }
     if(clip.kind==='chord'){
-      const p=parts.find(x=>x.type==='chord'&&String(x.id)===String(clip.sourcePartId))||parts.find(x=>x.type==='chord');if(!p)return null;const card=clone(clip.card||{});card.voxId=uid();card.voxStartBeat=targetBeat;card.voxDurationBeats=Math.max(.03,Number(card.voxDurationBeats)||Number(card.durationBeats)||core.cardDurationBeats?.(card,p.data?.beats||core.beats)||core.beats);card.durationBeats=card.voxDurationBeats;if(!Array.isArray(p.data.rows)||!p.data.rows.length)p.data.rows=[[]];const items=chordFlatItems(p);let idx=items.length;for(let i=0;i<items.length;i++){if(targetBeat<items[i].startBeat){idx=i;break;}}let remaining=idx,done=false;for(const row of p.data.rows){if(remaining<=row.length){row.splice(remaining,0,card);done=true;break;}remaining-=row.length;}if(!done)p.data.rows.at(-1).push(card);if(String(p.id)===String(loadedChordPartId))core.apply(p.data);return {kind:'chord',key:`chord:${p.id}:${card.voxId}`,part:p,card,startBeat:targetBeat,dur:card.voxDurationBeats};
+      const p=(destinationPart?.type==='chord'?destinationPart:null)||parts.find(x=>x.type==='chord'&&String(x.id)===String(clip.sourcePartId))||parts.find(x=>x.type==='chord');if(!p)return null;const card=clone(clip.card||{});card.voxId=uid();insertChordCardIntoPart(p,card,targetBeat);if(String(p.id)===String(loadedChordPartId))core.apply(p.data);return {kind:'chord',key:`chord:${p.id}:${card.voxId}`,part:p,card,startBeat:targetBeat,dur:card.voxDurationBeats};
     }
     return null;
   }
   function pasteInstrument(){
-    const clip=voxClipboard;if(!clip||!['instrument-group'].includes(clip.kind))return false;voxCheckpoint();const newSel=[];for(const item of clip.items||[]){const s=pasteOneInstrumentClip(item,voxPlayheadBeat+(Number(item.deltaBeat)||0));if(s)newSel.push(s);}voxInstrumentSelections=newSel;voxInstrumentSelection=newSel[0]||null;voxSelections=[];voxSelected=null;persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${newSel.length} event${newSel.length===1?'':'s'} pasted in order; first event starts at the playhead.`);return true;
+    const clip=voxClipboard;if(!clip||!['instrument-group'].includes(clip.kind))return false;voxCheckpoint();const newSel=[];for(const item of clip.items||[]){const dest=destinationInstrumentPartForClip(item),s=pasteOneInstrumentClip(item,voxPlayheadBeat+(Number(item.deltaBeat)||0),dest);if(s)newSel.push(s);}voxInstrumentSelections=newSel;voxInstrumentSelection=newSel[0]||null;voxSelections=[];voxSelected=null;if(newSel[0]?.part)voxInstrumentTrackFocus={kind:newSel[0].kind,name:newSel[0].part.name,key:`part:${newSel[0].part.id}`};persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${newSel.length} event${newSel.length===1?'':'s'} pasted to the selected track${newSel.length===1?'':'s'}; first event starts at the playhead.`);return true;
   }
   function pasteVox(){
     if(!voxClipboard)return;if(voxClipboard.kind==='instrument-group'){pasteInstrument();return;}voxCheckpoint();const newV=[],newI=[],vocalTracks=allVocalParts(),target=voxTargetPart()||vocalTracks[0]||null,base=target?Math.max(0,vocalTracks.indexOf(target)):0;
     const pasteVocals=items=>{if(!target)return;for(const item of items||[]){const dest=vocalTracks[Math.max(0,Math.min(vocalTracks.length-1,base+(Number(item.trackOffset)||0)))]||target,ev=normalizeVoxEvent({...clone(item.event),id:uid(),sourcePartId:item.event?.sourcePartId||item.sourcePartId,startBeat:Math.max(0,Math.round((voxPlayheadBeat+(Number(item.deltaBeat)||0))*1000)/1000)},dest);dest.voxEvents=dest.voxEvents||[];dest.voxEvents.push(ev);newV.push({partId:dest.id,eventId:ev.id});}};
-    if(voxClipboard.kind==='vocal')pasteVocals(voxClipboard.items);else if(voxClipboard.kind==='mixed'){pasteVocals(voxClipboard.vocalItems);for(const item of voxClipboard.instrumentItems||[]){const s=pasteOneInstrumentClip(item,voxPlayheadBeat+(Number(item.deltaBeat)||0));if(s)newI.push(s);}}else{voxUndoStack.pop();updateVoxHistoryButtons();return;}
+    if(voxClipboard.kind==='vocal')pasteVocals(voxClipboard.items);else if(voxClipboard.kind==='mixed'){pasteVocals(voxClipboard.vocalItems);for(const item of voxClipboard.instrumentItems||[]){const dest=destinationInstrumentPartForClip(item),s=pasteOneInstrumentClip(item,voxPlayheadBeat+(Number(item.deltaBeat)||0),dest);if(s)newI.push(s);}}else{voxUndoStack.pop();updateVoxHistoryButtons();return;}
     voxSelections=newV;voxSelected=newV[0]||null;voxInstrumentSelections=newI;voxInstrumentSelection=newI[0]||null;persistVoxEdits();renderParts();renderVoxBox();const n=newV.length+newI.length;voxStatus(`${n} event${n===1?'':'s'} pasted in order; earliest event starts at beat ${voxPlayheadBeat.toFixed(2)}.`);
   }
   function deleteInstrumentSelection(){

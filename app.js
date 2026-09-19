@@ -1073,7 +1073,48 @@
   function localProjects(){try{return JSON.parse(localStorage.getItem('crp-projects')||'[]')}catch{return[]}}
   function saveLocalProjects(p){localStorage.setItem('crp-projects',JSON.stringify(p))}
   async function api(path,options={}){const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.error||`Request failed (${r.status})`);return d;}
-  function newProject(){
+  let allowUnsavedUnloadOnce=false,unsavedProjectTouched=false;
+  function unsavedProjectHasWork(){
+    if(IS_PLAYBACK_BRIDGE||state.currentProjectId)return false;
+    if(unsavedProjectTouched)return true;
+    if(($('projectName')?.value||'').trim()||($('chordInput')?.value||'').trim()||($('keyInput')?.value||'').trim()||($('notesEditor')?.textContent||'').trim())return true;
+    if((state.rows||[]).some(row=>Array.isArray(row)&&row.length))return true;
+    try{
+      const beat=window.CRPBeatMaker?.getBeat?.();
+      if(beat&&Object.values(beat.tracks||{}).some(bars=>(bars||[]).some(a=>Array.isArray(a)&&a.length)))return true;
+    }catch{}
+    try{
+      const pack=window.CRPParts?.capture?.(),items=pack?.items||[];
+      if(items.length>1)return true;
+      for(const part of items){
+        if(part?.type==='chord'&&(part.data?.rows||[]).some(row=>Array.isArray(row)&&row.length))return true;
+        if(part?.type==='lead'&&(part.events||[]).length)return true;
+        if(part?.type==='vocal'&&((part.recordings||[]).length||(part.voxEvents||[]).length||String(part.transcript||'').trim()))return true;
+      }
+    }catch{}
+    return false;
+  }
+  function ensureUnsavedProjectDialog(){
+    let modal=document.getElementById('unsavedProjectExitDialog');if(modal)return modal;
+    modal=document.createElement('div');modal.id='unsavedProjectExitDialog';modal.className='unsaved-project-dialog';modal.hidden=true;
+    modal.innerHTML=`<div class="unsaved-project-backdrop"></div><div class="unsaved-project-card" role="dialog" aria-modal="true" aria-labelledby="unsavedProjectTitle"><h3 id="unsavedProjectTitle">Save this project?</h3><p>You have work in an unsaved project. Save it before leaving, continue without saving, or cancel and stay here.</p><label class="unsaved-project-name-label">Project name<input id="unsavedProjectNameInput" type="text" placeholder="Project name (optional)"></label><div class="unsaved-project-actions"><button type="button" data-cancel>Cancel</button><button type="button" data-continue>Continue Without Saving</button><button type="button" data-save class="accent">Save & Continue</button></div></div>`;
+    document.body.appendChild(modal);
+    const close=()=>{modal.hidden=true;modal._continue=null;};
+    modal.querySelector('[data-cancel]').onclick=close;modal.querySelector('.unsaved-project-backdrop').onclick=close;
+    modal.querySelector('[data-continue]').onclick=()=>{const fn=modal._continue;close();fn?.();};
+    modal.querySelector('[data-save]').onclick=async()=>{
+      const saveBtn=modal.querySelector('[data-save]'),buttons=[...modal.querySelectorAll('button')],name=modal.querySelector('#unsavedProjectNameInput')?.value.trim();if(name&&$('projectName'))$('projectName').value=name;
+      buttons.forEach(b=>b.disabled=true);saveBtn.textContent='Saving…';
+      try{await saveProject();const fn=modal._continue;if(state.currentProjectId){close();fn?.();}}
+      finally{buttons.forEach(b=>b.disabled=false);saveBtn.textContent='Save & Continue';}
+    };
+    return modal;
+  }
+  function requestProjectExit(continueFn){
+    if(!unsavedProjectHasWork()){continueFn?.();return;}
+    const modal=ensureUnsavedProjectDialog(),input=modal.querySelector('#unsavedProjectNameInput');modal._continue=continueFn;modal.hidden=false;if(input){input.value=($('projectName')?.value||'').trim();requestAnimationFrame(()=>input.focus());}
+  }
+  function performNewProject(){
     if(state.playing)stopProgression();
     closeExportMenu?.();
 
@@ -1107,9 +1148,12 @@
     syncBuildInput();
     renderFits();
     window.CRPParts?.newProject?.();
+    unsavedProjectTouched=false;
     $('status').textContent='New blank project.';
     $('projectName').focus();
   }
+
+  function newProject(){requestProjectExit(performNewProject);}
 
   function capture(id,name){
     const existing=id?localProjects().find(x=>x.id===id):null;
@@ -1163,8 +1207,9 @@
     window.CRPParts?.syncActiveChord?.();
     window.CRPParts?.liveEditRefresh?.();
     publishSrpHandoff();
-    // Brand-new/unnamed projects wait for the first manual Save.
-    if(!state.currentProjectId)return;
+    // Brand-new/unnamed projects wait for the first manual Save, but remember that
+    // the user changed something so navigation can protect the work.
+    if(!state.currentProjectId){unsavedProjectTouched=true;return;}
     clearTimeout(autoSaveTimer);
     autoSaveTimer=setTimeout(()=>runAutoSave(),850);
   }
@@ -1231,7 +1276,7 @@
       }catch{}
     }
     const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);
-    state.currentProjectId=p.id;try{localStorage.setItem('crp-active-project-id',String(p.id));}catch{}$('projectName').value=name;upsertLocal(p);publishSrpHandoff();
+    state.currentProjectId=p.id;unsavedProjectTouched=false;try{localStorage.setItem('crp-active-project-id',String(p.id));}catch{}$('projectName').value=name;upsertLocal(p);publishSrpHandoff();
     if(accountUser){
       try{
         const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
@@ -1294,7 +1339,9 @@
       ? `“${p.name}” moved to Archive.`
       : `“${p.name}” restored to Projects.`;
   }
-  function loadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;p=recoverNavigationSnapshot(p);upsertLocal(p);const __srpSession=readSrpLinkSession();const shared=(__srpSession&&String(__srpSession.crpProjectId||'')===String(id))?readSharedSrpMeta(id):null;if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=normalizeInstrument(p.instrument);state.mode=p.mode||'chord';state.sound=(SOUNDS[state.instrument]||SOUNDS.piano).some(x=>x[0]===p.sound)?p.sound:SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
+  function performLoadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;p=recoverNavigationSnapshot(p);upsertLocal(p);const __srpSession=readSrpLinkSession();const shared=(__srpSession&&String(__srpSession.crpProjectId||'')===String(id))?readSharedSrpMeta(id):null;if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;unsavedProjectTouched=false;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=normalizeInstrument(p.instrument);state.mode=p.mode||'chord';state.sound=(SOUNDS[state.instrument]||SOUNDS.piano).some(x=>x[0]===p.sound)?p.sound:SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
+  function loadProject(id){if(String(state.currentProjectId||'')===String(id||'')){performLoadProject(id);return;}requestProjectExit(()=>performLoadProject(id));}
+
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
   function renderProjects(){
     const w=$('projectList');
@@ -1612,6 +1659,7 @@
     $('bpmInput')?.addEventListener('blur',commitCrpBpm);
     $('bpmInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitCrpBpm();e.currentTarget.blur();}});
     $('notesEditor')?.addEventListener('input',scheduleAutoSave);
+    window.addEventListener('beforeunload',e=>{if(allowUnsavedUnloadOnce){allowUnsavedUnloadOnce=false;return;}if(!unsavedProjectHasWork())return;e.preventDefault();e.returnValue='';});
 
     $('projectsTabBtn').onclick=()=>setProjectBrowserMode('projects');
     $('archiveTabBtn').onclick=()=>setProjectBrowserMode('archive');
@@ -1645,7 +1693,7 @@
     // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
     // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.
     if(!IS_PLAYBACK_BRIDGE) checkAccount();
-    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.35-TRACK-MASTER-BLOCK-EDIT-FIX').catch(()=>{});
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.36-TRACK-MASTER-MULTITRACK-SAVE-GUARD').catch(()=>{});
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
@@ -1888,7 +1936,7 @@
     return project;
   }
 
-  function openSongRiderWorkspace(){
+  function performOpenSongRiderWorkspace(){
     try{
       // Persist the exact active project snapshot before leaving CRP.
       // This prevents SRP from seeing stale data and lets CRP restore the same project on return.
@@ -1914,9 +1962,12 @@
       }else{
         appRoot=path.slice(0,path.lastIndexOf('/')+1);
       }
+      allowUnsavedUnloadOnce=true;
       location.href=new URL(appRoot+'song-rider/index.html?crpMode=1',location.origin).href;
     }
   }
+  function openSongRiderWorkspace(){requestProjectExit(performOpenSongRiderWorkspace);}
+
   // v3.2.2 — CRP and Baby DAW keep independent setup-menu visibility.
   // Hiding Piano/Guitar/etc. in CRP must never strand Baby DAW chord parts without those controls.
   const CRP_SETUP_HIDDEN_KEY='crp-setup-controls-hidden';

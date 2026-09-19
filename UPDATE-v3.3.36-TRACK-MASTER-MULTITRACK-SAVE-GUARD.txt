@@ -1,0 +1,25 @@
+Song Rider Suite v3.3.36 — Track Master Multitrack + Save Guard
+
+FIXED
+1. Mobile Track Master double-tap now creates exactly one block.
+   - The duplicate-event guard survives timeline rerenders.
+   - Android synthesized click/dblclick events are ignored after the real double-tap add.
+   - Eliminates hidden/phantom blocks that previously required repeated Delete presses.
+
+2. Track Master chord/note and Lead/Bass copy/paste is destination-track aware.
+   - Copy a block, select another compatible track, then Paste to that track at the playhead.
+   - Multi-track copied selections preserve relative track offsets where compatible tracks exist.
+   - Mixed chord/note cards keep their own event type when moved between Chord/Note tracks.
+
+3. Track Master drag-and-drop now works between compatible tracks.
+   - Chord/note blocks can be dragged between Chord/Note tracks.
+   - Lead/Bass note blocks can be dragged between Lead/Bass tracks.
+   - Destination track becomes the active Track Master focus after a cross-track move.
+
+4. Unsaved project exit protection.
+   - Starting New, opening another project, or leaving for Song Rider Pro prompts when a new project contains unsaved work.
+   - Choices: Save & Continue, Continue Without Saving, or Cancel.
+   - Browser/PWA close/back/reload also uses the browser's native unsaved-changes warning as a fallback.
+
+CACHE
+- Bumped shell/service-worker cache to v3.3.36 so patched JS/CSS replaces v3.3.35 reliably.

@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.35-track-master-block-edit-fix';
+const CACHE = 'song-rider-suite-v3.3.36-track-master-multitrack-save-guard';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
   './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css',

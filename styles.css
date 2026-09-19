@@ -4408,3 +4408,16 @@ body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
   .vox-inst-handle.left::after{left:6px;}
   .vox-inst-handle.right::after{right:6px;}
 }
+
+/* v3.3.36 — unsaved/unnamed project exit guard */
+.unsaved-project-dialog[hidden]{display:none!important}
+.unsaved-project-dialog{position:fixed;inset:0;z-index:12000;display:grid;place-items:center;padding:18px}
+.unsaved-project-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(3px)}
+.unsaved-project-card{position:relative;width:min(520px,100%);background:#15171b;border:1px solid rgba(218,176,72,.78);border-radius:18px;box-shadow:0 22px 70px rgba(0,0,0,.58);padding:20px;color:#f6f3ea}
+.unsaved-project-card h3{margin:0 0 8px;color:#f2c85d;font-size:1.28rem}
+.unsaved-project-card p{margin:0 0 16px;line-height:1.45;color:#d9d7d0}
+.unsaved-project-name-label{display:grid;gap:7px;font-weight:700;color:#f0dfad}
+.unsaved-project-name-label input{width:100%;box-sizing:border-box;border:1px solid #60563b;border-radius:10px;background:#0d0f12;color:#fff;padding:11px 12px;font:inherit}
+.unsaved-project-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:9px;margin-top:18px}
+.unsaved-project-actions button{min-height:42px}
+@media(max-width:520px){.unsaved-project-card{padding:17px 15px}.unsaved-project-actions{display:grid;grid-template-columns:1fr}.unsaved-project-actions button{width:100%}}
