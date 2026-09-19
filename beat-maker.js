@@ -51,12 +51,14 @@
   function freshBeat(){
     const tracks = {};
     DRUMS.forEach(([id]) => tracks[id] = Array.from({length:16}, () => []));
-    return {version:VERSION, enabled:true, bars:1, resolution:16, gain:.50, tracks};
+    return {version:VERSION, enabled:true, muted:false, solo:false, bars:1, resolution:16, gain:.50, tracks};
   }
   function normalizeBeat(src){
     const b = freshBeat();
     if(!src || typeof src !== 'object') return b;
     b.enabled = src.enabled !== false;
+    b.muted = src.muted === true;
+    b.solo = src.solo === true;
     b.bars = clamp(+src.bars || 1, 1, 16);
     b.resolution = [8,16,32,64].includes(+src.resolution) ? +src.resolution : 16;
     const sourceGain = Number.isFinite(+src.gain) ? +src.gain : .50;
@@ -616,6 +618,8 @@
       try{await ensureDrums();startMainDrums(delaySeconds,startBeat,gainScale);}catch(e){console.error(e);}
     },
     getDurationBeats(){ return beat.enabled&&countHits()>0 ? Math.max(4,(Number(beat.bars)||1)*4) : 0; },
+    setMainGainScale(scale){ mainGainScale=Math.max(0,Math.min(1,Number(scale)||0)); return mainGainScale; },
+    isMainPlaying(){ return !!mainPlaying; },
     stopMainNow(){stopMainDrums();}
   };
 

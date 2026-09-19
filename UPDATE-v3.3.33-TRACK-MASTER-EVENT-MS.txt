@@ -1,0 +1,12 @@
+Song Rider Suite v3.3.33 — Track Master event creation + Mute/Solo + compact Vox tools
+
+Changes
+- Empty Chord/Note and Lead/Bass Track Master lanes can be double-clicked/double-tapped to create an event at that beat.
+- The first event on an unconfigured track opens a setup dialog for Chord/Note, Instrument and Sound; later double-clicks use the saved track setup.
+- New events open directly for inline typing. Note entries accept optional octave (for example F#, F#4, Bb3); no octave uses the track grid octave/default context.
+- Added Mute (M) and Solo (S) controls to Chord/Note, Lead/Bass, Vocal and Drums track title boxes. Mix changes are live during playback.
+- Removed the redundant + Active Take Vox Box button.
+- Mobile Vox Box edit controls are packed into two action rows; Undo and Redo remain adjacent without horizontal scrolling.
+- Blank Lead/Bass placeholder events are not played/exported until a real note is entered.
+
+Cache generation: song-rider-suite-v3.3.33-track-master-event-ms

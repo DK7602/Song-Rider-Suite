@@ -4333,3 +4333,58 @@ body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
   outline:1px solid rgba(255,238,158,.72)!important;
   outline-offset:-1px!important;
 }
+
+
+/* =========================================================
+   v3.3.33 — Track Master event creation + M/S + compact mobile tools
+   ========================================================= */
+.vox-track-label{position:sticky;padding-bottom:38px!important;}
+.vox-track-ms{
+  position:absolute;left:10px;bottom:8px;display:flex;align-items:center;gap:6px;z-index:18;
+}
+.vox-track-ms button{
+  width:27px;min-width:27px!important;height:23px;min-height:23px!important;
+  padding:0!important;border-radius:6px!important;border:1px solid #475463!important;
+  background:#202833!important;color:#dce4eb!important;font:900 .68rem/1 system-ui,sans-serif!important;
+}
+.vox-track-ms button:hover{border-color:#d4aa44!important;}
+.vox-track-ms button.is-on{background:var(--accent)!important;color:#111!important;border-color:#d4a02e!important;box-shadow:0 0 0 1px rgba(241,198,85,.18)!important;}
+.vox-drum-track-head{position:relative;}
+.vox-drum-track-head>.vox-track-ms{
+  position:static;left:auto;bottom:auto;margin-top:auto;padding-top:2px;
+}
+.vox-drum-track-head>.vox-track-ms button{width:25px;min-width:25px!important;height:21px;min-height:21px!important;font-size:.62rem!important;}
+/* Drum names must remain vertically aligned with their grid rows. The generic
+   M/S reserve-space rule below is for ordinary 122px track labels only. */
+.vox-drum-map-label{padding-bottom:0!important;}
+.vox-instrument-event.is-blank{
+  border-style:dashed!important;color:#dce4eb!important;background:rgba(83,103,124,.62)!important;
+  font-style:italic!important;font-weight:800!important;
+}
+.vox-event-setup-card{max-width:520px!important;}
+.vox-event-setup-card>label{grid-template-columns:150px minmax(0,1fr)!important;}
+
+@media(max-width:600px){
+  .vox-track-label{padding-bottom:34px!important;}
+  .vox-track-ms{left:7px;bottom:6px;gap:5px;}
+  .vox-track-ms button{width:24px;min-width:24px!important;height:21px;min-height:21px!important;font-size:.62rem!important;}
+  .vox-event-setup-card>label{grid-template-columns:1fr!important;gap:4px!important;}
+
+  .vox-box-tools{
+    display:grid!important;
+    grid-template-columns:repeat(12,minmax(0,1fr))!important;
+    gap:5px!important;
+    align-items:center!important;
+  }
+  .vox-box-tools>button,.vox-box-tools>.vox-tool-check{
+    width:100%!important;min-width:0!important;max-width:none!important;
+    box-sizing:border-box!important;margin:0!important;
+  }
+  .vox-box-tools>button{padding:5px 3px!important;font-size:.68rem!important;white-space:nowrap!important;}
+  #voxAddTrackBtn{grid-column:span 3!important;}
+  .vox-box-tools>.vox-tool-check{grid-column:span 3!important;justify-content:center!important;padding:4px 3px!important;font-size:.66rem!important;white-space:nowrap!important;}
+  #voxCropBtn{grid-column:span 2!important;}
+  #voxSplitBtn{grid-column:span 4!important;}
+  #voxCopyBtn,#voxCutBtn,#voxPasteBtn,#voxDeleteBtn,#voxUndoBtn,#voxRedoBtn{grid-column:span 2!important;}
+  #voxBoxStatus,.vox-harmony-guide{grid-column:1/-1!important;width:100%!important;max-width:100%!important;margin-left:0!important;}
+}

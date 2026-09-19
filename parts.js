@@ -22,7 +22,7 @@
       const durationSteps=Math.max(1,Math.round(Number(raw?.durationSteps)||1));
       const exactStart=Number(raw?.voxStartBeat),exactDur=Number(raw?.voxDurationBeats);
       const key=Number.isFinite(exactStart)&&exactStart>=0?`x:${exactStart.toFixed(3)}:${midi}`:`s:${step}:${midi}`,prev=byKey.get(key);
-      if(!prev||durationSteps>prev.durationSteps)byKey.set(key,{step,midi,durationSteps,...(raw?.voxId?{voxId:String(raw.voxId)}:{}),...(Number.isFinite(exactStart)&&exactStart>=0?{voxStartBeat:exactStart}:{}),...(Number.isFinite(exactDur)&&exactDur>0?{voxDurationBeats:exactDur}:{})});
+      if(!prev||durationSteps>prev.durationSteps)byKey.set(key,{step,midi,durationSteps,...(raw?.voxId?{voxId:String(raw.voxId)}:{}),...(raw?.voxBlank===true?{voxBlank:true}:{}),...(Number.isFinite(exactStart)&&exactStart>=0?{voxStartBeat:exactStart}:{}),...(Number.isFinite(exactDur)&&exactDur>0?{voxDurationBeats:exactDur}:{})});
     }
     return [...byKey.values()].sort((a,b)=>a.step-b.step||a.midi-b.midi);
   }
@@ -53,13 +53,13 @@
   function chordPart(name='Chords 1', data=null){
     const d=data?clone(data):core.snapshot();
     if(!d.rows?.length)d.rows=[[]];
-    return {id:uid(),type:'chord',name,enabled:true,volume:.85,data:d};
+    return {id:uid(),type:'chord',name,enabled:true,muted:false,solo:false,voxSetupEstablished:false,volume:.85,data:d};
   }
   function leadPart(name='Lead 1'){
-    return {id:uid(),type:'lead',name,enabled:true,repeat:true,sustain:false,volume:.8,instrument:'piano',sound:'acoustic_grand_piano',octave:0,gridOctave:3,resolution:16,bars:4,events:[]};
+    return {id:uid(),type:'lead',name,enabled:true,muted:false,solo:false,voxSetupEstablished:false,repeat:true,sustain:false,volume:.8,instrument:'piano',sound:'acoustic_grand_piano',octave:0,gridOctave:3,resolution:16,bars:4,events:[]};
   }
   function vocalPart(name='Vocals 1'){
-    return {id:uid(),type:'vocal',name,enabled:true,repeat:true,volume:1,transcript:'',recordings:[],activeTakeId:null,voxEvents:[],backingPartIds:parts.filter(x=>x.type==='chord'||x.type==='lead').filter(x=>x.enabled).map(x=>x.id),backingDrums:true,backingVolume:.8,fx:{eq:'clear',comp:'medium',reverb:.12,delay:0,autotune:0}};
+    return {id:uid(),type:'vocal',name,enabled:true,muted:false,solo:false,repeat:true,volume:1,transcript:'',recordings:[],activeTakeId:null,voxEvents:[],backingPartIds:parts.filter(x=>x.type==='chord'||x.type==='lead').filter(x=>x.enabled).map(x=>x.id),backingDrums:true,backingVolume:.8,fx:{eq:'clear',comp:'medium',reverb:.12,delay:0,autotune:0}};
   }
   function normalizeVocalFx(fx,fallback=null){
     const f=fx||fallback||{};
@@ -80,7 +80,7 @@
   }
   function normalizePart(p,i){
     if(!p||!p.type)return null;
-    const base={id:p.id||uid(),name:p.name||`${p.type==='chord'?'Chords':p.type==='lead'?'Lead':'Vocals'} ${i+1}`,enabled:p.enabled!==false,volume:Number.isFinite(+p.volume)?Math.max(0,Math.min(1,+p.volume)):.85};
+    const base={id:p.id||uid(),name:p.name||`${p.type==='chord'?'Chords':p.type==='lead'?'Lead':'Vocals'} ${i+1}`,enabled:p.enabled!==false,muted:p.muted===true,solo:p.solo===true,voxSetupEstablished:p.voxSetupEstablished===true,volume:Number.isFinite(+p.volume)?Math.max(0,Math.min(1,+p.volume)):.85};
     if(p.type==='chord')return {...base,type:'chord',data:clone(p.data||core.snapshot())};
     if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,sustain:p.sustain===true,instrument:['piano','guitar','misc'].includes(p.instrument)?p.instrument:'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(16,+p.bars||4)),events:normalizeLeadEvents(p.events)};
     const voxEvents=Array.isArray(p.voxEvents)?p.voxEvents.map(e=>normalizeVoxEvent(e,p)).filter(Boolean):[];
@@ -110,6 +110,22 @@
   function voxEventDurationBeats(e,bpm=core.bpm){return voxEventDurationSeconds(e)*Math.max(40,Math.min(240,Number(bpm)||92))/60;}
   function voxTrackEvents(p){return p?.type==='vocal'&&Array.isArray(p.voxEvents)?p.voxEvents.filter(e=>voxEventTake(e)&&voxEventDurationSeconds(e)>.01):[];}
   function vocalHasPlayableAudio(p){return !!(voxTrackEvents(p).length||(p?.activeTakeId&&p?.recordings?.some(r=>r.id===p.activeTakeId)));}
+  function currentBeatMixState(){return window.CRPBeatMaker?.getBeat?.()||null;}
+  function anyTrackSoloed(){
+    const partSolo=parts.some(p=>p.enabled!==false&&p.solo===true&&p.muted!==true);
+    const b=currentBeatMixState();
+    return partSolo||!!(b&&b.enabled!==false&&b.solo===true&&b.muted!==true);
+  }
+  function partAudibleInMix(p){
+    if(!p||p.enabled===false||p.muted===true)return false;
+    return !anyTrackSoloed()||p.solo===true;
+  }
+  function drumsAudibleInMix(){
+    const b=currentBeatMixState();
+    if(!b||b.enabled===false||b.muted===true)return false;
+    return !anyTrackSoloed()||b.solo===true;
+  }
+  function currentDrumScopeGain(){return playbackScope?Math.max(0,Math.min(1,Number(playbackScope?.drumGain??1))):1;}
   function effectiveVocalFx(p,e=null){return e?.fx?normalizeVocalFx(e.fx,p?.fx):normalizeVocalFx(p?.fx);}
   function ensureVoxEventForActiveTake(p,startBeat=0){
     if(!p||p.type!=='vocal'||!p.activeTakeId||!p.recordings?.some(r=>r.id===p.activeTakeId))return null;
@@ -383,7 +399,7 @@
     wrap.scrollTo({left:Math.max(0,leadBarPage*barWidth),behavior:smooth?'smooth':'auto'});
   }
   function leadEventCovering(p,midi,step){
-    return p.events.find(e=>e.midi===midi&&step>=e.step&&step<e.step+leadDurationSteps(e))||null;
+    return p.events.find(e=>e.voxBlank!==true&&e.midi===midi&&step>=e.step&&step<e.step+leadDurationSteps(e))||null;
   }
   function removeLeadEvent(p,event){
     if(!p||!event)return false;
@@ -490,6 +506,7 @@
       }
     }
     for(const event of p.events){
+      if(event.voxBlank===true)continue;
       if(!Number.isFinite(event.step)||!Number.isFinite(event.midi)||event.step<0||event.step>=totalSteps)continue;
       const pc=((event.midi-baseMidi)%12+12)%12;if(event.midi<baseMidi||event.midi>baseMidi+11)continue;
       const rowIndex=2+(11-pc),dur=Math.min(leadDurationSteps(event),Math.max(1,totalSteps-event.step));event.durationSteps=dur;
@@ -894,7 +911,8 @@
   }
   function desiredPartGain(p,soundOverride=null){
     const scopeGain=playbackScope&&Array.isArray(playbackScope.playableIds)&&playbackScope.playableIds.includes(p.id)?Math.max(0,Math.min(1,Number(playbackScope.backingGain??1))):1;
-    return soundGain(soundOverride||requestedPartSound(p))*p.volume*(p.type==='lead'?LEAD_OUTPUT_BOOST:1)*scopeGain;
+    const mixGain=partAudibleInMix(p)?1:0;
+    return soundGain(soundOverride||requestedPartSound(p))*p.volume*(p.type==='lead'?LEAD_OUTPUT_BOOST:1)*scopeGain*mixGain;
   }
   function applyVocalFxLive(p){
     const set=liveVocalFxNodes.get(p?.id);if(!set?.size||!audioCtx)return;
@@ -914,7 +932,7 @@
         n.wet.gain.setTargetAtTime(Number(fx.reverb||0),now,.03);
         n.delay.delayTime.setTargetAtTime(Number(fx.delay||0),now,.03);
         n.delayGain.gain.setTargetAtTime(fx.delay?0.22:0,now,.03);
-        n.out.gain.setTargetAtTime(Math.max(0,Math.min(1.5,(Number(p.volume)||0)*clipVolume)),now,.025);
+        n.out.gain.setTargetAtTime(Math.max(0,Math.min(1.5,(Number(p.volume)||0)*clipVolume*(partAudibleInMix(p)?1:0))),now,.025);
         n.tune?.port?.postMessage({amount:Math.max(0,Math.min(100,Number(fx.autotune)||0)),allowedPcs:scale.allowedPcs||[]});
       }catch{}
     }
@@ -929,6 +947,7 @@
         if(bus&&audioCtx){try{if(typeof bus.gain.cancelAndHoldAtTime==='function')bus.gain.cancelAndHoldAtTime(now);else bus.gain.cancelScheduledValues(now);bus.gain.setTargetAtTime(desiredPartGain(p,outputSoundFor(p)),now,.028);}catch{}}
         if(p.type==='vocal')applyVocalFxLive(p);
       }
+      if(playing||starting)window.CRPBeatMaker?.setMainGainScale?.(drumsAudibleInMix()?currentDrumScopeGain():0);
       if(playing||starting){
         const beat=currentCycleBeat();
         if(Number.isFinite(beat)&&audioCtx){playbackClockStartBeat=beat;playbackClockStartAudioTime=audioCtx.currentTime;playbackClockBpm=Math.max(40,Math.min(240,+core.bpm||92));}
@@ -1070,7 +1089,7 @@
     ensureAudio();const eq=audioCtx.createBiquadFilter(),comp=audioCtx.createDynamicsCompressor(),dry=audioCtx.createGain(),wet=audioCtx.createGain(),rev=audioCtx.createConvolver(),delay=audioCtx.createDelay(1),delayGain=audioCtx.createGain(),out=audioCtx.createGain();
     const fx=effectiveVocalFx(p,event);eq.type=fx.eq==='warm'?'lowshelf':fx.eq==='bright'?'highshelf':'peaking';eq.frequency.value=fx.eq==='warm'?180:fx.eq==='bright'?4500:2800;eq.gain.value=fx.eq==='flat'?0:fx.eq==='warm'?2:fx.eq==='bright'?2.5:1.5;
     const c=fx.comp||'medium';comp.threshold.value=c==='off'?0:c==='light'?-12:c==='heavy'?-24:-18;comp.ratio.value=c==='off'?1:c==='light'?2:c==='heavy'?6:3.5;comp.attack.value=.008;comp.release.value=.12;
-    dry.gain.value=1;wet.gain.value=Number(fx.reverb||0);rev.buffer=impulse(audioCtx,1.25);delay.delayTime.value=Number(fx.delay||0);delayGain.gain.value=fx.delay?0.22:0;out.gain.value=Math.max(0,Math.min(1.5,(Number(p.volume)||0)*(event?Math.max(0,Math.min(1.5,Number(event.volume)||0)):1)));
+    dry.gain.value=1;wet.gain.value=Number(fx.reverb||0);rev.buffer=impulse(audioCtx,1.25);delay.delayTime.value=Number(fx.delay||0);delayGain.gain.value=fx.delay?0.22:0;out.gain.value=Math.max(0,Math.min(1.5,(Number(p.volume)||0)*(event?Math.max(0,Math.min(1.5,Number(event.volume)||0)):1)*(partAudibleInMix(p)?1:0)));
     const tune=makeAutotuneNode(audioCtx,p,fx);src.connect(eq);eq.connect(comp);const post=tune||comp;if(tune)comp.connect(tune);post.connect(dry);dry.connect(out);post.connect(rev);rev.connect(wet);wet.connect(out);post.connect(delay);delay.connect(delayGain);delayGain.connect(out);out.connect(masterLimiter);
     const nodes={eq,comp,tune,dry,wet,rev,delay,delayGain,out};
     let set=liveVocalFxNodes.get(p.id);if(!set){set=new Set();liveVocalFxNodes.set(p.id,set);}
@@ -1180,7 +1199,7 @@
         const items=chordFlatItems(p);items.forEach((item,i)=>{if(!playing||generation!==playbackGeneration)return;const card=item.card,durBeats=item.dur,b=item.startBeat;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;const baseDur=durBeats*beatSec,duration=core.sustain?sustainedPartSeconds(scheduledSound,baseDur):Math.max(.18,baseDur*.98);const notes=core.notesFor(card,p.data)||[];notes.forEach((n,j)=>playTracked(player,n,at+(p.data.instrument==='guitar'?j*.035:0),{duration,gain:.94}));scheduleHighlight((at-audioCtx.currentTime)*1000,p,i);});
       }else{
         const stepBeats=4/p.resolution,partBeats=Math.max(stepBeats,p.bars*4),repeatLead=playbackScope?.kind==='vocalMix'?p.repeat:!!core.loop,firstCycle=repeatLead?Math.max(0,Math.floor(fromBeat/partBeats)):0,lastCycle=repeatLead?Math.floor((toBeat-1e-6)/partBeats):0;
-        for(let cyc=firstCycle;cyc<=lastCycle;cyc++)p.events.forEach(e=>{if(!playing||generation!==playbackGeneration)return;const local=leadEventStartBeat(p,e),b=local+cyc*partBeats;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;let midi=e.midi+(Number(p.octave)||0)*12;if(core.isBassSound?.(scheduledSound)||scheduledSound==='electric_bass_finger')midi-=12;const drawnBeats=leadEventDurationBeats(p,e),duration=p.sustain&&drawnBeats<=stepBeats?sustainedPartSeconds(scheduledSound,beatSec):Math.max(.05,drawnBeats*beatSec*.98);playTracked(player,midiName(midi),at,{duration,gain:.92});scheduleLeadHighlight((at-audioCtx.currentTime)*1000,p,e.step);});
+        for(let cyc=firstCycle;cyc<=lastCycle;cyc++)p.events.forEach(e=>{if(e.voxBlank===true||!playing||generation!==playbackGeneration)return;const local=leadEventStartBeat(p,e),b=local+cyc*partBeats;if(b<fromBeat||b>=toBeat)return;const at=startTime+(b-fromBeat)*beatSec;let midi=e.midi+(Number(p.octave)||0)*12;if(core.isBassSound?.(scheduledSound)||scheduledSound==='electric_bass_finger')midi-=12;const drawnBeats=leadEventDurationBeats(p,e),duration=p.sustain&&drawnBeats<=stepBeats?sustainedPartSeconds(scheduledSound,beatSec):Math.max(.05,drawnBeats*beatSec*.98);playTracked(player,midiName(midi),at,{duration,gain:.92});scheduleLeadHighlight((at-audioCtx.currentTime)*1000,p,e.step);});
       }
     }
     if(withVocals)for(const p of enabledVocals()){
@@ -1232,7 +1251,7 @@
       if(cursorBeat>=total-.001)cursorBeat=0;
       const initialBeat=cursorBeat;
       if(scopedDrums){
-        const drumGain=Math.max(0,Math.min(1,Number(playbackScope?.drumGain??1)));
+        const drumGain=Math.max(0,Math.min(1,Number(playbackScope?.drumGain??1)))*(drumsAudibleInMix()?1:0);
         await window.CRPBeatMaker?.startMainNow?.(leadIn,initialBeat,drumGain);
       }else{
         window.CRPBeatMaker?.stopMainNow?.();
@@ -1348,7 +1367,7 @@
   function midiNum(note){const m=String(note).match(/^([A-G])(#|b)?(-?\d+)$/);if(!m)return 60;const pc={C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]]+(m[2]==='#'?1:m[2]==='b'?-1:0);return Math.max(0,Math.min(127,(+m[3]+1)*12+pc));}
   function vlq(n){n=Math.max(0,Math.floor(n));let a=[n&127];while(n>>=7)a.unshift((n&127)|128);return a;}
   function midiFile(events,bpm=120){const ppq=480,tempo=Math.round(60000000/bpm),ev=[];events.sort((a,b)=>a.t-b.t||a.on-b.on);let last=0;for(const e of events){ev.push(...vlq(e.t-last),e.on?0x90:0x80,e.note&127,e.on?(e.vel||96):0);last=e.t;}ev.push(0,0xff,0x2f,0);const tr=new Uint8Array(ev),head=new Uint8Array([77,84,104,100,0,0,0,6,0,0,0,1,ppq>>8,ppq&255]),th=new Uint8Array([77,84,114,107,(tr.length>>>24)&255,(tr.length>>>16)&255,(tr.length>>>8)&255,tr.length&255]);return concatBytes([head,th,tr]);}
-  function partMidi(p){const ppq=480,E=[];if(p.type==='lead'){for(const x of p.events){const start=leadEventStartBeat(p,x),t=Math.round(start*ppq),n=Math.max(0,Math.min(127,x.midi+(p.octave||0)*12+((core.isBassSound?.(p.sound)||p.sound==='electric_bass_finger')?-12:0))),drawnBeats=leadEventDurationBeats(p,x),durBeats=(p.sustain&&drawnBeats<=4/p.resolution)?Math.max(1,drawnBeats):drawnBeats,durTicks=Math.max(30,Math.round(durBeats*ppq*.98));E.push({t,on:1,note:n},{t:t+durTicks,on:0,note:n});}}else if(p.type==='chord'){for(const item of chordFlatItems(p)){const card=item.card,notes=core.notesFor(card,p.data)||[],dur=item.dur,beat=item.startBeat;for(const n of notes){const mn=midiNum(n);E.push({t:Math.round(beat*ppq),on:1,note:mn},{t:Math.round((beat+dur*.98)*ppq),on:0,note:mn});}}}return midiFile(E,core.bpm);}
+  function partMidi(p){const ppq=480,E=[];if(p.type==='lead'){for(const x of p.events){if(x.voxBlank===true)continue;const start=leadEventStartBeat(p,x),t=Math.round(start*ppq),n=Math.max(0,Math.min(127,x.midi+(p.octave||0)*12+((core.isBassSound?.(p.sound)||p.sound==='electric_bass_finger')?-12:0))),drawnBeats=leadEventDurationBeats(p,x),durBeats=(p.sustain&&drawnBeats<=4/p.resolution)?Math.max(1,drawnBeats):drawnBeats,durTicks=Math.max(30,Math.round(durBeats*ppq*.98));E.push({t,on:1,note:n},{t:t+durTicks,on:0,note:n});}}else if(p.type==='chord'){for(const item of chordFlatItems(p)){const card=item.card,notes=core.notesFor(card,p.data)||[],dur=item.dur,beat=item.startBeat;for(const n of notes){const mn=midiNum(n);E.push({t:Math.round(beat*ppq),on:1,note:mn},{t:Math.round((beat+dur*.98)*ppq),on:0,note:mn});}}}return midiFile(E,core.bpm);}
   function drumMidi(b){const map={kick1:36,kick2:36,kick3:35,snare1:38,snare2:38,snare3:40,snare4:38,snare5:40,chh:42,ohh:46,tomHi:50,tomMid:47,tomLow:45,clap:39,rim:37,shaker:82,tamb:54,cowbell:56,conga:64},E=[];if(!b)return midiFile(E,core.bpm);for(const [id,bars] of Object.entries(b.tracks||{}))for(let bar=0;bar<(b.bars||1);bar++)for(const st of bars[bar]||[]){const t=Math.round((bar*4+st/16)*480),n=map[id]||37;E.push({t,on:1,note:n},{t:t+60,on:0,note:n});}return midiFile(E,core.bpm);}
   function closeStudioExport(){document.getElementById('studioExportModal')?.remove();}
   function openStudioExport(){
@@ -1450,7 +1469,7 @@
         if(p.type==='chord'){
           for(const item of chordFlatItems(p)){const card=item.card,durBeats=item.dur,at=startAt+item.startBeat*beatSec,base=durBeats*beatSec,duration=core.sustain?sustainedPartSeconds(p.data?.sound,base):Math.max(.18,base*.98),notes=core.notesFor(card,p.data)||[];notes.forEach((n,j)=>{try{player.play(n,at+(p.data.instrument==='guitar'?j*.035:0),{duration,gain:.94});}catch{}});}
         }else{
-          const stepBeats=4/p.resolution;for(const e of p.events||[]){const at=startAt+leadEventStartBeat(p,e)*beatSec;let midi=e.midi+(Number(p.octave)||0)*12;if(core.isBassSound?.(p.sound)||p.sound==='electric_bass_finger')midi-=12;const drawn=leadEventDurationBeats(p,e),duration=p.sustain&&drawn<=stepBeats?sustainedPartSeconds(p.sound,beatSec):Math.max(.05,drawn*beatSec*.98);try{player.play(midiName(midi),at,{duration,gain:.92});}catch{}}
+          const stepBeats=4/p.resolution;for(const e of p.events||[]){if(e.voxBlank===true)continue;const at=startAt+leadEventStartBeat(p,e)*beatSec;let midi=e.midi+(Number(p.octave)||0)*12;if(core.isBassSound?.(p.sound)||p.sound==='electric_bass_finger')midi-=12;const drawn=leadEventDurationBeats(p,e),duration=p.sustain&&drawn<=stepBeats?sustainedPartSeconds(p.sound,beatSec):Math.max(.05,drawn*beatSec*.98);try{player.play(midiName(midi),at,{duration,gain:.92});}catch{}}
         }
       }
       // Vocal parts: render the Vox Box arrangement (placement, trims and clip FX).
@@ -1695,6 +1714,45 @@
     if($('voxPasteBtn'))$('voxPasteBtn').disabled=!voxClipboard;updateVoxHistoryButtons();
   }
 
+  function applyVoxTrackMixChange(){
+    persistVoxEdits();
+    liveEditRefresh();
+    renderParts();
+    renderVoxBox();
+  }
+  function toggleVoxPartMuteSolo(part,kind){
+    if(!part)return;
+    voxCheckpoint();
+    if(kind==='mute'){part.muted=!part.muted;if(part.muted)part.solo=false;}
+    else{part.solo=!part.solo;if(part.solo)part.muted=false;}
+    applyVoxTrackMixChange();
+    voxStatus(`${part.name} ${kind==='mute'?(part.muted?'muted':'unmuted'):(part.solo?'soloed':'solo off')}.`);
+  }
+  function toggleVoxDrumMuteSolo(kind){
+    const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;
+    voxCheckpoint();
+    if(kind==='mute'){b.muted=!b.muted;if(b.muted)b.solo=false;}
+    else{b.solo=!b.solo;if(b.solo)b.muted=false;}
+    window.CRPBeatMaker.setBeat(b,{persist:true});
+    liveEditRefresh();
+    renderVoxBox();
+    voxStatus(`Drums ${kind==='mute'?(b.muted?'muted':'unmuted'):(b.solo?'soloed':'solo off')}.`);
+  }
+  function appendVoxMuteSolo(host,{part=null,drums=false}={}){
+    if(!host)return;
+    const state=drums?(window.CRPBeatMaker?.getBeat?.()||{}):(part||{});
+    const row=document.createElement('div');row.className='vox-track-ms';
+    const m=document.createElement('button'),s=document.createElement('button');
+    m.type=s.type='button';m.textContent='M';s.textContent='S';m.title='Mute track';s.title='Solo track';
+    m.setAttribute('aria-pressed',String(state.muted===true));s.setAttribute('aria-pressed',String(state.solo===true));
+    m.classList.toggle('is-on',state.muted===true);s.classList.toggle('is-on',state.solo===true);
+    const stop=e=>{e.preventDefault();e.stopPropagation();};
+    m.onpointerdown=stop;s.onpointerdown=stop;
+    m.onclick=e=>{stop(e);drums?toggleVoxDrumMuteSolo('mute'):toggleVoxPartMuteSolo(part,'mute');};
+    s.onclick=e=>{stop(e);drums?toggleVoxDrumMuteSolo('solo'):toggleVoxPartMuteSolo(part,'solo');};
+    row.append(m,s);host.append(row);
+  }
+
   function makeVoxTrackLabel({name,meta,checked=null,onChecked=null,kind='vocal',part=null}){
     const label=document.createElement('div');label.className='vox-track-label'+(kind!=='vocal'?' vox-instrument-label':'');
     if(checked!==null){const top=document.createElement('label');top.className='vox-track-enable';const c=document.createElement('input');c.type='checkbox';c.checked=!!checked;c.onpointerdown=e=>e.stopPropagation();c.onchange=e=>{e.stopPropagation();onChecked?.(c.checked);};const strong=document.createElement('strong');strong.textContent=name;top.append(c,strong);label.append(top);}else{const strong=document.createElement('strong');strong.textContent=name;label.append(strong);}
@@ -1703,6 +1761,7 @@
       label.dataset.voxPartId=String(part.id);label.dataset.voxPartType=String(part.type);
       const menu=document.createElement('button');menu.type='button';menu.className='vox-track-menu-btn';menu.textContent='⋮';menu.title='Track actions';menu.setAttribute('aria-label',`${name} track actions`);
       menu.onclick=e=>{e.preventDefault();e.stopPropagation();const r=menu.getBoundingClientRect();openVoxTrackContextMenu(part,label,r.right,r.bottom);};label.append(menu);
+      appendVoxMuteSolo(label,{part});
     }
     return label;
   }
@@ -1747,7 +1806,7 @@
     style.onchange=()=>{try{localStorage.setItem('crp-vox-drum-style-v1',style.value)}catch{}};complex.onchange=()=>{try{localStorage.setItem('crp-vox-drum-complexity-v1',complex.value)}catch{}};
     gen.querySelector('.vox-drum-randomize').onclick=e=>{e.stopPropagation();voxCheckpoint();window.CRPBeatMaker?.generateBeat?.({style:style.value,complexity:complex.value});persistVoxEdits();renderVoxBox();voxStatus(`${style.options[style.selectedIndex]?.text||style.value} drum pattern generated.`);};
     gen.querySelector('.vox-drum-fill').onclick=e=>{e.stopPropagation();voxCheckpoint();window.CRPBeatMaker?.fillLastBar?.({style:style.value,complexity:complex.value});persistVoxEdits();renderVoxBox();voxStatus('Fill added to the last drum bar.');};
-    head.append(enable,meta,gen);
+    head.append(enable,meta,gen);appendVoxMuteSolo(head,{drums:true});
     const names=document.createElement('div');names.className='vox-drum-names';
     for(const d of defs){const n=document.createElement('div');n.className='vox-drum-name';n.textContent=d.name;n.title=d.name;names.appendChild(n);}
     label.append(head,names);label.onclick=e=>{if(e.target.closest('button,input,select,label'))return;focusVoxInstrumentTrack('drum-map','Drums','drum-map');renderVoxInspector();};
@@ -1811,10 +1870,10 @@
     }catch(err){console.warn('Vox Box audition failed',err);}
   }
   function beginVoxInlineEventEdit(sel,el){
-    if(!sel||!el||sel.kind==='drum')return;el.querySelector('.vox-inline-event-input')?.remove();const input=document.createElement('input');input.className='vox-inline-event-input';input.type='text';input.autocomplete='off';input.spellcheck=false;const noteCard=sel.kind==='chord'&&(sel.part?.data?.mode==='note'||sel.card?.type==='note');input.value=sel.kind==='lead'?midiName(sel.event.midi):(noteCard&&Number.isFinite(Number(sel.card?.midiNotes?.[0]))?midiName(Number(sel.card.midiNotes[0])):String(sel.card?.value||''));el.appendChild(input);requestAnimationFrame(()=>{input.focus();input.select();});
+    if(!sel||!el||sel.kind==='drum')return;el.querySelector('.vox-inline-event-input')?.remove();const input=document.createElement('input');input.className='vox-inline-event-input';input.type='text';input.autocomplete='off';input.spellcheck=false;const noteCard=sel.kind==='chord'&&(sel.part?.data?.mode==='note'||sel.card?.type==='note'),blank=sel.kind==='lead'?sel.event?.voxBlank===true:sel.card?.voxBlank===true;input.value=blank?'':(sel.kind==='lead'?midiName(sel.event.midi):(noteCard&&Number.isFinite(Number(sel.card?.midiNotes?.[0]))?midiName(Number(sel.card.midiNotes[0])):String(sel.card?.value||'')));input.placeholder=sel.kind==='lead'||noteCard?'Type note (ex. F#4)':'Type chord (ex. Bm7)';el.appendChild(input);requestAnimationFrame(()=>{input.focus();input.select();});
     let finished=false;const finish=async(commit=true)=>{if(finished)return;finished=true;const txt=input.value.trim();input.remove();if(!commit||!txt){renderVoxBox();return;}voxCheckpoint();
-      if(sel.kind==='lead'){const oldOct=Math.floor((Number(sel.event.midi)||60)/12)-1,n=voxNoteFromText(txt,oldOct);if(!n){voxUndoStack.pop();updateVoxHistoryButtons();voxStatus('Type a note such as F#, D5, or Bb3.');renderVoxBox();return;}sel.event.midi=n.midi;}
-      else if(sel.kind==='chord'){const noteMode=sel.part.data?.mode==='note'||sel.card?.type==='note';if(noteMode){const n=voxNoteFromText(txt,defaultChordNoteOctave(sel.part,sel.card));if(!n){voxUndoStack.pop();updateVoxHistoryButtons();voxStatus('Type a note such as C#, A4, or Bb3.');renderVoxBox();return;}sel.card.type='note';sel.card.value=n.root;sel.card.midiNotes=[n.midi];}else{const probe={...sel.card,type:'chord',value:txt};if(!(core.notesFor(probe,sel.part.data)||[]).length){voxUndoStack.pop();updateVoxHistoryButtons();voxStatus('That chord name was not recognized. Try D, Bm, F#m7, Cmaj7, etc.');renderVoxBox();return;}sel.card.type='chord';sel.card.value=txt;delete sel.card.midiNotes;}}
+      if(sel.kind==='lead'){const oldOct=Math.floor((Number(sel.event.midi)||60)/12)-1,n=voxNoteFromText(txt,oldOct);if(!n){voxUndoStack.pop();updateVoxHistoryButtons();voxStatus('Type a note such as F#, D5, or Bb3.');renderVoxBox();return;}sel.event.midi=n.midi;delete sel.event.voxBlank;}
+      else if(sel.kind==='chord'){const noteMode=sel.part.data?.mode==='note'||sel.card?.type==='note';if(noteMode){const n=voxNoteFromText(txt,defaultChordNoteOctave(sel.part,sel.card));if(!n){voxUndoStack.pop();updateVoxHistoryButtons();voxStatus('Type a note such as C#, A4, or Bb3.');renderVoxBox();return;}sel.card.type='note';sel.card.value=n.root;sel.card.midiNotes=[n.midi];delete sel.card.voxBlank;}else{const probe={...sel.card,type:'chord',value:txt};if(!(core.notesFor(probe,sel.part.data)||[]).length){voxUndoStack.pop();updateVoxHistoryButtons();voxStatus('That chord name was not recognized. Try D, Bm, F#m7, Cmaj7, etc.');renderVoxBox();return;}sel.card.type='chord';sel.card.value=txt;delete sel.card.midiNotes;delete sel.card.voxBlank;}}
       if(sel.kind==='chord'&&String(sel.part.id)===String(loadedChordPartId))core.apply(sel.part.data);persistVoxEdits();renderParts();renderVoxBox();await auditionVoxInstrument(sel);voxStatus(`${txt} updated and auditioned.`);};
     input.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();finish(true);}else if(e.key==='Escape'){e.preventDefault();finish(false);}};input.onblur=()=>finish(true);input.onclick=e=>e.stopPropagation();input.onpointerdown=e=>e.stopPropagation();
   }
@@ -1828,7 +1887,7 @@
   function deleteVoxTrack(part){if(!part)return;closeVoxTrackContextMenu();if(!confirm(`Delete “${part.name}”?`))return;voxCheckpoint();const wasLoaded=String(part.id)===String(loadedChordPartId);parts=parts.filter(p=>String(p.id)!==String(part.id));if(!parts.length){const p=chordPart('Chords 1');parts=[p];loadedChordPartId=p.id;activePartId=p.id;}if(wasLoaded){const c=parts.find(p=>p.type==='chord');if(c){loadedChordPartId=c.id;core.apply(c.data);}}if(String(activePartId)===String(part.id))activePartId=(parts.find(p=>p.type==='chord')||parts[0])?.id||null;voxTargetPartId=allVocalParts()[0]?.id||null;persistVoxEdits();renderParts();renderVoxBox();voxStatus('Track deleted.');}
   function duplicateVoxTrack(part){if(!part)return;closeVoxTrackContextMenu();voxCheckpoint();let copy;if(part.type==='chord'){copy=normalizePart({...clone(part),id:uid(),name:`${part.name} Copy`},parts.length);}else if(part.type==='lead'){copy=normalizePart({...clone(part),id:uid(),name:`${part.name} Copy`,events:(part.events||[]).map(e=>({...clone(e),voxId:uid()}))},parts.length);}else{copy={...part,id:uid(),name:`${part.name} Copy`,recordings:(part.recordings||[]).map(r=>({...r})),voxEvents:(part.voxEvents||[]).map(e=>({...clone(e),id:uid()}))};copy.voxEvents.forEach(e=>e.sourcePartId=copy.id);}parts.splice(Math.max(0,parts.indexOf(part)+1),0,copy);persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${copy.name} duplicated.`);}
   function ensureVoxTrackDialog(){
-    let modal=document.getElementById('voxTrackDialog');if(modal)return modal;modal=document.createElement('div');modal.id='voxTrackDialog';modal.className='vox-track-dialog';modal.hidden=true;modal.innerHTML=`<div class="vox-track-dialog-backdrop"></div><div class="vox-track-dialog-card" role="dialog" aria-modal="true" aria-label="Add track"><h3>Add Track</h3><label>Name<input id="voxNewTrackName" type="text"></label><label>Type<select id="voxNewTrackType"><option value="chord">Chord / Note</option><option value="lead">Lead / Bass</option><option value="vocal">Vocal</option></select></label><label class="vox-new-mode-row">Chord/Note<select id="voxNewTrackMode"><option value="chord">Chord</option><option value="note">Note</option></select></label><label class="vox-new-inst-row">Instrument<select id="voxNewTrackInstrument"><option value="piano">Piano</option><option value="guitar">Guitar</option><option value="misc">Misc</option></select></label><label class="vox-new-inst-row">Sound<select id="voxNewTrackSound"></select></label><div class="vox-track-dialog-actions"><button type="button" data-cancel>Cancel</button><button type="button" data-add class="accent">Add Track</button></div></div>`;document.body.appendChild(modal);modal.querySelector('[data-cancel]').onclick=()=>modal.hidden=true;modal.querySelector('.vox-track-dialog-backdrop').onclick=()=>modal.hidden=true;const type=modal.querySelector('#voxNewTrackType'),inst=modal.querySelector('#voxNewTrackInstrument'),sound=modal.querySelector('#voxNewTrackSound');const fillSounds=()=>{const opts=core.sounds[inst.value]||core.sounds.piano;sound.innerHTML=opts.map(([v,l])=>`<option value="${escapeHtml(v)}">${escapeHtml(l)}</option>`).join('');};const refresh=()=>{const vocal=type.value==='vocal';modal.querySelector('.vox-new-mode-row').hidden=type.value!=='chord';modal.querySelectorAll('.vox-new-inst-row').forEach(x=>x.hidden=vocal);fillSounds();};type.onchange=refresh;inst.onchange=fillSounds;modal._refresh=refresh;modal.querySelector('[data-add]').onclick=()=>{const t=type.value,name=modal.querySelector('#voxNewTrackName').value.trim();voxCheckpoint();let p;if(t==='chord'){p=chordPart(name||`Chords ${countType('chord')+1}`,{...core.snapshot(),rows:[[]],key:''});p.data.mode=modal.querySelector('#voxNewTrackMode').value;p.data.instrument=inst.value;p.data.sound=sound.value;}else if(t==='lead'){p=leadPart(name||`Lead ${countType('lead')+1}`);p.instrument=inst.value;p.sound=sound.value;}else p=vocalPart(name||`Vocals ${countType('vocal')+1}`);parts.push(p);modal.hidden=true;persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${p.name} added.`);};refresh();return modal;
+    let modal=document.getElementById('voxTrackDialog');if(modal)return modal;modal=document.createElement('div');modal.id='voxTrackDialog';modal.className='vox-track-dialog';modal.hidden=true;modal.innerHTML=`<div class="vox-track-dialog-backdrop"></div><div class="vox-track-dialog-card" role="dialog" aria-modal="true" aria-label="Add track"><h3>Add Track</h3><label>Name<input id="voxNewTrackName" type="text"></label><label>Type<select id="voxNewTrackType"><option value="chord">Chord / Note</option><option value="lead">Lead / Bass</option><option value="vocal">Vocal</option></select></label><label class="vox-new-mode-row">Chord/Note<select id="voxNewTrackMode"><option value="chord">Chord</option><option value="note">Note</option></select></label><label class="vox-new-inst-row">Instrument<select id="voxNewTrackInstrument"><option value="piano">Piano</option><option value="guitar">Guitar</option><option value="misc">Misc</option></select></label><label class="vox-new-inst-row">Sound<select id="voxNewTrackSound"></select></label><div class="vox-track-dialog-actions"><button type="button" data-cancel>Cancel</button><button type="button" data-add class="accent">Add Track</button></div></div>`;document.body.appendChild(modal);modal.querySelector('[data-cancel]').onclick=()=>modal.hidden=true;modal.querySelector('.vox-track-dialog-backdrop').onclick=()=>modal.hidden=true;const type=modal.querySelector('#voxNewTrackType'),inst=modal.querySelector('#voxNewTrackInstrument'),sound=modal.querySelector('#voxNewTrackSound');const fillSounds=()=>{const opts=core.sounds[inst.value]||core.sounds.piano;sound.innerHTML=opts.map(([v,l])=>`<option value="${escapeHtml(v)}">${escapeHtml(l)}</option>`).join('');};const refresh=()=>{const vocal=type.value==='vocal';modal.querySelector('.vox-new-mode-row').hidden=type.value!=='chord';modal.querySelectorAll('.vox-new-inst-row').forEach(x=>x.hidden=vocal);fillSounds();};type.onchange=refresh;inst.onchange=fillSounds;modal._refresh=refresh;modal.querySelector('[data-add]').onclick=()=>{const t=type.value,name=modal.querySelector('#voxNewTrackName').value.trim();voxCheckpoint();let p;if(t==='chord'){p=chordPart(name||`Chords ${countType('chord')+1}`,{...core.snapshot(),rows:[[]],key:''});p.data.mode=modal.querySelector('#voxNewTrackMode').value;p.data.instrument=inst.value;p.data.sound=sound.value;p.voxSetupEstablished=true;}else if(t==='lead'){p=leadPart(name||`Lead ${countType('lead')+1}`);p.instrument=inst.value;p.sound=sound.value;p.voxSetupEstablished=true;}else p=vocalPart(name||`Vocals ${countType('vocal')+1}`);parts.push(p);modal.hidden=true;persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${p.name} added.`);};refresh();return modal;
   }
   function openVoxAddTrackDialog(type='chord'){closeVoxTrackContextMenu();const modal=ensureVoxTrackDialog();modal.hidden=false;const sel=modal.querySelector('#voxNewTrackType');sel.value=['chord','lead','vocal'].includes(type)?type:'chord';modal.querySelector('#voxNewTrackName').value='';modal._refresh?.();setTimeout(()=>modal.querySelector('#voxNewTrackName').focus(),30);}
   function openVoxTrackContextMenu(part,label,x,y,{drums=false}={}){closeVoxTrackContextMenu();const menu=document.createElement('div');menu.id='voxTrackContextMenu';menu.className='vox-track-context-menu';const add=(txt,fn,cls='')=>{const b=document.createElement('button');b.type='button';b.textContent=txt;if(cls)b.className=cls;b.onclick=e=>{e.stopPropagation();fn();};menu.appendChild(b);};if(part)add('Duplicate Track',()=>duplicateVoxTrack(part));add('Add Chord / Note Track',()=>openVoxAddTrackDialog('chord'));add('Add Lead / Bass Track',()=>openVoxAddTrackDialog('lead'));add('Add Vocal Track',()=>openVoxAddTrackDialog('vocal'));if(part)add('Delete Track',()=>deleteVoxTrack(part),'danger');document.body.appendChild(menu);const r=menu.getBoundingClientRect(),left=Math.max(6,Math.min(window.innerWidth-r.width-6,Number(x)||label.getBoundingClientRect().right)),top=Math.max(6,Math.min(window.innerHeight-r.height-6,Number(y)||label.getBoundingClientRect().top));menu.style.left=`${left}px`;menu.style.top=`${top}px`;const outside=e=>{if(menu.contains(e.target))return;document.removeEventListener('pointerdown',outside,true);closeVoxTrackContextMenu();};setTimeout(()=>document.addEventListener('pointerdown',outside,true),0);}
@@ -1839,19 +1898,99 @@
   function appendInstrumentHandles(ev,sel){
     if(sel.kind!=='lead'&&sel.kind!=='chord')return;const lh=document.createElement('span'),rh=document.createElement('span');lh.className='vox-inst-handle left';rh.className='vox-inst-handle right';lh.title='Drag start edge';rh.title='Drag end edge';lh.onpointerdown=e=>beginVoxInstrumentPointerEdit(e,sel,ev,'trim-left');rh.onpointerdown=e=>beginVoxInstrumentPointerEdit(e,sel,ev,'trim-right');ev.append(lh,rh);
   }
+  function voxTrackSetupEstablished(part){
+    if(!part)return false;
+    if(part.voxSetupEstablished===true)return true;
+    if(part.type==='chord')return chordFlatItems(part).length>0;
+    if(part.type==='lead')return (part.events||[]).some(e=>!e.voxBlank);
+    return true;
+  }
+  function insertBlankChordAtBeat(part,beat,mode){
+    const start=Math.max(0,quantizeVoxBeat(beat)),dur=1,card={voxId:uid(),voxBlank:true,type:mode==='note'?'note':'chord',value:'',durationBeats:dur,voxStartBeat:start,voxDurationBeats:dur};
+    if(card.type==='note')card.midiNotes=[];
+    if(!Array.isArray(part.data.rows)||!part.data.rows.length)part.data.rows=[[]];
+    const flat=part.data.rows.flat(),rowSizes=part.data.rows.map(r=>r.length);flat.push(card);flat.sort((a,b)=>(Number(a.voxStartBeat)||0)-(Number(b.voxStartBeat)||0));
+    if(!rowSizes.some(Boolean))part.data.rows=[[...flat]];
+    else{let i=0;part.data.rows=rowSizes.map((n,ri)=>{const take=ri===rowSizes.length-1?flat.slice(i):flat.slice(i,i+n);i+=n;return take;});if(i<flat.length)part.data.rows.at(-1).push(...flat.slice(i));}
+    return card;
+  }
+  function insertBlankLeadAtBeat(part,beat){
+    const start=Math.max(0,quantizeVoxBeat(beat)),stepBeats=4/Math.max(8,Number(part.resolution)||16),oct=Number.isFinite(Number(part.gridOctave))?Number(part.gridOctave):3;
+    const event={voxId:uid(),voxBlank:true,voxStartBeat:start,voxDurationBeats:1,step:Math.max(0,Math.round(start/stepBeats)),durationSteps:Math.max(1,Math.round(1/stepBeats)),midi:Math.max(0,Math.min(127,(oct+1)*12))};
+    part.events=normalizeLeadEvents([...(part.events||[]),event]);
+    return part.events.find(e=>String(e.voxId)===String(event.voxId))||event;
+  }
+  function focusNewBlankEvent(part,item){
+    requestAnimationFrame(()=>{
+      if(!item)return;
+      const key=part.type==='lead'?`lead:${part.id}:${item.voxId}`:`chord:${part.id}:${item.voxId}`;
+      const el=document.querySelector(`.vox-instrument-event[data-vox-key="${CSS.escape(key)}"]`);
+      if(!el)return;
+      const sel=el.__voxSelection;
+      if(sel){setVoxInstrumentSelection(sel,{render:false});renderVoxSelectionClasses();beginVoxInlineEventEdit(sel,el);}
+    });
+  }
+  function createBlankVoxInstrumentEvent(part,beat,{mode=null,instrument=null,sound=null}={}){
+    if(!part||!['chord','lead'].includes(part.type))return;
+    voxCheckpoint();
+    if(part.type==='chord'){
+      part.data=part.data||core.snapshot();part.data.mode=mode||part.data.mode||'chord';
+      if(instrument)part.data.instrument=instrument;if(sound)part.data.sound=sound;
+    }else{
+      if(instrument)part.instrument=instrument;if(sound)part.sound=sound;
+    }
+    part.voxSetupEstablished=true;
+    const item=part.type==='chord'?insertBlankChordAtBeat(part,beat,part.data.mode):insertBlankLeadAtBeat(part,beat);
+    if(part.type==='chord'&&String(part.id)===String(loadedChordPartId))core.apply(part.data);
+    persistVoxEdits();renderParts();renderVoxBox();focusNewBlankEvent(part,item);
+    voxStatus(`Blank ${part.type==='chord'?(part.data.mode==='note'?'note':'chord'):'note'} added at beat ${(quantizeVoxBeat(beat)+1).toFixed(2)}. Type its value, then press Enter.`);
+  }
+  function ensureVoxEventSetupDialog(){
+    let modal=document.getElementById('voxEventSetupDialog');if(modal)return modal;
+    modal=document.createElement('div');modal.id='voxEventSetupDialog';modal.className='vox-track-dialog';modal.hidden=true;
+    modal.innerHTML=`<div class="vox-track-dialog-backdrop"></div><div class="vox-track-dialog-card vox-event-setup-card" role="dialog" aria-modal="true" aria-label="Set up track event"><h3>Set Up Track</h3><label>Chord/Note<select id="voxEventMode"><option value="chord">Chord</option><option value="note">Note</option></select></label><label>Instrument<select id="voxEventInstrument"><option value="piano">Piano</option><option value="guitar">Guitar</option><option value="misc">Misc</option></select></label><label>Sound<select id="voxEventSound"></select></label><div class="vox-track-dialog-actions"><button type="button" data-cancel>Cancel</button><button type="button" data-add class="accent">Add Event</button></div></div>`;
+    document.body.appendChild(modal);
+    const mode=modal.querySelector('#voxEventMode'),inst=modal.querySelector('#voxEventInstrument'),sound=modal.querySelector('#voxEventSound');
+    const fillSounds=()=>{const opts=core.sounds[inst.value]||core.sounds.piano;sound.innerHTML=opts.map(([v,l])=>`<option value="${escapeHtml(v)}">${escapeHtml(l)}</option>`).join('');};
+    inst.onchange=fillSounds;modal.querySelector('[data-cancel]').onclick=()=>{modal.hidden=true;modal._pending=null;};modal.querySelector('.vox-track-dialog-backdrop').onclick=()=>{modal.hidden=true;modal._pending=null;};
+    modal.querySelector('[data-add]').onclick=()=>{const p=modal._pending?.part,atBeat=modal._pending?.beat;if(!p)return;modal.hidden=true;modal._pending=null;createBlankVoxInstrumentEvent(p,atBeat,{mode:mode.value,instrument:inst.value,sound:sound.value});};
+    modal._fillSounds=fillSounds;return modal;
+  }
+  function openVoxEventSetupDialog(part,beat){
+    const modal=ensureVoxEventSetupDialog(),mode=modal.querySelector('#voxEventMode'),inst=modal.querySelector('#voxEventInstrument'),sound=modal.querySelector('#voxEventSound');
+    modal._pending={part,beat};modal.hidden=false;
+    if(part.type==='lead'){mode.innerHTML='<option value="note">Note</option>';mode.value='note';mode.disabled=true;inst.value=part.instrument||'piano';}
+    else{mode.innerHTML='<option value="chord">Chord</option><option value="note">Note</option>';mode.disabled=false;mode.value=part.data?.mode==='note'?'note':'chord';inst.value=part.data?.instrument||'piano';}
+    modal._fillSounds?.();const wanted=part.type==='lead'?part.sound:part.data?.sound;if(wanted&&[...sound.options].some(o=>o.value===wanted))sound.value=wanted;
+    requestAnimationFrame(()=>mode.disabled?inst.focus():mode.focus());
+  }
+  function addVoxInstrumentEventAt(part,beat){
+    if(!voxTrackSetupEstablished(part)){openVoxEventSetupDialog(part,beat);return;}
+    createBlankVoxInstrumentEvent(part,beat,{mode:part.type==='chord'?(part.data?.mode||'chord'):'note',instrument:part.type==='chord'?part.data?.instrument:part.instrument,sound:part.type==='chord'?part.data?.sound:part.sound});
+  }
+  function wireVoxLaneDoubleAdd(lane,part,clickBeat){
+    if(!lane||!part)return;
+    // Desktop double-click and touch double-tap share one guarded path. Some mobile
+    // browsers synthesize a dblclick after our two pointerup taps; the short guard
+    // prevents that synthesized event from creating a second blank note/chord.
+    lane.ondblclick=e=>{if(e.target!==lane)return;if((lane.__voxTouchDoubleAddAt||0)+650>performance.now()){e.preventDefault();e.stopPropagation();return;}e.preventDefault();e.stopPropagation();addVoxInstrumentEventAt(part,clickBeat(e,lane));};
+    let lastTouch=0,lastX=0,lastY=0;
+    lane.addEventListener('pointerup',e=>{if(e.pointerType!=='touch'||e.target!==lane)return;const now=performance.now(),near=Math.hypot(e.clientX-lastX,e.clientY-lastY)<28;if(now-lastTouch<360&&near){e.preventDefault();e.stopPropagation();lastTouch=0;lane.__voxTouchDoubleAddAt=now;addVoxInstrumentEventAt(part,clickBeat(e,lane));}else{lastTouch=now;lastX=e.clientX;lastY=e.clientY;}},{passive:false});
+  }
+
   function renderVoxInstrumentTracks(tracks,width,ppb,clickBeat){
     if(!voxShowInstrumentals)return;
     for(const part of parts.filter(p=>p.type==='chord')){
       const items=chordFlatItems(part);const row=document.createElement('div');row.className='vox-track-row vox-instrument-track';row.style.width=`${width}px`;row.dataset.voxKind='chord';row.dataset.voxPartId=part.id;row.dataset.voxTrackKey=voxTrackTokenForPart(part);row.classList.toggle('is-instrument-focus',voxInstrumentTrackFocus?.key===voxTrackTokenForPart(part));
       const mode=part.data?.mode==='note'?'Note':'Chord';const label=makeVoxTrackLabel({name:part.name,meta:`${mode} • ${items.length} events`,checked:part.enabled,onChecked:on=>{voxCheckpoint();part.enabled=on;persistVoxEdits();renderParts();renderVoxBox();},kind:'chord',part});label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`);renderVoxInspector();};label.querySelector('strong')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`);renderVoxInspector();});label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(part,label,e.clientX,e.clientY);};
-      const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane';lane.dataset.voxKind='chord';lane.dataset.voxPartId=part.id;lane.onclick=e=>{if(e.target!==lane)return;focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`);if(voxToolMode==='playhead')voxSeekTo(clickBeat(e,lane),{manual:true});};
-      for(const item of items){if(!item.card.voxId)item.card.voxId=uid();const key=`chord:${part.id}:${item.card.voxId}`,ev=document.createElement('div');ev.className='vox-instrument-event vox-chord-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.dataset.voxPartId=part.id;ev.style.left=`${item.startBeat*ppb}px`;ev.style.width=`${Math.max(26,item.dur*ppb)}px`;ev.textContent=String(item.card?.value||mode);ev.title=`${part.name} • ${item.card?.value||'event'} • beat ${item.startBeat.toFixed(2)}`;const sel={kind:'chord',key,part,card:item.card,startBeat:item.startBeat,dur:item.dur,flatIndex:item.flatIndex};ev.__voxSelection=sel;ev.onclick=e=>instrumentClickSelection(sel,ev,e);ev.ondblclick=e=>{e.preventDefault();e.stopPropagation();beginVoxInlineEventEdit(sel,ev);};ev.onpointerdown=e=>{if(e.target.classList.contains('vox-inst-handle')||e.target.classList.contains('vox-inline-event-input'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
+      const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane';lane.dataset.voxKind='chord';lane.dataset.voxPartId=part.id;lane.onclick=e=>{if(e.target!==lane)return;focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`);if(voxToolMode==='playhead')voxSeekTo(clickBeat(e,lane),{manual:true});};wireVoxLaneDoubleAdd(lane,part,clickBeat);
+      for(const item of items){if(!item.card.voxId)item.card.voxId=uid();const key=`chord:${part.id}:${item.card.voxId}`,ev=document.createElement('div');ev.className='vox-instrument-event vox-chord-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.dataset.voxPartId=part.id;ev.style.left=`${item.startBeat*ppb}px`;ev.style.width=`${Math.max(26,item.dur*ppb)}px`;ev.classList.toggle('is-blank',item.card?.voxBlank===true);ev.textContent=item.card?.voxBlank===true?`Type ${mode.toLowerCase()}`:String(item.card?.value||mode);ev.title=`${part.name} • ${item.card?.value||'event'} • beat ${item.startBeat.toFixed(2)}`;const sel={kind:'chord',key,part,card:item.card,startBeat:item.startBeat,dur:item.dur,flatIndex:item.flatIndex};ev.__voxSelection=sel;ev.onclick=e=>instrumentClickSelection(sel,ev,e);ev.ondblclick=e=>{e.preventDefault();e.stopPropagation();beginVoxInlineEventEdit(sel,ev);};ev.onpointerdown=e=>{if(e.target.classList.contains('vox-inst-handle')||e.target.classList.contains('vox-inline-event-input'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
     }
     for(const part of parts.filter(p=>p.type==='lead')){
       const row=document.createElement('div');row.className='vox-track-row vox-instrument-track';row.style.width=`${width}px`;row.dataset.voxKind='lead';row.dataset.voxPartId=part.id;row.dataset.voxTrackKey=voxTrackTokenForPart(part);row.classList.toggle('is-instrument-focus',voxInstrumentTrackFocus?.key===voxTrackTokenForPart(part));
       const label=makeVoxTrackLabel({name:part.name,meta:`Lead/Bass • ${part.events?.length||0} notes`,checked:part.enabled,onChecked:on=>{voxCheckpoint();part.enabled=on;persistVoxEdits();renderParts();renderVoxBox();},kind:'lead',part});label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`);renderVoxInspector();};label.querySelector('strong')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`);renderVoxInspector();});label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(part,label,e.clientX,e.clientY);};
-      const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane';lane.dataset.voxKind='lead';lane.dataset.voxPartId=part.id;lane.onclick=e=>{if(e.target!==lane)return;focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`);if(voxToolMode==='playhead')voxSeekTo(clickBeat(e,lane),{manual:true});};
-      for(const event of part.events||[]){if(!event.voxId)event.voxId=uid();const startBeat=leadEventStartBeat(part,event),dur=leadEventDurationBeats(part,event),key=`lead:${part.id}:${event.voxId}`,ev=document.createElement('div');ev.className='vox-instrument-event vox-lead-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.dataset.voxPartId=part.id;ev.style.left=`${startBeat*ppb}px`;ev.style.width=`${Math.max(22,dur*ppb)}px`;ev.textContent=midiName(event.midi);ev.title=`${part.name} • ${midiName(event.midi)} • beat ${startBeat.toFixed(2)}`;const sel={kind:'lead',key,part,event,startBeat,dur};ev.__voxSelection=sel;ev.onclick=e=>instrumentClickSelection(sel,ev,e);ev.ondblclick=e=>{e.preventDefault();e.stopPropagation();beginVoxInlineEventEdit(sel,ev);};ev.onpointerdown=e=>{if(e.target.classList.contains('vox-inst-handle')||e.target.classList.contains('vox-inline-event-input'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
+      const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane';lane.dataset.voxKind='lead';lane.dataset.voxPartId=part.id;lane.onclick=e=>{if(e.target!==lane)return;focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`);if(voxToolMode==='playhead')voxSeekTo(clickBeat(e,lane),{manual:true});};wireVoxLaneDoubleAdd(lane,part,clickBeat);
+      for(const event of part.events||[]){if(!event.voxId)event.voxId=uid();const startBeat=leadEventStartBeat(part,event),dur=leadEventDurationBeats(part,event),key=`lead:${part.id}:${event.voxId}`,ev=document.createElement('div');ev.className='vox-instrument-event vox-lead-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.dataset.voxPartId=part.id;ev.style.left=`${startBeat*ppb}px`;ev.style.width=`${Math.max(22,dur*ppb)}px`;ev.classList.toggle('is-blank',event.voxBlank===true);ev.textContent=event.voxBlank===true?'Type note':midiName(event.midi);ev.title=`${part.name} • ${event.voxBlank===true?'blank note':midiName(event.midi)} • beat ${startBeat.toFixed(2)}`;const sel={kind:'lead',key,part,event,startBeat,dur};ev.__voxSelection=sel;ev.onclick=e=>instrumentClickSelection(sel,ev,e);ev.ondblclick=e=>{e.preventDefault();e.stopPropagation();beginVoxInlineEventEdit(sel,ev);};ev.onpointerdown=e=>{if(e.target.classList.contains('vox-inst-handle')||e.target.classList.contains('vox-inline-event-input'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
     }
     renderVoxDrumMap(tracks,width,ppb);
   }
@@ -1900,7 +2039,7 @@
         nameInput.onclick=e=>e.stopPropagation();nameInput.onfocus=()=>{voxCheckpoint();voxTargetPartId=part.id;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=null;renderVoxInspector();};
         nameInput.oninput=()=>{part.name=String(nameInput.value||'');markPartsDirty();core.scheduleAutoSave();};nameInput.onblur=()=>{part.name=String(nameInput.value||'').trim()||`Vocals ${allVocalParts().indexOf(part)+1}`;nameInput.value=part.name;renderParts();markPartsDirty();core.scheduleAutoSave();};
         const meta=document.createElement('span');meta.className='vox-track-meta';meta.textContent=`${Math.round((Number(part.volume)||0)*100)}% • ${(part.voxEvents||[]).length} event${(part.voxEvents||[]).length===1?'':'s'}`;
-        const menu=document.createElement('button');menu.type='button';menu.className='vox-track-menu-btn';menu.textContent='⋮';menu.title='Track actions';menu.setAttribute('aria-label',`${part.name} track actions`);menu.onclick=e=>{e.preventDefault();e.stopPropagation();const r=menu.getBoundingClientRect();openVoxTrackContextMenu(part,label,r.right,r.bottom);};label.append(nameInput,meta,menu);
+        const menu=document.createElement('button');menu.type='button';menu.className='vox-track-menu-btn';menu.textContent='⋮';menu.title='Track actions';menu.setAttribute('aria-label',`${part.name} track actions`);menu.onclick=e=>{e.preventDefault();e.stopPropagation();const r=menu.getBoundingClientRect();openVoxTrackContextMenu(part,label,r.right,r.bottom);};label.append(nameInput,meta,menu);appendVoxMuteSolo(label,{part});
         label.onclick=e=>{if(e.target.closest('input,button'))return;voxTargetPartId=part.id;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=null;renderVoxBox();};
         label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(part,label,e.clientX,e.clientY);};
         const lane=document.createElement('div');lane.className='vox-track-lane';lane.dataset.voxPartId=part.id;lane.dataset.voxKind='vocal';lane.onclick=e=>{if(e.target!==lane)return;voxTargetPartId=part.id;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=null;if(voxToolMode==='playhead')voxSeekTo(clickBeat(e,lane),{manual:true});renderVoxBox();};
@@ -2051,7 +2190,6 @@
     if($('voxShowInstrumentals'))$('voxShowInstrumentals').onchange=e=>{voxShowInstrumentals=!!e.target.checked;try{localStorage.setItem(VOX_INST_KEY,voxShowInstrumentals?'1':'0')}catch{};voxInstrumentSelections=[];voxInstrumentSelection=null;if(!voxShowInstrumentals)voxInstrumentTrackFocus=null;renderVoxBox();voxStatus(voxShowInstrumentals?'Instrument tracks added. Edit Chord/Note and Lead/Bass events on the timeline; edit drums in the Drum Map at the bottom.':'Instrument tracks hidden.');};
     if($('voxToolModeBtn'))$('voxToolModeBtn').onclick=()=>{voxToolMode=voxToolMode==='cursor'?'playhead':'cursor';try{localStorage.setItem(VOX_TOOL_KEY,voxToolMode)}catch{};renderVoxBox();voxStatus(voxToolMode==='cursor'?'Cursor mode — drag a selection box with the regular pointer, then move/edit the selected events.':'Playhead mode — the ruler and empty lanes locate playback; events remain draggable.');};
     if($('voxAddTrackBtn'))$('voxAddTrackBtn').onclick=addVoxTrack;
-    if($('voxAddActiveTakeBtn'))$('voxAddActiveTakeBtn').onclick=addActiveTakeToVox;
     if($('voxCropBtn'))$('voxCropBtn').onclick=()=>{voxCropMode=!voxCropMode;renderVoxBox();voxStatus(voxCropMode?'Crop mode: drag the blue-selected event edges.':'Crop mode off.');};
     if($('voxSplitBtn'))$('voxSplitBtn').onclick=splitSelectedVox;
     if($('voxCopyBtn'))$('voxCopyBtn').onclick=()=>copySelectedVox(false);
