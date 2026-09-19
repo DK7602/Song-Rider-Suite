@@ -1,0 +1,26 @@
+Song Rider Suite v3.3.35 — Track Master block editing reliability
+
+Fixes the mobile Track Master / Vox Box chord-note event problems shown in 1000097728.mp4:
+
+1. Typed chord/note now becomes the real timeline block
+   - Root cause: autosave capture called syncLoadedChord(), which replaced the loaded chord part's data object while the inline keyboard editor was open.
+   - The editor then committed into an orphaned card object. Audition used that orphan (so the chord played) but the actual project card stayed blank.
+   - While Vox Box / Track Master is open, its part data is now the editing authority. The core snapshot is captured immediately before opening instead of replacing live event objects during editing.
+   - Inline commits also re-resolve the event by stable voxId before writing, then preserve explicit start/duration timeline fields.
+
+2. Delete / Copy / Cut selection reliability
+   - Instrument selection now re-resolves current chord/lead objects by stable IDs before an operation.
+   - Tapping/selecting an event updates the Inspector/action toolbar immediately, so Delete/Copy/Cut are enabled on the same tap instead of waiting for another click.
+
+3. Drag/drop and left/right resize reliability
+   - Instrument drag/trim now uses window-level captured pointermove/pointerup listeners rather than relying only on the event element's pointer stream.
+   - This is more reliable on Android Chrome inside the horizontally scrollable Track Master timeline.
+   - Selection references are resolved against current project data before editing.
+   - Touch trim handles are larger and have visible edge grips.
+
+4. Persistence / app sync
+   - Chord edits still apply to the loaded CRP chord core when committed.
+   - Vox edits autosave without replacing live card identities.
+   - Delete, move and trim persist back into the shared Song Rider Suite parts model.
+
+Cache/version bumped to v3.3.35.

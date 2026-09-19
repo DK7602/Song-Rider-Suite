@@ -4388,3 +4388,23 @@ body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
   #voxCopyBtn,#voxCutBtn,#voxPasteBtn,#voxDeleteBtn,#voxUndoBtn,#voxRedoBtn{grid-column:span 2!important;}
   #voxBoxStatus,.vox-harmony-guide{grid-column:1/-1!important;width:100%!important;max-width:100%!important;margin-left:0!important;}
 }
+
+/* =========================================================
+   v3.3.35 — Track Master chord/note block interaction reliability
+   ========================================================= */
+/* Keep trim targets easy to grab on touch without obscuring the editable center. */
+.vox-inst-handle{
+  width:14px!important;
+  opacity:.9;
+}
+.vox-instrument-event.is-selected .vox-inst-handle::after{
+  content:"";position:absolute;top:18%;bottom:18%;width:2px;border-radius:2px;background:#b7e8ff;opacity:.9;
+}
+.vox-inst-handle.left::after{left:4px;}
+.vox-inst-handle.right::after{right:4px;}
+.vox-instrument-event.is-dragging,.vox-instrument-event.is-trimming{z-index:80!important;will-change:left,width;}
+@media(max-width:600px){
+  .vox-inst-handle{width:22px!important;}
+  .vox-inst-handle.left::after{left:6px;}
+  .vox-inst-handle.right::after{right:6px;}
+}
