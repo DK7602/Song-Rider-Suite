@@ -20,6 +20,8 @@
         else if(txt.includes('baby daw')) a.href=new URL(root+'index.html?workspace=baby-daw',location.origin).href;
         else if(txt.includes('song rider')) a.href=new URL(root+'song-rider/index.html?crpMode=1',location.origin).href;
       });
+      const trackMaster=document.getElementById('srpTrackMasterBtn');
+      if(trackMaster)trackMaster.href=new URL(root+'index.html?workspace=baby-daw&trackMaster=1&return=song-rider',location.origin).href;
     }catch{}
   }
 
@@ -17423,6 +17425,7 @@ KEEP RHYME UI ABOVE KEYBOARD
     document.querySelectorAll('a.workspace-mode-btn').forEach(a=>{
       if(!String(a.getAttribute('href')||'').includes('/song-rider/'))a.addEventListener('pointerdown',flushSrpTransport,true);
     });
+    document.getElementById('srpTrackMasterBtn')?.addEventListener('pointerdown',flushSrpTransport,true);
     window.addEventListener('pagehide',flushSrpTransport);
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSrpTransport();});
     window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='srp-show-full-song'){try{goToSection('Full');}catch{}}if(e.data?.type==='crp-playback-state'){window.__SRP_LINKED_PLAYING=!!e.data.playing;try{renderSheetTitleBar();}catch{}}});
