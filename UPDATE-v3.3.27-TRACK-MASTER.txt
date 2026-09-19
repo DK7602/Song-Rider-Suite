@@ -1,0 +1,8 @@
+Song Rider Suite v3.3.27 — Track Master
+
+- Added a 24-karat-gold-style Track Master shortcut beneath the workspace selector in Chord Rider Pro, Baby DAW, and Song Rider Pro.
+- Track Master opens the existing Vox Box/DAW track editor with instrument tracks enabled.
+- Track Master can open even when no vocal part exists; instruments remain editable and a Vocal Track can be added from inside the editor.
+- Song Rider Pro flushes linked BPM/capo/step state before navigating to Track Master.
+- Track Master route is normalized for subpath deployments and auto-opens after returning to the main suite.
+- Bumped suite cache/version to v3.3.27.

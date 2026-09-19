@@ -4031,3 +4031,29 @@ body.vox-box-open>footer{display:none!important}
  .vox-inspector.is-collapsed #voxInspectorTitle{font-size:.9rem;}
  .vox-inspector.is-collapsed #voxInspectorMeta{font-size:.64rem!important;max-width:calc(100vw - 24px);}
 }
+
+
+/* v3.3.27 — Track Master shortcut shared by Chord Rider and Baby DAW. */
+.track-master-nav-row{
+  display:flex;justify-content:center;align-items:center;max-width:760px;margin:6px auto 10px;padding:0 14px;
+}
+.track-master-gold-btn{
+  position:relative;isolation:isolate;overflow:hidden;min-height:40px;width:min(230px,62vw);padding:8px 22px;
+  border:1px solid #ffe999;border-radius:13px;
+  background:linear-gradient(120deg,#7a5000 0%,#c98700 11%,#f3bd24 24%,#fff3a1 35%,#e8a914 48%,#9f6500 61%,#f8ce45 76%,#fff0a0 86%,#a66c00 100%);
+  color:#171005!important;font-weight:950;letter-spacing:.075em;text-transform:uppercase;font-size:.9rem;
+  text-shadow:0 1px 0 rgba(255,255,255,.58);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.82),inset 0 -2px 4px rgba(91,48,0,.4),0 0 0 1px rgba(125,77,0,.38),0 5px 15px rgba(227,166,22,.2);
+  transition:transform .12s ease,filter .12s ease,box-shadow .12s ease;
+}
+.track-master-gold-btn::after{
+  content:"";position:absolute;z-index:-1;inset:-70% -20%;transform:translateX(-65%) rotate(18deg);
+  background:linear-gradient(90deg,transparent 38%,rgba(255,255,255,.7) 50%,transparent 62%);opacity:.48;pointer-events:none;
+}
+.track-master-gold-btn:hover{filter:brightness(1.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -2px 4px rgba(91,48,0,.38),0 0 0 1px rgba(125,77,0,.4),0 6px 19px rgba(240,184,40,.33)}
+.track-master-gold-btn:active{transform:translateY(1px) scale(.988);filter:brightness(.98)}
+.track-master-gold-btn:focus-visible{outline:2px solid #fff0a0;outline-offset:3px}
+@media(max-width:520px){
+  .track-master-nav-row{margin:5px auto 8px;padding:0 8px}
+  .track-master-gold-btn{width:min(205px,68vw);min-height:38px;padding:7px 18px;border-radius:12px;font-size:.78rem}
+}
