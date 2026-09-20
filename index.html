@@ -9,7 +9,7 @@
   <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
-  <link rel="stylesheet" href="styles.css?v=3.3.37-PHANTOM-CHORD-FIX" />
+  <link rel="stylesheet" href="styles.css?v=3.3.38-TRACK-MASTER-LOCATORS-DRUM-REGIONS" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
   <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
@@ -288,35 +288,6 @@
       </div>
     </section>
 
-    <section id="songEndPanel" class="panel song-end-panel baby-daw-only" aria-label="Song end">
-      <button id="songEndToggleBtn" class="song-end-toggle" type="button" aria-expanded="false">
-        <span class="song-end-toggle-copy"><strong>Song End</strong><span id="songEndSummaryValue">Full song</span></span>
-        <span class="song-end-toggle-chevron" aria-hidden="true">▾</span>
-      </button>
-      <div id="songEndEditor" class="song-end-editor" aria-label="Song end editor" hidden>
-        <div class="song-end-topline">
-          <div class="song-end-copy">
-            <span class="subtle">Cutoff</span>
-            <span id="songEndValue">Full song</span>
-            <small id="songPlayheadValue" class="subtle">Playhead 00:00.0</small>
-          </div>
-          <div class="song-end-inline-controls" aria-label="Song end fine controls">
-            <button id="songEndMinusBtn" class="song-end-nudge" type="button" title="Move song end 0.1 second earlier">−0.1s</button>
-            <button id="songEndPlusBtn" class="song-end-nudge" type="button" title="Move song end 0.1 second later">+0.1s</button>
-            <label class="song-end-snap"><input id="songEndSnapBar" type="checkbox" checked> <span>Snap to Bar</span></label>
-          </div>
-        </div>
-        <div class="song-end-slider-block">
-          <div class="song-end-slider-wrap">
-            <div id="songEndBarTicks" class="song-end-bar-ticks" aria-hidden="true"></div>
-            <input id="songEndSlider" type="range" min="0.05" max="1" step="0.01" value="1" aria-label="Song end position">
-          </div>
-        </div>
-        <button id="songEndClearBtn" type="button">Restore Full Song</button>
-        <small class="song-end-hint subtle">Drag the slider to set the exact ending. Gold lines mark each bar. Turn <b>Snap to Bar</b> off for free placement. Playback, notification seek, and WAV export use this cutoff.</small>
-      </div>
-    </section>
-
     <section class="panel save-panel">
       <div class="section-heading-row">
         <h2>Projects</h2>
@@ -435,7 +406,7 @@
         <button id="voxAddTrackBtn" type="button">+ Vocal Track</button>
         <label class="vox-tool-check"><input id="voxShowInstrumentals" type="checkbox"><span>Instrumentals</span></label>
         <button id="voxCropBtn" type="button">Crop</button>
-        <button id="voxSplitBtn" type="button">Split at Playhead</button>
+        <button id="voxSplitBtn" type="button">Split</button>
         <button id="voxCopyBtn" type="button">Copy</button>
         <button id="voxCutBtn" type="button">Cut</button>
         <button id="voxPasteBtn" type="button" disabled>Paste</button>
@@ -452,7 +423,10 @@
       <div id="voxTimelineScroller" class="vox-timeline-scroller">
         <button id="voxToolModeBtn" class="vox-tool-mode-btn" type="button" aria-pressed="true" title="Cycle Cursor / Playhead">Playhead</button>
         <div id="voxTimelineInner" class="vox-timeline-inner">
-          <div id="voxRuler" class="vox-ruler" aria-label="Vocal timeline ruler"></div>
+          <div id="voxRuler" class="vox-ruler" aria-label="Track Master timeline ruler"></div>
+          <div id="voxSongRangeFill" class="vox-song-range-fill" aria-hidden="true"></div>
+          <button id="voxSongStartLocator" class="vox-song-locator start" type="button" aria-label="Song start locator" title="Drag to set song start"><span>START</span></button>
+          <button id="voxSongEndLocator" class="vox-song-locator end" type="button" aria-label="Song end locator" title="Drag to set song finish"><span>FINISH</span></button>
           <div id="voxTracks" class="vox-tracks"></div>
           <div id="voxPlayhead" class="vox-playhead" aria-hidden="true"><span></span></div>
         </div>
@@ -511,8 +485,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.37-PHANTOM-CHORD-FIX"></script>
-  <script src="parts.js?v=3.3.37-PHANTOM-CHORD-FIX"></script>
-  <script src="beat-maker.js?v=3.3.37-PHANTOM-CHORD-FIX"></script>
+  <script src="app.js?v=3.3.38-TRACK-MASTER-LOCATORS-DRUM-REGIONS"></script>
+  <script src="parts.js?v=3.3.38-TRACK-MASTER-LOCATORS-DRUM-REGIONS"></script>
+  <script src="beat-maker.js?v=3.3.38-TRACK-MASTER-LOCATORS-DRUM-REGIONS"></script>
 </body>
 </html>

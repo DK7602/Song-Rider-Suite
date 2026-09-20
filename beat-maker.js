@@ -44,6 +44,13 @@
   let mainGainScale = 1;
   let mainStep = 0;
   let mainNextTime = 0;
+  let mainArrangement = null;
+  let mainArrangementRangeStart = 0;
+  let mainArrangementRangeEnd = null;
+  let mainArrangementCanLoop = true;
+  let eventEditCommit = null;
+  let eventEditClose = null;
+  let eventEditPriorBeat = null;
   let activeProjectId = null;
   let beat = freshBeat();
   let beatUpdatedAt=0;
@@ -110,6 +117,14 @@
   function persistBeatIntoProject(){
     const now=Date.now();
     beatUpdatedAt=now;
+    // When Track Master opens the Beat Maker for one drum region, that region owns
+    // the edit.  Do not overwrite the project's legacy/global Beat Maker pattern.
+    // The callback stores the edited snapshot in the selected drum event instead.
+    if(typeof eventEditCommit==='function'){
+      try{eventEditCommit(JSON.parse(JSON.stringify(normalizeBeat(beat))));}catch(e){console.warn('Could not commit drum region edit',e);}
+      window.CRPCore?.scheduleAutoSave?.();
+      return true;
+    }
     const ps = readProjects();
     let p = activeProjectId ? ps.find(x=>x.id===activeProjectId) : null;
     if(!p){
@@ -278,7 +293,15 @@
     // reset explicitly by loadProject(null), so stale draft drums cannot leak in.
     renderEditor(); $('crpBeatModal').classList.add('open');
   }
-  function closeEditor(){ stopPreview(); $('crpBeatModal')?.classList.remove('open'); }
+  function closeEditor(){
+    stopPreview(); $('crpBeatModal')?.classList.remove('open');
+    if(eventEditCommit){
+      try{eventEditCommit(JSON.parse(JSON.stringify(normalizeBeat(beat))));}catch{}
+      const close=eventEditClose,prior=eventEditPriorBeat;eventEditCommit=null;eventEditClose=null;eventEditPriorBeat=null;
+      if(prior){beat=normalizeBeat(prior);currentBar=clamp(currentBar,0,beat.bars-1);updateMainControls();}
+      try{close?.();}catch{}
+    }
+  }
   function renderEditor(){
     $('crpBarsSelect').value=String(beat.bars); $('crpResolution').value=String(beat.resolution); updateVolumeControls();
     renderBarTabs(); renderGrid();
@@ -515,8 +538,23 @@
     const src=audioCtx.createBufferSource(), g=audioCtx.createGain(); src.buffer=buf; g.gain.value=beat.gain*DRUM_OUTPUT_SCALE*gain; src.connect(g).connect(audioCtx.destination); src.start(time);
   }
   async function audition(id,gain=.78){ try{await ensureDrums();hit(id,audioCtx.currentTime+.01,gain)}catch(e){console.error(e);status(`Drum error: ${e.message||e}`);} }
-  function scheduleCanonicalStep(absStep,time,barIndex,gainScale=1){
-    const step=absStep%64; DRUMS.forEach(([id])=>{ if(beat.tracks[id][barIndex]?.includes(step)) hit(id,time,gainScale); });
+  function scheduleCanonicalStep(absStep,time,barIndex,gainScale=1,pattern=beat){
+    const pat=normalizeBeat(pattern),step=((absStep%64)+64)%64;
+    DRUMS.forEach(([id])=>{
+      const buf=buffers.get(id);if(!buf||!audioCtx)return;
+      if(pat.tracks[id][barIndex]?.includes(step)){const src=audioCtx.createBufferSource(),g=audioCtx.createGain();src.buffer=buf;g.gain.value=pat.gain*DRUM_OUTPUT_SCALE*gainScale;src.connect(g).connect(audioCtx.destination);src.start(time);}
+    });
+  }
+  function arrangementHitCount(events){
+    let n=0;for(const ev of Array.isArray(events)?events:[]){const pat=normalizeBeat(ev?.pattern);DRUMS.forEach(([id])=>{for(let b=0;b<pat.bars;b++)n+=pat.tracks[id][b].length;});}return n;
+  }
+  function scheduleArrangementStep(absStep,time,gainScale=1){
+    const songBeat=absStep/16;
+    for(const ev of Array.isArray(mainArrangement)?mainArrangement:[]){
+      const start=Math.max(0,Number(ev?.startBeat)||0),dur=Math.max(0,Number(ev?.durationBeats)||0),end=start+dur;if(songBeat<start-1e-6||songBeat>=end-1e-6)continue;
+      const pat=normalizeBeat(ev?.pattern),offset=Number(ev?.patternOffsetBeats)||0,patternSteps=Math.max(64,Math.max(1,pat.bars)*64),rawStep=Math.round((songBeat-start+offset)*16),localCanonical=((rawStep%patternSteps)+patternSteps)%patternSteps,bar=Math.floor(localCanonical/64),step=localCanonical%64;
+      DRUMS.forEach(([id])=>{if(pat.tracks[id][bar]?.includes(step)){const buf=buffers.get(id);if(!buf||!audioCtx)return;const src=audioCtx.createBufferSource(),g=audioCtx.createGain();src.buffer=buf;g.gain.value=pat.gain*DRUM_OUTPUT_SCALE*gainScale;src.connect(g).connect(audioCtx.destination);src.start(time);}});
+    }
   }
   function stepSeconds(){ return (60/getBpm())/16; } // one 64th = quarter/16
   function startScheduler(kind){
@@ -529,7 +567,11 @@
           const bar=Math.floor(previewStep/64)%beat.bars; scheduleCanonicalStep(previewStep,previewNextTime,bar,1);
           markPlayingStep(bar,previewStep%64); previewStep++; previewNextTime+=stepSeconds();
         }else{
-          const bar=Math.floor(mainStep/64)%beat.bars; scheduleCanonicalStep(mainStep,mainNextTime,bar,mainGainScale);
+          if(mainArrangement){
+            const rangeStartStep=Math.max(0,Math.round((Number(mainArrangementRangeStart)||0)*16)),rangeEndStep=Number.isFinite(Number(mainArrangementRangeEnd))?Math.max(rangeStartStep+1,Math.round(Number(mainArrangementRangeEnd)*16)):null;
+            if(rangeEndStep!==null&&mainStep>=rangeEndStep&&mainArrangementCanLoop&&$('loopToggle')?.checked)mainStep=rangeStartStep;
+            scheduleArrangementStep(mainStep,mainNextTime,mainGainScale);
+          }else {const bar=Math.floor(mainStep/64)%beat.bars; scheduleCanonicalStep(mainStep,mainNextTime,bar,mainGainScale);}
           mainStep++; mainNextTime+=stepSeconds();
         }
       }
@@ -561,7 +603,7 @@
   }
   function startMainDrums(delaySeconds=.01,startBeat=0,gainScale=1){
     if(!audioCtx||!beat.enabled) return;
-    mainPlaying=true;
+    mainPlaying=true;mainArrangement=null;mainArrangementRangeStart=0;mainArrangementRangeEnd=null;mainArrangementCanLoop=true;
     mainGainScale=Math.max(0,Math.min(1,Number(gainScale)||0));
     // 16 canonical drum steps per quarter-note beat (64 per 4/4 bar).
     // Starting from the same song beat keeps drums aligned when playback begins
@@ -570,7 +612,7 @@
     mainNextTime=audioCtx.currentTime+Math.max(.01,Number(delaySeconds)||.01);
     startScheduler('main');
   }
-  function stopMainDrums(){ mainPlaying=false; mainGainScale=1; if(scheduler && !previewing){clearInterval(scheduler);scheduler=null;} }
+  function stopMainDrums(){ mainPlaying=false; mainArrangement=null; mainArrangementRangeStart=0; mainArrangementRangeEnd=null; mainArrangementCanLoop=true; mainGainScale=1; if(scheduler && !previewing){clearInterval(scheduler);scheduler=null;} }
 
   // If the chord progression stops itself (Repeat off), stop drums too.
   setInterval(()=>{ if(mainPlaying && $('playAllBtn') && !/Stop/i.test($('playAllBtn').textContent||'')) stopMainDrums(); },120);
@@ -601,6 +643,18 @@
       if(persist)persistBeatIntoProject();
       try{window.dispatchEvent(new CustomEvent('crp-beat-changed',{detail:{source:'vox-box'}}));}catch{}
       return JSON.parse(JSON.stringify(beat));
+    },
+    editBeatEvent(next,{onCommit=null,onClose=null}={}){
+      stopPreview();stopMainDrums();eventEditPriorBeat=JSON.parse(JSON.stringify(normalizeBeat(beat)));eventEditCommit=typeof onCommit==='function'?onCommit:null;eventEditClose=typeof onClose==='function'?onClose:null;
+      beat=normalizeBeat(next);currentBar=0;updateMainControls();renderEditor();$('crpBeatModal')?.classList.add('open');
+      return JSON.parse(JSON.stringify(beat));
+    },
+    async startArrangementNow(events,delaySeconds=.01,startBeat=0,gainScale=1,options={}){
+      const list=(Array.isArray(events)?events:[]).filter(e=>Number(e?.durationBeats)>0);if(!beat.enabled||!list.length||arrangementHitCount(list)===0)return;
+      stopPreview();try{await ensureDrums();mainPlaying=true;mainArrangement=JSON.parse(JSON.stringify(list));mainArrangementRangeStart=Math.max(0,Number(options?.rangeStart)||0);mainArrangementRangeEnd=Number.isFinite(Number(options?.rangeEnd))?Math.max(mainArrangementRangeStart+.03,Number(options.rangeEnd)):null;mainArrangementCanLoop=options?.canLoop!==false;mainGainScale=Math.max(0,Math.min(1,Number(gainScale)||0));mainStep=Math.max(0,Math.round((Number(startBeat)||0)*16));mainNextTime=audioCtx.currentTime+Math.max(.01,Number(delaySeconds)||.01);startScheduler('main');}catch(e){console.error(e);}
+    },
+    updateArrangement(events,options={}){
+      if(!mainArrangement)return false;const list=(Array.isArray(events)?events:[]).filter(e=>Number(e?.durationBeats)>0);mainArrangement=JSON.parse(JSON.stringify(list));if(Number.isFinite(Number(options?.rangeStart)))mainArrangementRangeStart=Math.max(0,Number(options.rangeStart));if(Number.isFinite(Number(options?.rangeEnd)))mainArrangementRangeEnd=Math.max(mainArrangementRangeStart+.03,Number(options.rangeEnd));if(options?.canLoop!==undefined)mainArrangementCanLoop=options.canLoop!==false;return true;
     },
     getUpdatedAt(){ return Number(beatUpdatedAt)||0; },
     loadProject(project){

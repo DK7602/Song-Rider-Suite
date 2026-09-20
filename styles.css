@@ -3184,7 +3184,6 @@ body.workspace-chord-rider .primary-toolbar > .capo-shape-mode-row{
 }
 
 /* v3.3.16 — collapsed Baby DAW Song End panel, below the full part editor and above Projects. */
-body:not(.workspace-baby-daw) #songEndPanel{display:none!important;}
 body.workspace-baby-daw #songEndPanel{
   display:block!important;margin:12px 0!important;padding:0!important;overflow:hidden!important;
   border:1px solid #394452!important;border-radius:16px!important;background:#121820!important;
@@ -4421,3 +4420,28 @@ body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
 .unsaved-project-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:9px;margin-top:18px}
 .unsaved-project-actions button{min-height:42px}
 @media(max-width:520px){.unsaved-project-card{padding:17px 15px}.unsaved-project-actions{display:grid;grid-template-columns:1fr}.unsaved-project-actions button{width:100%}}
+
+
+/* =========================================================
+   v3.3.38 — Track Master smooth follow, song locators, drum regions
+   ========================================================= */
+.vox-song-range-fill{
+  position:absolute;top:0;height:46px;z-index:16;pointer-events:none;
+  background:rgba(241,198,85,.055);border-left:1px solid rgba(241,198,85,.28);border-right:1px solid rgba(241,198,85,.28);
+}
+.vox-song-locator{
+  position:absolute!important;top:0!important;z-index:40!important;width:0!important;min-width:0!important;height:46px!important;min-height:46px!important;padding:0!important;margin:0!important;
+  border:0!important;border-radius:0!important;background:transparent!important;color:#111!important;overflow:visible!important;touch-action:none!important;cursor:ew-resize!important;
+}
+.vox-song-locator::after{content:"";position:absolute;left:-1px;top:19px;width:2px;height:calc(100vh - 140px);background:#f1c655;opacity:.62;pointer-events:none;box-shadow:0 0 5px rgba(241,198,85,.32)}
+.vox-song-locator span{position:absolute;top:1px;display:flex;align-items:center;justify-content:center;height:18px;padding:0 5px;background:#f1c655;color:#16120a;font:950 .56rem/1 system-ui,sans-serif;letter-spacing:.04em;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.vox-song-locator.start span{left:0;border-radius:2px 7px 7px 2px}.vox-song-locator.end span{right:0;border-radius:7px 2px 2px 7px;transform:translateX(-100%)}
+.vox-song-locator.start span::before{content:"";position:absolute;left:0;bottom:-6px;border-top:6px solid #f1c655;border-right:6px solid transparent}.vox-song-locator.end span::after{content:"";position:absolute;right:0;bottom:-6px;border-top:6px solid #f1c655;border-left:6px solid transparent}
+.vox-drum-region-row{height:92px!important;min-height:92px!important;order:9999;background:#0d141c!important;overflow:visible!important}
+.vox-drum-region-row>.vox-track-label{height:92px!important;min-height:92px!important;padding-top:9px!important;padding-bottom:33px!important}
+.vox-drum-region-lane{background:repeating-linear-gradient(90deg,transparent 0,transparent 55px,rgba(255,255,255,.055) 55px,rgba(255,255,255,.055) 56px),#0e161f!important}
+.vox-drum-event{top:15px!important;height:62px!important;display:flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:center!important;gap:3px!important;padding:5px 12px!important;box-sizing:border-box!important;background:linear-gradient(180deg,#5b3887,#402866)!important;border-color:#b58ee6!important;color:#f8efff!important;overflow:hidden!important}
+.vox-drum-event strong{font-size:.74rem;line-height:1;pointer-events:none}.vox-drum-event span:not(.vox-inst-handle){font-size:.59rem;line-height:1.15;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;pointer-events:none}
+.vox-drum-event.is-selected{border-color:#66c6ff!important;box-shadow:0 0 0 2px rgba(102,198,255,.22),0 6px 18px rgba(0,0,0,.35)!important}
+.vox-drum-event .vox-inst-handle{display:block!important;background:rgba(255,255,255,.12)!important}
+@media(max-width:600px){.vox-song-locator span{font-size:.5rem;padding:0 4px}.vox-drum-region-row,.vox-drum-region-row>.vox-track-label{height:86px!important;min-height:86px!important}.vox-drum-event{top:13px!important;height:58px!important;padding:4px 10px!important}}

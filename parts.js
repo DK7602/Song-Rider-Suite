@@ -58,9 +58,11 @@
   try{leadGridCollapsed=localStorage.getItem('crp-lead-grid-collapsed-v1')==='1';}catch{}
   let playing=false, starting=false, playbackGeneration=0;
   let playbackScope=null; // null = normal enabled-part playback; otherwise a scoped Lead/Vocal preview
-  let playbackClockStartAudioTime=0, playbackClockStartBeat=0, playbackClockBpm=92, playbackTotalBeats=0;
-  let songEndBeat=null, songEndUiTimer=null, songEndSnapToBar=true;
-  const SONG_END_OPEN_KEY='crp-song-end-open-v1', SONG_END_SNAP_KEY='crp-song-end-snap-bar-v1';
+  let playbackClockStartAudioTime=0, playbackClockStartBeat=0, playbackClockBpm=92, playbackTotalBeats=0, playbackLoopStartBeat=0;
+  let songStartBeat=0, songEndBeat=null, songEndUiTimer=null;
+  let drumEvents=[];
+  let drumArrangementInitialized=false;
+  let voxLastHarmonyBeatKey='';
   let liveEditTimer=null, mediaPositionTimer=null, mediaKeepAlive=null, mediaKeepAliveUrl='', mediaPausedBeat=0, mediaActionsInstalled=false;
   let liveVocalFxNodes=new Map();
   let audioCtx=null, masterLimiter=null, cycleTimer=null;
@@ -766,108 +768,58 @@
     const t=p.recordings?.find(r=>r.id===p.activeTakeId);return t?Math.max(0,(Number(t.duration)||0)*core.bpm/60):0;
   }
 
+  function drumPatternHitCount(pattern){
+    if(!pattern?.tracks)return 0;let n=0;for(const bars of Object.values(pattern.tracks||{}))for(const arr of Array.isArray(bars)?bars:[])n+=Array.isArray(arr)?arr.length:0;return n;
+  }
+  function blankDrumPattern(){
+    const b=clone(window.CRPBeatMaker?.getBeat?.()||{version:3,enabled:true,muted:false,solo:false,bars:1,resolution:16,gain:.5,tracks:{}});b.enabled=true;b.bars=1;
+    for(const k of Object.keys(b.tracks||{}))b.tracks[k]=Array.from({length:16},()=>[]);return b;
+  }
+  function normalizeDrumEvent(raw){
+    if(!raw)return null;const start=Math.max(0,Number(raw.startBeat)||0),duration=Math.max(.03,Number(raw.durationBeats)||4),pattern=clone(raw.pattern||blankDrumPattern());
+    return {id:String(raw.id||uid()),startBeat:start,durationBeats:duration,patternOffsetBeats:Number(raw.patternOffsetBeats)||0,pattern};
+  }
+  function musicalVocalDurationBeats(){
+    const musical=parts.filter(p=>p.type==='chord'||p.type==='lead').map(partDurationBeats),vocals=parts.filter(p=>p.type==='vocal').map(vocalDurationBeats);return Math.max(0,...musical,...vocals);
+  }
+  function ensureLegacyDrumEvent(){
+    // Old projects stored one global Beat Maker pattern. Migrate it exactly once.
+    // New projects explicitly persist drumEvents (even []), so deleting the last
+    // region never resurrects a legacy pattern on the next render/save.
+    if(drumArrangementInitialized)return;
+    if(!window.CRPBeatMaker?.getBeat)return;
+    drumArrangementInitialized=true;
+    const beat=window.CRPBeatMaker.getBeat();if(!beat||beat.enabled===false||drumPatternHitCount(beat)<=0)return;
+    const duration=Math.max(4,musicalVocalDurationBeats(),(Number(beat.bars)||1)*4);
+    drumEvents=[normalizeDrumEvent({id:uid(),startBeat:0,durationBeats:duration,pattern:beat})];
+  }
   function naturalSongDurationBeats(){
-    const musical=parts.filter(p=>p.type==='chord'||p.type==='lead').map(partDurationBeats);
-    const vocals=parts.filter(p=>p.type==='vocal').map(vocalDurationBeats);
-    const drums=Math.max(0,Number(window.CRPBeatMaker?.getDurationBeats?.()||0));
-    return Math.max(0,...musical,...vocals,drums);
+    ensureLegacyDrumEvent();const drumEnd=drumEvents.length?Math.max(...drumEvents.map(e=>(Number(e.startBeat)||0)+(Number(e.durationBeats)||0))):0;return Math.max(musicalVocalDurationBeats(),drumEnd,0);
   }
-  function effectiveSongEndBeats(natural){
-    const n=Math.max(0,Number(natural)||0);
-    const custom=Number(songEndBeat);
-    return Number.isFinite(custom)&&custom>0?Math.max(.05,Math.min(n,custom)):n;
+  function effectiveSongStartBeat(){return Math.max(0,Number(songStartBeat)||0);}
+  function effectiveSongEndBeats(natural=naturalSongDurationBeats()){
+    const start=effectiveSongStartBeat(),custom=Number(songEndBeat);if(Number.isFinite(custom)&&custom>start+.03)return custom;const n=Math.max(0,Number(natural)||0);return Math.max(start+.05,n||start+.05);
   }
+  function songRangeForTimeline(){const start=effectiveSongStartBeat(),natural=naturalSongDurationBeats(),end=Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>start+.03?Number(songEndBeat):(natural>start?natural:Math.max(16,start+16));return {start,end:Math.max(start+.05,end)};}
   function songEndSeconds(beats){
-    const bpm=Math.max(40,Math.min(240,Number(core.bpm)||92));
-    return Math.max(0,Number(beats)||0)*60/bpm;
+    const bpm=Math.max(40,Math.min(240,Number(core.bpm)||92));return Math.max(0,Number(beats)||0)*60/bpm;
   }
   function formatSongTime(seconds){
-    const s=Math.max(0,Number(seconds)||0),m=Math.floor(s/60),r=s-m*60;
-    return `${String(m).padStart(2,'0')}:${r.toFixed(1).padStart(4,'0')}`;
+    const s=Math.max(0,Number(seconds)||0),m=Math.floor(s/60),r=s-m*60;return `${String(m).padStart(2,'0')}:${r.toFixed(1).padStart(4,'0')}`;
   }
   function currentCycleBeat(){
     if(!(playing||starting)||!audioCtx||!playbackClockStartAudioTime||!playbackTotalBeats)return null;
-    const bpm=Math.max(40,Math.min(240,+playbackClockBpm||+core.bpm||92)),beatSec=60/bpm;
-    let beat=(playbackClockStartBeat||0)+Math.max(0,audioCtx.currentTime-playbackClockStartAudioTime)/beatSec;
-    if(playbackTotalBeats>0)beat=((beat%playbackTotalBeats)+playbackTotalBeats)%playbackTotalBeats;
+    const bpm=Math.max(40,Math.min(240,+playbackClockBpm||+core.bpm||92)),beatSec=60/bpm,start=Math.max(0,Number(playbackLoopStartBeat)||0),end=Math.max(start+.05,Number(playbackTotalBeats)||start+.05),period=end-start;
+    let beat=(playbackClockStartBeat||start)+Math.max(0,audioCtx.currentTime-playbackClockStartAudioTime)/beatSec;
+    const loopSong=!playbackScope&&!!core.loop;
+    if(period>0&&loopSong)beat=start+((((beat-start)%period)+period)%period);
+    else beat=Math.max(start,Math.min(end-.001,beat));
     return beat;
   }
-  function songEndBarBeats(){ return 4; }
-  function snappedSongEndBeat(value,natural){
-    const n=Math.max(.05,Number(natural)||.05),v=Math.max(.05,Math.min(n,Number(value)||n));
-    if(!songEndSnapToBar)return v;
-    const bar=songEndBarBeats();
-    const maxBar=Math.floor(n/bar)*bar;
-    let snapped=Math.round(v/bar)*bar;
-    if(snapped<bar)snapped=Math.min(bar,n);
-    if(maxBar>0)snapped=Math.min(maxBar,snapped);
-    if(n-maxBar>1e-5 && Math.abs(v-n)<Math.abs(v-snapped))snapped=n;
-    return Math.max(.05,Math.min(n,snapped));
+  function renderSongEndEditor(){ if(!(playing||starting))updateMediaPosition(); }
+  function setSongRange(start,end,{save=true,status=true}={}){
+    const minGap=voxSnapEnabled()?Math.max(.03,voxBeatStep()):.03;let a=Math.max(0,Number(start)||0),b=Math.max(a+minGap,Number(end)||a+minGap);songStartBeat=a;songEndBeat=b;markPartsDirty();liveEditRefresh();if(save)core.scheduleAutoSave();if(voxBoxOpen){renderVoxBox();if(status)voxStatus(`Song range: ${a.toFixed(2)}–${b.toFixed(2)} beats.`);}
   }
-  function renderSongEndTicks(natural){
-    const box=$('songEndBarTicks');if(!box)return;
-    const n=Math.max(0,Number(natural)||0),bar=songEndBarBeats(),key=`${n.toFixed(4)}:${bar}`;
-    if(box.dataset.tickKey===key)return;
-    box.dataset.tickKey=key;box.innerHTML='';
-    if(n<=0)return;
-    for(let b=bar;b<n-1e-5;b+=bar){const mark=document.createElement('span');mark.style.left=`${(b/n)*100}%`;box.appendChild(mark);}
-  }
-  function renderSongEndEditor(){
-    const box=$('songEndEditor');if(!box)return;
-    const natural=naturalSongDurationBeats(),custom=Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0;
-    const end=custom?effectiveSongEndBeats(natural):natural;
-    const endLabel=custom?formatSongTime(songEndSeconds(end)):'Full song';
-    if($('songEndValue'))$('songEndValue').textContent=endLabel;
-    if($('songEndSummaryValue'))$('songEndSummaryValue').textContent=endLabel;
-    const playhead=currentCycleBeat();
-    if($('songPlayheadValue'))$('songPlayheadValue').textContent=`Playhead ${formatSongTime(songEndSeconds(playhead??mediaPausedBeat??0))}`;
-    if($('songEndMinusBtn'))$('songEndMinusBtn').disabled=natural<=0;
-    if($('songEndPlusBtn'))$('songEndPlusBtn').disabled=natural<=0;
-    if($('songEndClearBtn'))$('songEndClearBtn').disabled=!custom;
-    const slider=$('songEndSlider');
-    if(slider){
-      slider.disabled=natural<=0;
-      slider.min='0.05';slider.max=String(Math.max(.05,natural));slider.step='0.01';
-      const value=Math.max(.05,Math.min(Math.max(.05,natural),custom?end:Math.max(.05,natural)));
-      if(document.activeElement!==slider)slider.value=String(value);
-      const pct=natural>0?(value/natural)*100:100;slider.style.setProperty('--song-end-progress',`${Math.max(0,Math.min(100,pct))}%`);
-    }
-    if($('songEndSnapBar'))$('songEndSnapBar').checked=!!songEndSnapToBar;
-    renderSongEndTicks(natural);
-    if(!(playing||starting))updateMediaPosition();
-  }
-  function setSongEndPanelOpen(open,persist=true){
-    const panel=$('songEndPanel'),editor=$('songEndEditor'),btn=$('songEndToggleBtn');
-    if(!panel||!editor||!btn)return;
-    const on=!!open;
-    panel.classList.toggle('is-open',on);
-    editor.hidden=!on;
-    btn.setAttribute('aria-expanded',String(on));
-    if(persist){try{localStorage.setItem(SONG_END_OPEN_KEY,on?'1':'0')}catch{}}
-  }
-  function initSongEndPanel(){
-    let open=false;
-    try{open=localStorage.getItem(SONG_END_OPEN_KEY)==='1';songEndSnapToBar=localStorage.getItem(SONG_END_SNAP_KEY)!=='0';}catch{}
-    setSongEndPanelOpen(open,false);
-    const btn=$('songEndToggleBtn');
-    if(btn)btn.onclick=()=>setSongEndPanelOpen(btn.getAttribute('aria-expanded')!=='true');
-  }
-  function setSongEndFromSlider(value,save=true){
-    const natural=naturalSongDurationBeats();if(natural<=0)return;
-    songEndBeat=snappedSongEndBeat(value,natural);
-    markPartsDirty();renderSongEndEditor();
-    liveEditRefresh();
-    if(save)core.scheduleAutoSave();
-  }
-  function nudgeSongEnd(seconds){
-    const natural=naturalSongDurationBeats();if(natural<=0)return;
-    const bpm=Math.max(40,Math.min(240,Number(core.bpm)||92));
-    const base=Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):natural;
-    // +/-0.1s is always a true fine adjustment, even when Snap to Bar is checked.
-    songEndBeat=Math.max(.05,Math.min(natural,base+Number(seconds||0)*bpm/60));
-    markPartsDirty();renderSongEndEditor();liveEditRefresh();core.scheduleAutoSave();
-  }
-  function clearSongEnd(){songEndBeat=null;markPartsDirty();renderSongEndEditor();liveEditRefresh();core.scheduleAutoSave();core.status('Song end restored to the full project.');}
 
   function makeMediaCarrierWavUrl(){
     try{
@@ -913,7 +865,7 @@
     if(!ensureMediaSession())return;
     try{navigator.mediaSession.metadata=new MediaMetadata({title:core.projectName||'Song Rider Suite',artist:'Song Rider Suite',album:'Baby DAW',artwork:[{src:new URL('assets/icon-192.png',location.href).href,sizes:'192x192',type:'image/png'}]});}catch{}
   }
-  function mediaDurationBeats(){const natural=naturalSongDurationBeats();return Math.max(.05,effectiveSongEndBeats(natural)||natural||.05);}
+  function mediaDurationBeats(){return Math.max(effectiveSongStartBeat()+.05,effectiveSongEndBeats(naturalSongDurationBeats()));}
   function updateMediaPosition(){
     if(!('mediaSession' in navigator)||typeof navigator.mediaSession.setPositionState!=='function')return;
     try{
@@ -989,7 +941,10 @@
         if(bus&&audioCtx){try{if(typeof bus.gain.cancelAndHoldAtTime==='function')bus.gain.cancelAndHoldAtTime(now);else bus.gain.cancelScheduledValues(now);bus.gain.setTargetAtTime(desiredPartGain(p,outputSoundFor(p)),now,.028);}catch{}}
         if(p.type==='vocal')applyVocalFxLive(p);
       }
-      if(playing||starting)window.CRPBeatMaker?.setMainGainScale?.(drumsAudibleInMix()?currentDrumScopeGain():0);
+      if(playing||starting){
+        window.CRPBeatMaker?.setMainGainScale?.(drumsAudibleInMix()?currentDrumScopeGain():0);
+        window.CRPBeatMaker?.updateArrangement?.(drumEvents,{rangeStart:effectiveSongStartBeat(),rangeEnd:mediaDurationBeats(),canLoop:!playbackScope});
+      }
       if(playing||starting){
         const beat=currentCycleBeat();
         if(Number.isFinite(beat)&&audioCtx){playbackClockStartBeat=beat;playbackClockStartAudioTime=audioCtx.currentTime;playbackClockBpm=Math.max(40,Math.min(240,+core.bpm||92));}
@@ -1257,7 +1212,7 @@
     syncLoadedChord();
     const ps=enabledPlayable(),vs=enabledVocals();
     const scopedDrums=playbackScope?playbackScope.drums===true:true;
-    const drumBeats=scopedDrums?Math.max(0,Number(window.CRPBeatMaker?.getDurationBeats?.()||0)):0;
+    ensureLegacyDrumEvent();const drumBeats=scopedDrums?(drumEvents.length?Math.max(0,...drumEvents.map(e=>(Number(e.startBeat)||0)+(Number(e.durationBeats)||0))):Math.max(0,Number(window.CRPBeatMaker?.getDurationBeats?.()||0))):0;
     if(!ps.length&&!vs.length&&drumBeats<=0){
       const wasVocalMix=playbackScope?.kind==='vocalMix';
       playbackScope=null;updatePartPlaybackButtons();
@@ -1280,7 +1235,7 @@
       const leadIn=options?.liveRestart?.035:.16;
       const computePlaybackTotal=()=>{
         const livePs=enabledPlayable(),liveVs=enabledVocals();
-        const liveDrums=scopedDrums?Math.max(0,Number(window.CRPBeatMaker?.getDurationBeats?.()||0)):0;
+        ensureLegacyDrumEvent();const liveDrums=scopedDrums?(drumEvents.length?Math.max(0,...drumEvents.map(e=>(Number(e.startBeat)||0)+(Number(e.durationBeats)||0))):Math.max(0,Number(window.CRPBeatMaker?.getDurationBeats?.()||0))):0;
         const natural=Math.max(...livePs.map(partDurationBeats),...liveVs.map(vocalDurationBeats),liveDrums,4);
         return effectiveSongEndBeats(natural);
       };
@@ -1289,12 +1244,13 @@
       // Scoped Lead/Vocal preview buttons always begin at beat 1. The normal
       // Chord transport still honors "play line in view". If the visible line
       // begins past a custom song end, restart from beat 1 instead of silently ending.
-      let cursorBeat=Number.isFinite(Number(options?.fromBeat))?Math.max(0,Number(options.fromBeat)):((!playbackScope&&active()?.type==='chord'&&active()?.enabled&&activePartId===loadedChordPartId)?Math.min(core.startBeat(),Math.max(0,total-0.001)):0);
-      if(cursorBeat>=total-.001)cursorBeat=0;
+      const rangeStart=effectiveSongStartBeat();playbackLoopStartBeat=rangeStart;
+      let cursorBeat=Number.isFinite(Number(options?.fromBeat))?Math.max(rangeStart,Number(options.fromBeat)):((!playbackScope&&active()?.type==='chord'&&active()?.enabled&&activePartId===loadedChordPartId)?Math.max(rangeStart,Math.min(core.startBeat(),Math.max(rangeStart,total-0.001))):rangeStart);
+      if(cursorBeat>=total-.001)cursorBeat=rangeStart;
       const initialBeat=cursorBeat;
       if(scopedDrums){
         const drumGain=Math.max(0,Math.min(1,Number(playbackScope?.drumGain??1)))*(drumsAudibleInMix()?1:0);
-        await window.CRPBeatMaker?.startMainNow?.(leadIn,initialBeat,drumGain);
+        ensureLegacyDrumEvent();if(drumEvents.length)await window.CRPBeatMaker?.startArrangementNow?.(drumEvents,leadIn,initialBeat,drumGain,{rangeStart,rangeEnd:total,canLoop:!playbackScope});else await window.CRPBeatMaker?.startMainNow?.(leadIn,initialBeat,drumGain);
       }else{
         window.CRPBeatMaker?.stopMainNow?.();
       }
@@ -1320,7 +1276,7 @@
         const beatSec=60/Math.max(40,Math.min(240,+core.bpm||92));
         const chunkBeats=Math.max(1,Math.min(2.5,.68/beatSec));
         total=computePlaybackTotal();playbackTotalBeats=total;
-        if(cursorBeat>=total-.001)cursorBeat=0;
+        if(cursorBeat>=total-.001)cursorBeat=playbackLoopStartBeat;
         const fromBeat=cursorBeat;
         const toBeat=Math.min(total,fromBeat+chunkBeats);
         const span=(toBeat-fromBeat)*beatSec;
@@ -1338,7 +1294,7 @@
         cursorBeat=toBeat;
         if(cursorBeat>=total-1e-7){
           const loopSong=playbackScope?false:!!core.loop;
-          if(loopSong){cursorBeat=0;vocalsScheduledForCycle=false;}
+          if(loopSong){cursorBeat=playbackLoopStartBeat;vocalsScheduledForCycle=false;}
           else{
             cycleTimer=setTimeout(()=>{if(generation===playbackGeneration)stopPlayback();},Math.max(10,(end-audioCtx.currentTime)*1000+35));
             return;
@@ -1362,7 +1318,7 @@
     const priorBeat=currentCycleBeat();
     ++playbackGeneration;starting=false;playing=false;
     playbackClockStartAudioTime=0;
-    playbackTotalBeats=0;
+    playbackTotalBeats=0;playbackLoopStartBeat=effectiveSongStartBeat();
     clearTimeout(cycleTimer);cycleTimer=null;
     highlightTimers.forEach(clearTimeout);highlightTimers=[];
     document.querySelectorAll('.lead-cell.playing,.lead-note-block.playing').forEach(c=>c.classList.remove('playing'));
@@ -1418,7 +1374,7 @@
   }
   async function exportStudioPackage(){
     const modal=$('studioExportModal');if(!modal)return;const ids=[...modal.querySelectorAll('[data-export-part]:checked')].map(x=>x.dataset.exportPart),selected=parts.filter(p=>ids.includes(p.id));if(!selected.length&&!$('studioExportDrums')?.checked&&!$('studioExportNotes')?.checked){core.status('Choose at least one thing to export.');return;}
-    const manifest={format:'Chord Rider Pro Studio Package',version:1,createdAt:new Date().toISOString(),project:{name:core.projectName,bpm:core.bpm,beats:core.beats,songEndBeat:Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):null},parts:selected.map(p=>{const q=clone(p);if(q.type==='vocal')q.recordings=(q.recordings||[]).map(r=>({...r,blob:undefined}));return q;})};if($('studioExportDrums')?.checked)manifest.beatMaker=window.CRPBeatMaker?.getBeat?.()||null;if($('studioExportNotes')?.checked)manifest.notes=core.projectNotes||'';
+    const manifest={format:'Chord Rider Pro Studio Package',version:1,createdAt:new Date().toISOString(),project:{name:core.projectName,bpm:core.bpm,beats:core.beats,songStartBeat:effectiveSongStartBeat(),songEndBeat:Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):null,drumEvents:clone(drumEvents)},parts:selected.map(p=>{const q=clone(p);if(q.type==='vocal')q.recordings=(q.recordings||[]).map(r=>({...r,blob:undefined}));return q;})};if($('studioExportDrums')?.checked)manifest.beatMaker=window.CRPBeatMaker?.getBeat?.()||null;if($('studioExportNotes')?.checked)manifest.notes=core.projectNotes||'';
     const files=[{name:'project.json',data:new TextEncoder().encode(JSON.stringify(manifest,null,2))}];for(const p of selected.filter(x=>x.type==='chord'||x.type==='lead'))files.push({name:`midi/${safeFileName(p.name)}.mid`,data:partMidi(p)});if($('studioExportDrums')?.checked)files.push({name:'midi/Drums.mid',data:drumMidi(window.CRPBeatMaker?.getBeat?.())});for(const p of selected.filter(x=>x.type==='vocal')){const refs=voxTrackEvents(p).length?voxTrackEvents(p).map(e=>({takeId:e.takeId,sourcePartId:e.sourcePartId})):(p.activeTakeId?[{takeId:p.activeTakeId,sourcePartId:p.id}]:[]),seen=new Set();for(const ref of refs){if(seen.has(ref.takeId))continue;seen.add(ref.takeId);const found=findVocalTake(ref.takeId,ref.sourcePartId),take=found?.take;if(!take)continue;const blob=await getTakeBlob(take);if(blob)files.push({name:`vocals/${safeFileName(p.name)}-${safeFileName(take.name)}-${String(take.id).slice(0,8)}.wav`,data:new Uint8Array(await blob.arrayBuffer())});}}
     files.push({name:'README.txt',data:new TextEncoder().encode('Chord Rider Pro Studio Package\n\nproject.json contains only the parts you checked. Project notes are included only when their checkbox was selected. Selected vocal parts include every dry WAV referenced by Vox Box. Chord/Note, Lead/Bass, and drums are also exported as Standard MIDI files in /midi for direct import into Cubase and other DAWs. project.json preserves Vox Box event placement, trims, clip FX, and Chord Rider editing data.\n')});const zip=await makeZip(files),a=document.createElement('a');a.href=URL.createObjectURL(zip);a.download=`${safeFileName(core.projectName)}-Studio-Export.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);closeStudioExport();core.status('Studio package exported.');
   }
@@ -1470,9 +1426,11 @@
       ctx=new Ctx({sampleRate:48000});if(ctx.state==='suspended')await ctx.resume();
       const beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92));
       const beat=window.CRPBeatMaker?.getBeat?.()||null;
+      ensureLegacyDrumEvent();
       let songSec=.25;
       selected.forEach(p=>{if(p.type==='chord'||p.type==='lead')songSec=Math.max(songSec,partDurationBeats(p)*beatSec);else if(p.type==='vocal')songSec=Math.max(songSec,vocalDurationBeats(p)*beatSec);});
-      if(drums&&beat)songSec=Math.max(songSec,Math.max(1,Number(beat.bars)||1)*4*beatSec);
+      if(drums&&drumEvents.length)songSec=Math.max(songSec,Math.max(...drumEvents.map(e=>(Number(e.startBeat)||0)+(Number(e.durationBeats)||0)))*beatSec);
+      else if(drums&&beat)songSec=Math.max(songSec,Math.max(1,Number(beat.bars)||1)*4*beatSec);
       const customEnd=Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0;
       if(customEnd)songSec=Math.max(.05,Math.min(songSec,Number(songEndBeat)*beatSec));
       const tailSec=customEnd?.08:1.8,leadSec=.18;
@@ -1492,7 +1450,7 @@
       for(const p of selected.filter(x=>x.type==='vocal')){const refs=voxTrackEvents(p).length?voxTrackEvents(p).map(e=>({takeId:e.takeId,sourcePartId:e.sourcePartId})):(p.activeTakeId?[{takeId:p.activeTakeId,sourcePartId:p.id}]:[]);for(const ref of refs){const key=`${ref.sourcePartId}:${ref.takeId}`;if(vocalBuffers.has(key))continue;const found=findVocalTake(ref.takeId,ref.sourcePartId),take=found?.take;if(!take)continue;const blob=await getTakeBlob(take);if(blob)vocalBuffers.set(key,await ctx.decodeAudioData(await blob.arrayBuffer()));}}
       if([...selected].some(p=>p.type==='vocal'&&(Number(p.fx?.autotune)>0||voxTrackEvents(p).some(e=>Number(e.fx?.autotune)>0))))await ensureAutotuneWorklet(ctx);
       const drumBuffers=new Map();
-      if(drums&&beat){for(const [id,url] of Object.entries(AUDIO_EXPORT_DRUMS)){if(!(beat.tracks?.[id]||[]).some(a=>Array.isArray(a)&&a.length))continue;const res=await fetch(url);if(!res.ok)continue;drumBuffers.set(id,await ctx.decodeAudioData(await res.arrayBuffer()));}}
+      if(drums&&beat){for(const [id,url] of Object.entries(AUDIO_EXPORT_DRUMS)){const used=drumEvents.length?drumEvents.some(ev=>(ev.pattern?.tracks?.[id]||[]).some(a=>Array.isArray(a)&&a.length)):(beat.tracks?.[id]||[]).some(a=>Array.isArray(a)&&a.length);if(!used)continue;const res=await fetch(url);if(!res.ok)continue;drumBuffers.set(id,await ctx.decodeAudioData(await res.arrayBuffer()));}}
 
       // Discard the silent processing buffers accumulated while remote soundfont
       // samples and vocal/drum assets were loading. The exported WAV starts at
@@ -1526,8 +1484,24 @@
           const key=`${p.id}:${p.activeTakeId}`,buf=vocalBuffers.get(key);if(!buf)continue;const schedule=(when=0)=>{if(when>=songSec)return;const src=ctx.createBufferSource();src.buffer=buf;makeExportFx(src,effectiveVocalFx(p),Number(p.volume)||0);src.start(startAt+when,0,Math.min(buf.duration,songSec-when));};schedule(0);if(p.repeat&&buf.duration>0)for(let t=buf.duration;t<songSec-.05;t+=buf.duration)schedule(t);
         }
       }
-      // Drum pattern loops for the length of the selected song mix, matching normal playback.
-      if(drums&&beat&&drumBuffers.size){const stepSec=beatSec/16,totalSteps=Math.ceil(songSec/stepSec),bars=Math.max(1,Number(beat.bars)||1),gain=Math.max(0,Math.min(1,Number(beat.gain)||0))*AUDIO_EXPORT_DRUM_SCALE;for(let abs=0;abs<totalSteps;abs++){const bar=Math.floor(abs/64)%bars,step=abs%64,at=startAt+abs*stepSec;for(const [id,buf] of drumBuffers){if(!beat.tracks?.[id]?.[bar]?.includes(step))continue;const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=buf;g.gain.value=gain;src.connect(g).connect(mix);src.start(at);}}}
+      // Render the Track Master drum arrangement. Each region owns its own pattern,
+      // so intro / verse / chorus drums export exactly as they play in Track Master.
+      if(drums&&beat&&drumBuffers.size){
+        const stepSec=beatSec/16,totalSteps=Math.ceil(songSec/stepSec);
+        for(let abs=0;abs<totalSteps;abs++){
+          const songBeat=abs/16,at=startAt+abs*stepSec;
+          if(drumEvents.length){
+            for(const ev of drumEvents){
+              const evStart=Math.max(0,Number(ev.startBeat)||0),evDur=Math.max(0,Number(ev.durationBeats)||0);if(songBeat<evStart-1e-6||songBeat>=evStart+evDur-1e-6)continue;
+              const pat=ev.pattern||beat,bars=Math.max(1,Number(pat.bars)||1),patternSteps=Math.max(64,bars*64),offset=Number(ev.patternOffsetBeats)||0,rawStep=Math.round((songBeat-evStart+offset)*16),local=((rawStep%patternSteps)+patternSteps)%patternSteps,bar=Math.floor(local/64),step=local%64,gain=Math.max(0,Math.min(1,Number(pat.gain)||0))*AUDIO_EXPORT_DRUM_SCALE;
+              for(const [id,buf] of drumBuffers){if(!pat.tracks?.[id]?.[bar]?.includes(step))continue;const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=buf;g.gain.value=gain;src.connect(g).connect(mix);src.start(at);}
+            }
+          }else{
+            const bars=Math.max(1,Number(beat.bars)||1),bar=Math.floor(abs/64)%bars,step=abs%64,gain=Math.max(0,Math.min(1,Number(beat.gain)||0))*AUDIO_EXPORT_DRUM_SCALE;
+            for(const [id,buf] of drumBuffers){if(!beat.tracks?.[id]?.[bar]?.includes(step))continue;const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=buf;g.gain.value=gain;src.connect(g).connect(mix);src.start(at);}
+          }
+        }
+      }
 
       go.textContent='Rendering WAV…';
       await sleep((leadSec+songSec+tailSec+.25)*1000);
@@ -1539,12 +1513,12 @@
     finally{try{await ctx?.close();}catch{}}
   }
 
-  function capture(){syncLoadedChord();partsUpdatedAt=Math.max(partsUpdatedAt,Date.now());const safe=parts.map(p=>{const q=clone(p);delete q._recordOldStates;delete q._recordOldVolumes;delete q._recordOldDrums;delete q._recordOldDrumVol;if(q.type==='vocal')q.recordings=(q.recordings||[]).map(({blob,...r})=>r);return q;});return {version:4,updatedAt:partsUpdatedAt,activePartId,songEndBeat:Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):null,items:safe};}
+  function capture(){syncLoadedChord();ensureLegacyDrumEvent();drumArrangementInitialized=true;partsUpdatedAt=Math.max(partsUpdatedAt,Date.now());const safe=parts.map(p=>{const q=clone(p);delete q._recordOldStates;delete q._recordOldVolumes;delete q._recordOldDrums;delete q._recordOldDrumVol;if(q.type==='vocal')q.recordings=(q.recordings||[]).map(({blob,...r})=>r);return q;});return {version:5,updatedAt:partsUpdatedAt,activePartId,songStartBeat:effectiveSongStartBeat(),songEndBeat:Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):null,drumEvents:clone(drumEvents),items:safe};}
   function loadProject(project){
     stopPlayback();stopPreview();
     const saved=project?.parts;
     partsUpdatedAt=Number(saved?.updatedAt||project?.updatedAt||0)||0;
-    songEndBeat=Number.isFinite(Number(saved?.songEndBeat))&&Number(saved.songEndBeat)>0?Number(saved.songEndBeat):null;
+    songStartBeat=Math.max(0,Number(saved?.songStartBeat)||0);songEndBeat=Number.isFinite(Number(saved?.songEndBeat))&&Number(saved.songEndBeat)>songStartBeat?Number(saved.songEndBeat):null;drumArrangementInitialized=Array.isArray(saved?.drumEvents);drumEvents=drumArrangementInitialized?saved.drumEvents.map(normalizeDrumEvent).filter(Boolean):[];
     if(saved?.items?.length){parts=saved.items.map(normalizePart).filter(Boolean);activePartId=parts.some(p=>p.id===saved.activePartId)?saved.activePartId:(parts.find(p=>p.type==='chord')||parts[0]).id;}
     else {const first=chordPart('Chords 1',core.snapshot());parts=[first];activePartId=first.id;}
     let c=parts.find(p=>p.id===activePartId&&p.type==='chord')||parts.find(p=>p.type==='chord');
@@ -1552,7 +1526,7 @@
     if(activePartId!==c.id)selectPart(activePartId);else{setEditorMode('chord');renderParts();}
     renderSongEndEditor();
   }
-  function newProject(){stopPlayback();stopPreview();partsUpdatedAt=0;songEndBeat=null;const p=chordPart('Chords 1',core.snapshot());parts=[p];activePartId=p.id;loadedChordPartId=p.id;setEditorMode('chord');renderParts();renderSongEndEditor();}
+  function newProject(){stopPlayback();stopPreview();partsUpdatedAt=0;songStartBeat=0;songEndBeat=null;drumEvents=[];drumArrangementInitialized=true;const p=chordPart('Chords 1',core.snapshot());parts=[p];activePartId=p.id;loadedChordPartId=p.id;setEditorMode('chord');renderParts();renderSongEndEditor();}
 
   function openLyricsOverlay(){
     const overlay=$('srpLyricsOverlay'),frame=$('srpLyricsFrame');if(!overlay||!frame)return;
@@ -1597,7 +1571,7 @@
   }
   function voxIsSelected(partId,eventId){return voxSelections.some(s=>String(s.partId)===String(partId)&&String(s.eventId)===String(eventId));}
   function voxTargetPart(){return parts.find(p=>p.type==='vocal'&&String(p.id)===String(voxTargetPartId))||voxSelectedPair().part||allVocalParts()[0]||null;}
-  function voxTimelineBeats(){const natural=Math.max(0,naturalSongDurationBeats()),maxEvent=Math.max(0,...allVocalParts().flatMap(p=>voxTrackEvents(p).map(e=>(Number(e.startBeat)||0)+voxEventDurationBeats(e))));return Math.max(16,Math.ceil((Math.max(natural,maxEvent,voxPlayheadBeat+1)+4)/4)*4);}
+  function voxTimelineBeats(){const natural=Math.max(0,naturalSongDurationBeats()),maxEvent=Math.max(0,...allVocalParts().flatMap(p=>voxTrackEvents(p).map(e=>(Number(e.startBeat)||0)+voxEventDurationBeats(e)))),range=songRangeForTimeline(),drumEnd=drumEvents.length?Math.max(...drumEvents.map(e=>(Number(e.startBeat)||0)+(Number(e.durationBeats)||0))):0;return Math.max(16,Math.ceil((Math.max(natural,maxEvent,drumEnd,range.end,voxPlayheadBeat+1)+4)/4)*4);}
   function voxStatus(msg){if($('voxBoxStatus'))$('voxBoxStatus').textContent=msg||'';}
   function persistVoxEdits(){markPartsDirty();playbackTotalBeats=mediaDurationBeats();renderSongEndEditor();const a=active();if(a?.type==='lead')renderLeadEditor(a);else if(a?.type==='vocal')renderVocalEditor(a);core.scheduleAutoSave();core.flushAutoSaveNow?.();}
   function voxSetSelection(part,event,{add=false,toggle=false,render=true}={}){
@@ -1626,14 +1600,30 @@
     if(manual&&!voxAutoScroll)voxStatus('AutoScroll off — manual navigation detected.');
   }
   function disableVoxAutoScroll(){if(voxAutoScroll)setVoxAutoScroll(false,{manual:true});}
+  let voxLastFollowBeat=null;
   function updateVoxPlayhead(beat,scrollIntoView=false){
     voxPlayheadBeat=Math.max(0,Math.min(voxTimelineBeats(),Number(beat)||0));
-    const x=voxLabelWidth()+voxPlayheadBeat*voxPpb(),ph=$('voxPlayhead');if(ph)ph.style.left=`${x}px`;if(voxBoxOpen)renderVoxHarmonyGuide();
-    if(scrollIntoView){const sc=$('voxTimelineScroller');if(sc){const left=sc.scrollLeft,right=left+sc.clientWidth-140;if(x<left+voxLabelWidth()+20)sc.scrollTo({left:Math.max(0,x-voxLabelWidth()-30),behavior:'smooth'});else if(x>right)sc.scrollTo({left:Math.max(0,x-sc.clientWidth+190),behavior:'smooth'});}}
+    const x=voxLabelWidth()+voxPlayheadBeat*voxPpb(),ph=$('voxPlayhead');if(ph)ph.style.left=`${x}px`;
+    // Harmony is textual UI; rebuilding it at 60fps was enough DOM churn to make
+    // horizontal follow stutter on phones. Refresh only on quarter-beat changes.
+    if(voxBoxOpen){const hk=`${Math.floor(voxPlayheadBeat*4)}:${Math.round(Number(core.bpm)||92)}`;if(hk!==voxLastHarmonyBeatKey){voxLastHarmonyBeatKey=hk;renderVoxHarmonyGuide();}}
+    if(scrollIntoView){const sc=$('voxTimelineScroller');if(sc){
+      const wrapped=Number.isFinite(voxLastFollowBeat)&&voxPlayheadBeat+0.75<voxLastFollowBeat;
+      const viewport=Math.max(120,sc.clientWidth),label=voxLabelWidth(),anchor=Math.min(viewport*.58,Math.max(label+70,viewport-190)),max=Math.max(0,sc.scrollWidth-viewport);
+      if(wrapped){
+        // A repeat is a transport jump, not a backwards camera animation.
+        const startX=voxLabelWidth()+effectiveSongStartBeat()*voxPpb();sc.scrollLeft=Math.max(0,Math.min(max,startX-anchor));
+      }else{
+        // Once the playhead reaches the follow anchor, move the viewport a few pixels
+        // every animation frame at exactly the playhead rate. No edge-hit jump cycle.
+        const target=Math.max(0,Math.min(max,x-anchor));if(x>=anchor||sc.scrollLeft>target+2)sc.scrollLeft=target;
+      }
+      voxLastFollowBeat=voxPlayheadBeat;
+    }}else voxLastFollowBeat=null;
   }
   function voxSeekTo(beat,{manual=false}={}){
     if(recording&&!recordingPaused){voxStatus('Pause or stop recording before moving the playhead.');return;}
-    const target=Math.max(0,Math.min(mediaDurationBeats(),Number(beat)||0));
+    const target=Math.max(effectiveSongStartBeat(),Math.min(mediaDurationBeats(),Number(beat)||0));
     if(manual)disableVoxAutoScroll();
     updateVoxPlayhead(target,true);
     if(playing||starting)seekPlaybackToBeat(target);else mediaPausedBeat=target;
@@ -1653,7 +1643,7 @@
   function updateVoxEventReadout(el,event){if(!el||!event)return;const b=voxEventBounds(event),time=el.querySelector('.vox-event-time');if(time)time.textContent=`${b.start.toFixed(2)}–${b.end.toFixed(2)}b`;}
 
   function voxSnapshot(){
-    return {parts:clone(parts),beat:window.CRPBeatMaker?.getBeat?.()||null,activePartId,loadedChordPartId,voxTargetPartId,voxPlayheadBeat,voxInstrumentTrackFocus:voxInstrumentTrackFocus?clone(voxInstrumentTrackFocus):null,voxInspectorManualOverride,voxToolMode};
+    return {parts:clone(parts),beat:window.CRPBeatMaker?.getBeat?.()||null,drumEvents:clone(drumEvents),drumArrangementInitialized,songStartBeat,effectiveSongEndBeat:songEndBeat,activePartId,loadedChordPartId,voxTargetPartId,voxPlayheadBeat,voxInstrumentTrackFocus:voxInstrumentTrackFocus?clone(voxInstrumentTrackFocus):null,voxInspectorManualOverride,voxToolMode};
   }
   function updateVoxHistoryButtons(){if($('voxUndoBtn'))$('voxUndoBtn').disabled=!voxUndoStack.length;if($('voxRedoBtn'))$('voxRedoBtn').disabled=!voxRedoStack.length;}
   function voxCheckpoint(){voxUndoStack.push(voxSnapshot());if(voxUndoStack.length>50)voxUndoStack.shift();voxRedoStack=[];updateVoxHistoryButtons();}
@@ -1661,7 +1651,7 @@
     if(!snap)return;parts=(snap.parts||[]).map((p,i)=>normalizePart(p,i)).filter(Boolean);ensureInitial();
     activePartId=parts.some(p=>String(p.id)===String(snap.activePartId))?snap.activePartId:(parts[0]?.id||null);
     loadedChordPartId=parts.some(p=>p.type==='chord'&&String(p.id)===String(snap.loadedChordPartId))?snap.loadedChordPartId:(parts.find(p=>p.type==='chord')?.id||null);
-    if(snap.beat)window.CRPBeatMaker?.setBeat?.(snap.beat,{persist:true});
+    if(snap.beat)window.CRPBeatMaker?.setBeat?.(snap.beat,{persist:true});drumEvents=Array.isArray(snap.drumEvents)?snap.drumEvents.map(normalizeDrumEvent).filter(Boolean):drumEvents;drumArrangementInitialized=snap.drumArrangementInitialized!==false;songStartBeat=Math.max(0,Number(snap.songStartBeat)||0);songEndBeat=Number.isFinite(Number(snap.effectiveSongEndBeat))?Number(snap.effectiveSongEndBeat):songEndBeat;
     voxTargetPartId=parts.some(p=>p.type==='vocal'&&String(p.id)===String(snap.voxTargetPartId))?snap.voxTargetPartId:(allVocalParts()[0]?.id||null);voxPlayheadBeat=Math.max(0,Number(snap.voxPlayheadBeat)||0);voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=snap.voxInstrumentTrackFocus?clone(snap.voxInstrumentTrackFocus):null;voxInspectorManualOverride=snap.voxInspectorManualOverride??null;voxToolMode=snap.voxToolMode||voxToolMode;
     const c=parts.find(p=>p.type==='chord'&&String(p.id)===String(loadedChordPartId));if(c)core.apply(c.data);
     renderParts();persistVoxEdits();renderVoxBox();
@@ -1672,6 +1662,7 @@
   function resolveVoxInstrumentSelection(sel){
     if(!sel)return null;
     const key=String(sel.key||'');
+    if(sel.kind==='drum'||key.startsWith('drum:')){const id=String(sel.event?.id||key.slice(5)||'');const event=drumEvents.find(e=>String(e.id)===id);if(!event)return null;return {...sel,kind:'drum',key:`drum:${event.id}`,event,startBeat:Number(event.startBeat)||0,dur:Math.max(.03,Number(event.durationBeats)||4),name:'Drums'};}
     if(sel.kind==='lead'||key.startsWith('lead:')){
       const bits=key.split(':'),partId=String(sel.part?.id||bits[1]||''),voxId=String(sel.event?.voxId||bits.slice(2).join(':')||'');
       const part=parts.find(p=>p.type==='lead'&&String(p.id)===partId);if(!part)return null;
@@ -1696,7 +1687,7 @@
     voxInspectorManualOverride=null;
     voxSelections=[];voxSelected=null;
     if(!sel){voxInstrumentSelections=[];voxInstrumentSelection=null;if(render){renderVoxSelectionClasses();renderVoxInspector();}return;}
-    voxInstrumentTrackFocus={kind:sel.kind||'instrument',name:sel.kind==='drum'?'Beat':(sel.part?.name||'Instrument'),key:sel.kind==='drum'?'beat':(sel.part?.id?`part:${sel.part.id}`:null)};
+    voxInstrumentTrackFocus={kind:sel.kind||'instrument',name:sel.kind==='drum'?'Drums':(sel.part?.name||'Instrument'),key:sel.kind==='drum'?'drum-map':(sel.part?.id?`part:${sel.part.id}`:null)};
     const exists=voxInstrumentIsSelected(sel.key);
     if(toggle&&exists)voxInstrumentSelections=voxInstrumentSelections.filter(x=>String(x.key)!==String(sel.key));
     else if(add){if(!exists)voxInstrumentSelections.push(sel);}
@@ -1707,7 +1698,7 @@
   function instrumentalSelectionDescription(){
     const list=voxInstrumentSelectionList(),s=list[0];if(!s)return '';
     if(list.length>1)return `${list.length} instrument events selected`;
-    if(s.kind==='drum')return `Beat • ${s.name||s.drumId} at beat ${s.startBeat.toFixed(2)}`;
+    if(s.kind==='drum')return `Drums • ${s.dur.toFixed(2)} beats from ${s.startBeat.toFixed(2)}`;
     if(s.kind==='lead')return `${s.part?.name||'Lead'} • ${midiName(s.event?.midi||60)} at beat ${s.startBeat.toFixed(2)}`;
     if(s.kind==='chord')return `${s.part?.name||'Chords'} • ${s.card?.value||'event'} at beat ${s.startBeat.toFixed(2)}`;
     return 'Instrument event';
@@ -1760,7 +1751,8 @@
       if($('voxInspectorTitle'))$('voxInspectorTitle').textContent=inst?'Instrument Event':'Instrument Track';
       if($('voxInspectorMeta'))$('voxInspectorMeta').textContent=`${focusName} • Vocal Effects collapsed while editing instruments. Select a vocal track or clip to reopen them.`;
       ids.forEach(id=>{if($(id))$(id).disabled=true;});
-      for(const id of ['voxCropBtn','voxSplitBtn'])if($(id))$(id).disabled=true;
+      if($('voxCropBtn'))$('voxCropBtn').disabled=true;
+      if($('voxSplitBtn'))$('voxSplitBtn').disabled=!instList.some(x=>x.kind==='drum');
       for(const id of ['voxCopyBtn','voxCutBtn','voxDeleteBtn'])if($(id))$(id).disabled=!inst;
       if($('voxPasteBtn'))$('voxPasteBtn').disabled=!voxClipboard;updateVoxHistoryButtons();return;
     }
@@ -1854,7 +1846,7 @@
   function serializeInstrumentClipboardItems(list,anchor){
     const baseByKind={};
     for(const kind of ['chord','lead']){const tracks=instrumentPartsForKind(kind),indexes=list.filter(s=>s.kind===kind).map(s=>tracks.indexOf(s.part)).filter(i=>i>=0);baseByKind[kind]=indexes.length?Math.min(...indexes):0;}
-    return list.map(s=>{const tracks=instrumentPartsForKind(s.kind),idx=Math.max(0,tracks.indexOf(s.part));return {kind:s.kind,deltaBeat:(Number(s.startBeat)||0)-anchor,sourcePartId:s.part?.id||null,trackOffset:idx-(baseByKind[s.kind]||0),event:s.event?clone(s.event):null,card:s.card?clone(s.card):null};});
+    return list.map(s=>{if(s.kind==='drum')return {kind:'drum',deltaBeat:(Number(s.startBeat)||0)-anchor,event:clone(s.event)};const tracks=instrumentPartsForKind(s.kind),idx=Math.max(0,tracks.indexOf(s.part));return {kind:s.kind,deltaBeat:(Number(s.startBeat)||0)-anchor,sourcePartId:s.part?.id||null,trackOffset:idx-(baseByKind[s.kind]||0),event:s.event?clone(s.event):null,card:s.card?clone(s.card):null};});
   }
   function destinationInstrumentPartForClip(clip){
     const kind=clip?.kind;if(!['chord','lead'].includes(kind))return null;const tracks=instrumentPartsForKind(kind),focus=focusedInstrumentPart(kind),source=parts.find(x=>x.type===(kind==='chord'?'chord':'lead')&&String(x.id)===String(clip?.sourcePartId))||null;
@@ -1868,79 +1860,22 @@
     const rows=part.data?.rows||[];const lengths=rows.map(r=>r.length),flat=rows.flat();const old=flat.indexOf(card);if(old<0||flat.length<2)return;
     flat.splice(old,1);let beat=0,idx=flat.length;for(let i=0;i<flat.length;i++){const dur=core.cardDurationBeats?.(flat[i],core.beats)||core.beats;if(targetBeat<beat+dur/2){idx=i;break;}beat+=dur;}flat.splice(idx,0,card);let pos=0;part.data.rows=lengths.map(len=>{const r=flat.slice(pos,pos+len);pos+=len;return r;});
   }
-  function renderVoxDrumMap(tracks,width,ppb){
-    if(!voxShowInstrumentals)return;
-    const beat=window.CRPBeatMaker?.getBeat?.();if(!beat)return;
-    const defs=window.CRPBeatMaker?.getDrumDefs?.()||[];
-    const res=[8,16,32,64].includes(+beat.resolution)?+beat.resolution:16;
-    const patternBars=Math.max(1,Number(beat.bars)||1),canonicalStep=64/res;
-    // Vox Box is a song timeline, not merely the Beat Maker pattern editor.  Repeat
-    // the saved drum pattern across the complete visible song so each audible hit
-    // appears at the same horizontal beat position as chords, leads and vocals.
-    const totalBeats=Math.max(4,width/Math.max(1,ppb));
-    const cols=Math.max(1,Math.ceil(totalBeats*res/4));
-    const cellBeat=4/res,cellWidth=ppb*cellBeat;
-    const drumRowHeight=22,headerHeight=150,drumMapHeight=headerHeight+defs.length*drumRowHeight;
-    const row=document.createElement('div');row.className='vox-track-row vox-drum-map-row';row.style.width=`${width}px`;row.dataset.voxTrackKey='drum-map';row.dataset.voxKind='drum-map';row.classList.toggle('is-instrument-focus',voxInstrumentTrackFocus?.key==='drum-map');
-    row.style.setProperty('--vox-drum-map-height',`${drumMapHeight}px`);row.style.setProperty('--vox-drum-header-height',`${headerHeight}px`);row.style.setProperty('--vox-drum-row-height',`${drumRowHeight}px`);row.style.setProperty('--vox-drum-row-count',String(defs.length));row.style.setProperty('--vox-drum-cols',String(cols));row.style.setProperty('--vox-drum-cell-width',`${cellWidth}px`);
-    const hitCount=Object.values(beat.tracks||{}).reduce((n,bars)=>n+(bars||[]).slice(0,patternBars).reduce((m,a)=>m+(a?.length||0),0),0);
-
-    // Everything descriptive about the Drum Map belongs in the same sticky track-title
-    // column as every other Vox Box track.  Drum names no longer consume timeline width.
-    const label=document.createElement('div');label.className='vox-track-label vox-instrument-label vox-drum-map-label';
-    const head=document.createElement('div');head.className='vox-drum-track-head';
-    const enable=document.createElement('label');enable.className='vox-track-enable';
-    const chk=document.createElement('input');chk.type='checkbox';chk.checked=beat.enabled!==false;chk.onpointerdown=e=>e.stopPropagation();chk.onchange=e=>{e.stopPropagation();voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;b.enabled=chk.checked;window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();};
-    const strong=document.createElement('strong');strong.textContent='Drums';enable.append(chk,strong);
-    const meta=document.createElement('span');meta.className='vox-track-meta';meta.textContent=`${patternBars} bar${patternBars===1?'':'s'} • ${hitCount} hits`;
-    const gen=document.createElement('div');gen.className='vox-drum-generator';gen.innerHTML=`<label>Style<select class="vox-drum-style"><option value="rock">Rock</option><option value="pop">Pop</option><option value="rap">Rap</option><option value="trap">Trap</option><option value="boombap">Boom Bap</option><option value="gfunk">G-Funk</option></select></label><label>Complexity<select class="vox-drum-complexity"><option value="simple">Simple</option><option value="medium">Medium</option><option value="busy">Busy</option></select></label><div class="vox-drum-gen-actions"><button type="button" class="vox-drum-randomize">Randomize</button><button type="button" class="vox-drum-fill">Fill Last Bar</button></div>`;
-    const style=gen.querySelector('.vox-drum-style'),complex=gen.querySelector('.vox-drum-complexity');try{style.value=localStorage.getItem('crp-vox-drum-style-v1')||'rap';complex.value=localStorage.getItem('crp-vox-drum-complexity-v1')||'medium';}catch{}
-    for(const ctl of gen.querySelectorAll('select,button')){ctl.onpointerdown=e=>e.stopPropagation();ctl.onclick=e=>e.stopPropagation();}
-    style.onchange=()=>{try{localStorage.setItem('crp-vox-drum-style-v1',style.value)}catch{}};complex.onchange=()=>{try{localStorage.setItem('crp-vox-drum-complexity-v1',complex.value)}catch{}};
-    gen.querySelector('.vox-drum-randomize').onclick=e=>{e.stopPropagation();voxCheckpoint();window.CRPBeatMaker?.generateBeat?.({style:style.value,complexity:complex.value});persistVoxEdits();renderVoxBox();voxStatus(`${style.options[style.selectedIndex]?.text||style.value} drum pattern generated.`);};
-    gen.querySelector('.vox-drum-fill').onclick=e=>{e.stopPropagation();voxCheckpoint();window.CRPBeatMaker?.fillLastBar?.({style:style.value,complexity:complex.value});persistVoxEdits();renderVoxBox();voxStatus('Fill added to the last drum bar.');};
-    head.append(enable,meta,gen);appendVoxMuteSolo(head,{drums:true});
-    const names=document.createElement('div');names.className='vox-drum-names';
-    for(const d of defs){const n=document.createElement('div');n.className='vox-drum-name';n.textContent=d.name;n.title=d.name;names.appendChild(n);}
-    label.append(head,names);label.onclick=e=>{if(e.target.closest('button,input,select,label'))return;focusVoxInstrumentTrack('drum-map','Drums','drum-map');renderVoxInspector();};
-    label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(null,label,e.clientX,e.clientY,{drums:true});};
-
-    const lane=document.createElement('div');lane.className='vox-drum-map-lane';lane.onclick=e=>{if(e.target!==lane&&e.target!==grid)return;focusVoxInstrumentTrack('drum-map','Drums','drum-map');};
-    // Use absolute timeline geometry for the drum editor instead of CSS grid flow.
-    // Every cell's X coordinate is derived from the exact same pixels-per-beat value
-    // as the ruler/chord/lead/vocal events, so a hit at beat N is guaranteed to sit
-    // directly beneath beat N even after long horizontal scrolls or fractional zooms.
-    const grid=document.createElement('div');grid.className='vox-drum-map-grid';grid.style.width=`${width}px`;grid.style.height=`${defs.length*drumRowHeight}px`;
-    defs.forEach((d,di)=>{
-      for(let c=0;c<cols;c++){
-        const absoluteBeat=c*cellBeat,absoluteBar=Math.floor(absoluteBeat/4),patternBar=absoluteBar%patternBars,local=c%res,step=local*canonicalStep;
-        const on=(beat.tracks?.[d.id]?.[patternBar]||[]).some(x=>Number(x)===step),cell=document.createElement('button');cell.type='button';
-        const quarterEvery=res/4;cell.className='vox-drum-cell'+(on?' on':'')+(local===0?' bar-start':(local%quarterEvery===0?' beat-start':''));
-        cell.style.left=`${absoluteBeat*ppb}px`;cell.style.top=`${di*drumRowHeight}px`;cell.style.width=`${cellWidth}px`;cell.style.height=`${drumRowHeight}px`;
-        cell.dataset.songBeat=String(absoluteBeat);cell.dataset.drumId=d.id;
-        cell.title=`${d.name} • Song bar ${absoluteBar+1}, beat ${(local*4/res+1).toFixed(2)} • pattern bar ${patternBar+1}`;
-        cell.onclick=e=>{e.stopPropagation();voxInstrumentTrackFocus={kind:'drum-map',name:'Drums',key:'drum-map'};voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;const arr=b.tracks?.[d.id]?.[patternBar]||[],has=arr.some(x=>Number(x)===step);b.tracks[d.id][patternBar]=has?arr.filter(x=>Number(x)!==step):[...new Set([...arr,step])].sort((a,z)=>a-z);window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();voxStatus(`${d.name} ${has?'removed':'added'} at song beat ${(absoluteBeat+1).toFixed(2)} (pattern bar ${patternBar+1}).`);};
-        grid.appendChild(cell);
-      }
-      // A project can contain finer hits left behind after changing the Beat Maker
-      // resolution (for example a 1/32 hit while the editor is showing 1/16).
-      // Playback still schedules those canonical hits, so render them too rather
-      // than letting an audible drum hit disappear from Vox Box.
-      const songBars=Math.ceil(totalBeats/4);
-      for(let absoluteBar=0;absoluteBar<songBars;absoluteBar++){
-        const patternBar=absoluteBar%patternBars,hits=beat.tracks?.[d.id]?.[patternBar]||[];
-        for(const rawStep of hits){
-          const canonical=Number(rawStep);if(!Number.isInteger(canonical)||canonical<0||canonical>=64||canonical%canonicalStep===0)continue;
-          const absoluteBeat=absoluteBar*4+canonical/16;if(absoluteBeat>=totalBeats-.0001)continue;
-          const hit=document.createElement('button');hit.type='button';hit.className='vox-drum-cell vox-drum-offgrid-hit on';
-          hit.style.left=`${absoluteBeat*ppb}px`;hit.style.top=`${di*drumRowHeight}px`;hit.style.width=`${Math.max(5,Math.min(cellWidth,ppb/16))}px`;hit.style.height=`${drumRowHeight}px`;
-          hit.dataset.songBeat=String(absoluteBeat);hit.dataset.drumId=d.id;hit.title=`${d.name} • exact song beat ${(absoluteBeat+1).toFixed(3)} • finer saved hit`;
-          hit.onclick=e=>{e.stopPropagation();voxInstrumentTrackFocus={kind:'drum-map',name:'Drums',key:'drum-map'};voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;const arr=b.tracks?.[d.id]?.[patternBar]||[];b.tracks[d.id][patternBar]=arr.filter(x=>Number(x)!==canonical);window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();voxStatus(`${d.name} removed at exact song beat ${(absoluteBeat+1).toFixed(3)}.`);};
-          grid.appendChild(hit);
-        }
-      }
-    });
-    lane.appendChild(grid);row.append(label,lane);tracks.appendChild(row);
+  function addBlankDrumEventAt(beat){
+    drumArrangementInitialized=true;voxCheckpoint();const start=Math.max(0,quantizeVoxBeat(beat)),event=normalizeDrumEvent({id:uid(),startBeat:start,durationBeats:4,patternOffsetBeats:0,pattern:blankDrumPattern()});drumEvents.push(event);drumEvents.sort((a,b)=>a.startBeat-b.startBeat);const sel={kind:'drum',key:`drum:${event.id}`,event,startBeat:event.startBeat,dur:event.durationBeats,name:'Drums'};voxInstrumentSelections=[sel];voxInstrumentSelection=sel;voxInstrumentTrackFocus={kind:'drum',name:'Drums',key:'drum-map'};persistVoxEdits();renderVoxBox();voxStatus(`Empty 4-beat drum region added at beat ${start.toFixed(2)}. Double-tap the region to edit its pattern.`);
+  }
+  function openDrumEventEditor(sel){
+    const live=resolveVoxInstrumentSelection(sel);if(!live?.event||!window.CRPBeatMaker?.editBeatEvent)return;setVoxInstrumentSelection(live);window.CRPBeatMaker.editBeatEvent(live.event.pattern,{onCommit:pattern=>{const ev=drumEvents.find(x=>String(x.id)===String(live.event.id));if(!ev)return;ev.pattern=clone(pattern);markPartsDirty();core.scheduleAutoSave();},onClose:()=>{persistVoxEdits();renderVoxBox();voxStatus('Drum region pattern updated.');}});
+  }
+  function wireDrumLaneDoubleAdd(lane,clickBeat){
+    if(!lane)return;lane.ondblclick=e=>{if(e.target!==lane)return;e.preventDefault();e.stopPropagation();const pseudo={id:'drum-map'};if(recentVoxLaneAdd(pseudo,e))return;voxLaneAddGuard={partId:'drum-map',at:performance.now(),x:Number(e.clientX)||0,y:Number(e.clientY)||0};addBlankDrumEventAt(clickBeat(e,lane));};let lastTouch=0,lastX=0,lastY=0;lane.addEventListener('pointerup',e=>{if(e.pointerType!=='touch'||e.target!==lane)return;const now=performance.now(),near=Math.hypot(e.clientX-lastX,e.clientY-lastY)<28;if(now-lastTouch<360&&near){e.preventDefault();e.stopPropagation();lastTouch=0;const pseudo={id:'drum-map'};if(recentVoxLaneAdd(pseudo,e))return;voxLaneAddGuard={partId:'drum-map',at:now,x:e.clientX,y:e.clientY};addBlankDrumEventAt(clickBeat(e,lane));}else{lastTouch=now;lastX=e.clientX;lastY=e.clientY;}},{passive:false});
+  }
+  function renderVoxDrumMap(tracks,width,ppb,clickBeat){
+    if(!voxShowInstrumentals)return;ensureLegacyDrumEvent();const master=window.CRPBeatMaker?.getBeat?.()||blankDrumPattern();
+    const row=document.createElement('div');row.className='vox-track-row vox-instrument-track vox-drum-region-row';row.style.width=`${width}px`;row.dataset.voxTrackKey='drum-map';row.dataset.voxKind='drum';row.classList.toggle('is-instrument-focus',voxInstrumentTrackFocus?.key==='drum-map');
+    const label=makeVoxTrackLabel({name:'Drums',meta:`${drumEvents.length} region${drumEvents.length===1?'':'s'} • double-tap empty space to add 4 beats`,checked:master.enabled!==false,onChecked:on=>{voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;b.enabled=on;window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();},kind:'drum'});label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('drum','Drums','drum-map');renderVoxInspector();};appendVoxMuteSolo(label,{drums:true});
+    const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane vox-drum-region-lane';lane.dataset.voxKind='drum';lane.onclick=e=>{if(e.target!==lane)return;if(recentVoxLaneAdd({id:'drum-map'},e)){e.preventDefault();e.stopPropagation();return;}focusVoxInstrumentTrack('drum','Drums','drum-map');if(voxToolMode==='cursor'&&e.detail===1){addBlankDrumEventAt(clickBeat(e,lane));return;}if(voxToolMode==='playhead')voxSeekTo(clickBeat(e,lane),{manual:true});};wireDrumLaneDoubleAdd(lane,clickBeat);
+    for(const event of drumEvents){const key=`drum:${event.id}`,sel={kind:'drum',key,event,startBeat:event.startBeat,dur:event.durationBeats,name:'Drums'},ev=document.createElement('div');ev.className='vox-instrument-event vox-drum-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.style.left=`${event.startBeat*ppb}px`;ev.style.width=`${Math.max(34,event.durationBeats*ppb)}px`;const hits=drumPatternHitCount(event.pattern),bars=Math.max(1,Number(event.pattern?.bars)||1);ev.innerHTML=`<strong>Drums</strong><span>${event.durationBeats.toFixed(2)}b • ${bars}-bar pattern • ${hits} hits</span>`;ev.title='Drag to move • drag either edge to resize • Split • double-tap to edit pattern';ev.__voxSelection=sel;ev.onclick=e=>instrumentClickSelection(sel,ev,e);ev.ondblclick=e=>{e.preventDefault();e.stopPropagation();openDrumEventEditor(sel);};ev.onpointerdown=e=>{if(e.target.classList.contains('vox-inst-handle'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}
+    row.append(label,lane);tracks.appendChild(row);
   }
 
   function instrumentClickSelection(sel,evEl,e){
@@ -2015,7 +1950,7 @@
   }
 
   function appendInstrumentHandles(ev,sel){
-    if(sel.kind!=='lead'&&sel.kind!=='chord')return;const lh=document.createElement('span'),rh=document.createElement('span');lh.className='vox-inst-handle left';rh.className='vox-inst-handle right';lh.title='Drag start edge';rh.title='Drag end edge';lh.onpointerdown=e=>beginVoxInstrumentPointerEdit(e,sel,ev,'trim-left');rh.onpointerdown=e=>beginVoxInstrumentPointerEdit(e,sel,ev,'trim-right');ev.append(lh,rh);
+    if(!['lead','chord','drum'].includes(sel.kind))return;const lh=document.createElement('span'),rh=document.createElement('span');lh.className='vox-inst-handle left';rh.className='vox-inst-handle right';lh.title='Drag start edge';rh.title='Drag end edge';lh.onpointerdown=e=>beginVoxInstrumentPointerEdit(e,sel,ev,'trim-left');rh.onpointerdown=e=>beginVoxInstrumentPointerEdit(e,sel,ev,'trim-right');ev.append(lh,rh);
   }
   function voxTrackSetupEstablished(part){
     if(!part)return false;
@@ -2118,7 +2053,7 @@
       const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane';lane.dataset.voxKind='lead';lane.dataset.voxPartId=part.id;lane.onclick=e=>{if(e.target!==lane)return;if(recentVoxLaneAdd(part,e)){e.preventDefault();e.stopPropagation();return;}focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`);if(voxToolMode==='playhead')voxSeekTo(clickBeat(e,lane),{manual:true});};wireVoxLaneDoubleAdd(lane,part,clickBeat);
       for(const event of part.events||[]){if(!event.voxId)event.voxId=uid();const startBeat=leadEventStartBeat(part,event),dur=leadEventDurationBeats(part,event),key=`lead:${part.id}:${event.voxId}`,ev=document.createElement('div');ev.className='vox-instrument-event vox-lead-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.dataset.voxPartId=part.id;ev.style.left=`${startBeat*ppb}px`;ev.style.width=`${Math.max(22,dur*ppb)}px`;ev.classList.toggle('is-blank',event.voxBlank===true);ev.textContent=event.voxBlank===true?'Type note':midiName(event.midi);ev.title=`${part.name} • ${event.voxBlank===true?'blank note':midiName(event.midi)} • beat ${startBeat.toFixed(2)}`;const sel={kind:'lead',key,part,event,startBeat,dur};ev.__voxSelection=sel;ev.onclick=e=>instrumentClickSelection(sel,ev,e);ev.ondblclick=e=>{e.preventDefault();e.stopPropagation();beginVoxInlineEventEdit(sel,ev);};ev.onpointerdown=e=>{if(e.target.classList.contains('vox-inst-handle')||e.target.classList.contains('vox-inline-event-input'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
     }
-    renderVoxDrumMap(tracks,width,ppb);
+    renderVoxDrumMap(tracks,width,ppb,clickBeat);
   }
   function beginVoxInstrumentPointerEdit(e,sel,el,mode='move'){
     sel=resolveVoxInstrumentSelection(sel)||sel;
@@ -2173,6 +2108,9 @@
           const targetStart=Math.max(0,Math.min(origEnd-minBeat,quantizeVoxBeat(orig+dx))),dur=Math.max(minBeat,origEnd-targetStart);
           sel.card.voxStartBeat=targetStart;sel.card.voxDurationBeats=dur;sel.card.durationBeats=dur;el.style.left=`${targetStart*ppb}px`;el.style.width=`${Math.max(26,dur*ppb)}px`;
         }
+      }else if(sel.kind==='drum'){
+        if(mode==='trim-right'){const targetEnd=Math.max(orig+minBeat,quantizeVoxBeat(origEnd+dx)),dur=Math.max(minBeat,targetEnd-orig);sel.event.durationBeats=dur;el.style.width=`${Math.max(34,dur*ppb)}px`;}
+        else{const targetStart=Math.max(0,Math.min(origEnd-minBeat,quantizeVoxBeat(orig+dx))),shift=targetStart-orig,dur=Math.max(minBeat,origEnd-targetStart);sel.event.startBeat=targetStart;sel.event.durationBeats=dur;sel.event.patternOffsetBeats=(Number(sel.event.patternOffsetBeats)||0)+shift;el.style.left=`${targetStart*ppb}px`;el.style.width=`${Math.max(34,dur*ppb)}px`;}
       }
     };
 
@@ -2202,7 +2140,7 @@
           if(dst!==src){removeChordCardFromPart(src,card);insertChordCardIntoPart(dst,card,targetBeat);voxInstrumentTrackFocus={kind:'chord',name:dst.name,key:`part:${dst.id}`};}
           else{card.voxStartBeat=targetBeat;if(!Number.isFinite(Number(card.voxDurationBeats)))card.voxDurationBeats=Math.max(.001,Number(item.dur)||chordEventDurationBeats(src,card));card.durationBeats=card.voxDurationBeats;}
           movedSelections.push({kind:'chord',key:`chord:${dst.id}:${card.voxId}`,part:dst,card,startBeat:targetBeat,dur:chordEventDurationBeats(dst,card)});
-        }
+        }else if(item.kind==='drum'&&item.event){item.event.startBeat=targetBeat;movedSelections.push({kind:'drum',key:`drum:${item.event.id}`,event:item.event,startBeat:targetBeat,dur:item.event.durationBeats,name:'Drums'});voxInstrumentTrackFocus={kind:'drum',name:'Drums',key:'drum-map'};}
       }
       if(mode==='move'&&movedSelections.length){voxInstrumentSelections=movedSelections;voxInstrumentSelection=movedSelections[0]||null;}
       const loaded=loadedChord();if(loaded)core.apply(loaded.data);
@@ -2213,10 +2151,23 @@
     window.addEventListener('pointermove',move,{capture:true,passive:false});window.addEventListener('pointerup',up,{capture:true,passive:false});window.addEventListener('pointercancel',up,{capture:true,passive:false});
   }
 
+  function renderVoxSongLocators(){
+    const ppb=voxPpb(),range=songRangeForTimeline(),startEl=$('voxSongStartLocator'),endEl=$('voxSongEndLocator'),fill=$('voxSongRangeFill');if(startEl)startEl.style.left=`${voxLabelWidth()+range.start*ppb}px`;if(endEl)endEl.style.left=`${voxLabelWidth()+range.end*ppb}px`;if(fill){fill.style.left=`${voxLabelWidth()+range.start*ppb}px`;fill.style.width=`${Math.max(2,(range.end-range.start)*ppb)}px`;}
+  }
+  function ensureVoxTimelineVisualBeats(beats){
+    const inner=$('voxTimelineInner'),ruler=$('voxRuler'),tracks=$('voxTracks'),ppb=voxPpb(),width=Math.max(720,Math.ceil(Math.max(16,beats)*ppb));if(inner)inner.style.width=`${width}px`;if(ruler)ruler.style.width=`${width}px`;for(const row of tracks?.querySelectorAll?.(':scope > .vox-track-row')||[])row.style.width=`${width}px`;
+  }
+  function wireVoxSongLocatorDrag(id,kind){
+    const el=$(id);if(!el||el.dataset.wired)return;el.dataset.wired='1';el.addEventListener('pointerdown',e=>{if(e.button!==undefined&&e.button!==0)return;e.preventDefault();e.stopPropagation();disableVoxAutoScroll();voxCheckpoint();const sc=$('voxTimelineScroller');if(!sc)return;try{el.setPointerCapture(e.pointerId)}catch{};let moved=false,lastClientX=e.clientX,raf=0;
+      const apply=clientX=>{const r=sc.getBoundingClientRect(),local=clientX-r.left+sc.scrollLeft-voxLabelWidth(),raw=Math.max(0,local/voxPpb()),step=voxSnapEnabled()?voxBeatStep():.03,q=voxSnapEnabled()?Math.max(0,Math.round(raw/step)*step):Math.max(0,Math.round(raw*1000)/1000),range=songRangeForTimeline();if(kind==='start'){if(!Number.isFinite(Number(songEndBeat)))songEndBeat=range.end;songStartBeat=Math.max(0,Math.min(songEndBeat-step,q));if(songEndBeat<=songStartBeat)songEndBeat=songStartBeat+step;}else{songEndBeat=Math.max(range.start+step,q);ensureVoxTimelineVisualBeats(songEndBeat+8);}renderVoxSongLocators();};
+      const auto=()=>{raf=0;const r=sc.getBoundingClientRect(),edge=44;let delta=0;if(lastClientX>r.right-edge)delta=Math.min(18,(lastClientX-(r.right-edge))*.45);else if(lastClientX<r.left+edge)delta=-Math.min(18,((r.left+edge)-lastClientX)*.45);if(delta){sc.scrollLeft=Math.max(0,sc.scrollLeft+delta);apply(lastClientX);raf=requestAnimationFrame(auto);}};
+      const move=ev=>{if(ev.pointerId!==e.pointerId)return;ev.preventDefault();moved=true;lastClientX=ev.clientX;apply(ev.clientX);if(!raf)raf=requestAnimationFrame(auto);};const up=ev=>{if(ev.pointerId!==e.pointerId)return;try{el.releasePointerCapture(ev.pointerId)}catch{};window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',up,true);window.removeEventListener('pointercancel',up,true);if(raf)cancelAnimationFrame(raf);if(!moved){voxUndoStack.pop();updateVoxHistoryButtons();return;}markPartsDirty();liveEditRefresh();core.scheduleAutoSave();renderVoxBox();voxStatus(`${kind==='start'?'Song start':'Song finish'} set to beat ${(kind==='start'?songStartBeat:songEndBeat).toFixed(2)}.`);};window.addEventListener('pointermove',move,{capture:true,passive:false});window.addEventListener('pointerup',up,true);window.addEventListener('pointercancel',up,true);
+    });
+  }
   function renderVoxBox(){
     if(!voxBoxOpen)return;const vocals=allVocalParts(),tracks=$('voxTracks'),ruler=$('voxRuler'),inner=$('voxTimelineInner'),page=$('voxBoxPage');if(!tracks||!ruler||!inner)return;
     const token=++voxRenderToken,ppb=voxPpb(),beats=voxTimelineBeats(),width=Math.max(720,Math.ceil(beats*ppb));inner.style.width=`${width}px`;ruler.style.width=`${width}px`;ruler.innerHTML='';tracks.innerHTML='';
-    for(let b=0;b<=Math.ceil(beats);b++){const tick=document.createElement('span');tick.className='vox-ruler-beat'+(b%4===0?' major':'');tick.style.left=`${b*ppb}px`;ruler.appendChild(tick);if(b%4===0){const lab=document.createElement('span');lab.className='vox-ruler-label';lab.style.left=`${b*ppb}px`;lab.textContent=String(b+1);ruler.appendChild(lab);}}
+    for(let b=0;b<=Math.ceil(beats);b++){const tick=document.createElement('span');tick.className='vox-ruler-beat'+(b%4===0?' major':'');tick.style.left=`${b*ppb}px`;ruler.appendChild(tick);if(b%4===0){const lab=document.createElement('span');lab.className='vox-ruler-label';lab.style.left=`${b*ppb}px`;lab.textContent=String(b+1);ruler.appendChild(lab);}}renderVoxSongLocators();
     const clickBeat=(e,base)=>{const rect=base.getBoundingClientRect();return quantizeVoxBeat((e.clientX-rect.left)/ppb);};
     ruler.onclick=e=>{voxSeekTo(clickBeat(e,ruler),{manual:true});renderVoxInspector();renderVoxHarmonyGuide();};
     renderVoxInstrumentTracks(tracks,width,ppb,clickBeat);
@@ -2245,7 +2196,7 @@
     }else tracks.insertAdjacentHTML('beforeend','<div class="vocal-empty" style="padding:40px">No vocal tracks yet. Right-click a track title or use + Vocal Track to add one.</div>');
     applyVoxTrackOrder();inner.classList.toggle('has-crop-mode',voxCropMode);page?.classList.toggle('crop-mode',voxCropMode);page?.classList.toggle('cursor-mode',voxToolMode==='cursor');page?.classList.toggle('playhead-mode',voxToolMode!=='cursor');if($('voxCropBtn'))$('voxCropBtn').classList.toggle('is-active',voxCropMode);
     if($('voxToolModeBtn')){$('voxToolModeBtn').textContent=voxToolMode==='cursor'?'Cursor':'Playhead';$('voxToolModeBtn').classList.toggle('is-active',voxToolMode==='cursor');$('voxToolModeBtn').setAttribute('aria-pressed',String(voxToolMode==='cursor'));}
-    updateVoxPlayhead(voxPlayheadBeat);renderVoxHarmonyGuide();renderVoxInspector();updateVoxTransportState();wireVoxMarquee();
+    renderVoxSongLocators();updateVoxPlayhead(voxPlayheadBeat);renderVoxHarmonyGuide();renderVoxInspector();updateVoxTransportState();wireVoxMarquee();
   }
   function findVoxLaneAt(x,y){return document.elementsFromPoint?.(x,y)?.find(el=>el.classList?.contains('vox-track-lane'))||null;}
   function beginVoxPointerEdit(e,part,event,el,mode){
@@ -2281,7 +2232,14 @@
   function closeVoxBox(){voxBoxOpen=false;const page=$('voxBoxPage');if(page){page.hidden=true;page.setAttribute('aria-hidden','true');}document.body.classList.remove('vox-box-open');const p=active();if(p?.type==='vocal')renderVocalEditor(p);}
   function addVoxTrack(){voxCheckpoint();const p=vocalPart(`Vocals ${countType('vocal')+1}`);parts.push(p);activePartId=p.id;voxTargetPartId=p.id;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;markPartsDirty();renderParts();persistVoxEdits();renderVoxBox();voxStatus(`${p.name} added. Rename it in the track header, paste/layer clips here, or record directly with the floating transport.`);}
   function addActiveTakeToVox(){const p=voxTargetPart();if(!p?.activeTakeId||!p.recordings?.some(r=>r.id===p.activeTakeId)){voxStatus('Choose an active take on this vocal track first.');return;}voxCheckpoint();p.voxEvents=p.voxEvents||[];const ev=normalizeVoxEvent({id:uid(),takeId:p.activeTakeId,sourcePartId:p.id,startBeat:quantizeVoxBeat(voxPlayheadBeat),trimStartSec:0,trimEndSec:null,volume:1,fx:null},p);p.voxEvents.push(ev);voxSelections=[{partId:p.id,eventId:ev.id}];voxSelected=voxSelections[0];voxInstrumentSelections=[];voxInstrumentSelection=null;persistVoxEdits();renderVoxBox();voxStatus(`Added ${voxEventTake(ev)?.name||'active take'} at beat ${ev.startBeat.toFixed(2)}.`);}
-  function splitSelectedVox(){const selected=voxSelectionPairs();if(!selected.length)return;const split=quantizeVoxBeat(voxPlayheadBeat),valid=selected.filter(({event})=>{const b=voxEventBounds(event);return split>b.start+.01&&split<b.end-.01;});if(!valid.length){voxStatus('Move the playhead inside the selected event(s), then Split.');return;}voxCheckpoint();const beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92)),newSel=[];for(const {part,event} of valid){const b=voxEventBounds(event),splitSec=(Number(event.trimStartSec)||0)+(split-b.start)*beatSec,oldEnd=event.trimEndSec;event.trimEndSec=splitSec;const right=clone(event);right.id=uid();right.startBeat=split;right.trimStartSec=splitSec;right.trimEndSec=oldEnd;const ix=part.voxEvents.findIndex(x=>x.id===event.id);part.voxEvents.splice(ix+1,0,right);newSel.push({partId:part.id,eventId:right.id});}voxSelections=newSel;voxSelected=newSel[0]||null;persistVoxEdits();renderVoxBox();voxStatus(`${valid.length} event${valid.length===1?'':'s'} split at the playhead.`);}
+  function splitSelectedVox(){
+    const split=quantizeVoxBeat(voxPlayheadBeat),vocalSelected=voxSelectionPairs(),drumSelected=voxInstrumentSelectionList().filter(s=>s.kind==='drum'),validV=vocalSelected.filter(({event})=>{const b=voxEventBounds(event);return split>b.start+.01&&split<b.end-.01;}),validD=drumSelected.filter(s=>split>s.startBeat+.01&&split<s.startBeat+s.dur-.01);
+    if(!validV.length&&!validD.length){voxStatus('Move the playhead inside the selected vocal or drum event, then Split.');return;}voxCheckpoint();const beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92)),newV=[],newI=[];
+    for(const {part,event} of validV){const b=voxEventBounds(event),splitSec=(Number(event.trimStartSec)||0)+(split-b.start)*beatSec,oldEnd=event.trimEndSec;event.trimEndSec=splitSec;const right=clone(event);right.id=uid();right.startBeat=split;right.trimStartSec=splitSec;right.trimEndSec=oldEnd;const ix=part.voxEvents.findIndex(x=>x.id===event.id);part.voxEvents.splice(ix+1,0,right);newV.push({partId:part.id,eventId:right.id});}
+    for(const s of validD){const ev=s.event,oldEnd=ev.startBeat+ev.durationBeats,leftDur=split-ev.startBeat,rightDur=oldEnd-split,right=normalizeDrumEvent({...clone(ev),id:uid(),startBeat:split,durationBeats:rightDur,patternOffsetBeats:(Number(ev.patternOffsetBeats)||0)+leftDur});ev.durationBeats=leftDur;drumEvents.push(right);newI.push({kind:'drum',key:`drum:${right.id}`,event:right,startBeat:right.startBeat,dur:right.durationBeats,name:'Drums'});}
+    drumEvents.sort((a,b)=>a.startBeat-b.startBeat);voxSelections=newV;voxSelected=newV[0]||null;voxInstrumentSelections=newI;voxInstrumentSelection=newI[0]||null;persistVoxEdits();renderVoxBox();voxStatus(`${validV.length+validD.length} event${validV.length+validD.length===1?'':'s'} split.`);
+  }
+
   function copyInstrumentSelection(cut=false){
     const list=voxInstrumentSelectionList().slice().sort((a,b)=>(Number(a.startBeat)||0)-(Number(b.startBeat)||0));if(!list.length)return false;const anchor=Number(list[0].startBeat)||0;
     voxClipboard={kind:'instrument-group',focusKeyAtCopy:String(voxInstrumentTrackFocus?.key||''),items:serializeInstrumentClipboardItems(list,anchor)};
@@ -2290,7 +2248,8 @@
   function removeInstrumentSelectionNoCheckpoint(list=voxInstrumentSelectionList()){
     for(const raw of list){
       const s=resolveVoxInstrumentSelection(raw)||raw;
-      if(s.kind==='lead'&&s.part){const id=String(s.event?.voxId||'');s.part.events=(s.part.events||[]).filter(x=>x!==s.event&&(id?String(x.voxId||'')!==id:true));}
+      if(s.kind==='drum'&&s.event){drumArrangementInitialized=true;drumEvents=drumEvents.filter(e=>String(e.id)!==String(s.event.id));}
+      else if(s.kind==='lead'&&s.part){const id=String(s.event?.voxId||'');s.part.events=(s.part.events||[]).filter(x=>x!==s.event&&(id?String(x.voxId||'')!==id:true));}
       else if(s.kind==='chord'&&s.part){
         const id=String(s.card?.voxId||'');let removed=false;
         for(const row of s.part.data?.rows||[]){let i=row.indexOf(s.card);if(i<0&&id)i=row.findIndex(c=>String(c?.voxId||'')===id);if(i>=0){row.splice(i,1);removed=true;break;}}
@@ -2312,6 +2271,7 @@
   }
   function pasteOneInstrumentClip(clip,atBeat,destinationPart=null){
     const targetBeat=Math.max(0,Math.round((Number(atBeat)||0)*1000)/1000);
+    if(clip.kind==='drum'){drumArrangementInitialized=true;const event=normalizeDrumEvent({...clone(clip.event||{}),id:uid(),startBeat:targetBeat});drumEvents.push(event);drumEvents.sort((a,b)=>a.startBeat-b.startBeat);return {kind:'drum',key:`drum:${event.id}`,event,startBeat:event.startBeat,dur:event.durationBeats,name:'Drums'};}
     if(clip.kind==='lead'){
       const p=(destinationPart?.type==='lead'?destinationPart:null)||parts.find(x=>x.type==='lead'&&String(x.id)===String(clip.sourcePartId))||parts.find(x=>x.type==='lead');if(!p)return null;const stepBeats=4/Math.max(8,Number(p.resolution)||16),e=clone(clip.event||{});e.voxId=uid();e.voxStartBeat=targetBeat;e.voxDurationBeats=Math.max(stepBeats,Number(e.voxDurationBeats)||Math.max(1,Number(e.durationSteps)||1)*stepBeats);e.step=Math.max(0,Math.round(targetBeat/stepBeats));e.durationSteps=Math.max(1,Math.round(e.voxDurationBeats/stepBeats));p.events=normalizeLeadEvents([...(p.events||[]),e]);const stored=p.events.find(x=>String(x.voxId)===String(e.voxId))||e;return {kind:'lead',key:`lead:${p.id}:${stored.voxId}`,part:p,event:stored,startBeat:leadEventStartBeat(p,stored),dur:leadEventDurationBeats(p,stored)};
     }
@@ -2321,7 +2281,7 @@
     return null;
   }
   function pasteInstrument(){
-    const clip=voxClipboard;if(!clip||!['instrument-group'].includes(clip.kind))return false;voxCheckpoint();const newSel=[];for(const item of clip.items||[]){const dest=destinationInstrumentPartForClip(item),s=pasteOneInstrumentClip(item,voxPlayheadBeat+(Number(item.deltaBeat)||0),dest);if(s)newSel.push(s);}voxInstrumentSelections=newSel;voxInstrumentSelection=newSel[0]||null;voxSelections=[];voxSelected=null;if(newSel[0]?.part)voxInstrumentTrackFocus={kind:newSel[0].kind,name:newSel[0].part.name,key:`part:${newSel[0].part.id}`};persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${newSel.length} event${newSel.length===1?'':'s'} pasted to the selected track${newSel.length===1?'':'s'}; first event starts at the playhead.`);return true;
+    const clip=voxClipboard;if(!clip||!['instrument-group'].includes(clip.kind))return false;voxCheckpoint();const newSel=[];for(const item of clip.items||[]){const dest=destinationInstrumentPartForClip(item),s=pasteOneInstrumentClip(item,voxPlayheadBeat+(Number(item.deltaBeat)||0),dest);if(s)newSel.push(s);}voxInstrumentSelections=newSel;voxInstrumentSelection=newSel[0]||null;voxSelections=[];voxSelected=null;if(newSel[0])voxInstrumentTrackFocus=newSel[0].kind==='drum'?{kind:'drum',name:'Drums',key:'drum-map'}:(newSel[0]?.part?{kind:newSel[0].kind,name:newSel[0].part.name,key:`part:${newSel[0].part.id}`} : voxInstrumentTrackFocus);persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${newSel.length} event${newSel.length===1?'':'s'} pasted to the selected track${newSel.length===1?'':'s'}; first event starts at the playhead.`);return true;
   }
   function pasteVox(){
     if(!voxClipboard)return;if(voxClipboard.kind==='instrument-group'){pasteInstrument();return;}voxCheckpoint();const newV=[],newI=[],vocalTracks=allVocalParts(),target=voxTargetPart()||vocalTracks[0]||null,base=target?Math.max(0,vocalTracks.indexOf(target)):0;
@@ -2376,7 +2336,7 @@
   function wireVoxPlayheadDrag(){const grip=$('voxPlayhead')?.querySelector('span');if(!grip||grip.dataset.wired)return;grip.dataset.wired='1';grip.addEventListener('pointerdown',e=>{if(recording&&!recordingPaused){voxStatus('Pause or stop recording before moving the playhead.');return;}e.preventDefault();e.stopPropagation();disableVoxAutoScroll();const sc=$('voxTimelineScroller'),inner=$('voxTimelineInner');if(!sc||!inner)return;try{grip.setPointerCapture(e.pointerId)}catch{};const move=ev=>{ev.preventDefault();const rect=inner.getBoundingClientRect(),beat=quantizeVoxBeat((ev.clientX-rect.left-voxLabelWidth())/voxPpb());updateVoxPlayhead(beat,false);};const up=ev=>{try{grip.releasePointerCapture(ev.pointerId)}catch{};grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',up);grip.removeEventListener('pointercancel',up);voxSeekTo(voxPlayheadBeat,{manual:true});};grip.addEventListener('pointermove',move,{passive:false});grip.addEventListener('pointerup',up);grip.addEventListener('pointercancel',up);});}
 
   function wire(){
-    ensureInitial();setEditorMode(active()?.type||'chord');renderParts();initSongEndPanel();ensureMediaSession();updateMediaMetadata();renderSongEndEditor();
+    ensureInitial();setEditorMode(active()?.type||'chord');renderParts();ensureMediaSession();updateMediaMetadata();renderSongEndEditor();
     if($('voxBoxBtn'))$('voxBoxBtn').onclick=()=>openVoxBox();
     if($('trackMasterBtn'))$('trackMasterBtn').onclick=openTrackMaster;
     try{
@@ -2389,7 +2349,7 @@
     if($('voxBpmInput')){syncVoxBpmInput();$('voxBpmInput').addEventListener('change',commitVoxBpm);$('voxBpmInput').addEventListener('blur',commitVoxBpm);$('voxBpmInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitVoxBpm();e.currentTarget.blur();}});}
     if($('voxSnapToBeat'))$('voxSnapToBeat').onchange=e=>{try{localStorage.setItem(VOX_SNAP_KEY,e.target.checked?'1':'0')}catch{}voxStatus(e.target.checked?`Snap on (1/${$('voxSnapResolution')?.value||'16'})`:'Free drag enabled.');};
     if($('voxSnapResolution'))$('voxSnapResolution').onchange=e=>{try{localStorage.setItem(VOX_RES_KEY,e.target.value)}catch{}voxStatus(`Snap grid set to 1/${e.target.value}.`);};
-    if($('voxShowInstrumentals'))$('voxShowInstrumentals').onchange=e=>{voxShowInstrumentals=!!e.target.checked;try{localStorage.setItem(VOX_INST_KEY,voxShowInstrumentals?'1':'0')}catch{};voxInstrumentSelections=[];voxInstrumentSelection=null;if(!voxShowInstrumentals)voxInstrumentTrackFocus=null;renderVoxBox();voxStatus(voxShowInstrumentals?'Instrument tracks added. Edit Chord/Note and Lead/Bass events on the timeline; edit drums in the Drum Map at the bottom.':'Instrument tracks hidden.');};
+    if($('voxShowInstrumentals'))$('voxShowInstrumentals').onchange=e=>{voxShowInstrumentals=!!e.target.checked;try{localStorage.setItem(VOX_INST_KEY,voxShowInstrumentals?'1':'0')}catch{};voxInstrumentSelections=[];voxInstrumentSelection=null;if(!voxShowInstrumentals)voxInstrumentTrackFocus=null;renderVoxBox();voxStatus(voxShowInstrumentals?'Instrument tracks added. Drum regions now resize, split, copy/paste, and can hold different patterns.':'Instrument tracks hidden.');};
     if($('voxToolModeBtn'))$('voxToolModeBtn').onclick=()=>{voxToolMode=voxToolMode==='cursor'?'playhead':'cursor';try{localStorage.setItem(VOX_TOOL_KEY,voxToolMode)}catch{};renderVoxBox();voxStatus(voxToolMode==='cursor'?'Cursor mode — drag a selection box with the regular pointer, then move/edit the selected events.':'Playhead mode — the ruler and empty lanes locate playback; events remain draggable.');};
     if($('voxAddTrackBtn'))$('voxAddTrackBtn').onclick=addVoxTrack;
     if($('voxCropBtn'))$('voxCropBtn').onclick=()=>{voxCropMode=!voxCropMode;renderVoxBox();voxStatus(voxCropMode?'Crop mode: drag the blue-selected event edges.':'Crop mode off.');};
@@ -2409,8 +2369,8 @@
     if($('voxFxAutotune')){$('voxFxAutotune').addEventListener('pointerdown',voxCheckpoint);$('voxFxAutotune').oninput=()=>updateVoxFxFromUi('autotune');}
     if($('voxInspectorToggleBtn'))$('voxInspectorToggleBtn').onclick=toggleVoxInspector;
     if($('voxResetEventFxBtn'))$('voxResetEventFxBtn').onclick=resetSelectedVoxFx;
-    if($('voxToStartBtn'))$('voxToStartBtn').onclick=()=>voxSeekTo(0);
-    if($('voxRewindBtn'))$('voxRewindBtn').onclick=()=>voxSeekTo(Math.max(0,voxPlayheadBeat-4));
+    if($('voxToStartBtn'))$('voxToStartBtn').onclick=()=>voxSeekTo(effectiveSongStartBeat());
+    if($('voxRewindBtn'))$('voxRewindBtn').onclick=()=>voxSeekTo(Math.max(effectiveSongStartBeat(),voxPlayheadBeat-4));
     if($('voxFastForwardBtn'))$('voxFastForwardBtn').onclick=()=>voxSeekTo(Math.min(mediaDurationBeats(),voxPlayheadBeat+4));
     if($('voxToEndBtn'))$('voxToEndBtn').onclick=()=>voxSeekTo(Math.max(0,mediaDurationBeats()-.001));
     if($('voxStopTransportBtn'))$('voxStopTransportBtn').onclick=voxTransportStop;
@@ -2419,7 +2379,7 @@
     if($('voxRecordTransportBtn'))$('voxRecordTransportBtn').onclick=voxTransportRecord;
     if($('voxAutoScrollBtn'))$('voxAutoScrollBtn').onclick=()=>setVoxAutoScroll(!voxAutoScroll);
     if($('voxLyricsTransportBtn'))$('voxLyricsTransportBtn').onclick=openLyricsOverlay;
-    wireVoxTransportDrag();wireVoxPlayheadDrag();
+    wireVoxTransportDrag();wireVoxPlayheadDrag();wireVoxSongLocatorDrag('voxSongStartLocator','start');wireVoxSongLocatorDrag('voxSongEndLocator','end');
     const voxScroller=$('voxTimelineScroller');if(voxScroller){
       voxScroller.addEventListener('wheel',()=>{if((playing||starting)&&voxAutoScroll)disableVoxAutoScroll();},{passive:true});
       let voxTouchX=null,voxTouchY=null;
@@ -2439,29 +2399,9 @@
       if(inlineEditor||voxFormFocus||!widthChanged){requestAnimationFrame(()=>clampVoxTransportToViewport());return;}
       renderVoxBox();requestAnimationFrame(()=>clampVoxTransportToViewport());
     });
-    if($('songEndMinusBtn'))$('songEndMinusBtn').onclick=()=>nudgeSongEnd(-.1);
-    if($('songEndPlusBtn'))$('songEndPlusBtn').onclick=()=>nudgeSongEnd(.1);
-    if($('songEndClearBtn'))$('songEndClearBtn').onclick=clearSongEnd;
-    if($('songEndSlider')){
-      $('songEndSlider').addEventListener('input',e=>setSongEndFromSlider(e.target.value,false));
-      $('songEndSlider').addEventListener('change',e=>{setSongEndFromSlider(e.target.value,true);});
-    }
-    if($('songEndSnapBar'))$('songEndSnapBar').onchange=e=>{songEndSnapToBar=!!e.target.checked;try{localStorage.setItem(SONG_END_SNAP_KEY,songEndSnapToBar?'1':'0')}catch{}const natural=naturalSongDurationBeats();if(songEndSnapToBar&&Number.isFinite(Number(songEndBeat))&&natural>0)songEndBeat=snappedSongEndBeat(songEndBeat,natural);renderSongEndEditor();liveEditRefresh();core.scheduleAutoSave();};
     $('bpmInput')?.addEventListener('input',()=>{renderSongEndEditor();updateMediaMetadata();liveEditRefresh();});
-    if(songEndUiTimer)clearInterval(songEndUiTimer);songEndUiTimer=setInterval(()=>{
-      renderSongEndEditor();
-      if(voxBoxOpen){
-        let beat=null;
-        if(playing||starting)beat=currentCycleBeat();
-        else if(recording){
-          const now=recordingPaused&&recordPausedAt?recordPausedAt:performance.now();
-          const activeMs=Math.max(0,now-recordStartedAt-recordPausedTotal);
-          beat=recordInsertBeat+(activeMs/1000)*(Math.max(40,Math.min(240,Number(core.bpm)||92))/60);
-        }
-        if(Number.isFinite(beat))updateVoxPlayhead(beat,voxAutoScroll);
-        updatePartPlaybackButtons();updateVoxTransportState();
-      }
-    },120);
+    let voxFollowRaf=0;const voxFollowTick=()=>{if(voxBoxOpen){let beat=null;if(playing||starting)beat=currentCycleBeat();else if(recording){const now=recordingPaused&&recordPausedAt?recordPausedAt:performance.now(),activeMs=Math.max(0,now-recordStartedAt-recordPausedTotal);beat=recordInsertBeat+(activeMs/1000)*(Math.max(40,Math.min(240,Number(core.bpm)||92))/60);}if(Number.isFinite(beat))updateVoxPlayhead(beat,voxAutoScroll);}voxFollowRaf=requestAnimationFrame(voxFollowTick);};if(voxFollowRaf)cancelAnimationFrame(voxFollowRaf);voxFollowRaf=requestAnimationFrame(voxFollowTick);
+    if(songEndUiTimer)clearInterval(songEndUiTimer);songEndUiTimer=setInterval(()=>{renderSongEndEditor();if(voxBoxOpen){updatePartPlaybackButtons();updateVoxTransportState();}},300);
     $('addPartBtn')?.addEventListener('click',openModal);$('closePartModal')?.addEventListener('click',closeModal);document.querySelector('[data-close-part-modal]')?.addEventListener('click',closeModal);document.querySelectorAll('.part-choice').forEach(b=>b.addEventListener('click',()=>addPart(b.dataset.partType)));
     document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;p.instrument=b.dataset.leadInstrument;p.sound=(core.sounds[p.instrument]||[])[0]?.[0]||p.sound;renderLeadSoundControls(p);warmLivePlayer(p);core.scheduleAutoSave();});
     if($('leadPlaybackBtn'))$('leadPlaybackBtn').onclick=toggleLeadPartPlayback;
