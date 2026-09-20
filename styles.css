@@ -4740,3 +4740,24 @@ body.workspace-chord-rider .primary-toolbar > .sustain-control{
 /* The mode button is always labelled Multi Select. Its existing gold active
    treatment is the only mode indicator; when it is off, the ruler alone seeks. */
 .vox-tool-mode-btn{white-space:nowrap!important;}
+
+
+/* =========================================================
+   v3.3.45 — Track Master mobile edit targeting
+   ========================================================= */
+/* A single tap on blank track space now creates a persistent paste/drop target.
+   Make that state unmistakable on a phone without changing event-selection blue. */
+.vox-track-row.is-instrument-focus>.vox-track-lane,
+.vox-track-row.is-target>.vox-track-lane{
+  background-color:rgba(241,198,85,.075)!important;
+  box-shadow:inset 0 0 0 2px rgba(241,198,85,.58)!important;
+}
+.vox-track-row.is-instrument-focus>.vox-track-label,
+.vox-track-row.is-target>.vox-track-label{
+  border-right-color:#f1c655!important;
+  box-shadow:inset 4px 0 0 #f1c655,5px 0 12px rgba(0,0,0,.28)!important;
+}
+@media(max-width:600px){
+  .vox-track-row.is-instrument-focus>.vox-track-lane,
+  .vox-track-row.is-target>.vox-track-lane{box-shadow:inset 0 0 0 3px rgba(241,198,85,.66)!important;}
+}
