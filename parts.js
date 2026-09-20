@@ -1574,6 +1574,17 @@
   function voxTimelineBeats(){const natural=Math.max(0,naturalSongDurationBeats()),maxEvent=Math.max(0,...allVocalParts().flatMap(p=>voxTrackEvents(p).map(e=>(Number(e.startBeat)||0)+voxEventDurationBeats(e)))),range=songRangeForTimeline(),drumEnd=drumEvents.length?Math.max(...drumEvents.map(e=>(Number(e.startBeat)||0)+(Number(e.durationBeats)||0))):0;return Math.max(16,Math.ceil((Math.max(natural,maxEvent,drumEnd,range.end,voxPlayheadBeat+1)+4)/4)*4);}
   function voxStatus(msg){if($('voxBoxStatus'))$('voxBoxStatus').textContent=msg||'';}
   function persistVoxEdits(){markPartsDirty();playbackTotalBeats=mediaDurationBeats();renderSongEndEditor();const a=active();if(a?.type==='lead')renderLeadEditor(a);else if(a?.type==='vocal')renderVocalEditor(a);core.scheduleAutoSave();core.flushAutoSaveNow?.();}
+  // v3.3.46 — keep destructive Track Master edits visually immediate on phones.
+  // The first frame removes the event; heavier editor refresh/autosave runs after paint.
+  let voxDeferredPersistSeq=0;
+  function persistVoxEditsAfterPaint({renderPartsToo=false}={}){
+    const seq=++voxDeferredPersistSeq;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      if(seq!==voxDeferredPersistSeq)return;
+      persistVoxEdits();
+      if(renderPartsToo)renderParts();
+    }));
+  }
   function voxSetSelection(part,event,{add=false,toggle=false,render=true}={}){
     if(!part||!event)return;
     if(voxToolMode!=='multi'){voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=null;}voxTargetPartId=part.id;
@@ -2122,7 +2133,7 @@
   function beginVoxInstrumentPointerEdit(e,sel,el,mode='move'){
     sel=resolveVoxInstrumentSelection(sel)||sel;
     if(!sel||e.button!==undefined&&e.button!==0)return;
-    e.preventDefault();e.stopPropagation();disableVoxAutoScroll();
+    e.preventDefault();e.stopPropagation();
     const add=voxToolMode==='multi'||e.ctrlKey||e.metaKey||e.shiftKey;
     if(!voxInstrumentIsSelected(sel.key)){
       setVoxInstrumentSelection(sel,{add,render:false});el.classList.add('is-selected');el.__voxPointerSelected=true;
@@ -2130,9 +2141,9 @@
     // Selection must update the toolbar immediately. The old pointer path selected
     // the block visually but left Delete/Copy/Cut disabled until another click.
     renderVoxSelectionClasses();renderVoxInspector();
-    voxCheckpoint();
     const ppb=voxPpb(),pointerId=e.pointerId,startX=e.clientX,startY=e.clientY,orig=Number(sel.startBeat)||0,origDur=Math.max(.001,Number(sel.dur)||.25),origEnd=orig+origDur,minBeat=voxSnapEnabled()?voxBeatStep():.03;
-    let moved=false,targetInstrumentPart=sel.part,cleaned=false;
+    let moved=false,targetInstrumentPart=sel.part,cleaned=false,mutationStarted=false;
+    const startMutation=()=>{if(mutationStarted)return;mutationStarted=true;disableVoxAutoScroll();voxCheckpoint();};
     const moving=(mode==='move'?voxInstrumentSelectionList():[sel]).map(resolveVoxInstrumentSelection).filter(Boolean),starts=new Map(moving.map(x=>[String(x.key),Number(x.startBeat)||0]));
     const captureEl=e.currentTarget||el;
     el.classList.add('is-dragging');if(mode!=='move')el.classList.add('is-trimming');
@@ -2141,7 +2152,8 @@
     const move=ev=>{
       if(ev.pointerId!==pointerId)return;
       ev.preventDefault();ev.stopPropagation();
-      const dx=(ev.clientX-startX)/ppb;if(Math.hypot(ev.clientX-startX,ev.clientY-startY)>4)moved=true;
+      const distance=Math.hypot(ev.clientX-startX,ev.clientY-startY);if(distance<=4)return;if(!moved){moved=true;startMutation();}
+      const dx=(ev.clientX-startX)/ppb;
       if(mode==='move'){
         const target=quantizeVoxBeat(orig+dx),delta=target-orig;
         for(const item of moving){
@@ -2187,7 +2199,7 @@
     const up=ev=>{
       if(ev.pointerId!==pointerId)return;
       ev.preventDefault();ev.stopPropagation();cleanup();el.__voxDragged=moved;
-      if(!moved){voxUndoStack.pop();updateVoxHistoryButtons();renderVoxSelectionClasses();renderVoxInspector();return;}
+      if(!moved){renderVoxSelectionClasses();renderVoxInspector();return;}
       const movedSelections=[];
       if(mode==='move')for(const raw of moving){
         const item=resolveVoxInstrumentSelection(raw)||raw,targetBeat=Number(raw.__voxPreviewBeat);delete raw.__voxPreviewBeat;if(!Number.isFinite(targetBeat))continue;
@@ -2266,24 +2278,25 @@
         row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
       }
     }else tracks.insertAdjacentHTML('beforeend','<div class="vocal-empty" style="padding:40px">No vocal tracks yet. Open a track’s ⋮ menu to add a Vocal Track.</div>');
-    applyVoxTrackOrder();inner.classList.toggle('has-crop-mode',voxCropMode);page?.classList.toggle('crop-mode',voxCropMode);page?.classList.toggle('cursor-mode',voxToolMode==='multi');page?.classList.toggle('multi-select-mode',voxToolMode==='multi');page?.classList.toggle('playhead-mode',voxToolMode!=='multi');if($('voxCropBtn'))$('voxCropBtn').classList.toggle('is-active',voxCropMode);
-    if($('voxToolModeBtn')){$('voxToolModeBtn').textContent='Multi Select';$('voxToolModeBtn').classList.toggle('is-active',voxToolMode==='multi');$('voxToolModeBtn').setAttribute('aria-pressed',String(voxToolMode==='multi'));$('voxToolModeBtn').title=voxToolMode==='multi'?'Multi Select on — tap events to toggle selection; tap blank track space to choose a paste/drop target':'Multi Select off — use the timeline ruler to move the playhead';}
+    applyVoxTrackOrder();inner.classList.toggle('has-crop-mode',voxCropMode);page?.classList.toggle('crop-mode',voxCropMode);page?.classList.remove('cursor-mode');page?.classList.toggle('multi-select-mode',voxToolMode==='multi');page?.classList.add('playhead-mode');if($('voxCropBtn'))$('voxCropBtn').classList.toggle('is-active',voxCropMode);
+    if($('voxToolModeBtn')){$('voxToolModeBtn').textContent='Multi Select';$('voxToolModeBtn').classList.toggle('is-active',voxToolMode==='multi');$('voxToolModeBtn').setAttribute('aria-pressed',String(voxToolMode==='multi'));$('voxToolModeBtn').title=voxToolMode==='multi'?'Multi Select on — Track Master behaves normally; tap events to add/remove them from the selection':'Multi Select off — normal single-event editing';}
     renderVoxSongLocators();updateVoxPlayhead(voxPlayheadBeat);renderVoxHarmonyGuide();renderVoxInspector();updateVoxTransportState();wireVoxMarquee();
   }
   function findVoxLaneAt(x,y){return document.elementsFromPoint?.(x,y)?.find(el=>el.classList?.contains('vox-track-lane'))||null;}
   function beginVoxPointerEdit(e,part,event,el,mode){
-    if(e.button!==undefined&&e.button!==0)return;e.preventDefault();e.stopPropagation();disableVoxAutoScroll();
+    if(e.button!==undefined&&e.button!==0)return;e.preventDefault();e.stopPropagation();
     const add=voxToolMode==='multi'||e.ctrlKey||e.metaKey||e.shiftKey;if(!voxIsSelected(part.id,event.id)){voxSetSelection(part,event,{add,render:false});el.classList.add('is-selected');el.__voxPointerSelected=true;}
-    voxCheckpoint();const ppb=voxPpb(),beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92)),startX=e.clientX,startY=e.clientY,origStart=Number(event.startBeat)||0,origTrimStart=Math.max(0,Number(event.trimStartSec)||0),take=voxEventTake(event),full=Math.max(0,Number(take?.duration)||0),origTrimEnd=Math.max(origTrimStart,Math.min(full,Number.isFinite(Number(event.trimEndSec))&&Number(event.trimEndSec)>0?Number(event.trimEndSec):full)),origEndBeat=origStart+(origTrimEnd-origTrimStart)/beatSec;let targetPartId=part.id,moved=false;
+    const ppb=voxPpb(),beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92)),startX=e.clientX,startY=e.clientY,origStart=Number(event.startBeat)||0,origTrimStart=Math.max(0,Number(event.trimStartSec)||0),take=voxEventTake(event),full=Math.max(0,Number(take?.duration)||0),origTrimEnd=Math.max(origTrimStart,Math.min(full,Number.isFinite(Number(event.trimEndSec))&&Number(event.trimEndSec)>0?Number(event.trimEndSec):full)),origEndBeat=origStart+(origTrimEnd-origTrimStart)/beatSec;let targetPartId=part.id,moved=false,mutationStarted=false;
+    const startMutation=()=>{if(mutationStarted)return;mutationStarted=true;disableVoxAutoScroll();voxCheckpoint();};
     const selectedAtStart=mode==='move'?voxSelectionPairs():[{part,event}],starts=new Map(selectedAtStart.map(x=>[`${x.part.id}:${x.event.id}`,Number(x.event.startBeat)||0])),canvas=el.querySelector('.vox-event-waveform');
     el.classList.add('is-dragging');if(mode!=='move')el.classList.add('is-trimming');try{el.setPointerCapture(e.pointerId)}catch{}
     const liveCrop=()=>{updateVoxEventReadout(el,event);queueLiveVoxWaveform(canvas,event);};
-    const move=ev=>{ev.preventDefault();const dx=(ev.clientX-startX)/ppb;if(Math.hypot(ev.clientX-startX,ev.clientY-startY)>4)moved=true;if(mode==='move'){
+    const move=ev=>{ev.preventDefault();const distance=Math.hypot(ev.clientX-startX,ev.clientY-startY);if(distance<=4)return;if(!moved){moved=true;startMutation();}const dx=(ev.clientX-startX)/ppb;if(mode==='move'){
         const primaryNew=quantizeVoxBeat(origStart+dx),delta=primaryNew-origStart;for(const item of selectedAtStart){const base=starts.get(`${item.part.id}:${item.event.id}`)||0;item.event.startBeat=Math.max(0,Math.round((base+delta)*1000)/1000);const node=document.querySelector(`.vox-event[data-vox-part-id="${CSS.escape(String(item.part.id))}"][data-vox-event-id="${CSS.escape(String(item.event.id))}"]`);if(node){node.style.left=`${item.event.startBeat*ppb}px`;updateVoxEventReadout(node,item.event);}}
         if(selectedAtStart.length===1){const lane=findVoxLaneAt(ev.clientX,ev.clientY);if(lane?.dataset.voxKind==='vocal'&&lane?.dataset.voxPartId)targetPartId=lane.dataset.voxPartId;document.querySelectorAll('.vox-track-row').forEach(r=>r.classList.toggle('is-target',String(r.dataset.voxPartId)===String(targetPartId)));}
       }else if(mode==='trim-left'){const target=quantizeVoxBeat(origStart+dx),delta=(target-origStart)*beatSec,newTrim=Math.max(0,Math.min(origTrimEnd-.03,origTrimStart+delta));event.trimStartSec=newTrim;event.startBeat=Math.max(0,origStart+(newTrim-origTrimStart)/beatSec);const dur=Math.max(.001,(origTrimEnd-newTrim)/beatSec);el.style.left=`${event.startBeat*ppb}px`;el.style.width=`${Math.max(24,dur*ppb)}px`;liveCrop();voxStatus(`Cropping start • ${event.startBeat.toFixed(2)}–${(event.startBeat+dur).toFixed(2)} beats`);
       }else{const targetEnd=quantizeVoxBeat(origEndBeat+dx),newEnd=Math.max(origTrimStart+.03,Math.min(full,origTrimStart+Math.max(.02,targetEnd-origStart)*beatSec));event.trimEndSec=newEnd;const dur=Math.max(.001,(newEnd-origTrimStart)/beatSec);el.style.width=`${Math.max(24,dur*ppb)}px`;liveCrop();voxStatus(`Cropping end • ${origStart.toFixed(2)}–${(origStart+dur).toFixed(2)} beats`);}};
-    const up=ev=>{try{el.releasePointerCapture(ev.pointerId)}catch{};el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',up);el.removeEventListener('pointercancel',up);el.classList.remove('is-dragging','is-trimming');el.__voxDragged=moved;if(!moved&&mode==='move'){voxUndoStack.pop();updateVoxHistoryButtons();return;}if(mode==='move'&&selectedAtStart.length===1&&String(targetPartId)!==String(part.id)){const dest=parts.find(p=>p.type==='vocal'&&String(p.id)===String(targetPartId));if(dest){part.voxEvents=(part.voxEvents||[]).filter(x=>x.id!==event.id);dest.voxEvents=dest.voxEvents||[];dest.voxEvents.push(event);voxSelections=[{partId:dest.id,eventId:event.id}];voxSelected=voxSelections[0];voxTargetPartId=dest.id;}}persistVoxEdits();renderVoxBox();if(mode!=='move')voxStatus('Crop applied. The original dry take remains untouched.');else voxStatus(selectedAtStart.length>1?`${selectedAtStart.length} vocal events moved together.`:'Vocal event moved.');};
+    const up=ev=>{try{el.releasePointerCapture(ev.pointerId)}catch{};el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',up);el.removeEventListener('pointercancel',up);el.classList.remove('is-dragging','is-trimming');el.__voxDragged=moved;if(!moved)return;if(mode==='move'&&selectedAtStart.length===1&&String(targetPartId)!==String(part.id)){const dest=parts.find(p=>p.type==='vocal'&&String(p.id)===String(targetPartId));if(dest){part.voxEvents=(part.voxEvents||[]).filter(x=>x.id!==event.id);dest.voxEvents=dest.voxEvents||[];dest.voxEvents.push(event);voxSelections=[{partId:dest.id,eventId:event.id}];voxSelected=voxSelections[0];voxTargetPartId=dest.id;}}persistVoxEdits();renderVoxBox();if(mode!=='move')voxStatus('Crop applied. The original dry take remains untouched.');else voxStatus(selectedAtStart.length>1?`${selectedAtStart.length} vocal events moved together.`:'Vocal event moved.');};
     el.addEventListener('pointermove',move,{passive:false});el.addEventListener('pointerup',up,{passive:false});el.addEventListener('pointercancel',up,{passive:false});
   }
   function openVoxBox(options={}){
@@ -2370,10 +2383,10 @@
     voxSelections=newV;voxSelected=newV[0]||null;voxInstrumentSelections=newI;voxInstrumentSelection=newI[0]||null;persistVoxEdits();renderParts();renderVoxBox();const n=newV.length+newI.length;voxStatus(`${n} event${n===1?'':'s'} pasted in order; earliest event starts at beat ${voxPlayheadBeat.toFixed(2)}.`);
   }
   function deleteInstrumentSelection(){
-    const list=voxInstrumentSelectionList();if(!list.length)return false;voxCheckpoint();removeInstrumentSelectionNoCheckpoint(list);voxInstrumentSelections=[];voxInstrumentSelection=null;persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${list.length} instrument event${list.length===1?'':'s'} deleted.`);return true;
+    const list=voxInstrumentSelectionList();if(!list.length)return false;voxCheckpoint();removeInstrumentSelectionNoCheckpoint(list);voxInstrumentSelections=[];voxInstrumentSelection=null;renderVoxBox();voxStatus(`${list.length} instrument event${list.length===1?'':'s'} deleted.`);persistVoxEditsAfterPaint({renderPartsToo:true});return true;
   }
   function deleteSelectedVox(){
-    const inst=voxInstrumentSelectionList(),voc=voxSelectionPairs();if(!inst.length&&!voc.length)return;voxCheckpoint();removeInstrumentSelectionNoCheckpoint(inst);removeVocalSelectionNoCheckpoint(voc);voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;persistVoxEdits();renderParts();renderVoxBox();const n=inst.length+voc.length;voxStatus(`${n} event${n===1?'':'s'} deleted. Original vocal takes remain safe.`);
+    const inst=voxInstrumentSelectionList(),voc=voxSelectionPairs();if(!inst.length&&!voc.length)return;voxCheckpoint();removeInstrumentSelectionNoCheckpoint(inst);removeVocalSelectionNoCheckpoint(voc);voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;renderVoxBox();const n=inst.length+voc.length;voxStatus(`${n} event${n===1?'':'s'} deleted. Original vocal takes remain safe.`);persistVoxEditsAfterPaint({renderPartsToo:true});
   }
   function updateVoxFxFromUi(kind){
     const p=voxTargetPart(),selected=voxSelectionPairs(),eventMode=$('voxFxTarget')?.value==='event'&&selected.length;if(!p)return;const touchedParts=new Set();
@@ -2429,7 +2442,7 @@
     if($('voxBpmInput')){syncVoxBpmInput();$('voxBpmInput').addEventListener('change',commitVoxBpm);$('voxBpmInput').addEventListener('blur',commitVoxBpm);$('voxBpmInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitVoxBpm();e.currentTarget.blur();}});}
     if($('voxSnapToBeat'))$('voxSnapToBeat').onchange=e=>{try{localStorage.setItem(VOX_SNAP_KEY,e.target.checked?'1':'0')}catch{}voxStatus(e.target.checked?`Snap on (1/${$('voxSnapResolution')?.value||'16'})`:'Free drag enabled.');};
     if($('voxSnapResolution'))$('voxSnapResolution').onchange=e=>{try{localStorage.setItem(VOX_RES_KEY,e.target.value)}catch{}voxStatus(`Snap grid set to 1/${e.target.value}.`);};
-    if($('voxToolModeBtn'))$('voxToolModeBtn').onclick=()=>{voxToolMode=voxToolMode==='multi'?'playhead':'multi';clearVoxSelection({render:false,keepInstrumentFocus:true});try{localStorage.setItem(VOX_TOOL_KEY,voxToolMode)}catch{};renderVoxBox();voxStatus(voxToolMode==='multi'?'Multi Select — tap events to toggle selection. Tap blank track space to select that track as the paste/drop target.':'Multi Select off — normal cursor behavior restored. Tap/click the timeline ruler to move the playhead.');};
+    if($('voxToolModeBtn'))$('voxToolModeBtn').onclick=()=>{voxToolMode=voxToolMode==='multi'?'playhead':'multi';clearVoxSelection({render:false,keepInstrumentFocus:true});try{localStorage.setItem(VOX_TOOL_KEY,voxToolMode)}catch{};renderVoxBox();voxStatus(voxToolMode==='multi'?'Multi Select on — normal Track Master behavior stays active. Tap events to add/remove them from the selection.':'Multi Select off — normal single-event editing.');};
     if($('voxCropBtn'))$('voxCropBtn').onclick=()=>{voxCropMode=!voxCropMode;renderVoxBox();voxStatus(voxCropMode?'Crop mode: drag the blue-selected event edges.':'Crop mode off.');};
     if($('voxSplitBtn'))$('voxSplitBtn').onclick=splitSelectedVox;
     if($('voxCopyBtn'))$('voxCopyBtn').onclick=()=>copySelectedVox(false);

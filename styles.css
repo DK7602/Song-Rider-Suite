@@ -4589,7 +4589,7 @@ body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
 
 /* Multi-Select replaces marquee Cursor mode. */
 .vox-box-page.multi-select-mode .vox-event,.vox-box-page.multi-select-mode .vox-instrument-event{cursor:pointer!important}
-.vox-box-page.multi-select-mode .vox-track-lane{cursor:default!important}
+.vox-box-page.multi-select-mode .vox-track-lane{cursor:crosshair!important}
 .vox-box-page.multi-select-mode .vox-event.is-selected,.vox-box-page.multi-select-mode .vox-instrument-event.is-selected{box-shadow:0 0 0 3px rgba(102,198,255,.34),0 6px 18px rgba(0,0,0,.34)!important}
 .vox-edit-track-mode-row.is-note-only select{opacity:.7}
 

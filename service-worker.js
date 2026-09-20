@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.45-track-master-mobile-edit';
+const CACHE = 'song-rider-suite-v3.3.46-multi-select-delete-smooth';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
   './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css',
