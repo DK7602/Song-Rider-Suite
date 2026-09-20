@@ -1580,8 +1580,18 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
   margin-top:0;
 }
 .project-item.current{
-  border-color:rgba(233,196,106,.72);
-  box-shadow:0 0 0 1px rgba(233,196,106,.12);
+  border-color:var(--accent)!important;
+  background:linear-gradient(180deg,rgba(233,196,106,.12),rgba(233,196,106,.045))!important;
+  box-shadow:0 0 0 2px rgba(233,196,106,.26),0 8px 22px rgba(0,0,0,.24)!important;
+}
+.project-item.current .name{
+  color:#f5d46f;
+}
+.project-item.current .open{
+  background:var(--accent)!important;
+  border-color:#d7b654!important;
+  color:#17130a!important;
+  font-weight:900;
 }
 .project-item .archive-toggle{
   color:var(--accent);

@@ -1722,8 +1722,13 @@
   function writeVoxTrackOrder(a){try{localStorage.setItem(VOX_TRACK_ORDER_KEY,JSON.stringify(a||[]));}catch{}}
   function applyVoxTrackOrder(){
     const host=$('voxTracks');if(!host)return;const all=[...host.querySelectorAll(':scope > .vox-track-row[data-vox-track-key]')];if(all.length<2)return;
-    const drum=all.find(r=>r.dataset.voxTrackKey==='drum-map')||null,rows=all.filter(r=>r!==drum),saved=readVoxTrackOrder(),rank=new Map(saved.map((k,i)=>[String(k),i]));
-    rows.sort((a,b)=>{const ak=String(a.dataset.voxTrackKey||''),bk=String(b.dataset.voxTrackKey||''),ar=rank.has(ak)?rank.get(ak):1e6,br=rank.has(bk)?rank.get(bk):1e6;return ar-br;});rows.forEach(r=>host.appendChild(r));if(drum)host.appendChild(drum);
+    const drum=all.find(r=>r.dataset.voxTrackKey==='drum-map')||null,saved=readVoxTrackOrder(),rank=new Map(saved.map((k,i)=>[String(k),i]));
+    const bySavedOrder=(a,b)=>{const ak=String(a.dataset.voxTrackKey||''),bk=String(b.dataset.voxTrackKey||''),ar=rank.has(ak)?rank.get(ak):1e6,br=rank.has(bk)?rank.get(bk):1e6;return ar-br;};
+    // v3.3.49 — Drums belong to the Instruments section. Keep all melodic
+    // instrument tracks together, then Drums, then vocal tracks.
+    const instruments=all.filter(r=>r!==drum&&String(r.dataset.voxKind||'')!=='vocal').sort(bySavedOrder);
+    const vocals=all.filter(r=>String(r.dataset.voxKind||'')==='vocal').sort(bySavedOrder);
+    instruments.forEach(r=>host.appendChild(r));if(drum)host.appendChild(drum);vocals.forEach(r=>host.appendChild(r));
   }
   function persistCurrentVoxTrackOrder(){
     const host=$('voxTracks');if(!host)return;const order=[...host.querySelectorAll(':scope > .vox-track-row[data-vox-track-key]')].map(r=>r.dataset.voxTrackKey).filter(k=>k!=='drum-map');writeVoxTrackOrder(order);
@@ -2118,7 +2123,7 @@
   function renderVoxInstrumentGroupToggle(tracks,width){
     if(!voxOpenedFromVocal)return;const row=document.createElement('div');row.className='vox-track-row vox-instrument-group-row';row.style.width=`${width}px`;
     const label=document.createElement('div');label.className='vox-track-label vox-instrument-group-label';const btn=document.createElement('button');btn.type='button';btn.className='vox-instrument-group-toggle';btn.textContent=voxShowInstrumentals?'−':'+';btn.setAttribute('aria-label',voxShowInstrumentals?'Collapse instrument tracks':'Show instrument tracks');const title=document.createElement('strong');title.textContent='Instruments';label.append(btn,title);
-    const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-group-lane';lane.innerHTML=`<span>${voxShowInstrumentals?'Instrument tracks shown':'Tap + to show all instrument tracks'}</span>`;
+    const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-group-lane';lane.innerHTML=`<span>${voxShowInstrumentals?'Chord/Note • Lead/Bass • Drums shown':'Tap + for Chord/Note, Lead/Bass & Drums'}</span>`;
     const toggle=e=>{e?.preventDefault?.();e?.stopPropagation?.();voxShowInstrumentals=!voxShowInstrumentals;voxInstrumentSelections=[];voxInstrumentSelection=null;if(!voxShowInstrumentals)voxInstrumentTrackFocus=null;renderVoxBox();voxStatus(voxShowInstrumentals?'Instrument tracks expanded.':'Instrument tracks collapsed.');};btn.onclick=toggle;lane.onclick=()=>{if(!voxShowInstrumentals)toggle();};row.append(label,lane);tracks.appendChild(row);
   }
   function renderVoxInstrumentTracks(tracks,width,ppb,clickBeat){

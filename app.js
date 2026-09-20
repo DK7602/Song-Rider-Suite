@@ -1329,6 +1329,10 @@
   }
   let projectBrowserMode='projects';
 
+  function sameProjectId(a,b){
+    const aa=String(a??'').trim(),bb=String(b??'').trim();
+    return !!aa&&!!bb&&aa===bb;
+  }
   function projectSource(){return (accountUser&&cloudProjects)?cloudProjects:localProjects();}
 
   function restoreActiveProjectFromStorage(){
@@ -1379,13 +1383,22 @@
       ? `“${p.name}” moved to Archive.`
       : `“${p.name}” restored to Projects.`;
   }
-  function performLoadProject(id){if(state.currentProjectId&&state.currentProjectId!==id)flushAutoSaveNow();let p=projectSource().find(x=>x.id===id)||localProjects().find(x=>x.id===id);if(!p)return;p=recoverNavigationSnapshot(p);upsertLocal(p);const __srpSession=readSrpLinkSession();const shared=(__srpSession&&String(__srpSession.crpProjectId||'')===String(id))?readSharedSrpMeta(id):null;if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;unsavedProjectTouched=false;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=normalizeInstrument(p.instrument);state.mode=p.mode||'chord';state.sound=(SOUNDS[state.instrument]||SOUNDS.piano).some(x=>x[0]===p.sound)?p.sound:SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);}
-  function loadProject(id){if(String(state.currentProjectId||'')===String(id||'')){performLoadProject(id);return;}requestProjectExit(()=>performLoadProject(id));}
+  function performLoadProject(id){if(state.currentProjectId&&!sameProjectId(state.currentProjectId,id))flushAutoSaveNow();let p=projectSource().find(x=>sameProjectId(x.id,id))||localProjects().find(x=>sameProjectId(x.id,id));if(!p)return;p=recoverNavigationSnapshot(p);upsertLocal(p);const __srpSession=readSrpLinkSession();const shared=(__srpSession&&String(__srpSession.crpProjectId||'')===String(id))?readSharedSrpMeta(id):null;if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;unsavedProjectTouched=false;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=normalizeInstrument(p.instrument);state.mode=p.mode||'chord';state.sound=(SOUNDS[state.instrument]||SOUNDS.piano).some(x=>x[0]===p.sound)?p.sound:SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);
+    // v3.3.49 — opening a project is also a browser selection action.
+    // Repaint immediately so the active project is highlighted and pinned to the top.
+    renderProjects();
+    requestAnimationFrame(()=>{const win=document.querySelector('.project-browser-window');if(win)win.scrollTop=0;});
+  }
+  function loadProject(id){if(sameProjectId(state.currentProjectId,id)){performLoadProject(id);return;}requestProjectExit(()=>performLoadProject(id));}
 
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
   function renderProjects(){
     const w=$('projectList');
-    const all=[...projectSource()].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    const all=[...projectSource()].sort((a,b)=>{
+      const ac=sameProjectId(state.currentProjectId,a?.id),bc=sameProjectId(state.currentProjectId,b?.id);
+      if(ac!==bc)return ac?-1:1;
+      return (b.updatedAt||0)-(a.updatedAt||0);
+    });
     const active=all.filter(p=>!p.archived), archived=all.filter(p=>!!p.archived);
     const ps=projectBrowserMode==='archive'?archived:active;
 
@@ -1402,7 +1415,7 @@
 
     ps.forEach(p=>{
       const e=document.createElement('div');
-      e.className='project-item'+(state.currentProjectId===p.id?' current':'');
+      e.className='project-item'+(sameProjectId(state.currentProjectId,p.id)?' current':'');
       const count=p.rows?p.rows.flat().length:(p.chords||[]).length;
       const moveLabel=projectBrowserMode==='archive'?'Restore':'Archive';
       e.innerHTML=`<div class="name">${esc(p.name)}</div><div class="meta">${count} cards</div><button class="open">Open</button><button class="rename">Rename</button><button class="archive-toggle">${moveLabel}</button><button class="delete">Delete</button>`;
@@ -1415,7 +1428,7 @@
         const name=n.trim(),locals=localProjects(),i=locals.findIndex(x=>x.id===p.id);
         if(i>=0){locals[i].name=name;locals[i].updatedAt=Date.now();saveLocalProjects(locals);}
         if(cloudProjects){const ci=cloudProjects.findIndex(x=>x.id===p.id);if(ci>=0)cloudProjects[ci]={...cloudProjects[ci],name,updatedAt:Date.now()};}
-        if(state.currentProjectId===p.id)$('projectName').value=name;
+        if(sameProjectId(state.currentProjectId,p.id))$('projectName').value=name;
 
         if(accountUser){
           try{
@@ -1432,7 +1445,7 @@
 
       e.querySelector('.delete').onclick=async()=>{
         if(!confirm(`Delete “${p.name}”?`))return;
-        if(state.currentProjectId===p.id){
+        if(sameProjectId(state.currentProjectId,p.id)){
           clearTimeout(autoSaveTimer);autoSaveTimer=null;state.currentProjectId=null;
         }
         saveLocalProjects(localProjects().filter(x=>x.id!==p.id));
