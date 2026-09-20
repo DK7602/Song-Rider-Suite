@@ -4471,3 +4471,61 @@ body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
   -webkit-text-fill-color:transparent;
   text-shadow:0 1px 0 rgba(92,54,0,.55),0 0 8px rgba(246,200,79,.18);
 }
+
+
+/* =========================================================
+   v3.3.40 — reliable desktop drum add + true title-rail mask
+   ========================================================= */
+/* .vox-tracks used to create a z-index:2 stacking context. That trapped every
+   sticky track label underneath the sibling playhead (25) and song locators
+   (40), so raising the labels themselves could never mask those guide lines.
+   Remove that stacking context: events remain below the guides, while the
+   opaque sticky labels (70) now genuinely sit above them. */
+.vox-tracks{z-index:auto!important;}
+.vox-track-row>.vox-track-label,
+.vox-drum-region-row>.vox-track-label{
+  z-index:70!important;
+  background:#11161d!important;
+}
+.vox-track-row.is-target>.vox-track-label{background:#15191c!important;}
+
+/* The drum title rail is intentionally compact. Keep metadata to one line and
+   reserve the lower strip exclusively for M/S so text can never overlap them. */
+.vox-drum-region-row>.vox-track-label{
+  justify-content:flex-start!important;
+  gap:4px!important;
+  padding-top:10px!important;
+  padding-bottom:38px!important;
+  overflow:hidden!important;
+}
+.vox-drum-region-row>.vox-track-label .vox-track-enable{
+  min-width:0!important;
+  width:100%!important;
+}
+.vox-drum-region-row>.vox-track-label .vox-track-enable strong{
+  min-width:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+.vox-drum-region-row>.vox-track-label .vox-track-meta{
+  display:block!important;
+  max-width:100%!important;
+  padding-right:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  line-height:1.2!important;
+}
+.vox-drum-region-row>.vox-track-label>.vox-track-ms{
+  left:10px!important;
+  right:auto!important;
+  bottom:8px!important;
+}
+@media(max-width:600px){
+  .vox-drum-region-row>.vox-track-label{
+    padding-top:8px!important;
+    padding-bottom:34px!important;
+  }
+  .vox-drum-region-row>.vox-track-label>.vox-track-ms{left:7px!important;bottom:6px!important;}
+}
