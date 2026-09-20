@@ -1,0 +1,9 @@
+Song Rider Suite v3.3.50 — Cloudflare SRP Cutover
+
+- Song Rider Pro now uses the existing Song Rider Suite / Chord Rider Pro Cloudflare account session.
+- SRP project sync moved from Supabase srp_user_projects to Cloudflare D1 srp_projects.
+- SRP audio and note-image sync moved from Supabase Storage to authenticated Cloudflare R2 routes.
+- Migrated legacy Supabase media paths remain authorized through each SRP project legacy_user_id.
+- New SRP media uses the current Song Rider Suite user ID path.
+- Removed Supabase JS runtime dependency from Song Rider Pro.
+- Preserved local-first sync, tombstones, audio manifests, note-image manifests, and current CRP/BD cloud behavior.

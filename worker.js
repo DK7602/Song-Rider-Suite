@@ -26,9 +26,58 @@ async function createSession(userId,env){const token=randomToken(),id=crypto.ran
 function validPassword(p){return typeof p==='string'&&p.length>=8&&p.length<=200;}
 function validEmail(e){return typeof e==='string'&&e.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);}
 
+
+let srpSchemaReady=false;
+async function ensureSrpSchema(env){
+  if(srpSchemaReady)return;
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS srp_projects (
+    owner_user_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    legacy_user_id TEXT,
+    name TEXT NOT NULL DEFAULT '',
+    data TEXT NOT NULL,
+    updated_at INTEGER NOT NULL DEFAULT 0,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    deleted_at TEXT,
+    created_at TEXT,
+    last_synced_at TEXT,
+    PRIMARY KEY (owner_user_id, project_id)
+  )`).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_srp_projects_owner_updated ON srp_projects(owner_user_id, updated_at DESC)').run();
+  srpSchemaReady=true;
+}
+
+async function srpRowFor(env,userId,projectId){
+  await ensureSrpSchema(env);
+  return env.DB.prepare('SELECT owner_user_id,project_id,legacy_user_id,deleted FROM srp_projects WHERE owner_user_id=? AND project_id=?').bind(userId,projectId).first();
+}
+
+function srpMediaAllowed(row,userId,projectId,key){
+  const clean=String(key||'').replace(/^\/+/,''), pid=String(projectId||'');
+  if(!clean||!pid||!row)return false;
+  const prefixes=[`${userId}/${pid}/`];
+  if(row.legacy_user_id)prefixes.push(`${row.legacy_user_id}/${pid}/`);
+  return prefixes.some(prefix=>clean.startsWith(prefix));
+}
+
+function mimeForPath(path,fallback='application/octet-stream'){
+  const p=String(path||'').toLowerCase();
+  if(p.endsWith('.mp3'))return 'audio/mpeg';
+  if(p.endsWith('.wav'))return 'audio/wav';
+  if(p.endsWith('.ogg'))return 'audio/ogg';
+  if(p.endsWith('.webm'))return 'audio/webm';
+  if(p.endsWith('.m4a')||p.endsWith('.mp4'))return 'audio/mp4';
+  if(p.endsWith('.jpg')||p.endsWith('.jpeg'))return 'image/jpeg';
+  if(p.endsWith('.png'))return 'image/png';
+  if(p.endsWith('.webp'))return 'image/webp';
+  if(p.endsWith('.gif'))return 'image/gif';
+  if(p.endsWith('.heic'))return 'image/heic';
+  return fallback;
+}
+
 async function api(request,env,url){
   const path=url.pathname, method=request.method;
-  if(path==='/api/health') {try{const r=await env.DB.prepare('SELECT 1 ok').first();return json({ok:r?.ok===1,app:'Chord Rider Pro',database:'connected'});}catch(e){return json({ok:false,error:String(e?.message||e)},500);}}
+  if(path==='/api/health') {try{const r=await env.DB.prepare('SELECT 1 ok').first();return json({ok:r?.ok===1,app:'Song Rider Suite',database:'connected'});}catch(e){return json({ok:false,error:String(e?.message||e)},500);}}
   if(path==='/api/auth/me'&&method==='GET'){const u=await userFor(request,env);return json({ok:true,user:u});}
   if(path==='/api/auth/register'&&method==='POST'){
     const b=await body(request), email=String(b.email||'').trim().toLowerCase(), displayName=String(b.displayName||'').trim().slice(0,80), password=String(b.password||''), invite=String(b.inviteCode||'');
@@ -54,6 +103,71 @@ async function api(request,env,url){
     const salt=b64(crypto.getRandomValues(new Uint8Array(16))),hash=await hashPassword(newP,salt),now=Date.now();await env.DB.batch([env.DB.prepare('UPDATE users SET password_hash=?,password_salt=?,password_iterations=?,updated_at=? WHERE id=?').bind(hash,salt,ITERATIONS,now,u.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(u.id)]);const token=await createSession(u.id,env);return json({ok:true},200,{'Set-Cookie':sessionCookie(token)});
   }
   const u=await userFor(request,env);if(!u)return json({ok:false,error:'Please log in.'},401);
+
+  // Song Rider Pro projects now use the same Song Rider Suite account/session as CRP.
+  if(path==='/api/srp/projects'&&method==='GET'){
+    await ensureSrpSchema(env);
+    const rs=await env.DB.prepare('SELECT owner_user_id,project_id,legacy_user_id,name,data,updated_at,deleted,deleted_at,created_at,last_synced_at FROM srp_projects WHERE owner_user_id=? ORDER BY updated_at DESC').bind(u.id).all();
+    const projects=(rs.results||[]).map(r=>{let data={};try{data=JSON.parse(r.data)}catch{}return {...r,user_id:r.owner_user_id,data,deleted:!!r.deleted};});
+    return json({ok:true,projects});
+  }
+  if(path==='/api/srp/projects'&&method==='POST'){
+    await ensureSrpSchema(env);
+    const b=await body(request), incoming=b.project||{}, dataObj=(incoming.data&&typeof incoming.data==='object')?incoming.data:incoming;
+    const id=String(incoming.project_id||dataObj.id||crypto.randomUUID()), name=String(incoming.name||dataObj.name||'Untitled').trim().slice(0,200)||'Untitled';
+    const updated=Number(incoming.updated_at||dataObj.updatedAt)||Date.now(), synced=String(incoming.last_synced_at||new Date().toISOString());
+    const existing=await env.DB.prepare('SELECT legacy_user_id,created_at FROM srp_projects WHERE owner_user_id=? AND project_id=?').bind(u.id,id).first();
+    const created=existing?.created_at||new Date(Number(dataObj.createdAt)||Date.now()).toISOString();
+    const clean={...dataObj,id,name,updatedAt:updated};
+    await env.DB.prepare(`INSERT INTO srp_projects(owner_user_id,project_id,legacy_user_id,name,data,updated_at,deleted,deleted_at,created_at,last_synced_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(owner_user_id,project_id) DO UPDATE SET
+        name=excluded.name,data=excluded.data,updated_at=excluded.updated_at,deleted=0,deleted_at=NULL,last_synced_at=excluded.last_synced_at`)
+      .bind(u.id,id,existing?.legacy_user_id||null,name,JSON.stringify(clean),updated,0,null,created,synced).run();
+    return json({ok:true,project_id:id,updated_at:updated});
+  }
+  const srpProjectMatch=path.match(/^\/api\/srp\/projects\/([^/]+)$/);
+  if(srpProjectMatch&&method==='DELETE'){
+    await ensureSrpSchema(env);
+    const id=decodeURIComponent(srpProjectMatch[1]), ts=Date.now(), deletedAt=new Date().toISOString();
+    const existing=await env.DB.prepare('SELECT data FROM srp_projects WHERE owner_user_id=? AND project_id=?').bind(u.id,id).first();
+    if(!existing)return json({ok:true});
+    let data={};try{data=JSON.parse(existing.data)}catch{}data={...data,id,deleted:true,updatedAt:ts};
+    await env.DB.prepare('UPDATE srp_projects SET data=?,updated_at=?,deleted=1,deleted_at=?,last_synced_at=? WHERE owner_user_id=? AND project_id=?').bind(JSON.stringify(data),ts,deletedAt,deletedAt,u.id,id).run();
+    return json({ok:true});
+  }
+
+  // Authenticated SRP media gateway. Allows current Suite-owned paths plus migrated legacy Supabase paths for that project only.
+  if(path==='/api/srp/media'){
+    if(!env.AUDIO)return json({ok:false,error:'Song Rider Suite media storage is not connected.'},503);
+    const projectId=String(url.searchParams.get('projectId')||''), key=String(url.searchParams.get('path')||'').replace(/^\/+/, '');
+    if(!projectId||!key)return json({ok:false,error:'projectId and path are required.'},400);
+    const row=await srpRowFor(env,u.id,projectId);
+    if(!row)return json({ok:false,error:'SRP project not found.'},404);
+    if(!srpMediaAllowed(row,u.id,projectId,key))return json({ok:false,error:'Media path is not authorized for this project.'},403);
+    if(method==='PUT'){
+      const buf=await request.arrayBuffer();
+      if(!buf.byteLength)return json({ok:false,error:'Media body is empty.'},400);
+      if(buf.byteLength>100*1024*1024)return json({ok:false,error:'Media file is too large.'},413);
+      const contentType=request.headers.get('Content-Type')||mimeForPath(key);
+      await env.AUDIO.put(key,buf,{httpMetadata:{contentType},customMetadata:{projectId,ownerUserId:u.id,uploadedAt:String(Date.now())}});
+      return json({ok:true,size:buf.byteLength,path:key});
+    }
+    if(method==='GET'){
+      const obj=await env.AUDIO.get(key);
+      if(!obj)return json({ok:false,error:'Media object not found.'},404);
+      const headers=new Headers();obj.writeHttpMetadata(headers);
+      const existingType=String(headers.get('Content-Type')||'');
+      if(!existingType||existingType==='application/octet-stream')headers.set('Content-Type',mimeForPath(key,existingType||'application/octet-stream'));
+      headers.set('Cache-Control','private, max-age=0, no-store');headers.set('Content-Length',String(obj.size));
+      return new Response(obj.body,{status:200,headers});
+    }
+    if(method==='HEAD'){
+      const obj=await env.AUDIO.head(key);if(!obj)return new Response(null,{status:404});
+      return new Response(null,{status:200,headers:{'Content-Length':String(obj.size),'Content-Type':mimeForPath(key)}});
+    }
+    if(method==='DELETE'){await env.AUDIO.delete(key);return json({ok:true});}
+  }
 
   // Cross-device vocal transcription. The browser only records WAV; Cloudflare Workers AI transcribes the R2 master.
   const transcribeMatch=path.match(/^\/api\/transcribe\/([^/]+)$/);
@@ -82,7 +196,7 @@ async function api(request,env,url){
   // Vocal masters live in authenticated R2 object storage, not in D1 project JSON.
   const audioMatch=path.match(/^\/api\/audio\/([^/]+)$/);
   if(audioMatch){
-    if(!env.AUDIO)return json({ok:false,error:'Cloud vocal storage is not connected. Bind the R2 bucket chord-rider-pro-audio to this Worker with binding name AUDIO.'},503);
+    if(!env.AUDIO)return json({ok:false,error:'Cloud vocal storage is not connected. Bind the Song Rider Suite R2 bucket to this Worker with binding name AUDIO.'},503);
     const takeId=decodeURIComponent(audioMatch[1]), projectId=String(url.searchParams.get('projectId')||'');
     if(!projectId)return json({ok:false,error:'projectId is required.'},400);
     const owns=await env.DB.prepare('SELECT id FROM projects WHERE id=? AND user_id=?').bind(projectId,u.id).first();
