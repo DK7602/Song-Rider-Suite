@@ -4715,3 +4715,28 @@ body.workspace-chord-rider .primary-toolbar > .sustain-control{
 }
 /* Cancel legacy phone span assignments now that the edit buttons live in their own 8-column row. */
 #voxCropBtn,#voxSplitBtn,#voxCopyBtn,#voxCutBtn,#voxPasteBtn,#voxDeleteBtn,#voxUndoBtn,#voxRedoBtn{grid-column:auto!important;}
+
+
+/* =========================================================
+   v3.3.43 — mobile sound click-through guard + Multi Select
+   ========================================================= */
+/* A transparent modal hit-layer remains above the setup while the sound menu is
+   open. On touch devices this consumes Android Chrome's trailing compatibility
+   click so a sound tap cannot activate Chord/Note/Build/etc. behind the picker. */
+.instrument-sound-picker-layer{
+  position:fixed!important;
+  inset:0!important;
+  z-index:11990!important;
+  background:transparent!important;
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+}
+.instrument-sound-picker-layer>.instrument-sound-picker{
+  z-index:12000!important;
+}
+.instrument-sound-picker-layer.is-consuming-tap{
+  cursor:default!important;
+}
+/* The mode button is always labelled Multi Select. Its existing gold active
+   treatment is the only mode indicator; when it is off, the ruler alone seeks. */
+.vox-tool-mode-btn{white-space:nowrap!important;}

@@ -920,25 +920,44 @@
     };w.appendChild(b);});
   }
   function renderSound(){const s=$('soundSelect');s.innerHTML='';SOUNDS[state.instrument].forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;s.appendChild(o);});if(!SOUNDS[state.instrument].some(x=>x[0]===state.sound))state.sound=SOUNDS[state.instrument][0][0];s.value=state.sound;}
-  function closeInstrumentSoundPicker(){document.getElementById('crpInstrumentSoundPicker')?.remove();}
+  function closeInstrumentSoundPicker(){
+    document.getElementById('crpInstrumentSoundPickerLayer')?.remove();
+    document.getElementById('crpInstrumentSoundPicker')?.remove();
+  }
   function showInstrumentSoundPicker(anchor,instrument,current,onChoose){
     closeInstrumentSoundPicker();
     const options=SOUNDS[instrument]||SOUNDS.piano;if(!anchor||!options?.length)return;
+    // The full-screen transparent layer is intentional. On Android Chrome a touch
+    // selection can emit a compatibility click *after* pointerup. If the menu is
+    // removed on pointerup, that trailing click lands on whatever control is behind
+    // the menu (Build, Note, etc.). Keep the layer alive just long enough to consume
+    // that click, while hiding the menu immediately after the sound is chosen.
+    const layer=document.createElement('div');layer.id='crpInstrumentSoundPickerLayer';layer.className='instrument-sound-picker-layer';layer.setAttribute('aria-hidden','false');
     const pop=document.createElement('div');pop.id='crpInstrumentSoundPicker';pop.className='instrument-sound-picker';pop.setAttribute('role','menu');pop.setAttribute('aria-label',`${instrument} sounds`);
     const title=document.createElement('strong');title.textContent=`${instrument.charAt(0).toUpperCase()+instrument.slice(1)} Sounds`;pop.appendChild(title);
+    let guardTimer=0;
+    const guardedClose=()=>{clearTimeout(guardTimer);pop.style.visibility='hidden';layer.classList.add('is-consuming-tap');guardTimer=setTimeout(closeInstrumentSoundPicker,420);};
     for(const [value,label] of options){
       const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.sound=value;b.classList.toggle('is-current',String(value)===String(current));b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(String(value)===String(current)));
       let down=null,chosen=false;
-      const choose=e=>{if(chosen)return;chosen=true;e?.preventDefault?.();e?.stopPropagation?.();onChoose?.(value,label);closeInstrumentSoundPicker();};
+      const choose=(e,{guardTouch=false}={})=>{
+        // Always consume the event, including the synthetic click that may follow a
+        // handled touch pointerup. This is what prevents click-through on mobile.
+        e?.preventDefault?.();e?.stopPropagation?.();e?.stopImmediatePropagation?.();
+        if(chosen)return;chosen=true;onChoose?.(value,label);if(guardTouch)guardedClose();else closeInstrumentSoundPicker();
+      };
       b.addEventListener('pointerdown',e=>{down={id:e.pointerId,x:e.clientX,y:e.clientY,type:e.pointerType};},{passive:true});
-      b.addEventListener('pointerup',e=>{if(!down||down.id!==e.pointerId)return;const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y);const touchLike=down.type==='touch'||down.type==='pen';down=null;if(touchLike&&moved<12)choose(e);});
+      b.addEventListener('pointerup',e=>{if(!down||down.id!==e.pointerId)return;const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y);const touchLike=down.type==='touch'||down.type==='pen';down=null;if(touchLike&&moved<14)choose(e,{guardTouch:true});});
       b.addEventListener('pointercancel',()=>{down=null;});
       b.onclick=e=>choose(e);
       pop.appendChild(b);
     }
-    document.body.appendChild(pop);const ar=anchor.getBoundingClientRect(),pr=pop.getBoundingClientRect(),left=Math.max(6,Math.min(window.innerWidth-pr.width-6,ar.left)),top=Math.max(6,Math.min(window.innerHeight-pr.height-6,ar.bottom+6));pop.style.left=`${left}px`;pop.style.top=`${top}px`;
-    const outside=e=>{if(pop.contains(e.target)||anchor.contains(e.target))return;document.removeEventListener('pointerdown',outside,true);closeInstrumentSoundPicker();};setTimeout(()=>document.addEventListener('pointerdown',outside,true),0);
-    pop.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();closeInstrumentSoundPicker();anchor.focus?.();}};
+    layer.appendChild(pop);document.body.appendChild(layer);const ar=anchor.getBoundingClientRect(),pr=pop.getBoundingClientRect(),left=Math.max(6,Math.min(window.innerWidth-pr.width-6,ar.left)),top=Math.max(6,Math.min(window.innerHeight-pr.height-6,ar.bottom+6));pop.style.left=`${left}px`;pop.style.top=`${top}px`;
+    // Taps outside the menu are captured by the layer, so they close the picker
+    // without ever reaching the page underneath it.
+    layer.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();if(e.target===layer)closeInstrumentSoundPicker();});
+    layer.addEventListener('pointerdown',e=>{if(e.target===layer)e.stopPropagation();},true);
+    pop.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeInstrumentSoundPicker();anchor.focus?.();}};
   }
   window.CRPShowSoundPicker=(anchor,instrument,current,onChoose)=>showInstrumentSoundPicker(anchor,instrument,current,onChoose);
   function updateCardViewButton(){
