@@ -1942,6 +1942,7 @@
   function instrumentClickSelection(sel,evEl,e){
     e.stopPropagation();
     if(evEl.__voxDragged){evEl.__voxDragged=false;return;}
+    if((evEl.__voxSuppressClickUntil||0)>performance.now())return;
     if(evEl.__voxPointerSelected){
       evEl.__voxPointerSelected=false;renderVoxSelectionClasses();renderVoxInspector();return;
     }
@@ -2140,31 +2141,41 @@
   function beginVoxInstrumentPointerEdit(e,sel,el,mode='move'){
     sel=resolveVoxInstrumentSelection(sel)||sel;
     if(!sel||e.button!==undefined&&e.button!==0)return;
-    e.preventDefault();e.stopPropagation();
-    const add=voxToolMode==='multi'||e.ctrlKey||e.metaKey||e.shiftKey,wasSelected=voxInstrumentIsSelected(sel.key),selectionOnlyGesture=voxToolMode==='multi'&&mode==='move'&&!wasSelected;
-    if(!wasSelected){
-      setVoxInstrumentSelection(sel,{add,render:false});el.classList.add('is-selected');el.__voxPointerSelected=true;
-    }
-    // Selection must update the toolbar immediately. The old pointer path selected
-    // the block visually but left Delete/Copy/Cut disabled until another click.
-    renderVoxSelectionClasses();renderVoxInspector();
-    const ppb=voxPpb(),pointerId=e.pointerId,startX=e.clientX,startY=e.clientY,orig=Number(sel.startBeat)||0,origDur=Math.max(.001,Number(sel.dur)||.25),origEnd=orig+origDur,minBeat=voxSnapEnabled()?voxBeatStep():.03,touchPointer=e.pointerType==='touch',dragThreshold=touchPointer?(voxToolMode==='multi'?14:10):4;
-    let moved=false,targetInstrumentPart=sel.part,cleaned=false,mutationStarted=false;
-    const startMutation=()=>{if(mutationStarted)return;mutationStarted=true;disableVoxAutoScroll();voxCheckpoint();};
-    const moving=(mode==='move'?voxInstrumentSelectionList():[sel]).map(resolveVoxInstrumentSelection).filter(Boolean),starts=new Map(moving.map(x=>[String(x.key),Number(x.startBeat)||0]));
+    const touchPointer=e.pointerType==='touch',holdToMove=touchPointer&&mode==='move',pointerId=e.pointerId;
+    // Moving an event on touch is deliberately different from resizing it: a normal
+    // swipe must remain a timeline scroll, and only a stationary long-press grabs it.
+    if(holdToMove)e.stopPropagation();else{e.preventDefault();e.stopPropagation();}
+    const add=voxToolMode==='multi'||e.ctrlKey||e.metaKey||e.shiftKey,wasSelected=voxInstrumentIsSelected(sel.key),desktopSelectionOnly=(!touchPointer&&voxToolMode==='multi'&&mode==='move'&&!wasSelected);
+    const selectForEdit=()=>{
+      if(!voxInstrumentIsSelected(sel.key)){setVoxInstrumentSelection(sel,{add,render:false});el.classList.add('is-selected');el.__voxPointerSelected=true;}
+      renderVoxSelectionClasses();renderVoxInspector();
+    };
+    if(!holdToMove)selectForEdit();
+    const ppb=voxPpb(),downX=e.clientX,downY=e.clientY,orig=Number(sel.startBeat)||0,origDur=Math.max(.001,Number(sel.dur)||.25),origEnd=orig+origDur,minBeat=voxSnapEnabled()?voxBeatStep():.03,dragThreshold=touchPointer?6:4;
+    let dragX=downX,dragY=downY,moved=false,targetInstrumentPart=sel.part,cleaned=false,mutationStarted=false,armed=!holdToMove,holdTimer=0,holdCanceled=false,moving=[],starts=new Map();
     const captureEl=e.currentTarget||el;
-    el.classList.add('is-dragging');if(mode!=='move')el.classList.add('is-trimming');
-    try{captureEl.setPointerCapture?.(pointerId)}catch{}
+    const startMutation=()=>{if(mutationStarted)return;mutationStarted=true;disableVoxAutoScroll();voxCheckpoint();};
+    const refreshMoving=()=>{moving=(mode==='move'?voxInstrumentSelectionList():[sel]).map(resolveVoxInstrumentSelection).filter(Boolean);if(!moving.length)moving=[resolveVoxInstrumentSelection(sel)||sel];starts=new Map(moving.map(x=>[String(x.key),Number(x.startBeat)||0]));};
+    const blockTouchScroll=te=>{if(armed&&holdToMove&&te.cancelable)te.preventDefault();};
+    const armTouchMove=()=>{
+      if(cleaned||holdCanceled||armed)return;armed=true;selectForEdit();refreshMoving();dragX=downX;dragY=downY;el.classList.add('is-dragging','is-longpress-grabbed');
+      try{captureEl.setPointerCapture?.(pointerId)}catch{}
+      document.addEventListener('touchmove',blockTouchScroll,{capture:true,passive:false});
+      voxStatus('Event grabbed — drag to move.');
+    };
+    if(holdToMove){holdTimer=setTimeout(armTouchMove,420);}else{refreshMoving();el.classList.add('is-dragging');if(mode!=='move')el.classList.add('is-trimming');try{captureEl.setPointerCapture?.(pointerId)}catch{}}
 
     const move=ev=>{
       if(ev.pointerId!==pointerId)return;
+      if(!armed){
+        if(Math.hypot(ev.clientX-downX,ev.clientY-downY)>10){holdCanceled=true;if(holdTimer){clearTimeout(holdTimer);holdTimer=0;}}
+        return; // leave the browser free to scroll the timeline normally
+      }
       ev.preventDefault();ev.stopPropagation();
-      const distance=Math.hypot(ev.clientX-startX,ev.clientY-startY);if(distance<=dragThreshold)return;
-      // In Multi Select the first gesture on a new clip is selection-only. This keeps
-      // normal tap behavior stable on phones; drag the now-selected clip on the next gesture.
-      if(selectionOnlyGesture)return;
+      const distance=Math.hypot(ev.clientX-dragX,ev.clientY-dragY);if(distance<=dragThreshold)return;
+      if(desktopSelectionOnly)return;
       if(!moved){moved=true;startMutation();}
-      const dx=(ev.clientX-startX)/ppb;
+      const dx=(ev.clientX-dragX)/ppb;
       if(mode==='move'){
         const target=quantizeVoxBeat(orig+dx),delta=target-orig;
         for(const item of moving){
@@ -2202,15 +2213,12 @@
     };
 
     const cleanup=()=>{
-      if(cleaned)return;cleaned=true;
-      window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',up,true);window.removeEventListener('pointercancel',up,true);
+      if(cleaned)return;cleaned=true;if(holdTimer){clearTimeout(holdTimer);holdTimer=0;}
+      window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',up,true);window.removeEventListener('pointercancel',cancel,true);document.removeEventListener('touchmove',blockTouchScroll,true);
       try{captureEl.releasePointerCapture?.(pointerId)}catch{}
-      el.classList.remove('is-dragging','is-trimming');document.querySelectorAll('.vox-instrument-track.is-target').forEach(r=>r.classList.remove('is-target'));
+      el.classList.remove('is-dragging','is-trimming','is-longpress-grabbed');document.querySelectorAll('.vox-instrument-track.is-target').forEach(r=>r.classList.remove('is-target'));
     };
-    const up=ev=>{
-      if(ev.pointerId!==pointerId)return;
-      ev.preventDefault();ev.stopPropagation();cleanup();el.__voxDragged=moved;
-      if(!moved){renderVoxSelectionClasses();renderVoxInspector();return;}
+    const finishMove=()=>{
       const movedSelections=[];
       if(mode==='move')for(const raw of moving){
         const item=resolveVoxInstrumentSelection(raw)||raw,targetBeat=Number(raw.__voxPreviewBeat);delete raw.__voxPreviewBeat;if(!Number.isFinite(targetBeat))continue;
@@ -2241,13 +2249,17 @@
       const loaded=loadedChord();if(loaded)core.apply(loaded.data);
       persistVoxEdits();renderParts();renderVoxBox();voxStatus(mode==='move'?(moving.length>1?`${moving.length} instrument events moved.`:'Instrument event moved.'):'Instrument event resized.');
     };
-    // Document/window capture is substantially more reliable than element-only
-    // pointer listeners on Android Chrome, especially near scrollable timeline edges.
-    window.addEventListener('pointermove',move,{capture:true,passive:false});window.addEventListener('pointerup',up,{capture:true,passive:false});window.addEventListener('pointercancel',up,{capture:true,passive:false});
+    const up=ev=>{
+      if(ev.pointerId!==pointerId)return;
+      if(armed){ev.preventDefault();ev.stopPropagation();}const wasArmed=armed;cleanup();el.__voxDragged=moved;if(holdToMove&&wasArmed&&!moved){el.__voxPointerSelected=false;el.__voxSuppressClickUntil=performance.now()+520;}
+      if(!moved){if(wasArmed){renderVoxSelectionClasses();renderVoxInspector();}return;}finishMove();
+    };
+    const cancel=ev=>{if(ev.pointerId!==pointerId)return;cleanup();if(moved)renderVoxBox();};
+    window.addEventListener('pointermove',move,{capture:true,passive:false});window.addEventListener('pointerup',up,{capture:true,passive:false});window.addEventListener('pointercancel',cancel,{capture:true,passive:true});
   }
 
   function renderVoxSongLocators(){
-    const ppb=voxPpb(),range=songRangeForTimeline(),startEl=$('voxSongStartLocator'),endEl=$('voxSongEndLocator'),fill=$('voxSongRangeFill');if(startEl)startEl.style.left=`${voxLabelWidth()+range.start*ppb}px`;if(endEl)endEl.style.left=`${voxLabelWidth()+range.end*ppb}px`;if(fill){fill.style.left=`${voxLabelWidth()+range.start*ppb}px`;fill.style.width=`${Math.max(2,(range.end-range.start)*ppb)}px`;}
+    const ppb=voxPpb(),range=songRangeForTimeline(),startEl=$('voxSongStartLocator'),endEl=$('voxSongEndLocator'),fill=$('voxSongRangeFill');/* Locators now live inside the sticky ruler layer, whose x=0 is timeline beat 0 (after the title rail). */if(startEl)startEl.style.left=`${range.start*ppb}px`;if(endEl)endEl.style.left=`${range.end*ppb}px`;if(fill){fill.style.left=`${range.start*ppb}px`;fill.style.width=`${Math.max(2,(range.end-range.start)*ppb)}px`;}
   }
   function ensureVoxTimelineVisualBeats(beats){
     const inner=$('voxTimelineInner'),ruler=$('voxRuler'),tracks=$('voxTracks'),ppb=voxPpb(),width=Math.max(720,Math.ceil(Math.max(16,beats)*ppb));if(inner)inner.style.width=`${width}px`;if(ruler)ruler.style.width=`${width}px`;for(const row of tracks?.querySelectorAll?.(':scope > .vox-track-row')||[])row.style.width=`${width}px`;
@@ -2283,7 +2295,7 @@
           const take=voxEventTake(event),bounds=voxEventBounds(event),ev=document.createElement('div');ev.className='vox-event'+(voxIsSelected(part.id,event.id)?' is-selected':'');ev.dataset.voxEventId=event.id;ev.dataset.voxPartId=part.id;ev.style.left=`${bounds.start*ppb}px`;ev.style.width=`${Math.max(24,bounds.dur*ppb)}px`;
           const top=document.createElement('div');top.className='vox-event-top';top.innerHTML=`<span class="vox-event-name">${escapeHtml(take?.name||'Vocal event')}</span><span class="vox-event-time">${bounds.start.toFixed(2)}–${bounds.end.toFixed(2)}b</span>`;
           const canvas=document.createElement('canvas');canvas.className='vox-event-waveform';const lh=document.createElement('span');lh.className='vox-trim-handle left';const rh=document.createElement('span');rh.className='vox-trim-handle right';ev.append(top,canvas,lh,rh);
-          ev.onclick=e=>{e.stopPropagation();if(ev.__voxDragged){ev.__voxDragged=false;return;}if(ev.__voxPointerSelected){ev.__voxPointerSelected=false;renderVoxSelectionClasses();renderVoxInspector();return;}const multi=voxToolMode==='multi',add=multi||e.ctrlKey||e.metaKey||e.shiftKey;voxSetSelection(part,event,{add,toggle:add});renderVoxSelectionClasses();renderVoxInspector();};
+          ev.onclick=e=>{e.stopPropagation();if(ev.__voxDragged){ev.__voxDragged=false;return;}if((ev.__voxSuppressClickUntil||0)>performance.now())return;if(ev.__voxPointerSelected){ev.__voxPointerSelected=false;renderVoxSelectionClasses();renderVoxInspector();return;}const multi=voxToolMode==='multi',add=multi||e.ctrlKey||e.metaKey||e.shiftKey;voxSetSelection(part,event,{add,toggle:add});renderVoxSelectionClasses();renderVoxInspector();};
           ev.onpointerdown=e=>{if(e.target===lh||e.target===rh)return;beginVoxPointerEdit(e,part,event,ev,'move');};lh.onpointerdown=e=>beginVoxPointerEdit(e,part,event,ev,'trim-left');rh.onpointerdown=e=>beginVoxPointerEdit(e,part,event,ev,'trim-right');lane.appendChild(ev);requestAnimationFrame(()=>drawVoxWaveform(canvas,event,token));
         }
         row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
@@ -2295,21 +2307,37 @@
   }
   function findVoxLaneAt(x,y){return document.elementsFromPoint?.(x,y)?.find(el=>el.classList?.contains('vox-track-lane'))||null;}
   function beginVoxPointerEdit(e,part,event,el,mode){
-    if(e.button!==undefined&&e.button!==0)return;e.preventDefault();e.stopPropagation();
-    const add=voxToolMode==='multi'||e.ctrlKey||e.metaKey||e.shiftKey,wasSelected=voxIsSelected(part.id,event.id),selectionOnlyGesture=voxToolMode==='multi'&&mode==='move'&&!wasSelected;if(!wasSelected){voxSetSelection(part,event,{add,render:false});el.classList.add('is-selected');el.__voxPointerSelected=true;}
-    const ppb=voxPpb(),beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92)),startX=e.clientX,startY=e.clientY,origStart=Number(event.startBeat)||0,origTrimStart=Math.max(0,Number(event.trimStartSec)||0),take=voxEventTake(event),full=Math.max(0,Number(take?.duration)||0),origTrimEnd=Math.max(origTrimStart,Math.min(full,Number.isFinite(Number(event.trimEndSec))&&Number(event.trimEndSec)>0?Number(event.trimEndSec):full)),origEndBeat=origStart+(origTrimEnd-origTrimStart)/beatSec,touchPointer=e.pointerType==='touch',dragThreshold=touchPointer?(voxToolMode==='multi'?14:10):4;let targetPartId=part.id,moved=false,mutationStarted=false;
+    if(e.button!==undefined&&e.button!==0)return;
+    const touchPointer=e.pointerType==='touch',holdToMove=touchPointer&&mode==='move',pointerId=e.pointerId;
+    if(holdToMove)e.stopPropagation();else{e.preventDefault();e.stopPropagation();}
+    const add=voxToolMode==='multi'||e.ctrlKey||e.metaKey||e.shiftKey,wasSelected=voxIsSelected(part.id,event.id),desktopSelectionOnly=(!touchPointer&&voxToolMode==='multi'&&mode==='move'&&!wasSelected);
+    const selectForEdit=()=>{if(!voxIsSelected(part.id,event.id)){voxSetSelection(part,event,{add,render:false});el.classList.add('is-selected');el.__voxPointerSelected=true;}renderVoxSelectionClasses();renderVoxInspector();};
+    if(!holdToMove)selectForEdit();
+    const ppb=voxPpb(),beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92)),downX=e.clientX,downY=e.clientY,origStart=Number(event.startBeat)||0,origTrimStart=Math.max(0,Number(event.trimStartSec)||0),take=voxEventTake(event),full=Math.max(0,Number(take?.duration)||0),origTrimEnd=Math.max(origTrimStart,Math.min(full,Number.isFinite(Number(event.trimEndSec))&&Number(event.trimEndSec)>0?Number(event.trimEndSec):full)),origEndBeat=origStart+(origTrimEnd-origTrimStart)/beatSec,dragThreshold=touchPointer?6:4;
+    let dragX=downX,dragY=downY,targetPartId=part.id,moved=false,mutationStarted=false,armed=!holdToMove,holdTimer=0,holdCanceled=false,cleaned=false,selectedAtStart=[],starts=new Map();
+    const canvas=el.querySelector('.vox-event-waveform');
     const startMutation=()=>{if(mutationStarted)return;mutationStarted=true;disableVoxAutoScroll();voxCheckpoint();};
-    const selectedAtStart=mode==='move'?voxSelectionPairs():[{part,event}],starts=new Map(selectedAtStart.map(x=>[`${x.part.id}:${x.event.id}`,Number(x.event.startBeat)||0])),canvas=el.querySelector('.vox-event-waveform');
-    el.classList.add('is-dragging');if(mode!=='move')el.classList.add('is-trimming');try{el.setPointerCapture(e.pointerId)}catch{}
+    const refreshMoving=()=>{selectedAtStart=mode==='move'?voxSelectionPairs():[{part,event}];if(!selectedAtStart.length)selectedAtStart=[{part,event}];starts=new Map(selectedAtStart.map(x=>[`${x.part.id}:${x.event.id}`,Number(x.event.startBeat)||0]));};
+    const blockTouchScroll=te=>{if(armed&&holdToMove&&te.cancelable)te.preventDefault();};
+    const armTouchMove=()=>{if(cleaned||holdCanceled||armed)return;armed=true;selectForEdit();refreshMoving();dragX=downX;dragY=downY;el.classList.add('is-dragging','is-longpress-grabbed');try{el.setPointerCapture(pointerId)}catch{}document.addEventListener('touchmove',blockTouchScroll,{capture:true,passive:false});voxStatus('Event grabbed — drag to move.');};
+    if(holdToMove)holdTimer=setTimeout(armTouchMove,420);else{refreshMoving();el.classList.add('is-dragging');if(mode!=='move')el.classList.add('is-trimming');try{el.setPointerCapture(pointerId)}catch{}}
     const liveCrop=()=>{updateVoxEventReadout(el,event);queueLiveVoxWaveform(canvas,event);};
-    const move=ev=>{ev.preventDefault();const distance=Math.hypot(ev.clientX-startX,ev.clientY-startY);if(distance<=dragThreshold)return;if(selectionOnlyGesture)return;if(!moved){moved=true;startMutation();}const dx=(ev.clientX-startX)/ppb;if(mode==='move'){
+    const move=ev=>{
+      if(ev.pointerId!==pointerId)return;
+      if(!armed){if(Math.hypot(ev.clientX-downX,ev.clientY-downY)>10){holdCanceled=true;if(holdTimer){clearTimeout(holdTimer);holdTimer=0;}}return;}
+      ev.preventDefault();ev.stopPropagation();const distance=Math.hypot(ev.clientX-dragX,ev.clientY-dragY);if(distance<=dragThreshold)return;if(desktopSelectionOnly)return;if(!moved){moved=true;startMutation();}const dx=(ev.clientX-dragX)/ppb;
+      if(mode==='move'){
         const primaryNew=quantizeVoxBeat(origStart+dx),delta=primaryNew-origStart;for(const item of selectedAtStart){const base=starts.get(`${item.part.id}:${item.event.id}`)||0;item.event.startBeat=Math.max(0,Math.round((base+delta)*1000)/1000);const node=document.querySelector(`.vox-event[data-vox-part-id="${CSS.escape(String(item.part.id))}"][data-vox-event-id="${CSS.escape(String(item.event.id))}"]`);if(node){node.style.left=`${item.event.startBeat*ppb}px`;updateVoxEventReadout(node,item.event);}}
         if(selectedAtStart.length===1){const lane=findVoxLaneAt(ev.clientX,ev.clientY);if(lane?.dataset.voxKind==='vocal'&&lane?.dataset.voxPartId)targetPartId=lane.dataset.voxPartId;document.querySelectorAll('.vox-track-row').forEach(r=>r.classList.toggle('is-target',String(r.dataset.voxPartId)===String(targetPartId)));}
       }else if(mode==='trim-left'){const target=quantizeVoxBeat(origStart+dx),delta=(target-origStart)*beatSec,newTrim=Math.max(0,Math.min(origTrimEnd-.03,origTrimStart+delta));event.trimStartSec=newTrim;event.startBeat=Math.max(0,origStart+(newTrim-origTrimStart)/beatSec);const dur=Math.max(.001,(origTrimEnd-newTrim)/beatSec);el.style.left=`${event.startBeat*ppb}px`;el.style.width=`${Math.max(24,dur*ppb)}px`;liveCrop();voxStatus(`Cropping start • ${event.startBeat.toFixed(2)}–${(event.startBeat+dur).toFixed(2)} beats`);
-      }else{const targetEnd=quantizeVoxBeat(origEndBeat+dx),newEnd=Math.max(origTrimStart+.03,Math.min(full,origTrimStart+Math.max(.02,targetEnd-origStart)*beatSec));event.trimEndSec=newEnd;const dur=Math.max(.001,(newEnd-origTrimStart)/beatSec);el.style.width=`${Math.max(24,dur*ppb)}px`;liveCrop();voxStatus(`Cropping end • ${origStart.toFixed(2)}–${(origStart+dur).toFixed(2)} beats`);}};
-    const up=ev=>{try{el.releasePointerCapture(ev.pointerId)}catch{};el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',up);el.removeEventListener('pointercancel',up);el.classList.remove('is-dragging','is-trimming');el.__voxDragged=moved;if(!moved)return;if(mode==='move'&&selectedAtStart.length===1&&String(targetPartId)!==String(part.id)){const dest=parts.find(p=>p.type==='vocal'&&String(p.id)===String(targetPartId));if(dest){part.voxEvents=(part.voxEvents||[]).filter(x=>x.id!==event.id);dest.voxEvents=dest.voxEvents||[];dest.voxEvents.push(event);voxSelections=[{partId:dest.id,eventId:event.id}];voxSelected=voxSelections[0];voxTargetPartId=dest.id;}}persistVoxEdits();renderVoxBox();if(mode!=='move')voxStatus('Crop applied. The original dry take remains untouched.');else voxStatus(selectedAtStart.length>1?`${selectedAtStart.length} vocal events moved together.`:'Vocal event moved.');};
-    el.addEventListener('pointermove',move,{passive:false});el.addEventListener('pointerup',up,{passive:false});el.addEventListener('pointercancel',up,{passive:false});
+      }else{const targetEnd=quantizeVoxBeat(origEndBeat+dx),newEnd=Math.max(origTrimStart+.03,Math.min(full,origTrimStart+Math.max(.02,targetEnd-origStart)*beatSec));event.trimEndSec=newEnd;const dur=Math.max(.001,(newEnd-origTrimStart)/beatSec);el.style.width=`${Math.max(24,dur*ppb)}px`;liveCrop();voxStatus(`Cropping end • ${origStart.toFixed(2)}–${(origStart+dur).toFixed(2)} beats`);}
+    };
+    const cleanup=()=>{if(cleaned)return;cleaned=true;if(holdTimer){clearTimeout(holdTimer);holdTimer=0;}window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',up,true);window.removeEventListener('pointercancel',cancel,true);document.removeEventListener('touchmove',blockTouchScroll,true);try{el.releasePointerCapture(pointerId)}catch{}el.classList.remove('is-dragging','is-trimming','is-longpress-grabbed');document.querySelectorAll('.vox-track-row.is-target').forEach(r=>r.classList.remove('is-target'));};
+    const up=ev=>{if(ev.pointerId!==pointerId)return;if(armed){ev.preventDefault();ev.stopPropagation();}const wasArmed=armed;cleanup();el.__voxDragged=moved;if(holdToMove&&wasArmed&&!moved){el.__voxPointerSelected=false;el.__voxSuppressClickUntil=performance.now()+520;}if(!moved)return;if(mode==='move'&&selectedAtStart.length===1&&String(targetPartId)!==String(part.id)){const dest=parts.find(p=>p.type==='vocal'&&String(p.id)===String(targetPartId));if(dest){part.voxEvents=(part.voxEvents||[]).filter(x=>x.id!==event.id);dest.voxEvents=dest.voxEvents||[];dest.voxEvents.push(event);voxSelections=[{partId:dest.id,eventId:event.id}];voxSelected=voxSelections[0];voxTargetPartId=dest.id;}}persistVoxEdits();renderVoxBox();if(mode!=='move')voxStatus('Crop applied. The original dry take remains untouched.');else voxStatus(selectedAtStart.length>1?`${selectedAtStart.length} vocal events moved together.`:'Vocal event moved.');};
+    const cancel=ev=>{if(ev.pointerId!==pointerId)return;cleanup();if(moved)renderVoxBox();};
+    window.addEventListener('pointermove',move,{capture:true,passive:false});window.addEventListener('pointerup',up,{capture:true,passive:false});window.addEventListener('pointercancel',cancel,{capture:true,passive:true});
   }
+
   function openVoxBox(options={}){
     const allowNoVocals=!!options.allowNoVocals,forceInstrumentals=!!options.forceInstrumentals,fromVocal=!!options.fromVocal,vocals=allVocalParts();if(!vocals.length&&!allowNoVocals){core.status('Add a Vocals part first.');return;}
     // Capture any CRP/BD chord edits before Vox Box becomes the canonical timeline

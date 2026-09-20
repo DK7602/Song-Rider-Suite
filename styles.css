@@ -4773,3 +4773,44 @@ body.workspace-chord-rider .primary-toolbar > .sustain-control{
     -webkit-tap-highlight-color:transparent;
   }
 }
+
+
+/* =========================================================
+   v3.3.48 — sticky song locators + deliberate mobile event grab
+   ========================================================= */
+/* This zero-height layer shares the ruler's sticky top edge. Its children keep
+   their beat-relative x positions while START / FINISH remain reachable during
+   vertical Track Master scrolling. The title rail is still supplied by the
+   timeline-inner padding, so x=0 here is beat 0. */
+.vox-locator-layer{
+  position:sticky!important;
+  top:0!important;
+  z-index:41!important;
+  width:100%!important;
+  min-width:100%!important;
+  height:0!important;
+  overflow:visible!important;
+  pointer-events:none!important;
+}
+.vox-locator-layer .vox-song-range-fill{pointer-events:none!important;}
+.vox-locator-layer .vox-song-locator{pointer-events:auto!important;}
+
+@media(max-width:600px){
+  /* A swipe that begins on an event is a timeline scroll. The JS long-press
+     gate adds is-longpress-grabbed only after a stationary 420 ms hold. */
+  .vox-instrument-event,
+  .vox-event{
+    touch-action:pan-x pan-y!important;
+    -webkit-touch-callout:none!important;
+  }
+  .vox-instrument-event.is-longpress-grabbed,
+  .vox-event.is-longpress-grabbed,
+  .vox-trim-handle{
+    touch-action:none!important;
+  }
+  .vox-instrument-event.is-longpress-grabbed,
+  .vox-event.is-longpress-grabbed{
+    outline:2px solid rgba(241,198,85,.92)!important;
+    outline-offset:1px!important;
+  }
+}
