@@ -3284,7 +3284,7 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
         <div>Cloud Account</div>
         <button id="authCloseBtn" class="authClose" type="button" aria-label="Close">×</button>
       </div>
-      <div id="authStatus" class="authStatus">Sign in so your projects follow you across devices.</div>
+      <div id="authStatus" class="authStatus">Sign in with your Song Rider Suite / Chord Rider Pro cloud account.</div>
 
       <div class="authSignedOut">
         <input id="authEmailInput" class="authField" type="email" placeholder="Email" autocomplete="email" />
@@ -3315,7 +3315,7 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
         </div>
       </div>
 
-      <div class="authHelp">Use the same email and password on any device, and your projects will stay with your account.</div>
+      <div class="authHelp">Uses your Song Rider Suite / Chord Rider Pro cloud account. Your SRP projects and media now sync through Cloudflare.</div>
       <div class="authForgotRow"><button id="authForgotPasswordBtn" class="authLinkBtn" type="button">Forgot Password?</button></div>
     </div>
   </div>
@@ -3326,9 +3326,8 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
   pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf.worker.mjs?v=20";
   window.pdfjsLib = pdfjsLib; // <-- makes your existing app.js code work unchanged
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <!-- cache-buster -->
-<script src="./app.js?v=3.3.28-WIDE-TRACK-MASTER"></script>
+<script src="./app.js?v=3.3.50-CLOUDFLARE-SRP-CUTOVER"></script>
 
 
 <script>

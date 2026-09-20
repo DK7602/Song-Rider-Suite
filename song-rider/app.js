@@ -1820,15 +1820,15 @@ function deleteNotesBackup(projectId){
 
 
 /***********************
-CLOUD SYNC (Supabase)
+CLOUD SYNC (Cloudflare / Song Rider Suite)
 - Local-first app with automatic cloud backup/restore
-- Keeps existing local behavior intact
-- Sync target: public.srp_projects
+- Uses the Suite's existing authenticated Cloudflare account
+- Project target: D1 srp_projects
+- Media target: R2 via authenticated Worker API
 ***********************/
-const SUPABASE_URL = "https://nuezufupwutnuxhkblyi.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im51ZXp1ZnVwd3V0bnV4aGtibHlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDczMTcsImV4cCI6MjA4OTc4MzMxN30.Qqi3BWcBCE1G5Aro_tIh7iMgJejk-Q0fG3EjFyhOVxw";
-const CLOUD_PROJECTS_TABLE = "srp_user_projects";
-const CLOUD_AUDIO_BUCKET = "audio-files";
+const CLOUD_PROVIDER = "cloudflare";
+const CLOUD_SRP_PROJECTS_API = "/api/srp/projects";
+const CLOUD_SRP_MEDIA_API = "/api/srp/media";
 
 const cloud = {
   client: null,
@@ -1853,7 +1853,40 @@ const cloud = {
 };
 
 function canUseCloudSync(){
-  return !!(window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY);
+  return typeof window.fetch === "function";
+}
+
+async function suiteCloudApi(path, options={}){
+  const opts = { credentials:"same-origin", cache:"no-store", ...options };
+  const headers = new Headers(opts.headers || {});
+  if(opts.body && !(opts.body instanceof Blob) && !(opts.body instanceof ArrayBuffer) && !headers.has("Content-Type")){
+    headers.set("Content-Type", "application/json");
+  }
+  opts.headers = headers;
+  const res = await fetch(path, opts);
+  const type = String(res.headers.get("Content-Type") || "").toLowerCase();
+  let payload = null;
+  if(type.includes("application/json")){
+    try{ payload = await res.json(); }catch{}
+  }
+  if(!res.ok || payload?.ok === false){
+    const err = new Error(payload?.error || `Cloud request failed (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
+  return payload || { ok:true };
+}
+
+function cloudMediaProjectId(path, fallback=""){
+  const parts = String(path || "").replace(/^\/+/, "").split("/").filter(Boolean);
+  return String(fallback || parts[1] || "").trim();
+}
+
+function cloudMediaUrl(path, projectId=""){
+  const p = String(path || "").trim();
+  const pid = cloudMediaProjectId(p, projectId);
+  if(!p || !pid) return "";
+  return `${CLOUD_SRP_MEDIA_API}?projectId=${encodeURIComponent(pid)}&path=${encodeURIComponent(p)}`;
 }
 
 function setCloudStatus(kind, extra=""){
@@ -1890,7 +1923,6 @@ function setCloudStatus(kind, extra=""){
 function serializeProjectForCloud(project){
   const normalized = normalizeProject(deepClone(project));
   return {
-    user_id: getAuthUserId(),
     project_id: normalized.id,
     name: String(normalized.name || "Untitled"),
     data: normalized,
@@ -1903,7 +1935,11 @@ function serializeProjectForCloud(project){
 
 function projectFromCloudRow(row){
   if(!row || typeof row !== "object") return null;
-  const data = (row.data && typeof row.data === "object") ? deepClone(row.data) : {};
+  let source = row.data;
+  if(typeof source === "string"){
+    try{ source = JSON.parse(source); }catch{ source = {}; }
+  }
+  const data = (source && typeof source === "object") ? deepClone(source) : {};
   data.id = String(data.id || row.project_id || "");
   if(!data.id) return null;
   if(typeof row.name === "string" && row.name.trim()) data.name = row.name.trim();
@@ -1915,41 +1951,24 @@ function projectFromCloudRow(row){
 
 async function fetchCloudProjects(){
   if(!cloud.client || !getAuthUserId()) return [];
-  const { data, error } = await cloud.client
-    .from(CLOUD_PROJECTS_TABLE)
-    .select("user_id,project_id,name,data,updated_at,deleted,deleted_at")
-    .eq("user_id", getAuthUserId())
-    .order("updated_at", { ascending:false });
-
-  if(error) throw error;
-  return Array.isArray(data) ? data : [];
+  const result = await suiteCloudApi(CLOUD_SRP_PROJECTS_API);
+  return Array.isArray(result?.projects) ? result.projects : [];
 }
 
 async function pushProjectToCloud(project){
   if(!cloud.client || !getAuthUserId() || !project || !project.id) return;
   const row = serializeProjectForCloud(project);
-  const { error } = await cloud.client
-    .from(CLOUD_PROJECTS_TABLE)
-    .upsert(row, { onConflict: "user_id,project_id" });
-  if(error) throw error;
+  await suiteCloudApi(CLOUD_SRP_PROJECTS_API, {
+    method:"POST",
+    body:JSON.stringify({ project: row })
+  });
 }
 
 async function deleteProjectFromCloud(projectId){
   if(!cloud.client || !getAuthUserId() || !projectId) return;
-  const row = {
-    user_id: getAuthUserId(),
-    project_id: String(projectId),
-    name: "",
-    data: { id: String(projectId), deleted: true },
-    updated_at: now(),
-    deleted: true,
-    deleted_at: new Date().toISOString(),
-    last_synced_at: new Date().toISOString()
-  };
-  const { error } = await cloud.client
-    .from(CLOUD_PROJECTS_TABLE)
-    .upsert(row, { onConflict: "user_id,project_id" });
-  if(error) throw error;
+  await suiteCloudApi(`${CLOUD_SRP_PROJECTS_API}/${encodeURIComponent(String(projectId))}`, {
+    method:"DELETE"
+  });
 }
 
 async function mergeCloudIntoLocal(){
@@ -2289,10 +2308,13 @@ async function handleAuthSessionChange(session, reason=""){
   cloud.user = session?.user || null;
 
   if(cloud.user){
-    maybeSeedSignedInScopeFromGuest();
     cloud.ready = true;
     setCloudStatus("syncing");
     try{
+      // Only adopt guest projects when this account has no SRP cloud projects yet.
+      // Migrated/established accounts must never be polluted by a device's guest scratch data.
+      const existingRemote = await fetchCloudProjects();
+      if(!existingRemote.length) maybeSeedSignedInScopeFromGuest();
       await mergeCloudIntoLocal();
       if(seq !== cloud.authChangeSeq) return;
       setCloudStatus("ok");
@@ -2325,21 +2347,13 @@ async function initCloudSync(){
     return;
   }
 
+  // Keep a lightweight provider marker so all existing cloud-ready guards remain intact.
+  cloud.client = { provider:CLOUD_PROVIDER };
+
   try{
-    cloud.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:true }
-    });
-
-    cloud.client.auth.onAuthStateChange((event, session) => {
-      if(event === "PASSWORD_RECOVERY") { setAuthMode("recovery"); openAuthModal("Enter your new password below."); }
-      handleAuthSessionChange(session, event).catch(err => {
-        console.error("Auth state change failed", err);
-      });
-    });
-
-    const { data, error } = await cloud.client.auth.getSession();
-    if(error) throw error;
-    await handleAuthSessionChange(data?.session || null, "init");
+    const result = await suiteCloudApi("/api/auth/me");
+    const user = result?.user || null;
+    await handleAuthSessionChange(user ? { user } : null, "init");
 
     if(!cloud.onlineListenerWired){
       cloud.onlineListenerWired = true;
@@ -2390,8 +2404,11 @@ async function submitAuthSignIn(){
   }
   try{
     setAuthBusy(true, "Signing in…");
-    const { error } = await cloud.client.auth.signInWithPassword({ email, password });
-    if(error) throw error;
+    const result = await suiteCloudApi("/api/auth/login", {
+      method:"POST",
+      body:JSON.stringify({ email, password })
+    });
+    await handleAuthSessionChange(result?.user ? { user:result.user } : null, "SIGNED_IN");
     updateAuthModalUI("Signed in.");
     closeAuthModal();
   }catch(err){
@@ -2409,75 +2426,48 @@ async function submitAuthSignUp(){
     updateAuthModalUI("Enter your email and password.");
     return;
   }
-  if(password.length < 6){
-    updateAuthModalUI("Use a password with at least 6 characters.");
+  if(password.length < 8){
+    updateAuthModalUI("Use a password with at least 8 characters.");
     return;
   }
+
+  const displayName = window.prompt("Display name (optional):", "") ?? "";
+  const inviteCode = window.prompt("Invite code:", "");
+  if(inviteCode === null) return;
+
   try{
     setAuthBusy(true, "Creating account…");
-    const { data, error } = await cloud.client.auth.signUp({ email, password });
-    if(error) throw error;
-    if(data?.session){
-      updateAuthModalUI("Account created and signed in.");
-      closeAuthModal();
-    }else{
-      updateAuthModalUI("Account created. Check your email if Supabase asks for confirmation, then sign in.");
-    }
+    const result = await suiteCloudApi("/api/auth/register", {
+      method:"POST",
+      body:JSON.stringify({ email, password, displayName, inviteCode })
+    });
+    await handleAuthSessionChange(result?.user ? { user:result.user } : null, "SIGNED_UP");
+    updateAuthModalUI("Account created and signed in.");
+    closeAuthModal();
   }catch(err){
-    updateAuthModalUI(err?.message || "Sign-up failed.");
+    updateAuthModalUI(err?.message || "Could not create account.");
   }finally{
     setAuthBusy(false);
   }
 }
 
 async function submitAuthSendReset(){
-  if(!cloud.client) await initCloudSync();
-  const email = String(document.getElementById("authResetEmailInput")?.value || document.getElementById("authEmailInput")?.value || "").trim();
-  if(!email){
-    updateAuthModalUI("Enter your email first.");
-    return;
-  }
-  try{
-    setAuthBusy(true, "Sending reset link…");
-    const redirectTo = `${window.location.origin}${window.location.pathname}`;
-    const { error } = await cloud.client.auth.resetPasswordForEmail(email, { redirectTo });
-    if(error) throw error;
-    updateAuthModalUI("Password reset email sent. Check your inbox.");
-  }catch(err){
-    updateAuthModalUI(err?.message || "Could not send reset email.");
-  }finally{
-    setAuthBusy(false);
-  }
+  // Song Rider Suite account recovery is handled from the main Cloud Account panel.
+  setAuthMode("signin");
+  updateAuthModalUI("Password recovery is handled from the main Song Rider Suite Cloud Account panel.");
 }
 
 async function submitAuthUpdatePassword(){
-  if(!cloud.client) await initCloudSync();
-  const password = String(document.getElementById("authNewPasswordInput")?.value || "");
-  if(password.length < 6){
-    updateAuthModalUI("Use a password with at least 6 characters.");
-    return;
-  }
-  try{
-    setAuthBusy(true, "Updating password…");
-    const { error } = await cloud.client.auth.updateUser({ password });
-    if(error) throw error;
-    const newPass = document.getElementById("authNewPasswordInput");
-    if(newPass) newPass.value = "";
-    setAuthMode("signin");
-    updateAuthModalUI("Password updated. You can sign in now.");
-  }catch(err){
-    updateAuthModalUI(err?.message || "Could not update password.");
-  }finally{
-    setAuthBusy(false);
-  }
+  setAuthMode("signin");
+  updateAuthModalUI("Change your password from the main Song Rider Suite Cloud Account panel.");
 }
 
 async function submitAuthSignOut(){
   if(!cloud.client) return;
   try{
     setAuthBusy(true, "Signing out…");
-    const { error } = await cloud.client.auth.signOut();
-    if(error) throw error;
+    await suiteCloudApi("/api/auth/logout", { method:"POST", body:"{}" });
+    await handleAuthSessionChange(null, "SIGNED_OUT");
     closeAuthModal();
   }catch(err){
     updateAuthModalUI(err?.message || "Sign-out failed.");
@@ -2497,10 +2487,10 @@ function wireAuthModal(){
   });
   document.getElementById("authSignInBtn")?.addEventListener("click", submitAuthSignIn);
   document.getElementById("authSignUpBtn")?.addEventListener("click", submitAuthSignUp);
-  document.getElementById("authForgotPasswordBtn")?.addEventListener("click", () => {
-    setAuthMode("forgot");
-    updateAuthModalUI();
-  });
+  const forgotBtn = document.getElementById("authForgotPasswordBtn");
+  if(forgotBtn) forgotBtn.style.display = "none";
+  const resetWrap = document.getElementById("authResetWrap");
+  if(resetWrap) resetWrap.style.display = "none";
   document.getElementById("authBackToSignInBtn")?.addEventListener("click", () => {
     setAuthMode("signin");
     updateAuthModalUI();
@@ -2906,13 +2896,17 @@ async function uploadRecordingToCloud(rec){
   if(!cloud.client || !cloud.user || !rec || !rec.id || !rec.blob) return null;
   const entry = recordingToManifestEntry(rec);
   const path = entry.path;
-  const options = {
-    upsert: true,
-    contentType: entry.contentType || undefined,
-    cacheControl: "3600"
-  };
-  const { error } = await cloud.client.storage.from(CLOUD_AUDIO_BUCKET).upload(path, rec.blob, options);
-  if(error) throw error;
+  const url = cloudMediaUrl(path, rec.projectId || entry.projectId);
+  if(!url) throw new Error("Cloud audio path is invalid.");
+  const res = await fetch(url, {
+    method:"PUT",
+    credentials:"same-origin",
+    headers:{ "Content-Type": entry.contentType || rec.blob.type || "application/octet-stream" },
+    body:rec.blob
+  });
+  let payload = null;
+  try{ payload = await res.json(); }catch{}
+  if(!res.ok || payload?.ok === false) throw new Error(payload?.error || `Cloud audio upload failed (${res.status})`);
   rec.cloudPath = path;
   rec.contentType = entry.contentType;
   rec.size = entry.size;
@@ -2921,14 +2915,16 @@ async function uploadRecordingToCloud(rec){
 
 async function downloadRecordingFromCloud(entry){
   if(!cloud.client || !cloud.user || !entry?.path) return null;
-  const { data, error } = await cloud.client.storage.from(CLOUD_AUDIO_BUCKET).download(entry.path);
-  if(error){
-    const msg = String(error?.message || error || "").toLowerCase();
-    const missing = msg.includes("object not found") || msg.includes("not found") || String(error?.statusCode || "") === "404";
-    if(missing) return null;
-    throw error;
+  const url = cloudMediaUrl(entry.path, entry.projectId);
+  if(!url) return null;
+  const res = await fetch(url, { credentials:"same-origin", cache:"no-store" });
+  if(res.status === 404) return null;
+  if(!res.ok){
+    let msg = `Cloud audio download failed (${res.status})`;
+    try{ const d = await res.json(); if(d?.error) msg = d.error; }catch{}
+    throw new Error(msg);
   }
-  const blob = data instanceof Blob ? data : new Blob([data], { type: entry.contentType || "audio/mpeg" });
+  const blob = await res.blob();
   return {
     id: String(entry.id),
     projectId: String(entry.projectId || ""),
@@ -2947,8 +2943,14 @@ async function downloadRecordingFromCloud(entry){
 async function removeRecordingFromCloud(entry){
   if(!cloud.client || !cloud.user || !entry?.path) return;
   try{
-    const { error } = await cloud.client.storage.from(CLOUD_AUDIO_BUCKET).remove([entry.path]);
-    if(error) throw error;
+    const url = cloudMediaUrl(entry.path, entry.projectId);
+    if(!url) return;
+    const res = await fetch(url, { method:"DELETE", credentials:"same-origin" });
+    if(!res.ok && res.status !== 404){
+      let msg = `Cloud audio delete failed (${res.status})`;
+      try{ const d = await res.json(); if(d?.error) msg = d.error; }catch{}
+      throw new Error(msg);
+    }
   }catch(err){
     console.warn("Cloud audio remove failed", err);
   }
@@ -13269,12 +13271,17 @@ function noteImageToManifestEntry(rec){
 async function uploadNoteImageToCloud(rec){
   if(!cloud.client || !cloud.user || !rec || !rec.id || !rec.blob) return null;
   const entry = noteImageToManifestEntry(rec);
-  const { error } = await cloud.client.storage.from(CLOUD_AUDIO_BUCKET).upload(entry.path, rec.blob, {
-    upsert: true,
-    contentType: entry.contentType || undefined,
-    cacheControl: "3600"
+  const url = cloudMediaUrl(entry.path, rec.projectId || entry.projectId);
+  if(!url) throw new Error("Cloud note-image path is invalid.");
+  const res = await fetch(url, {
+    method:"PUT",
+    credentials:"same-origin",
+    headers:{ "Content-Type": entry.contentType || rec.blob.type || "application/octet-stream" },
+    body:rec.blob
   });
-  if(error) throw error;
+  let payload = null;
+  try{ payload = await res.json(); }catch{}
+  if(!res.ok || payload?.ok === false) throw new Error(payload?.error || `Cloud note-image upload failed (${res.status})`);
   rec.cloudPath = entry.path;
   rec.contentType = entry.contentType;
   rec.size = entry.size;
@@ -13283,14 +13290,16 @@ async function uploadNoteImageToCloud(rec){
 
 async function downloadNoteImageFromCloud(entry){
   if(!cloud.client || !cloud.user || !entry?.path) return null;
-  const { data, error } = await cloud.client.storage.from(CLOUD_AUDIO_BUCKET).download(entry.path);
-  if(error){
-    const msg = String(error?.message || error || "").toLowerCase();
-    const missing = msg.includes("object not found") || msg.includes("not found") || String(error?.statusCode || "") === "404";
-    if(missing) return null;
-    throw error;
+  const url = cloudMediaUrl(entry.path, entry.projectId);
+  if(!url) return null;
+  const res = await fetch(url, { credentials:"same-origin", cache:"no-store" });
+  if(res.status === 404) return null;
+  if(!res.ok){
+    let msg = `Cloud note-image download failed (${res.status})`;
+    try{ const d = await res.json(); if(d?.error) msg = d.error; }catch{}
+    throw new Error(msg);
   }
-  const blob = data instanceof Blob ? data : new Blob([data], { type: entry.contentType || "image/jpeg" });
+  const blob = await res.blob();
   return {
     id: String(entry.id),
     projectId: String(entry.projectId || ""),
@@ -13307,8 +13316,14 @@ async function downloadNoteImageFromCloud(entry){
 async function removeNoteImageFromCloud(entry){
   if(!cloud.client || !cloud.user || !entry?.path) return;
   try{
-    const { error } = await cloud.client.storage.from(CLOUD_AUDIO_BUCKET).remove([entry.path]);
-    if(error) throw error;
+    const url = cloudMediaUrl(entry.path, entry.projectId);
+    if(!url) return;
+    const res = await fetch(url, { method:"DELETE", credentials:"same-origin" });
+    if(!res.ok && res.status !== 404){
+      let msg = `Cloud note-image delete failed (${res.status})`;
+      try{ const d = await res.json(); if(d?.error) msg = d.error; }catch{}
+      throw new Error(msg);
+    }
   }catch(err){
     console.warn("Cloud note image remove failed", err);
   }
@@ -13960,47 +13975,17 @@ function ensureNotesImageBlockChrome(block){
 
 async function getSignedOrPublicNoteImageUrl(path){
   try{
-    const p = String(path || '').trim();
-    if(!p) return '';
-    if(cloud?.client?.storage?.from){
-      try{
-        const signed = await cloud.client.storage.from(CLOUD_AUDIO_BUCKET).createSignedUrl(p, 60 * 60 * 24 * 7);
-        const signedUrl = String(signed?.data?.signedUrl || '').trim();
-        if(signedUrl) return signedUrl;
-      }catch(err){
-        console.warn('Notes signed url failed', err);
-      }
-      try{
-        const pub = cloud.client.storage.from(CLOUD_AUDIO_BUCKET).getPublicUrl(p);
-        const publicUrl = String(pub?.data?.publicUrl || '').trim();
-        if(publicUrl) return publicUrl;
-      }catch(err){
-        console.warn('Notes public url failed', err);
-      }
-    }
-    const base = String(SUPABASE_URL || '').replace(/\/$/, '');
-    return base && p ? `${base}/storage/v1/object/public/${CLOUD_AUDIO_BUCKET}/${p}` : '';
+    return cloudMediaUrl(path);
   }catch{
-    return '';
+    return "";
   }
 }
 
-
 function getPublicNoteImageUrl(path){
   try{
-    const p = String(path || '').trim();
-    if(!p) return '';
-    if(cloud?.client?.storage?.from){
-      try{
-        const pub = cloud.client.storage.from(CLOUD_AUDIO_BUCKET).getPublicUrl(p);
-        const publicUrl = String(pub?.data?.publicUrl || '').trim();
-        if(publicUrl) return publicUrl;
-      }catch{}
-    }
-    const base = String(SUPABASE_URL || '').replace(/\/$/, '');
-    return (base && p) ? `${base}/storage/v1/object/public/${CLOUD_AUDIO_BUCKET}/${p}` : '';
+    return cloudMediaUrl(path);
   }catch{
-    return '';
+    return "";
   }
 }
 
