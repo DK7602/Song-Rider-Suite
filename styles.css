@@ -4445,3 +4445,29 @@ body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
 .vox-drum-event.is-selected{border-color:#66c6ff!important;box-shadow:0 0 0 2px rgba(102,198,255,.22),0 6px 18px rgba(0,0,0,.35)!important}
 .vox-drum-event .vox-inst-handle{display:block!important;background:rgba(255,255,255,.12)!important}
 @media(max-width:600px){.vox-song-locator span{font-size:.5rem;padding:0 4px}.vox-drum-region-row,.vox-drum-region-row>.vox-track-label{height:86px!important;min-height:86px!important}.vox-drum-event{top:13px!important;height:58px!important;padding:4px 10px!important}}
+
+
+/* =========================================================
+   v3.3.39 — Track Master desktop drum add + title-rail masking + gold title
+   ========================================================= */
+/* Keep the playhead and START/FINISH guide lines in the timeline only. Track
+   title rails are intentionally above those overlays so no vertical guide can
+   draw through track names, M/S buttons, or metadata while horizontally scrolled. */
+.vox-track-row>.vox-track-label,
+.vox-drum-region-row>.vox-track-label{
+  z-index:70!important;
+  background:#11161d!important;
+  isolation:isolate;
+}
+.vox-track-row.is-target>.vox-track-label{background:#15191c!important;}
+
+/* TRACK MASTER uses the existing header box and line-height: only the glyph
+   paint changes, so the brand does not make the header taller. */
+.vox-box-brand strong{
+  color:#f6c84f!important;
+  background:linear-gradient(180deg,#fff3a8 0%,#ffd85a 30%,#e7ad22 62%,#fff0a0 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+  text-shadow:0 1px 0 rgba(92,54,0,.55),0 0 8px rgba(246,200,79,.18);
+}
