@@ -73,9 +73,9 @@
           <button class="seg" data-mode="note">Note</button>
         </div>
 
-        <label class="sound-control">
+        <label class="sound-control legacy-sound-control" aria-hidden="true">
           Sound
-          <select id="soundSelect"></select>
+          <select id="soundSelect" tabindex="-1"></select>
         </label>
 
         <label class="octave-control">
@@ -180,7 +180,7 @@
             <button class="seg" data-lead-instrument="guitar" type="button">Guitar</button>
             <button class="seg" data-lead-instrument="misc" type="button">Misc</button>
           </div>
-          <label class="lead-sound-control">Sound<select id="leadSoundSelect"></select></label>
+          <label class="lead-sound-control legacy-sound-control" aria-hidden="true">Sound<select id="leadSoundSelect" tabindex="-1"></select></label>
           <div class="lead-compact-settings-row" aria-label="Lead grid settings">
             <label class="lead-grid-octave-control">Grid octave<select id="leadGridOctave"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
             <label class="lead-resolution-control">Resolution<select id="leadResolution"><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
@@ -403,25 +403,25 @@
       </header>
 
       <div class="vox-box-tools">
-        <button id="voxAddTrackBtn" type="button">+ Vocal Track</button>
-        <label class="vox-tool-check"><input id="voxShowInstrumentals" type="checkbox"><span>Instrumentals</span></label>
-        <button id="voxCropBtn" type="button">Crop</button>
-        <button id="voxSplitBtn" type="button">Split</button>
-        <button id="voxCopyBtn" type="button">Copy</button>
-        <button id="voxCutBtn" type="button">Cut</button>
-        <button id="voxPasteBtn" type="button" disabled>Paste</button>
-        <button id="voxDeleteBtn" type="button">Delete</button>
-        <button id="voxUndoBtn" type="button" disabled title="Undo Vox Box edit">Undo</button>
-        <button id="voxRedoBtn" type="button" disabled title="Redo Vox Box edit">Redo</button>
+        <div class="vox-edit-button-row" role="toolbar" aria-label="Track Master edit tools">
+          <button id="voxCropBtn" type="button">Crop</button>
+          <button id="voxSplitBtn" type="button">Split</button>
+          <button id="voxCopyBtn" type="button">Copy</button>
+          <button id="voxCutBtn" type="button">Cut</button>
+          <button id="voxPasteBtn" type="button" disabled>Paste</button>
+          <button id="voxDeleteBtn" type="button">Delete</button>
+          <button id="voxUndoBtn" type="button" disabled title="Undo Track Master edit">Undo</button>
+          <button id="voxRedoBtn" type="button" disabled title="Redo Track Master edit">Redo</button>
+        </div>
         <div id="voxHarmonyGuide" class="vox-harmony-guide" aria-live="polite">
           <div><strong>Chords Used</strong><span id="voxChordsUsed">—</span></div>
           <div><strong>Notes that fit</strong><span id="voxNotesFit">—</span></div>
         </div>
-        <span id="voxBoxStatus" class="subtle tiny">Cursor: drag a box to select events. Ruler: click to move the playhead.</span>
+        <span id="voxBoxStatus" class="subtle tiny">Multi-Select: tap/click events to add or remove them from the selection. Tap blank track space to clear.</span>
       </div>
 
       <div id="voxTimelineScroller" class="vox-timeline-scroller">
-        <button id="voxToolModeBtn" class="vox-tool-mode-btn" type="button" aria-pressed="true" title="Cycle Cursor / Playhead">Playhead</button>
+        <button id="voxToolModeBtn" class="vox-tool-mode-btn" type="button" aria-pressed="false" title="Toggle Playhead / Multi-Select">Playhead</button>
         <div id="voxTimelineInner" class="vox-timeline-inner">
           <div id="voxRuler" class="vox-ruler" aria-label="Track Master timeline ruler"></div>
           <div id="voxSongRangeFill" class="vox-song-range-fill" aria-hidden="true"></div>
@@ -485,8 +485,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.39-TRACK-MASTER-DESKTOP-MASK-TITLE"></script>
-  <script src="parts.js?v=3.3.39-TRACK-MASTER-DESKTOP-MASK-TITLE"></script>
-  <script src="beat-maker.js?v=3.3.39-TRACK-MASTER-DESKTOP-MASK-TITLE"></script>
+  <script src="app.js?v=3.3.41-TRACK-MASTER-MULTI-SOUND-PICKER"></script>
+  <script src="parts.js?v=3.3.41-TRACK-MASTER-MULTI-SOUND-PICKER"></script>
+  <script src="beat-maker.js?v=3.3.41-TRACK-MASTER-MULTI-SOUND-PICKER"></script>
 </body>
 </html>

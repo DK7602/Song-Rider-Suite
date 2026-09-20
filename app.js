@@ -920,6 +920,18 @@
     };w.appendChild(b);});
   }
   function renderSound(){const s=$('soundSelect');s.innerHTML='';SOUNDS[state.instrument].forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;s.appendChild(o);});if(!SOUNDS[state.instrument].some(x=>x[0]===state.sound))state.sound=SOUNDS[state.instrument][0][0];s.value=state.sound;}
+  function closeInstrumentSoundPicker(){document.getElementById('crpInstrumentSoundPicker')?.remove();}
+  function showInstrumentSoundPicker(anchor,instrument,current,onChoose){
+    closeInstrumentSoundPicker();
+    const options=SOUNDS[instrument]||SOUNDS.piano;if(!anchor||!options?.length)return;
+    const pop=document.createElement('div');pop.id='crpInstrumentSoundPicker';pop.className='instrument-sound-picker';pop.setAttribute('role','menu');pop.setAttribute('aria-label',`${instrument} sounds`);
+    const title=document.createElement('strong');title.textContent=`${instrument.charAt(0).toUpperCase()+instrument.slice(1)} Sounds`;pop.appendChild(title);
+    for(const [value,label] of options){const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.sound=value;b.classList.toggle('is-current',String(value)===String(current));b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(String(value)===String(current)));b.onclick=e=>{e.preventDefault();e.stopPropagation();onChoose?.(value,label);closeInstrumentSoundPicker();};pop.appendChild(b);}
+    document.body.appendChild(pop);const ar=anchor.getBoundingClientRect(),pr=pop.getBoundingClientRect(),left=Math.max(6,Math.min(window.innerWidth-pr.width-6,ar.left)),top=Math.max(6,Math.min(window.innerHeight-pr.height-6,ar.bottom+6));pop.style.left=`${left}px`;pop.style.top=`${top}px`;
+    const outside=e=>{if(pop.contains(e.target)||anchor.contains(e.target))return;document.removeEventListener('pointerdown',outside,true);closeInstrumentSoundPicker();};setTimeout(()=>document.addEventListener('pointerdown',outside,true),0);
+    pop.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();closeInstrumentSoundPicker();anchor.focus?.();}};
+  }
+  window.CRPShowSoundPicker=(anchor,instrument,current,onChoose)=>showInstrumentSoundPicker(anchor,instrument,current,onChoose);
   function updateCardViewButton(){
     const b=$('midiViewBtn');if(!b)return;
     const midi=state.cardView==='midi';
@@ -1594,7 +1606,7 @@
     $('chordInput').onkeydown=e=>{if(e.key==='Enter')$('buildBtn').click();};
     $('keyInput').oninput=()=>{const key=$('keyInput');key.dataset.autoKey='0';const raw=key.value.trim();scheduleAutoSave();if(!raw){key.dataset.autoKey='1';autoPopulateKeyFromEntry();return;}if(!enteredKey()){$('keyHint').textContent='Enter a key like F, F#m, Bb, or C minor';return;}renderFits();};
     $('keyInput').onkeydown=e=>{if(e.key==='Enter'){$('buildBtn').click();}};
-    document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.onclick=()=>{state.instrument=b.dataset.instrument;localStorage.setItem('crp-last-instrument',state.instrument);state.sound=SOUNDS[state.instrument][0][0];state.player=null;renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();});
+    document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.onclick=()=>{state.instrument=b.dataset.instrument;localStorage.setItem('crp-last-instrument',state.instrument);const opts=SOUNDS[state.instrument]||SOUNDS.piano;if(!opts.some(x=>x[0]===state.sound))state.sound=opts[0][0];state.player=null;renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();showInstrumentSoundPicker(b,state.instrument,state.sound,(value)=>{state.sound=value;state.player=null;renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();});});
     document.querySelectorAll('#modeTabs .seg').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;localStorage.setItem('crp-last-mode',state.mode);renderAll();syncBuildInput();scheduleAutoSave();});
     $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;window.CRPParts?.syncCoreLive?.();scheduleAutoSave();};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:'step'});publishLiveSrpMeta('crp');writeHardSync('crp','step');renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:'step'});publishLiveSrpMeta('crp');writeHardSync('crp','step');renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();};
     $('sustainBtn').onclick=()=>{state.sustain=!state.sustain;localStorage.setItem('crp-sustain',state.sustain?'1':'0');updateSustainButton();window.CRPParts?.syncCoreLive?.();};
