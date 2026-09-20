@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.41-track-master-multi-sound-picker';
+const CACHE = 'song-rider-suite-v3.3.42-mobile-sound-one-line';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
   './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css',

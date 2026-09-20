@@ -926,7 +926,16 @@
     const options=SOUNDS[instrument]||SOUNDS.piano;if(!anchor||!options?.length)return;
     const pop=document.createElement('div');pop.id='crpInstrumentSoundPicker';pop.className='instrument-sound-picker';pop.setAttribute('role','menu');pop.setAttribute('aria-label',`${instrument} sounds`);
     const title=document.createElement('strong');title.textContent=`${instrument.charAt(0).toUpperCase()+instrument.slice(1)} Sounds`;pop.appendChild(title);
-    for(const [value,label] of options){const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.sound=value;b.classList.toggle('is-current',String(value)===String(current));b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(String(value)===String(current)));b.onclick=e=>{e.preventDefault();e.stopPropagation();onChoose?.(value,label);closeInstrumentSoundPicker();};pop.appendChild(b);}
+    for(const [value,label] of options){
+      const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.sound=value;b.classList.toggle('is-current',String(value)===String(current));b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(String(value)===String(current)));
+      let down=null,chosen=false;
+      const choose=e=>{if(chosen)return;chosen=true;e?.preventDefault?.();e?.stopPropagation?.();onChoose?.(value,label);closeInstrumentSoundPicker();};
+      b.addEventListener('pointerdown',e=>{down={id:e.pointerId,x:e.clientX,y:e.clientY,type:e.pointerType};},{passive:true});
+      b.addEventListener('pointerup',e=>{if(!down||down.id!==e.pointerId)return;const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y);const touchLike=down.type==='touch'||down.type==='pen';down=null;if(touchLike&&moved<12)choose(e);});
+      b.addEventListener('pointercancel',()=>{down=null;});
+      b.onclick=e=>choose(e);
+      pop.appendChild(b);
+    }
     document.body.appendChild(pop);const ar=anchor.getBoundingClientRect(),pr=pop.getBoundingClientRect(),left=Math.max(6,Math.min(window.innerWidth-pr.width-6,ar.left)),top=Math.max(6,Math.min(window.innerHeight-pr.height-6,ar.bottom+6));pop.style.left=`${left}px`;pop.style.top=`${top}px`;
     const outside=e=>{if(pop.contains(e.target)||anchor.contains(e.target))return;document.removeEventListener('pointerdown',outside,true);closeInstrumentSoundPicker();};setTimeout(()=>document.addEventListener('pointerdown',outside,true),0);
     pop.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();closeInstrumentSoundPicker();anchor.focus?.();}};

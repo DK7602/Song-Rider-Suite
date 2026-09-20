@@ -4621,3 +4621,97 @@ body.workspace-chord-rider .primary-toolbar > .sustain-control{
 }
 .vox-track-enable{width:100%!important;box-sizing:border-box!important;}
 .vox-box-tools>.vox-harmony-guide{min-width:0!important;}
+
+
+/* =========================================================
+   v3.3.42 — reliable mobile sound taps + compact setup/edit rows
+   ========================================================= */
+.instrument-sound-picker{
+  touch-action:pan-y!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+.instrument-sound-picker>button{
+  touch-action:manipulation!important;
+  -webkit-tap-highlight-color:rgba(241,198,85,.18)!important;
+  user-select:none!important;
+  -webkit-user-select:none!important;
+}
+
+/* CRP and Baby DAW share this setup toolbar.  Instrument tabs own row 1;
+   Chord/Note + Octave + Sustain share row 2 on every workspace. */
+#chordPartControls>.primary-toolbar{
+  grid-template-columns:minmax(0,1fr) 104px 72px!important;
+  align-items:end!important;
+}
+#chordPartControls>.primary-toolbar>#instrumentTabs{
+  grid-column:1/-1!important;
+  grid-row:auto!important;
+  width:100%!important;
+  min-width:0!important;
+}
+#chordPartControls>.primary-toolbar>#modeTabs{
+  grid-column:1!important;
+  grid-row:auto!important;
+  width:100%!important;
+  min-width:0!important;
+}
+#chordPartControls>.primary-toolbar>.octave-control{
+  grid-column:2!important;
+  width:104px!important;
+  min-width:104px!important;
+  justify-self:end!important;
+}
+#chordPartControls>.primary-toolbar>.sustain-control{
+  grid-column:3!important;
+  width:72px!important;
+  min-width:72px!important;
+  justify-self:end!important;
+}
+#chordPartControls>.primary-toolbar>.capo-shape-mode-row{grid-column:1/-1!important;}
+@media(max-width:390px){
+  #chordPartControls>.primary-toolbar{
+    grid-template-columns:minmax(0,1fr) 88px 58px!important;
+    gap:7px!important;
+  }
+  #chordPartControls>.primary-toolbar>#modeTabs .seg{padding-left:7px!important;padding-right:7px!important;font-size:.9rem!important;}
+  #chordPartControls>.primary-toolbar>.octave-control{width:88px!important;min-width:88px!important;}
+  #chordPartControls>.primary-toolbar>.sustain-control{width:58px!important;min-width:58px!important;}
+  #chordPartControls>.primary-toolbar>.octave-control .stepper{min-width:0!important;width:88px!important;}
+  #chordPartControls>.primary-toolbar>.sustain-control .sustain-btn{min-width:58px!important;width:58px!important;padding-left:4px!important;padding-right:4px!important;}
+}
+
+/* Track Master edit controls: never wrap on phones.  The labels are deliberately
+   compact so all 8 actions remain visible without horizontal scrolling. */
+.vox-edit-button-row{
+  display:grid!important;
+  grid-template-columns:repeat(8,minmax(0,1fr))!important;
+  grid-auto-flow:column!important;
+  gap:4px!important;
+  width:100%!important;
+  min-width:0!important;
+  overflow:visible!important;
+}
+.vox-edit-button-row>button{
+  grid-column:auto!important;
+  min-width:0!important;
+  width:100%!important;
+  max-width:none!important;
+  min-height:32px!important;
+  padding:4px 2px!important;
+  margin:0!important;
+  font-size:.68rem!important;
+  line-height:1!important;
+  letter-spacing:-.015em!important;
+  white-space:nowrap!important;
+}
+@media(max-width:600px){
+  .vox-box-tools{padding-left:5px!important;padding-right:5px!important;}
+  .vox-edit-button-row{gap:2px!important;}
+  .vox-edit-button-row>button{min-height:30px!important;padding:3px 0!important;font-size:.56rem!important;letter-spacing:-.035em!important;}
+}
+@media(max-width:370px){
+  .vox-edit-button-row>button{font-size:.52rem!important;}
+}
+/* Cancel legacy phone span assignments now that the edit buttons live in their own 8-column row. */
+#voxCropBtn,#voxSplitBtn,#voxCopyBtn,#voxCutBtn,#voxPasteBtn,#voxDeleteBtn,#voxUndoBtn,#voxRedoBtn{grid-column:auto!important;}
