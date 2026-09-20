@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "chord-rider-pro-srp-test",
+  "name": "song-rider-suite",
   "main": "worker.js",
   "compatibility_date": "2026-09-11",
 
@@ -13,8 +13,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "chord-rider-pro-db",
-      "database_id": "623e5268-36b0-4046-b302-9c305588dccb"
+      "database_name": "song-rider-suite-prod-db",
+      "database_id": "a18a9b04-6c18-48f3-8af4-031649df873b"
     }
   ],
 
@@ -25,7 +25,7 @@
   "r2_buckets": [
     {
       "binding": "AUDIO",
-      "bucket_name": "chord-rider-pro-audio"
+      "bucket_name": "song-rider-suite-prod-audio"
     }
   ]
 }
