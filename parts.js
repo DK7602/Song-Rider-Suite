@@ -1574,7 +1574,7 @@
   function voxTimelineBeats(){const natural=Math.max(0,naturalSongDurationBeats()),maxEvent=Math.max(0,...allVocalParts().flatMap(p=>voxTrackEvents(p).map(e=>(Number(e.startBeat)||0)+voxEventDurationBeats(e)))),range=songRangeForTimeline(),drumEnd=drumEvents.length?Math.max(...drumEvents.map(e=>(Number(e.startBeat)||0)+(Number(e.durationBeats)||0))):0;return Math.max(16,Math.ceil((Math.max(natural,maxEvent,drumEnd,range.end,voxPlayheadBeat+1)+4)/4)*4);}
   function voxStatus(msg){if($('voxBoxStatus'))$('voxBoxStatus').textContent=msg||'';}
   function persistVoxEdits(){markPartsDirty();playbackTotalBeats=mediaDurationBeats();renderSongEndEditor();const a=active();if(a?.type==='lead')renderLeadEditor(a);else if(a?.type==='vocal')renderVocalEditor(a);core.scheduleAutoSave();core.flushAutoSaveNow?.();}
-  // v3.3.46 — keep destructive Track Master edits visually immediate on phones.
+  // v3.3.47 — keep destructive Track Master edits visually immediate on phones.
   // The first frame removes the event; heavier editor refresh/autosave runs after paint.
   let voxDeferredPersistSeq=0;
   function persistVoxEditsAfterPaint({renderPartsToo=false}={}){
@@ -1696,7 +1696,12 @@
   function setVoxInstrumentSelection(sel,{add=false,toggle=false,render=true}={}){
     if(voxToolMode!=='multi'){voxSelections=[];voxSelected=null;}
     if(!sel){voxInstrumentSelections=[];voxInstrumentSelection=null;if(render){renderVoxSelectionClasses();renderVoxInspector();}return;}
-    voxInstrumentTrackFocus={kind:sel.kind||'instrument',name:sel.kind==='drum'?'Drums':(sel.part?.name||'Instrument'),key:sel.kind==='drum'?'drum-map':(sel.part?.id?`part:${sel.part.id}`:null)};
+    // v3.3.47 — event selection and the gold paste/drop target are separate states.
+    // In Multi Select, tapping clips must not steal an explicitly tapped destination row.
+    // With no explicit destination, keep a lightweight implicit focus on the clip's own row.
+    if(!(voxToolMode==='multi'&&voxInstrumentTrackFocus?.explicitTarget===true)){
+      voxInstrumentTrackFocus={kind:sel.kind||'instrument',name:sel.kind==='drum'?'Drums':(sel.part?.name||'Instrument'),key:sel.kind==='drum'?'drum-map':(sel.part?.id?`part:${sel.part.id}`:null),explicitTarget:false};
+    }
     const exists=voxInstrumentIsSelected(sel.key);
     if(toggle&&exists)voxInstrumentSelections=voxInstrumentSelections.filter(x=>String(x.key)!==String(sel.key));
     else if(add){if(!exists)voxInstrumentSelections.push(sel);}
@@ -1746,7 +1751,9 @@
   }
   function focusVoxInstrumentTrack(kind,name,key=null,{announce=false}={}){
     voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;
-    voxInstrumentTrackFocus={kind:kind||'instrument',name:name||'Instrument',key:key||null};
+    // A direct tap on a row is an explicit paste/drop destination. Keep that target
+    // sticky while Multi Select clips are chosen elsewhere.
+    voxInstrumentTrackFocus={kind:kind||'instrument',name:name||'Instrument',key:key||null,explicitTarget:true};
     renderVoxSelectionClasses();syncVoxTrackFocusClasses();renderVoxInspector();
     if(announce)voxStatus(`${name||'Instrument'} selected — Paste and drag/drop will target this track.`);
   }
@@ -1876,12 +1883,12 @@
   }
   function destinationInstrumentPartForClip(clip){
     const kind=clip?.kind;if(!['chord','lead'].includes(kind))return null;const tracks=instrumentPartsForKind(kind),focus=focusedInstrumentPart(kind),focusAny=focusedMelodicInstrumentPart(),source=parts.find(x=>x.type===(kind==='chord'?'chord':'lead')&&String(x.id)===String(clip?.sourcePartId))||null;
-    // A deliberately tapped Track Master row always wins as the paste target. Same-type
-    // tracks preserve multi-track offsets; Chord/Note <-> Lead/Bass uses a safe MIDI-note
-    // conversion so mobile users can actually move/copy material between those track types.
-    const focusChanged=String(voxInstrumentTrackFocus?.key||'')!==String(voxClipboard?.focusKeyAtCopy||'');
-    if(focusChanged&&focusAny&&focusAny.type!==(kind==='chord'?'chord':'lead'))return focusAny;
-    if(focusChanged&&focus&&tracks.length){const base=tracks.indexOf(focus),offset=Number(clip.trackOffset)||0;return tracks[Math.max(0,Math.min(tracks.length-1,base+offset))]||focus;}
+    // v3.3.47 — only a row the user explicitly tapped is a destination override.
+    // Event selection itself no longer changes the destination, so copying several clips
+    // cannot silently redirect Paste back to the source row.
+    const explicit=voxInstrumentTrackFocus?.explicitTarget===true;
+    if(explicit&&focusAny&&focusAny.type!==(kind==='chord'?'chord':'lead'))return focusAny;
+    if(explicit&&focus&&tracks.length){const base=tracks.indexOf(focus),offset=Number(clip.trackOffset)||0;return tracks[Math.max(0,Math.min(tracks.length-1,base+offset))]||focus;}
     return source||tracks[0]||focusAny||null;
   }
   function reorderChordCardToBeat(part,card,targetBeat){
@@ -1889,7 +1896,7 @@
     flat.splice(old,1);let beat=0,idx=flat.length;for(let i=0;i<flat.length;i++){const dur=core.cardDurationBeats?.(flat[i],core.beats)||core.beats;if(targetBeat<beat+dur/2){idx=i;break;}beat+=dur;}flat.splice(idx,0,card);let pos=0;part.data.rows=lengths.map(len=>{const r=flat.slice(pos,pos+len);pos+=len;return r;});
   }
   function addBlankDrumEventAt(beat){
-    drumArrangementInitialized=true;voxCheckpoint();const start=Math.max(0,quantizeVoxBeat(beat)),event=normalizeDrumEvent({id:uid(),startBeat:start,durationBeats:4,patternOffsetBeats:0,pattern:blankDrumPattern()});drumEvents.push(event);drumEvents.sort((a,b)=>a.startBeat-b.startBeat);const sel={kind:'drum',key:`drum:${event.id}`,event,startBeat:event.startBeat,dur:event.durationBeats,name:'Drums'};voxInstrumentSelections=[sel];voxInstrumentSelection=sel;voxInstrumentTrackFocus={kind:'drum',name:'Drums',key:'drum-map'};persistVoxEdits();renderVoxBox();voxStatus(`Empty 4-beat drum region added at beat ${start.toFixed(2)}. Double-tap the region to edit its pattern.`);
+    drumArrangementInitialized=true;voxCheckpoint();const start=Math.max(0,quantizeVoxBeat(beat)),event=normalizeDrumEvent({id:uid(),startBeat:start,durationBeats:4,patternOffsetBeats:0,pattern:blankDrumPattern()});drumEvents.push(event);drumEvents.sort((a,b)=>a.startBeat-b.startBeat);const sel={kind:'drum',key:`drum:${event.id}`,event,startBeat:event.startBeat,dur:event.durationBeats,name:'Drums'};voxInstrumentSelections=[sel];voxInstrumentSelection=sel;voxInstrumentTrackFocus={kind:'drum',name:'Drums',key:'drum-map',explicitTarget:true};persistVoxEdits();renderVoxBox();voxStatus(`Empty 4-beat drum region added at beat ${start.toFixed(2)}. Double-tap the region to edit its pattern.`);
   }
   function openDrumEventEditor(sel){
     const live=resolveVoxInstrumentSelection(sel);if(!live?.event||!window.CRPBeatMaker?.editBeatEvent)return;setVoxInstrumentSelection(live);window.CRPBeatMaker.editBeatEvent(live.event.pattern,{onCommit:pattern=>{const ev=drumEvents.find(x=>String(x.id)===String(live.event.id));if(!ev)return;ev.pattern=clone(pattern);markPartsDirty();core.scheduleAutoSave();},onClose:()=>{persistVoxEdits();renderVoxBox();voxStatus('Drum region pattern updated.');}});
@@ -2134,14 +2141,14 @@
     sel=resolveVoxInstrumentSelection(sel)||sel;
     if(!sel||e.button!==undefined&&e.button!==0)return;
     e.preventDefault();e.stopPropagation();
-    const add=voxToolMode==='multi'||e.ctrlKey||e.metaKey||e.shiftKey;
-    if(!voxInstrumentIsSelected(sel.key)){
+    const add=voxToolMode==='multi'||e.ctrlKey||e.metaKey||e.shiftKey,wasSelected=voxInstrumentIsSelected(sel.key),selectionOnlyGesture=voxToolMode==='multi'&&mode==='move'&&!wasSelected;
+    if(!wasSelected){
       setVoxInstrumentSelection(sel,{add,render:false});el.classList.add('is-selected');el.__voxPointerSelected=true;
     }
     // Selection must update the toolbar immediately. The old pointer path selected
     // the block visually but left Delete/Copy/Cut disabled until another click.
     renderVoxSelectionClasses();renderVoxInspector();
-    const ppb=voxPpb(),pointerId=e.pointerId,startX=e.clientX,startY=e.clientY,orig=Number(sel.startBeat)||0,origDur=Math.max(.001,Number(sel.dur)||.25),origEnd=orig+origDur,minBeat=voxSnapEnabled()?voxBeatStep():.03;
+    const ppb=voxPpb(),pointerId=e.pointerId,startX=e.clientX,startY=e.clientY,orig=Number(sel.startBeat)||0,origDur=Math.max(.001,Number(sel.dur)||.25),origEnd=orig+origDur,minBeat=voxSnapEnabled()?voxBeatStep():.03,touchPointer=e.pointerType==='touch',dragThreshold=touchPointer?(voxToolMode==='multi'?14:10):4;
     let moved=false,targetInstrumentPart=sel.part,cleaned=false,mutationStarted=false;
     const startMutation=()=>{if(mutationStarted)return;mutationStarted=true;disableVoxAutoScroll();voxCheckpoint();};
     const moving=(mode==='move'?voxInstrumentSelectionList():[sel]).map(resolveVoxInstrumentSelection).filter(Boolean),starts=new Map(moving.map(x=>[String(x.key),Number(x.startBeat)||0]));
@@ -2152,7 +2159,11 @@
     const move=ev=>{
       if(ev.pointerId!==pointerId)return;
       ev.preventDefault();ev.stopPropagation();
-      const distance=Math.hypot(ev.clientX-startX,ev.clientY-startY);if(distance<=4)return;if(!moved){moved=true;startMutation();}
+      const distance=Math.hypot(ev.clientX-startX,ev.clientY-startY);if(distance<=dragThreshold)return;
+      // In Multi Select the first gesture on a new clip is selection-only. This keeps
+      // normal tap behavior stable on phones; drag the now-selected clip on the next gesture.
+      if(selectionOnlyGesture)return;
+      if(!moved){moved=true;startMutation();}
       const dx=(ev.clientX-startX)/ppb;
       if(mode==='move'){
         const target=quantizeVoxBeat(orig+dx),delta=target-orig;
@@ -2206,25 +2217,25 @@
         if(item.kind==='lead'&&item.part&&item.event){
           const src=item.part,dst=(targetInstrumentPart&&['chord','lead'].includes(targetInstrumentPart.type)?targetInstrumentPart:src),dur=leadEventDurationBeats(src,item.event);
           if(dst.type==='chord'&&dst!==src){
-            const clip={kind:'lead',sourcePartId:src.id,event:clone(item.event)},made=pasteOneInstrumentClip(clip,targetBeat,dst);if(made){removeInstrumentSelectionNoCheckpoint([item]);movedSelections.push(made);voxInstrumentTrackFocus={kind:'chord',name:dst.name,key:`part:${dst.id}`};}
+            const clip={kind:'lead',sourcePartId:src.id,event:clone(item.event)},made=pasteOneInstrumentClip(clip,targetBeat,dst);if(made){removeInstrumentSelectionNoCheckpoint([item]);movedSelections.push(made);voxInstrumentTrackFocus={kind:'chord',name:dst.name,key:`part:${dst.id}`,explicitTarget:true};}
           }else{
             if(dst!==src)src.events=(src.events||[]).filter(x=>x!==item.event&&String(x.voxId||'')!==String(item.event.voxId||''));
             const dstStepBeats=4/Math.max(8,Number(dst.resolution)||16),newEvent=item.event;if(!newEvent.voxId)newEvent.voxId=uid();
             newEvent.voxStartBeat=targetBeat;newEvent.voxDurationBeats=dur;newEvent.step=Math.max(0,Math.round(targetBeat/dstStepBeats));newEvent.durationSteps=Math.max(1,Math.round(dur/dstStepBeats));
             dst.events=normalizeLeadEvents(dst===src?(dst.events||[]):[...(dst.events||[]),newEvent]);const stored=(dst.events||[]).find(x=>String(x.voxId||'')===String(newEvent.voxId||''))||newEvent;
             movedSelections.push({kind:'lead',key:`lead:${dst.id}:${stored.voxId}`,part:dst,event:stored,startBeat:leadEventStartBeat(dst,stored),dur:leadEventDurationBeats(dst,stored)});
-            if(dst!==src)voxInstrumentTrackFocus={kind:'lead',name:dst.name,key:`part:${dst.id}`};
+            if(dst!==src)voxInstrumentTrackFocus={kind:'lead',name:dst.name,key:`part:${dst.id}`,explicitTarget:true};
           }
         }else if(item.kind==='chord'&&item.part&&item.card){
           const src=item.part,dst=(targetInstrumentPart&&['chord','lead'].includes(targetInstrumentPart.type)?targetInstrumentPart:src),card=item.card;if(!card.voxId)card.voxId=uid();
           if(dst.type==='lead'&&dst!==src){
-            const clip={kind:'chord',sourcePartId:src.id,card:clone(card)},made=pasteOneInstrumentClip(clip,targetBeat,dst);if(made){removeInstrumentSelectionNoCheckpoint([item]);movedSelections.push(made);voxInstrumentTrackFocus={kind:'lead',name:dst.name,key:`part:${dst.id}`};}
+            const clip={kind:'chord',sourcePartId:src.id,card:clone(card)},made=pasteOneInstrumentClip(clip,targetBeat,dst);if(made){removeInstrumentSelectionNoCheckpoint([item]);movedSelections.push(made);voxInstrumentTrackFocus={kind:'lead',name:dst.name,key:`part:${dst.id}`,explicitTarget:true};}
           }else{
-            if(dst!==src){removeChordCardFromPart(src,card);insertChordCardIntoPart(dst,card,targetBeat);voxInstrumentTrackFocus={kind:'chord',name:dst.name,key:`part:${dst.id}`};}
+            if(dst!==src){removeChordCardFromPart(src,card);insertChordCardIntoPart(dst,card,targetBeat);voxInstrumentTrackFocus={kind:'chord',name:dst.name,key:`part:${dst.id}`,explicitTarget:true};}
             else{card.voxStartBeat=targetBeat;if(!Number.isFinite(Number(card.voxDurationBeats)))card.voxDurationBeats=Math.max(.001,Number(item.dur)||chordEventDurationBeats(src,card));card.durationBeats=card.voxDurationBeats;}
             movedSelections.push({kind:'chord',key:`chord:${dst.id}:${card.voxId}`,part:dst,card,startBeat:targetBeat,dur:chordEventDurationBeats(dst,card)});
           }
-        }else if(item.kind==='drum'&&item.event){item.event.startBeat=targetBeat;movedSelections.push({kind:'drum',key:`drum:${item.event.id}`,event:item.event,startBeat:targetBeat,dur:item.event.durationBeats,name:'Drums'});voxInstrumentTrackFocus={kind:'drum',name:'Drums',key:'drum-map'};}
+        }else if(item.kind==='drum'&&item.event){item.event.startBeat=targetBeat;movedSelections.push({kind:'drum',key:`drum:${item.event.id}`,event:item.event,startBeat:targetBeat,dur:item.event.durationBeats,name:'Drums'});voxInstrumentTrackFocus={kind:'drum',name:'Drums',key:'drum-map',explicitTarget:true};}
       }
       if(mode==='move'&&movedSelections.length){voxInstrumentSelections=movedSelections;voxInstrumentSelection=movedSelections[0]||null;}
       const loaded=loadedChord();if(loaded)core.apply(loaded.data);
@@ -2285,13 +2296,13 @@
   function findVoxLaneAt(x,y){return document.elementsFromPoint?.(x,y)?.find(el=>el.classList?.contains('vox-track-lane'))||null;}
   function beginVoxPointerEdit(e,part,event,el,mode){
     if(e.button!==undefined&&e.button!==0)return;e.preventDefault();e.stopPropagation();
-    const add=voxToolMode==='multi'||e.ctrlKey||e.metaKey||e.shiftKey;if(!voxIsSelected(part.id,event.id)){voxSetSelection(part,event,{add,render:false});el.classList.add('is-selected');el.__voxPointerSelected=true;}
-    const ppb=voxPpb(),beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92)),startX=e.clientX,startY=e.clientY,origStart=Number(event.startBeat)||0,origTrimStart=Math.max(0,Number(event.trimStartSec)||0),take=voxEventTake(event),full=Math.max(0,Number(take?.duration)||0),origTrimEnd=Math.max(origTrimStart,Math.min(full,Number.isFinite(Number(event.trimEndSec))&&Number(event.trimEndSec)>0?Number(event.trimEndSec):full)),origEndBeat=origStart+(origTrimEnd-origTrimStart)/beatSec;let targetPartId=part.id,moved=false,mutationStarted=false;
+    const add=voxToolMode==='multi'||e.ctrlKey||e.metaKey||e.shiftKey,wasSelected=voxIsSelected(part.id,event.id),selectionOnlyGesture=voxToolMode==='multi'&&mode==='move'&&!wasSelected;if(!wasSelected){voxSetSelection(part,event,{add,render:false});el.classList.add('is-selected');el.__voxPointerSelected=true;}
+    const ppb=voxPpb(),beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92)),startX=e.clientX,startY=e.clientY,origStart=Number(event.startBeat)||0,origTrimStart=Math.max(0,Number(event.trimStartSec)||0),take=voxEventTake(event),full=Math.max(0,Number(take?.duration)||0),origTrimEnd=Math.max(origTrimStart,Math.min(full,Number.isFinite(Number(event.trimEndSec))&&Number(event.trimEndSec)>0?Number(event.trimEndSec):full)),origEndBeat=origStart+(origTrimEnd-origTrimStart)/beatSec,touchPointer=e.pointerType==='touch',dragThreshold=touchPointer?(voxToolMode==='multi'?14:10):4;let targetPartId=part.id,moved=false,mutationStarted=false;
     const startMutation=()=>{if(mutationStarted)return;mutationStarted=true;disableVoxAutoScroll();voxCheckpoint();};
     const selectedAtStart=mode==='move'?voxSelectionPairs():[{part,event}],starts=new Map(selectedAtStart.map(x=>[`${x.part.id}:${x.event.id}`,Number(x.event.startBeat)||0])),canvas=el.querySelector('.vox-event-waveform');
     el.classList.add('is-dragging');if(mode!=='move')el.classList.add('is-trimming');try{el.setPointerCapture(e.pointerId)}catch{}
     const liveCrop=()=>{updateVoxEventReadout(el,event);queueLiveVoxWaveform(canvas,event);};
-    const move=ev=>{ev.preventDefault();const distance=Math.hypot(ev.clientX-startX,ev.clientY-startY);if(distance<=4)return;if(!moved){moved=true;startMutation();}const dx=(ev.clientX-startX)/ppb;if(mode==='move'){
+    const move=ev=>{ev.preventDefault();const distance=Math.hypot(ev.clientX-startX,ev.clientY-startY);if(distance<=dragThreshold)return;if(selectionOnlyGesture)return;if(!moved){moved=true;startMutation();}const dx=(ev.clientX-startX)/ppb;if(mode==='move'){
         const primaryNew=quantizeVoxBeat(origStart+dx),delta=primaryNew-origStart;for(const item of selectedAtStart){const base=starts.get(`${item.part.id}:${item.event.id}`)||0;item.event.startBeat=Math.max(0,Math.round((base+delta)*1000)/1000);const node=document.querySelector(`.vox-event[data-vox-part-id="${CSS.escape(String(item.part.id))}"][data-vox-event-id="${CSS.escape(String(item.event.id))}"]`);if(node){node.style.left=`${item.event.startBeat*ppb}px`;updateVoxEventReadout(node,item.event);}}
         if(selectedAtStart.length===1){const lane=findVoxLaneAt(ev.clientX,ev.clientY);if(lane?.dataset.voxKind==='vocal'&&lane?.dataset.voxPartId)targetPartId=lane.dataset.voxPartId;document.querySelectorAll('.vox-track-row').forEach(r=>r.classList.toggle('is-target',String(r.dataset.voxPartId)===String(targetPartId)));}
       }else if(mode==='trim-left'){const target=quantizeVoxBeat(origStart+dx),delta=(target-origStart)*beatSec,newTrim=Math.max(0,Math.min(origTrimEnd-.03,origTrimStart+delta));event.trimStartSec=newTrim;event.startBeat=Math.max(0,origStart+(newTrim-origTrimStart)/beatSec);const dur=Math.max(.001,(origTrimEnd-newTrim)/beatSec);el.style.left=`${event.startBeat*ppb}px`;el.style.width=`${Math.max(24,dur*ppb)}px`;liveCrop();voxStatus(`Cropping start • ${event.startBeat.toFixed(2)}–${(event.startBeat+dur).toFixed(2)} beats`);
@@ -2374,7 +2385,7 @@
     return null;
   }
   function pasteInstrument(){
-    const clip=voxClipboard;if(!clip||!['instrument-group'].includes(clip.kind))return false;voxCheckpoint();const chosenFocus=focusedMelodicInstrumentPart(),newSel=[];for(const item of clip.items||[]){const dest=destinationInstrumentPartForClip(item),s=pasteOneInstrumentClip(item,voxPlayheadBeat+(Number(item.deltaBeat)||0),dest);if(s)newSel.push(s);}voxInstrumentSelections=newSel;voxInstrumentSelection=newSel[0]||null;voxSelections=[];voxSelected=null;if(chosenFocus)voxInstrumentTrackFocus={kind:chosenFocus.type==='chord'?'chord':'lead',name:chosenFocus.name,key:`part:${chosenFocus.id}`};else if(newSel[0])voxInstrumentTrackFocus=newSel[0].kind==='drum'?{kind:'drum',name:'Drums',key:'drum-map'}:(newSel[0]?.part?{kind:newSel[0].kind,name:newSel[0].part.name,key:`part:${newSel[0].part.id}`} : voxInstrumentTrackFocus);persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${newSel.length} event${newSel.length===1?'':'s'} pasted to the selected track${newSel.length===1?'':'s'}; first event starts at the playhead.`);return true;
+    const clip=voxClipboard;if(!clip||!['instrument-group'].includes(clip.kind))return false;voxCheckpoint();const chosenFocus=focusedMelodicInstrumentPart(),explicitTarget=voxInstrumentTrackFocus?.explicitTarget===true,newSel=[];for(const item of clip.items||[]){const dest=destinationInstrumentPartForClip(item),s=pasteOneInstrumentClip(item,voxPlayheadBeat+(Number(item.deltaBeat)||0),dest);if(s)newSel.push(s);}voxInstrumentSelections=newSel;voxInstrumentSelection=newSel[0]||null;voxSelections=[];voxSelected=null;if(chosenFocus)voxInstrumentTrackFocus={kind:chosenFocus.type==='chord'?'chord':'lead',name:chosenFocus.name,key:`part:${chosenFocus.id}`,explicitTarget};else if(newSel[0])voxInstrumentTrackFocus=newSel[0].kind==='drum'?{kind:'drum',name:'Drums',key:'drum-map',explicitTarget}:{kind:newSel[0].kind,name:newSel[0].part?.name||'Instrument',key:newSel[0]?.part?`part:${newSel[0].part.id}`:null,explicitTarget};persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${newSel.length} event${newSel.length===1?'':'s'} pasted to the selected track${newSel.length===1?'':'s'}; first event starts at the playhead.`);return true;
   }
   function pasteVox(){
     if(!voxClipboard)return;if(voxClipboard.kind==='instrument-group'){pasteInstrument();return;}voxCheckpoint();const newV=[],newI=[],vocalTracks=allVocalParts(),target=voxTargetPart()||vocalTracks[0]||null,base=target?Math.max(0,vocalTracks.indexOf(target)):0;

@@ -4761,3 +4761,15 @@ body.workspace-chord-rider .primary-toolbar > .sustain-control{
   .vox-track-row.is-instrument-focus>.vox-track-lane,
   .vox-track-row.is-target>.vox-track-lane{box-shadow:inset 0 0 0 3px rgba(241,198,85,.66)!important;}
 }
+
+
+/* =========================================================
+   v3.3.47 — mobile selection/drag intent polish
+   Event taps stay blue selection; the gold row remains the explicit paste/drop target.
+   ========================================================= */
+@media(max-width:600px){
+  .vox-box-page.multi-select-mode .vox-instrument-event.is-selected,
+  .vox-box-page.multi-select-mode .vox-event.is-selected{
+    -webkit-tap-highlight-color:transparent;
+  }
+}
