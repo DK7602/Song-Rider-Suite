@@ -4998,3 +4998,45 @@ body.workspace-chord-rider .primary-toolbar > .sustain-control{
 
 /* v3.3.55 — Range Select owns the lane; event resize handles stay out of the way. */
 .vox-box-page.range-select-mode .vox-inst-handle{display:none!important;}
+
+/* v3.3.57 — Mobile Track Master transport buttons fill the full bar width. */
+@media(max-width:600px){
+  .vox-floating-transport{
+    display:grid!important;
+    grid-template-columns:repeat(11,minmax(0,1fr))!important;
+    align-items:center!important;
+    justify-items:stretch!important;
+    width:calc(100vw - 6px)!important;
+    max-width:calc(100vw - 6px)!important;
+    gap:3px!important;
+    padding:4px 3px!important;
+    justify-content:stretch!important;
+  }
+  .vox-floating-transport button{
+    min-width:0!important;
+    width:100%!important;
+    flex:none!important;
+    min-height:32px!important;
+    padding:3px 1px!important;
+    font-size:.64rem!important;
+  }
+  .vox-floating-transport .vox-transport-drag,
+  #voxAutoScrollBtn,
+  #voxLyricsTransportBtn{
+    min-width:0!important;
+    width:100%!important;
+  }
+}
+@media(max-width:350px){
+  .vox-floating-transport{
+    gap:2px!important;
+    padding:4px 2px!important;
+  }
+  .vox-floating-transport button{
+    font-size:.60rem!important;
+    min-height:30px!important;
+    padding:2px 1px!important;
+  }
+  #voxAutoScrollBtn{font-size:.82rem!important;}
+  #voxLyricsTransportBtn{font-size:.56rem!important;}
+}
