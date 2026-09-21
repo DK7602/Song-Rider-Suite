@@ -1,0 +1,9 @@
+v3.3.60 — SRP Google Docs table-grid export
+
+- Replaces space-based chord positioning with borderless fixed-width HTML tables.
+- Chord token positions are encoded as explicit table-cell widths, so Google Docs cannot collapse them.
+- Lyrics use explicit leading-indent cells and inline Courier New styling.
+- Chords remain bold red; lyrics remain bold black.
+- Section titles remain bold + underlined.
+- Each section stays inside a one-cell outer table to improve page-break grouping.
+- Export styling is inline so Google Docs does not depend on preserving class-based CSS.
