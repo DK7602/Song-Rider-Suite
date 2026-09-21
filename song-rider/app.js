@@ -9029,12 +9029,6 @@ function transposeFullExportText(text, semis){
 function exportHtmlPreserveSpacing(line){
   const raw = String(line ?? "");
   const esc = escapeHtml(raw);
-
-  // v3.3.59: Google Docs' HTML importer can ignore `white-space: pre-wrap`
-  // and collapse the spacing used to align chords above lyrics. Encode the
-  // spacing into the HTML itself so browser preview, Google Docs, and print
-  // all see the same columns. Keep one normal trailing space in interior runs
-  // so long lyric lines may still wrap naturally between words.
   return esc.replace(/ +/g, (run, offset) => {
     const atStart = offset === 0;
     const atEnd = offset + run.length >= esc.length;
@@ -9042,6 +9036,61 @@ function exportHtmlPreserveSpacing(line){
     if(atStart || atEnd) return "&nbsp;".repeat(run.length);
     return "&nbsp;".repeat(Math.max(0, run.length - 1)) + " ";
   });
+}
+
+// v3.3.60: Google Docs does not reliably preserve class-based monospace
+// spacing from imported HTML. Build the printable sheet from old-school,
+// borderless tables with explicit widths + inline styles instead. Docs keeps
+// table geometry much more faithfully than runs of spaces, so chord positions
+// stay over the same lyric columns after "Open with Google Docs".
+const SRP_EXPORT_GRID_COLS = 72;
+const SRP_EXPORT_MONO = "font-family:'Courier New',Courier,monospace;font-size:16px;line-height:1.38;";
+
+function exportGridPct(chars){
+  const n = Math.max(0, Number(chars) || 0);
+  return Math.max(0, Math.min(100, (n / SRP_EXPORT_GRID_COLS) * 100));
+}
+
+function exportChordLineTable(line){
+  const raw = String(line ?? "").replace(/\t/g, "    ");
+  const runs = [];
+  const re = /\S+/g;
+  let m;
+  while((m = re.exec(raw))){
+    runs.push({ text:m[0], start:m.index });
+  }
+  if(!runs.length) return `<div style="height:.72em;line-height:.72em;">&nbsp;</div>`;
+
+  let cursor = 0;
+  const cells = [];
+  for(const run of runs){
+    const start = Math.max(cursor, Math.min(SRP_EXPORT_GRID_COLS - 1, run.start));
+    const gap = Math.max(0, start - cursor);
+    if(gap > 0){
+      cells.push(`<td width="${exportGridPct(gap).toFixed(3)}%" style="padding:0;border:0;">&nbsp;</td>`);
+    }
+    const tokenCols = Math.max(2, Math.min(SRP_EXPORT_GRID_COLS - start, String(run.text).length + 1));
+    cells.push(`<td width="${exportGridPct(tokenCols).toFixed(3)}%" nowrap style="padding:0;border:0;vertical-align:top;white-space:nowrap;${SRP_EXPORT_MONO}font-weight:900;color:#c00000;">${escapeHtml(run.text)}</td>`);
+    cursor = start + tokenCols;
+  }
+  if(cursor < SRP_EXPORT_GRID_COLS){
+    cells.push(`<td width="${exportGridPct(SRP_EXPORT_GRID_COLS - cursor).toFixed(3)}%" style="padding:0;border:0;">&nbsp;</td>`);
+  }
+
+  return `<table role="presentation" border="0" cellspacing="0" cellpadding="0" width="100%" style="width:100%;table-layout:fixed;border-collapse:collapse;border-spacing:0;margin:0;padding:0;"><tbody><tr>${cells.join("")}</tr></tbody></table>`;
+}
+
+function exportLyricLineTable(line){
+  const raw = String(line ?? "").replace(/\t/g, "    ");
+  const lead = (raw.match(/^ +/) || [""])[0].length;
+  const text = raw.slice(lead);
+  const leftCols = Math.max(0, Math.min(SRP_EXPORT_GRID_COLS - 1, lead));
+  const leftPct = exportGridPct(leftCols);
+  const rightPct = 100 - leftPct;
+  return `<table role="presentation" border="0" cellspacing="0" cellpadding="0" width="100%" style="width:100%;table-layout:fixed;border-collapse:collapse;border-spacing:0;margin:0;padding:0;"><tbody><tr>` +
+    (leftCols ? `<td width="${leftPct.toFixed(3)}%" style="padding:0;border:0;">&nbsp;</td>` : ``) +
+    `<td width="${rightPct.toFixed(3)}%" style="padding:0;border:0;vertical-align:top;${SRP_EXPORT_MONO}font-weight:700;color:#111;">${escapeHtml(text) || "&nbsp;"}</td>` +
+  `</tr></tbody></table>`;
 }
 
 function exportTextToHtmlBlocks(fullText){
@@ -9052,9 +9101,7 @@ function exportTextToHtmlBlocks(fullText){
 
   function flushSection(){
     const hasBody = current.lines.some(line => String(line || "").trim());
-    if(current.title || hasBody || (!sawBreak && current.lines.length)){
-      sections.push(current);
-    }
+    if(current.title || hasBody || (!sawBreak && current.lines.length)) sections.push(current);
     current = { title:"", lines:[] };
   }
 
@@ -9067,10 +9114,6 @@ function exportTextToHtmlBlocks(fullText){
       current = { title:String(br.title || "").trim(), lines:[] };
       continue;
     }
-
-    // Imports can occasionally contain a plain VERSE/CHORUS heading instead of
-    // an SRP break-line title. Promote it to the printable section heading when
-    // it appears at the start of a section.
     if(!current.title && !current.lines.some(x => String(x || "").trim()) && _fullPerf_isHeadingLine(line)){
       current.title = String(line || "").trim();
       continue;
@@ -9082,21 +9125,18 @@ function exportTextToHtmlBlocks(fullText){
   return sections.map(section => {
     const bodyLines = section.lines.map(rawLine => {
       const line = String(rawLine ?? "");
-      if(!line.trim()) return `<div class="srp-export-blank">&nbsp;</div>`;
+      if(!line.trim()) return `<div style="height:.72em;line-height:.72em;">&nbsp;</div>`;
       const isChord = lineLooksMostlyLikeChordsGlobal(line) || _fullPerf_isChordLine(line);
-      const cls = isChord ? "srp-export-line srp-export-chord" : "srp-export-line srp-export-lyric";
-      return `<div class="${cls}">${exportHtmlPreserveSpacing(line)}</div>`;
+      return isChord ? exportChordLineTable(line) : exportLyricLineTable(line);
     }).join("\n");
 
     const titleHtml = section.title
-      ? `<div class="srp-export-section-title">${escapeHtml(section.title)}</div>`
+      ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:18px;line-height:1.2;font-weight:900;text-decoration:underline;margin:18px 0 8px 0;">${escapeHtml(section.title)}</div>`
       : ``;
 
-    // A one-cell table is intentionally used instead of a generic <section>.
-    // Google Docs preserves table grouping/page flow far more reliably than
-    // modern CSS break-inside rules on arbitrary block elements. The table is
-    // borderless, so the browser preview remains visually unchanged.
-    return `<table class="srp-export-section" role="presentation"><tbody><tr><td>${titleHtml}<div class="srp-export-section-body">${bodyLines}</div></td></tr></tbody></table>`;
+    // Outer one-cell table keeps the section together when Docs can fit it on
+    // the next page. Inner line tables lock chord/lyric geometry.
+    return `<table role="presentation" border="0" cellspacing="0" cellpadding="0" width="100%" style="width:100%;border:0;border-collapse:collapse;border-spacing:0;margin:0 0 18px 0;page-break-inside:avoid;"><tbody><tr><td style="border:0;padding:0;vertical-align:top;">${titleHtml}${bodyLines}</td></tr></tbody></table>`;
   }).filter(Boolean);
 }
 
