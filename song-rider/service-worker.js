@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.50-cloudflare-srp-cutover';
+const CACHE = 'song-rider-suite-v3.3.52-track-master-polish-srp-fastload';
 const ASSETS = [
   './vocal-autotune-worklet.js',
   './song-rider-pro-wordmark-hq.png',

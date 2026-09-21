@@ -1,0 +1,8 @@
+Song Rider Suite v3.3.54 — Glitch-Free Live Playback
+
+- Reworked Baby DAW / Track Master playback scheduling to keep about one second of WebAudio safely queued in short ~0.22s slices. This prevents UI redraws, page navigation, scrolling, and SoundFont decode work from starving the audio timeline while preserving live-edit behavior.
+- Live-added/newly enabled instruments never block the scheduler waiting for a SoundFont; they join the mix once the player is ready. Existing instruments continue through live sound changes using the prior ready player until the new one is decoded.
+- Increased Beat Maker look-ahead from 100ms to 550ms so drum hits remain sample-accurate through heavy mobile UI/layout work.
+- Track Master waveform envelopes are cached and down-sampled for drawing instead of rescanning every PCM sample on each rerender. During playback, waveform painting is deferred to browser idle time when available.
+- Playback remains continuous; no transport restart was added for instrument changes, part/page navigation, scrolling, volume/FX edits, or Track Master interaction.
+- No database, Cloudflare, project format, Select/Multi Select, export, recording, or synchronization logic was changed.

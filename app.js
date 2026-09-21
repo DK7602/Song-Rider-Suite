@@ -1647,7 +1647,7 @@
     $('chordInput').onkeydown=e=>{if(e.key==='Enter')$('buildBtn').click();};
     $('keyInput').oninput=()=>{const key=$('keyInput');key.dataset.autoKey='0';const raw=key.value.trim();scheduleAutoSave();if(!raw){key.dataset.autoKey='1';autoPopulateKeyFromEntry();return;}if(!enteredKey()){$('keyHint').textContent='Enter a key like F, F#m, Bb, or C minor';return;}renderFits();};
     $('keyInput').onkeydown=e=>{if(e.key==='Enter'){$('buildBtn').click();}};
-    document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.onclick=()=>{state.instrument=b.dataset.instrument;localStorage.setItem('crp-last-instrument',state.instrument);const opts=SOUNDS[state.instrument]||SOUNDS.piano;if(!opts.some(x=>x[0]===state.sound))state.sound=opts[0][0];state.player=null;renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();showInstrumentSoundPicker(b,state.instrument,state.sound,(value)=>{state.sound=value;state.player=null;renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();});});
+    document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.onclick=()=>{const nextInstrument=b.dataset.instrument;if(!nextInstrument)return;/* v3.3.53 — instrument-family tabs are browsers, not selectors. Opening Guitar/Misc/Piano must not alter the active instrument, active sound, playback player, project data, or highlighted family. Commit both instrument + sound only after the user taps a specific sound in the popup. */showInstrumentSoundPicker(b,nextInstrument,state.sound,(value)=>{state.instrument=nextInstrument;state.sound=value;localStorage.setItem('crp-last-instrument',state.instrument);state.player=null;renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();});});
     document.querySelectorAll('#modeTabs .seg').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;localStorage.setItem('crp-last-mode',state.mode);renderAll();syncBuildInput();scheduleAutoSave();});
     $('soundSelect').onchange=e=>{state.sound=e.target.value;state.player=null;window.CRPParts?.syncCoreLive?.();scheduleAutoSave();};$('octaveDown').onclick=()=>{state.octave=Math.max(-2,state.octave-1);if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:'step'});publishLiveSrpMeta('crp');writeHardSync('crp','step');renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();};$('octaveUp').onclick=()=>{state.octave=Math.min(3,state.octave+1);if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:'step'});publishLiveSrpMeta('crp');writeHardSync('crp','step');renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();};
     $('sustainBtn').onclick=()=>{state.sustain=!state.sustain;localStorage.setItem('crp-sustain',state.sustain?'1':'0');updateSustainButton();window.CRPParts?.syncCoreLive?.();};
@@ -1746,7 +1746,7 @@
     // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
     // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.
     if(!IS_PLAYBACK_BRIDGE) checkAccount();
-    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.50-CLOUDFLARE-SRP-CUTOVER').catch(()=>{});
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.53-INSTRUMENT-BROWSE-NONDESTRUCTIVE').catch(()=>{});
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
