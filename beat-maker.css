@@ -289,3 +289,7 @@
     font-size:.58rem !important;
   }
 }
+
+/* v3.3.55 — multi-bar / multi-lane Beat Maker batch tools */
+.crp-beat-foot #crpCopyBar,.crp-beat-foot #crpPasteBar,.crp-beat-foot #crpDuplicateBar,.crp-beat-foot #crpClearBar{min-width:72px}
+@media(max-width:600px){.crp-beat-foot{gap:5px}.crp-beat-foot #crpCopyBar,.crp-beat-foot #crpPasteBar,.crp-beat-foot #crpDuplicateBar,.crp-beat-foot #crpClearBar{flex:1 1 22%;min-width:68px}}

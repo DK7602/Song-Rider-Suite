@@ -125,6 +125,9 @@
       window.CRPCore?.scheduleAutoSave?.();
       return true;
     }
+    // Keep Baby DAW Beat Maker and Track Master drum rail in lockstep.
+    // Track Master owns region placement; Beat Maker owns the primary region pattern.
+    try{window.CRPParts?.syncBeatMakerMaster?.(normalizeBeat(beat));}catch(e){console.warn('Could not sync Beat Maker to Track Master',e);}
     const ps = readProjects();
     let p = activeProjectId ? ps.find(x=>x.id===activeProjectId) : null;
     if(!p){
@@ -197,10 +200,10 @@
         </div>
         <div class="crp-beat-foot">
           <button id="crpPreview" type="button">▶ Preview</button>
-          <button id="crpCopyBar" type="button">Copy Bar</button>
-          <button id="crpPasteBar" type="button">Paste Bar</button>
-          <button id="crpDuplicateBar" type="button">Duplicate →</button>
-          <button id="crpClearBar" class="crp-danger" type="button">Clear Bar</button>
+          <button id="crpCopyBar" type="button">Copy</button>
+          <button id="crpPasteBar" type="button">Paste</button>
+          <button id="crpDuplicateBar" type="button">Duplicate</button>
+          <button id="crpClearBar" class="crp-danger" type="button">Clear</button>
           <span id="crpBeatStatus" class="crp-beat-status"></span>
           <span class="spacer"></span>
           <button id="crpBeatSave" class="accent" type="button">OK / Save Beat</button>
@@ -340,14 +343,69 @@
     btn.classList.toggle('active',i<0); $('crpBeatStatus').textContent=`${countHits()} hits • BPM ${getBpm()}`;
     persistBeatIntoProject();
   }
-  function copyBar(){ copiedBar={}; DRUMS.forEach(([id])=>copiedBar[id]=[...beat.tracks[id][currentBar]]); status(`Copied Bar ${currentBar+1}`); }
-  function pasteBar(){ if(!copiedBar){status('Copy a bar first');return;} DRUMS.forEach(([id])=>beat.tracks[id][currentBar]=[...(copiedBar[id]||[])]); renderGrid(); persistBeatIntoProject(); status(`Pasted into Bar ${currentBar+1}`); }
-  function duplicateBar(){
-    if(beat.bars>=16 && currentBar>=15){status('16-bar maximum');return;}
-    const target=Math.min(currentBar+1,15); if(target>=beat.bars) beat.bars=target+1;
-    DRUMS.forEach(([id])=>beat.tracks[id][target]=[...beat.tracks[id][currentBar]]); currentBar=target; renderEditor(); persistBeatIntoProject(); status(`Duplicated to Bar ${target+1}`);
+  function beatActiveBars(trackIds=DRUMS.map(([id])=>id)){
+    const ids=new Set(trackIds);const out=[];for(let b=0;b<beat.bars;b++){if(DRUMS.some(([id])=>ids.has(id)&&(beat.tracks[id]?.[b]?.length||0)>0))out.push(b);}return out;
   }
-  function clearBar(){ DRUMS.forEach(([id])=>beat.tracks[id][currentBar]=[]); renderGrid(); persistBeatIntoProject(); status(`Cleared Bar ${currentBar+1}`); }
+  function beatActiveTracks(bars=Array.from({length:beat.bars},(_,i)=>i)){
+    const bs=new Set(bars.map(Number));return DRUMS.map(([id])=>id).filter(id=>[...bs].some(b=>(beat.tracks[id]?.[b]?.length||0)>0));
+  }
+  function closeBeatBatchDialog(){document.getElementById('crpBeatBatchDialog')?.remove();}
+  function openBeatBatchDialog({title,help='',showBars=true,showTracks=true,defaultBars=[],defaultTracks=[],destinationBars=false,defaultDestinationBars=[],confirmText='Apply',onConfirm}){
+    closeBeatBatchDialog();const modal=document.createElement('div');modal.id='crpBeatBatchDialog';modal.className='bd-batch-backdrop';
+    const bars=Array.from({length:beat.bars},(_,i)=>i),allBars=Array.from({length:16},(_,i)=>i),activeBars=beatActiveBars(),activeTracks=beatActiveTracks();
+    const barHtml=bars.map(b=>`<label class="bd-batch-check${activeBars.includes(b)?' is-active':''}"><input type="checkbox" data-beat-bar="${b}" ${defaultBars.includes(b)?'checked':''}><span>Bar ${b+1}</span><small>${activeBars.includes(b)?'active':''}</small></label>`).join('');
+    const trackHtml=DRUMS.map(([id,name])=>{const hits=bars.reduce((n,b)=>n+(beat.tracks[id]?.[b]?.length||0),0);return `<label class="bd-batch-check${hits?' is-active':''}"><input type="checkbox" data-beat-track="${id}" ${defaultTracks.includes(id)?'checked':''}><span>${name}</span><small>${hits?`${hits} hit${hits===1?'':'s'}`:''}</small></label>`;}).join('');
+    const destSet=new Set(defaultDestinationBars.map(Number));
+    const destinationHtml=destinationBars?allBars.map(b=>`<label class="bd-batch-check"><input type="checkbox" data-beat-destination="${b}" ${destSet.has(b)?'checked':''}><span>Bar ${b+1}</span></label>`).join(''):'';
+    const barSection=showBars?`<div class="bd-batch-section"><div class="bd-batch-section-head"><strong>Source bars</strong><div class="bd-batch-quick"><button type="button" data-bars-active>Active bars</button><button type="button" data-bars-all>All bars</button><button type="button" data-bars-none>None</button></div></div><div class="bd-batch-grid">${barHtml}</div></div>`:'';
+    const trackSection=showTracks?`<div class="bd-batch-section"><div class="bd-batch-section-head"><strong>Drum tracks</strong><div class="bd-batch-quick"><button type="button" data-tracks-active>Active tracks</button><button type="button" data-tracks-all>All tracks</button><button type="button" data-tracks-none>None</button></div></div><div class="bd-batch-grid">${trackHtml}</div></div>`:'';
+    const destinationSection=destinationBars?`<div class="bd-batch-section"><div class="bd-batch-section-head"><strong>Destination bars</strong><div class="bd-batch-quick"><button type="button" data-dest-current>Current</button><button type="button" data-dest-all>All 16</button><button type="button" data-dest-none>None</button></div></div><div class="bd-batch-grid">${destinationHtml}</div><p class="subtle tiny">Choose one, several, or all destination bars. When more destination bars are selected than source bars, the copied bar pattern repeats across them.</p></div>`:'';
+    modal.innerHTML=`<div class="bd-batch-card" role="dialog" aria-modal="true" aria-label="${title}"><h3>${title}</h3>${help?`<p class="subtle tiny">${help}</p>`:''}${barSection}${trackSection}${destinationSection}<div class="bd-batch-actions"><button type="button" data-cancel>Cancel</button><button type="button" class="accent" data-confirm>${confirmText}</button></div></div>`;
+    document.body.appendChild(modal);const barChecks=()=>[...modal.querySelectorAll('[data-beat-bar]')],trackChecks=()=>[...modal.querySelectorAll('[data-beat-track]')],destChecks=()=>[...modal.querySelectorAll('[data-beat-destination]')];
+    const setBars=vals=>{const set=new Set(vals.map(Number));barChecks().forEach(c=>c.checked=set.has(Number(c.dataset.beatBar)));};
+    const setTracks=vals=>{const set=new Set(vals.map(String));trackChecks().forEach(c=>c.checked=set.has(String(c.dataset.beatTrack)));};
+    const setDestinations=vals=>{const set=new Set(vals.map(Number));destChecks().forEach(c=>c.checked=set.has(Number(c.dataset.beatDestination)));};
+    modal.querySelector('[data-bars-active]')?.addEventListener('click',()=>setBars(activeBars));modal.querySelector('[data-bars-all]')?.addEventListener('click',()=>barChecks().forEach(c=>c.checked=true));modal.querySelector('[data-bars-none]')?.addEventListener('click',()=>barChecks().forEach(c=>c.checked=false));
+    modal.querySelector('[data-tracks-active]')?.addEventListener('click',()=>{const chosen=barChecks().filter(c=>c.checked).map(c=>Number(c.dataset.beatBar));setTracks(beatActiveTracks(chosen.length?chosen:activeBars));});modal.querySelector('[data-tracks-all]')?.addEventListener('click',()=>trackChecks().forEach(c=>c.checked=true));modal.querySelector('[data-tracks-none]')?.addEventListener('click',()=>trackChecks().forEach(c=>c.checked=false));
+    modal.querySelector('[data-dest-current]')?.addEventListener('click',()=>setDestinations([currentBar]));modal.querySelector('[data-dest-all]')?.addEventListener('click',()=>destChecks().forEach(c=>c.checked=true));modal.querySelector('[data-dest-none]')?.addEventListener('click',()=>destChecks().forEach(c=>c.checked=false));
+    modal.querySelector('[data-cancel]').onclick=closeBeatBatchDialog;modal.addEventListener('click',e=>{if(e.target===modal)closeBeatBatchDialog();});
+    modal.querySelector('[data-confirm]').onclick=()=>{const pickedBars=barChecks().filter(c=>c.checked).map(c=>Number(c.dataset.beatBar)),pickedTracks=trackChecks().filter(c=>c.checked).map(c=>String(c.dataset.beatTrack)),pickedDestinations=destChecks().filter(c=>c.checked).map(c=>Number(c.dataset.beatDestination));if(showBars&&!pickedBars.length){status('Choose at least one source bar');return;}if(showTracks&&!pickedTracks.length){status('Choose at least one drum track');return;}if(destinationBars&&!pickedDestinations.length){status('Choose at least one destination bar');return;}closeBeatBatchDialog();onConfirm?.({bars:pickedBars,tracks:pickedTracks,destinationBars:pickedDestinations});};
+  }
+  function makeBeatClip(bars,tracks){
+    let sourceBars=[...new Set(bars.map(Number))].filter(b=>b>=0&&b<16).sort((a,b)=>a-b),trackIds=[...new Set(tracks.map(String))];if(!sourceBars.length||!trackIds.length)return null;
+    // If the user picked "All bars" but only a smaller region contains hits, trim
+    // empty leading/trailing bars while preserving any intentional gaps inside the phrase.
+    const activeSelected=sourceBars.filter(b=>trackIds.some(id=>(beat.tracks[id]?.[b]?.length||0)>0));
+    if(activeSelected.length){const first=activeSelected[0],last=activeSelected[activeSelected.length-1];sourceBars=sourceBars.filter(b=>b>=first&&b<=last);}
+    const minBar=sourceBars[0],offsets=sourceBars.map(b=>b-minBar),data={};let hits=0;
+    for(const id of trackIds){data[id]={};for(const b of sourceBars){const arr=[...(beat.tracks[id]?.[b]||[])];data[id][b-minBar]=arr;hits+=arr.length;}}
+    return {version:3,minBar,spanBars:sourceBars[sourceBars.length-1]-minBar+1,sourceBars,offsets,trackIds,data,hits};
+  }
+  function applyBeatClipToBars(clip,destinationBars){
+    if(!clip?.version)return false;const dests=[...new Set((destinationBars||[]).map(Number))].filter(b=>b>=0&&b<16).sort((a,b)=>a-b);if(!dests.length)return false;
+    const offsets=(clip.offsets||[]).length?clip.offsets:[0];
+    for(let i=0;i<dests.length;i++){
+      const dest=dests[i],off=offsets[i%offsets.length];
+      for(const id of clip.trackIds||[]){if(!beat.tracks[id])continue;beat.tracks[id][dest]=[...(clip.data?.[id]?.[off]||[])];}
+    }
+    beat.bars=Math.max(beat.bars,Math.max(...dests)+1);currentBar=dests[0];renderEditor();persistBeatIntoProject();return true;
+  }
+  function copyBar(){
+    const activeBars=beatActiveBars(),defaultBars=activeBars.includes(currentBar)?[currentBar]:(activeBars.length?activeBars:[currentBar]),defaultTracks=beatActiveTracks(defaultBars);
+    openBeatBatchDialog({title:'Copy Beat Maker',help:'Choose the source bars and drum tracks to copy. Empty leading/trailing bars are ignored automatically.',defaultBars,defaultTracks:defaultTracks.length?defaultTracks:beatActiveTracks(activeBars),confirmText:'Copy',onConfirm:({bars,tracks})=>{const clip=makeBeatClip(bars,tracks);if(!clip||!clip.hits){status('No drum hits are inside that selection');return;}copiedBar=clip;status(`Copied ${clip.hits} hit${clip.hits===1?'':'s'} from ${clip.sourceBars.length} source bar${clip.sourceBars.length===1?'':'s'} / ${tracks.length} track${tracks.length===1?'':'s'}`);}});
+  }
+  function pasteBar(){
+    if(!copiedBar?.version){status('Copy Beat Maker bars first');return;}
+    openBeatBatchDialog({title:'Paste Beat Maker',help:`Choose exactly where the copied ${copiedBar.sourceBars.length}-bar pattern should go. Pick one bar, several bars, or All 16.`,showBars:false,showTracks:false,destinationBars:true,defaultDestinationBars:[currentBar],confirmText:'Paste',onConfirm:({destinationBars})=>{if(applyBeatClipToBars(copiedBar,destinationBars))status(`Pasted the copied pattern across ${destinationBars.length} destination bar${destinationBars.length===1?'':'s'}`);}});
+  }
+  function duplicateBar(){
+    const activeBars=beatActiveBars(),defaultBars=activeBars.includes(currentBar)?[currentBar]:(activeBars.length?activeBars:[currentBar]),defaultTracks=beatActiveTracks(defaultBars);
+    openBeatBatchDialog({title:'Duplicate Beat Maker',help:'Choose the source bars/tracks, then choose one, several, or all destination bars. The source pattern repeats across every checked destination bar.',defaultBars,defaultTracks:defaultTracks.length?defaultTracks:beatActiveTracks(activeBars),destinationBars:true,defaultDestinationBars:[Math.min(15,currentBar+1)],confirmText:'Duplicate',onConfirm:({bars,tracks,destinationBars})=>{const clip=makeBeatClip(bars,tracks);if(!clip||!clip.hits){status('No drum hits are inside that source selection');return;}if(applyBeatClipToBars(clip,destinationBars))status(`Duplicated ${clip.hits} source hit${clip.hits===1?'':'s'} across ${destinationBars.length} destination bar${destinationBars.length===1?'':'s'}`);}});
+  }
+  function clearBar(){
+    const activeBars=beatActiveBars(),defaultBars=activeBars.includes(currentBar)?[currentBar]:(activeBars.length?activeBars:[currentBar]),defaultTracks=beatActiveTracks(defaultBars);
+    openBeatBatchDialog({title:'Clear Beat Maker',help:'Only hits on the checked bars and checked drum tracks are removed.',defaultBars,defaultTracks:defaultTracks.length?defaultTracks:beatActiveTracks(activeBars),confirmText:'Clear selected',onConfirm:({bars,tracks})=>{let removed=0;for(const id of tracks){for(const b of bars){removed+=beat.tracks[id]?.[b]?.length||0;if(beat.tracks[id])beat.tracks[id][b]=[];}}renderEditor();persistBeatIntoProject();status(`Cleared ${removed} hit${removed===1?'':'s'} from ${bars.length} bar${bars.length===1?'':'s'} / ${tracks.length} track${tracks.length===1?'':'s'}`);}});
+  }
   function status(s){ if($('crpBeatStatus')) $('crpBeatStatus').textContent=s; }
 
 
