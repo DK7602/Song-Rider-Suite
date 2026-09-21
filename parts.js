@@ -582,14 +582,14 @@
     return [...out].filter(o=>o>=1&&o<=6).sort((a,b)=>a-b);
   }
   function closeBdBatchModal(){document.getElementById('bdBatchModal')?.remove();}
-  function openBdBatchModal({title,help='',bars=[],activeBars=[],octaves=[],activeOctaves=[],defaultBars=[],defaultOctaves=[],confirmText='Apply',targetBar=false,targetOctave=false,onConfirm}){
+  function openBdBatchModal({title,help='',bars=[],activeBars=[],octaves=[],activeOctaves=[],defaultBars=[],defaultOctaves=[],confirmText='Apply',targetBar=false,targetOctave=false,targetOctaves=null,onConfirm}){
     closeBdBatchModal();
     const modal=document.createElement('div');modal.id='bdBatchModal';modal.className='bd-batch-backdrop';
     const barSet=new Set(defaultBars.map(Number)),octSet=new Set(defaultOctaves.map(Number)),activeBarSet=new Set(activeBars.map(Number)),activeOctSet=new Set(activeOctaves.map(Number));
     const barHtml=bars.map(b=>`<label class="bd-batch-check ${activeBarSet.has(b)?'is-active':''}"><input type="checkbox" data-batch-bar="${b}" ${barSet.has(b)?'checked':''}><span>Bar ${b+1}</span>${activeBarSet.has(b)?'<small>active</small>':''}</label>`).join('');
     const octHtml=octaves.map(o=>`<label class="bd-batch-check ${activeOctSet.has(o)?'is-active':''}"><input type="checkbox" data-batch-octave="${o}" ${octSet.has(o)?'checked':''}><span>Grid ${o}</span>${activeOctSet.has(o)?'<small>active</small>':''}</label>`).join('');
     const targetBarHtml=targetBar?`<label class="bd-batch-field">Paste / duplicate starting at<select id="bdBatchTargetBar">${bars.map(b=>`<option value="${b}">Bar ${b+1}</option>`).join('')}</select></label>`:'';
-    const targetOctHtml=targetOctave?`<label class="bd-batch-field">Target octave grids<select id="bdBatchTargetOctave"><option value="keep">Keep original grids</option>${octaves.map(o=>`<option value="${o}">Move phrase to Grid ${o}</option>`).join('')}</select></label>`:'';
+    const targetGridChoices=Array.isArray(targetOctaves)?targetOctaves:octaves;const targetOctHtml=targetOctave?`<label class="bd-batch-field">Target octave grid<select id="bdBatchTargetOctave"><option value="keep">Keep original grids</option>${targetGridChoices.map(o=>`<option value="${o}">Move phrase to Grid ${o}</option>`).join('')}</select></label>`:'';
     modal.innerHTML=`<div class="bd-batch-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}"><h3>${escapeHtml(title)}</h3>${help?`<p class="subtle tiny">${escapeHtml(help)}</p>`:''}<div class="bd-batch-section"><div class="bd-batch-section-head"><strong>Bars</strong><div class="bd-batch-quick"><button type="button" data-bars-active>Active bars</button><button type="button" data-bars-all>All bars</button><button type="button" data-bars-none>None</button></div></div><div class="bd-batch-grid">${barHtml}</div></div>${octaves.length?`<div class="bd-batch-section"><div class="bd-batch-section-head"><strong>Octave grids</strong><div class="bd-batch-quick"><button type="button" data-oct-active>Active grids</button><button type="button" data-oct-all>All grids</button><button type="button" data-oct-none>None</button></div></div><div class="bd-batch-grid">${octHtml}</div></div>`:''}${targetBarHtml}${targetOctHtml}<div class="bd-batch-actions"><button type="button" data-cancel>Cancel</button><button type="button" class="accent" data-confirm>${escapeHtml(confirmText)}</button></div></div>`;
     document.body.appendChild(modal);
     const checks=(sel)=>[...modal.querySelectorAll(sel)],setChecks=(sel,values)=>{const allowed=new Set(values.map(Number));for(const c of checks(sel))c.checked=allowed.has(Number(c.value||c.dataset.batchBar||c.dataset.batchOctave));};
@@ -619,7 +619,7 @@
   }
   function pasteLeadBar(){
     const p=active();if(!p||p.type!=='lead'||!leadBarClipboard){core.status('Copy Lead/Bass notes first.');return;}const bars=Array.from({length:p.bars},(_,i)=>i),octaves=[1,2,3,4,5,6],activeBars=leadActiveBars(p),activeOctaves=leadActiveOctaves(p);
-    openBdBatchModal({title:'Paste Lead / Bass',help:'Choose the destination start bar. “Move phrase to Grid” transposes every copied note by whole octaves while preserving intervals.',bars,activeBars,octaves:[],activeOctaves:[],defaultBars:[leadBarPage],defaultOctaves:[],targetBar:true,targetOctave:true,confirmText:'Paste',onConfirm:({targetBar,targetOctave})=>{
+    openBdBatchModal({title:'Paste Lead / Bass',help:'Choose the destination start bar and any target octave grid. “Move phrase to Grid” transposes every copied note by whole octaves while preserving intervals.',bars,activeBars,octaves:[],activeOctaves:[],defaultBars:[leadBarPage],defaultOctaves:[],targetBar:true,targetOctave:true,targetOctaves:octaves,confirmText:'Paste',onConfirm:({targetBar,targetOctave})=>{
       const clip=leadBarClipboard,items=clip.items||[];if(!items.length)return;const needed=Math.max(1,targetBar+Math.max(1,Number(clip.spanBars)||1)),allowedBars=[1,2,4,8,16],nextBars=allowedBars.find(n=>n>=needed)||16;if(nextBars>p.bars)p.bars=nextBars;
       const shift=targetOctave==='keep'?0:(Number(targetOctave)-Number(clip.sourceMinOctave||p.gridOctave))*12,stepBeats=4/Math.max(8,Number(p.resolution)||16),newEvents=[];
       for(const item of items){const startBeat=targetBar*4+Math.max(0,Number(item.deltaBeat)||0),durationBeats=Math.max(stepBeats,Number(item.durationBeats)||stepBeats),midi=Math.max(0,Math.min(127,(Number(item.event?.midi)||60)+shift)),e={...clone(item.event),voxId:uid(),midi,voxStartBeat:startBeat,voxDurationBeats:durationBeats,step:Math.max(0,Math.round(startBeat/stepBeats)),durationSteps:Math.max(1,Math.round(durationBeats/stepBeats))};newEvents.push(e);}
@@ -1802,13 +1802,13 @@
   function copyVoxRange(cut=false){
     const range=voxRangeResolved();if(!range){voxStatus('Finish the Select range first. On phone: tap the start, then tap the end.');return true;}
     if(range.kind==='vocal'){
-      const items=voxRangeSegments(range);if(!items.length){voxStatus('That range contains no vocal audio.');return true;}voxClipboard={kind:'vocal-range',items,durationBeats:range.dur,sourcePartId:range.part.id};if(cut){voxCheckpoint();const n=removeVoxRangeContent(range);persistVoxEdits();renderVoxBox();voxStatus(`${range.dur.toFixed(2)}-beat range cut from ${range.name} (${n} event${n===1?'':'s'} affected). Paste starts at the playhead.`);}else{renderVoxInspector();voxStatus(`${range.dur.toFixed(2)}-beat range copied from ${range.name}. Paste starts at the playhead.`);}return true;
+      const items=voxRangeSegments(range);if(!items.length){voxStatus('That range contains no vocal audio.');return true;}voxClipboard={kind:'vocal-range',items,durationBeats:range.dur,sourcePartId:range.part.id};if(cut){voxCheckpoint();const n=removeVoxRangeContent(range);renderVoxBox();persistVoxEditsAfterPaint({renderPartsToo:true});voxStatus(`${range.dur.toFixed(2)}-beat range cut from ${range.name} (${n} event${n===1?'':'s'} affected). Paste starts at the playhead.`);}else{renderVoxInspector();voxStatus(`${range.dur.toFixed(2)}-beat range copied from ${range.name}. Paste starts at the playhead.`);}return true;
     }
-    const items=instrumentRangeSegments(range);if(!items.length){voxStatus(`That range contains no ${range.name} events.`);return true;}voxClipboard={kind:'instrument-group',focusKeyAtCopy:range.trackKey,items};if(cut){voxCheckpoint();const n=removeInstrumentRangeContent(range);persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${range.dur.toFixed(2)}-beat range cut from ${range.name} (${n} event${n===1?'':'s'} affected). Paste starts at the playhead.`);}else{renderVoxInspector();voxStatus(`${range.dur.toFixed(2)}-beat range copied from ${range.name}. Paste starts at the playhead.`);}return true;
+    const items=instrumentRangeSegments(range);if(!items.length){voxStatus(`That range contains no ${range.name} events.`);return true;}voxClipboard={kind:'instrument-group',focusKeyAtCopy:range.trackKey,items};if(cut){voxCheckpoint();const n=removeInstrumentRangeContent(range);renderVoxBox();persistVoxEditsAfterPaint({renderPartsToo:true});voxStatus(`${range.dur.toFixed(2)}-beat range cut from ${range.name} (${n} event${n===1?'':'s'} affected). Paste starts at the playhead.`);}else{renderVoxInspector();voxStatus(`${range.dur.toFixed(2)}-beat range copied from ${range.name}. Paste starts at the playhead.`);}return true;
   }
   function deleteVoxRange(){
     const range=voxRangeResolved();if(!range){voxStatus('Finish the Select range first.');return true;}
-    const hits=range.kind==='vocal'?voxRangeSegments(range):instrumentRangeSegments(range);if(!hits.length){voxStatus(`That range contains no ${range.kind==='vocal'?'vocal audio':`${range.name} events`}.`);return true;}voxCheckpoint();const n=range.kind==='vocal'?removeVoxRangeContent(range):removeInstrumentRangeContent(range);persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${range.dur.toFixed(2)}-beat range deleted from ${range.name} (${n} event${n===1?'':'s'} affected).${range.kind==='vocal'?' Original takes remain safe.':''}`);return true;
+    const hits=range.kind==='vocal'?voxRangeSegments(range):instrumentRangeSegments(range);if(!hits.length){voxStatus(`That range contains no ${range.kind==='vocal'?'vocal audio':`${range.name} events`}.`);return true;}voxCheckpoint();const n=range.kind==='vocal'?removeVoxRangeContent(range):removeInstrumentRangeContent(range);renderVoxBox();persistVoxEditsAfterPaint({renderPartsToo:true});voxStatus(`${range.dur.toFixed(2)}-beat range deleted from ${range.name} (${n} event${n===1?'':'s'} affected).${range.kind==='vocal'?' Original takes remain safe.':''}`);return true;
   }
   function setVoxAutoScroll(on,{manual=false,persist=true}={}){
     voxAutoScroll=!!on;if(persist){try{localStorage.setItem(VOX_AUTO_KEY,voxAutoScroll?'1':'0')}catch{}}
@@ -1881,7 +1881,7 @@
   function updateVoxEventReadout(el,event){if(!el||!event)return;const b=voxEventBounds(event),time=el.querySelector('.vox-event-time');if(time)time.textContent=`${b.start.toFixed(2)}–${b.end.toFixed(2)}b`;}
 
   function voxSnapshot(){
-    return {parts:clone(parts),beat:window.CRPBeatMaker?.getBeat?.()||null,drumEvents:clone(drumEvents),drumArrangementInitialized,songStartBeat,effectiveSongEndBeat:songEndBeat,activePartId,loadedChordPartId,voxTargetPartId,voxPlayheadBeat,voxInstrumentTrackFocus:voxInstrumentTrackFocus?clone(voxInstrumentTrackFocus):null,voxToolMode};
+    return {parts:clone(parts),beat:window.CRPBeatMaker?.getBeat?.()||null,drumEvents:clone(drumEvents),drumArrangementInitialized,songStartBeat,effectiveSongEndBeat:songEndBeat,activePartId,loadedChordPartId,voxTargetPartId,voxPlayheadBeat,voxInstrumentTrackFocus:voxInstrumentTrackFocus?clone(voxInstrumentTrackFocus):null,voxToolMode,voxRangeMode,voxRangeSelection:voxRangeSelection?clone(voxRangeSelection):null};
   }
   function updateVoxHistoryButtons(){if($('voxUndoBtn'))$('voxUndoBtn').disabled=!voxUndoStack.length;if($('voxRedoBtn'))$('voxRedoBtn').disabled=!voxRedoStack.length;}
   function voxCheckpoint(){voxUndoStack.push(voxSnapshot());if(voxUndoStack.length>50)voxUndoStack.shift();voxRedoStack=[];updateVoxHistoryButtons();}
@@ -1890,7 +1890,7 @@
     activePartId=parts.some(p=>String(p.id)===String(snap.activePartId))?snap.activePartId:(parts[0]?.id||null);
     loadedChordPartId=parts.some(p=>p.type==='chord'&&String(p.id)===String(snap.loadedChordPartId))?snap.loadedChordPartId:(parts.find(p=>p.type==='chord')?.id||null);
     if(snap.beat)window.CRPBeatMaker?.setBeat?.(snap.beat,{persist:true});drumEvents=Array.isArray(snap.drumEvents)?snap.drumEvents.map(normalizeDrumEvent).filter(Boolean):drumEvents;drumArrangementInitialized=snap.drumArrangementInitialized!==false;songStartBeat=Math.max(0,Number(snap.songStartBeat)||0);songEndBeat=Number.isFinite(Number(snap.effectiveSongEndBeat))?Number(snap.effectiveSongEndBeat):songEndBeat;
-    voxTargetPartId=parts.some(p=>p.type==='vocal'&&String(p.id)===String(snap.voxTargetPartId))?snap.voxTargetPartId:(allVocalParts()[0]?.id||null);voxPlayheadBeat=Math.max(0,Number(snap.voxPlayheadBeat)||0);voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=snap.voxInstrumentTrackFocus?clone(snap.voxInstrumentTrackFocus):null;voxToolMode=snap.voxToolMode||voxToolMode;
+    voxTargetPartId=parts.some(p=>p.type==='vocal'&&String(p.id)===String(snap.voxTargetPartId))?snap.voxTargetPartId:(allVocalParts()[0]?.id||null);voxPlayheadBeat=Math.max(0,Number(snap.voxPlayheadBeat)||0);voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=snap.voxInstrumentTrackFocus?clone(snap.voxInstrumentTrackFocus):null;voxToolMode=snap.voxToolMode||voxToolMode;voxRangeMode=!!snap.voxRangeMode;voxRangeSelection=snap.voxRangeSelection?clone(snap.voxRangeSelection):null;
     const c=parts.find(p=>p.type==='chord'&&String(p.id)===String(loadedChordPartId));if(c)core.apply(c.data);
     renderParts();persistVoxEdits();renderVoxBox();
   }
@@ -2244,16 +2244,21 @@
   function closeVoxTrackContextMenu(){document.getElementById('voxTrackContextMenu')?.remove();}
   function deleteVoxTrack(part){
     if(!part)return;closeVoxTrackContextMenu();if(!confirm(`Delete “${part.name}”?`))return;
-    voxCheckpoint();const deletedId=String(part.id),wasLoaded=deletedId===String(loadedChordPartId),wasActive=deletedId===String(activePartId);
+    voxCheckpoint();const deletedId=String(part.id),deletedType=String(part.type||''),wasLoaded=deletedId===String(loadedChordPartId),wasActive=deletedId===String(activePartId);
     parts=parts.filter(p=>String(p.id)!==deletedId);
+    // Remove stale backing references to the deleted Baby DAW part as well.
+    for(const p of parts.filter(p=>p.type==='vocal'))p.backingPartIds=(p.backingPartIds||[]).filter(id=>String(id)!==deletedId);
     if(!parts.length){const first=chordPart('Chords 1');parts=[first];loadedChordPartId=first.id;activePartId=first.id;}
     if(wasLoaded){const c=parts.find(p=>p.type==='chord');if(c){loadedChordPartId=c.id;core.apply(c.data);}}
-    if(wasActive){const next=parts.find(p=>p.type==='chord')||parts[0]||null;activePartId=next?.id||null;if(next){if(next.type==='chord'){loadedChordPartId=next.id;core.apply(next.data);}else if(next.type==='lead')renderLeadEditor(next);else if(next.type==='vocal')renderVocalEditor(next);setEditorMode(next.type);}}
+    if(wasActive||!parts.some(p=>String(p.id)===String(activePartId))){const next=parts.find(p=>p.type==='chord')||parts[0]||null;activePartId=next?.id||null;}
+    const nowActive=active();if(nowActive){if(nowActive.type==='chord'){loadedChordPartId=nowActive.id;core.apply(nowActive.data);}else if(nowActive.type==='lead')renderLeadEditor(nowActive);else if(nowActive.type==='vocal')renderVocalEditor(nowActive);setEditorMode(nowActive.type);}
+    else setEditorMode('chord');
     const vocals=allVocalParts();voxTargetPartId=vocals.some(p=>String(p.id)===String(voxTargetPartId))?voxTargetPartId:(vocals[0]?.id||null);
-    voxSelections=voxSelections.filter(s=>String(s.partId)!==deletedId);voxSelected=voxSelections[0]||null;
-    voxInstrumentSelections=voxInstrumentSelections.filter(s=>String((resolveVoxInstrumentSelection(s)||s)?.part?.id||'')!==deletedId);voxInstrumentSelection=voxInstrumentSelections[0]||null;
+    voxSelections=voxSelections.filter(sel=>String(sel.partId)!==deletedId);voxSelected=voxSelections[0]||null;
+    voxInstrumentSelections=voxInstrumentSelections.filter(sel=>String((resolveVoxInstrumentSelection(sel)||sel)?.part?.id||'')!==deletedId);voxInstrumentSelection=voxInstrumentSelections[0]||null;
     if(String(voxInstrumentTrackFocus?.key||'')===`part:${deletedId}`)voxInstrumentTrackFocus=null;
-    persistVoxEdits();renderParts();renderVoxBox();core.flushAutoSaveNow?.();voxStatus('Track deleted in Track Master and Baby DAW.');
+    markPartsDirty();renderParts();renderVoxBox();core.scheduleAutoSave();core.flushAutoSaveNow?.();
+    voxStatus(`${deletedType==='vocal'?'Vocal track':'Track'} deleted from Track Master and Baby DAW.`);
   }
   function duplicateVoxTrack(part){if(!part)return;closeVoxTrackContextMenu();voxCheckpoint();let copy;if(part.type==='chord'){copy=normalizePart({...clone(part),id:uid(),name:`${part.name} Copy`},parts.length);}else if(part.type==='lead'){copy=normalizePart({...clone(part),id:uid(),name:`${part.name} Copy`,events:(part.events||[]).map(e=>({...clone(e),voxId:uid()}))},parts.length);}else{copy={...part,id:uid(),name:`${part.name} Copy`,recordings:(part.recordings||[]).map(r=>({...r})),voxEvents:(part.voxEvents||[]).map(e=>({...clone(e),id:uid()}))};copy.voxEvents.forEach(e=>e.sourcePartId=copy.id);}parts.splice(Math.max(0,parts.indexOf(part)+1),0,copy);persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${copy.name} duplicated.`);}
   function ensureVoxTrackDialog(){
@@ -2608,7 +2613,7 @@
     openVoxBox({allowNoVocals:true,forceInstrumentals:true,fromVocal:false});
     if(voxBoxOpen&&!allVocalParts().length)voxStatus('Track Master open. Instrument tracks are ready; add a Vocal Track whenever you want to record or edit vocals.');
   }
-  function closeVoxBox(){voxBoxOpen=false;const page=$('voxBoxPage');if(page){page.hidden=true;page.setAttribute('aria-hidden','true');}document.body.classList.remove('vox-box-open');const p=active();if(p?.type==='vocal')renderVocalEditor(p);}
+  function closeVoxBox(){voxBoxOpen=false;const page=$('voxBoxPage');if(page){page.hidden=true;page.setAttribute('aria-hidden','true');}document.body.classList.remove('vox-box-open');const p=active();renderParts();if(p){setEditorMode(p.type);if(p.type==='lead')renderLeadEditor(p);else if(p.type==='vocal')renderVocalEditor(p);} }
   function addVoxTrack(){voxCheckpoint();const p=vocalPart(`Vocals ${countType('vocal')+1}`);parts.push(p);activePartId=p.id;voxTargetPartId=p.id;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;markPartsDirty();renderParts();persistVoxEdits();renderVoxBox();voxStatus(`${p.name} added. Rename it in the track header, paste/layer clips here, or record directly with the floating transport.`);}
   function addActiveTakeToVox(){const p=voxTargetPart();if(!p?.activeTakeId||!p.recordings?.some(r=>r.id===p.activeTakeId)){voxStatus('Choose an active take on this vocal track first.');return;}voxCheckpoint();p.voxEvents=p.voxEvents||[];const ev=normalizeVoxEvent({id:uid(),takeId:p.activeTakeId,sourcePartId:p.id,startBeat:quantizeVoxBeat(voxPlayheadBeat),trimStartSec:0,trimEndSec:null,volume:1,fx:null},p);p.voxEvents.push(ev);voxSelections=[{partId:p.id,eventId:ev.id}];voxSelected=voxSelections[0];voxInstrumentSelections=[];voxInstrumentSelection=null;persistVoxEdits();renderVoxBox();voxStatus(`Added ${voxEventTake(ev)?.name||'active take'} at beat ${ev.startBeat.toFixed(2)}.`);}
   function splitSelectedVox(){
