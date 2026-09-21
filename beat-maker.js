@@ -559,7 +559,10 @@
   function stepSeconds(){ return (60/getBpm())/16; } // one 64th = quarter/16
   function startScheduler(kind){
     if(scheduler) clearInterval(scheduler);
-    const lookAhead=.10;
+    // v3.3.54 — drums need enough scheduled headroom to survive UI/layout work.
+    // 100ms was easy to starve when Track Master redrew waveforms or a SoundFont
+    // decoded on mobile. WebAudio still fires these hits sample-accurately once queued.
+    const lookAhead=.55;
     scheduler=setInterval(()=>{
       if(!audioCtx) return;
       while((kind==='preview'?previewNextTime:mainNextTime) < audioCtx.currentTime+lookAhead){

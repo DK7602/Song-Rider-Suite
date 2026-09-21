@@ -67,6 +67,9 @@
   let liveVocalFxNodes=new Map();
   let audioCtx=null, masterLimiter=null, cycleTimer=null;
   let playerCache=new Map(), resolvedPlayerCache=new Map(), lastReadyPlayer=new Map(), playerSound=new WeakMap(), partBuses=new Map(), partInstrumentFx=new Map(), highlightTimers=[], activeVoices=new Set(), vocalBufferCache=new Map(), activeVocalSources=new Set();
+  // v3.3.54 — cached waveform envelopes keep Track Master navigation from rescanning
+  // millions of audio samples on the UI thread while WebAudio playback is running.
+  const voxWaveformPeakCache=new Map();
   let micStream=null,micCtx=null,micSource=null,micAnalyser=null,micProcessor=null,micSilentGain=null,micMeterRaf=0;
   let recording=false,recordingPaused=false,recordChunks=[],recordSampleRate=48000,recordStartedAt=0,recordPausedAt=0,recordPausedTotal=0,recordTimer=null,currentPreview=null,recordInsertBeat=0,recordTargetPartId=null,recordStartedFromVox=false,recordResumeBeat=0;
   let leadBarClipboard=null, speechRec=null, speechBase='';
@@ -983,7 +986,7 @@
     }catch{bus.gain.value=target;}
     return bus;
   }
-  async function playerFor(p,{forceCurrent=false}={}){
+  async function playerFor(p,{forceCurrent=false,nonBlocking=false}={}){
     ensureAudio();
     const sound=requestedPartSound(p),key=`${p.id}:${sound}`;
     if(resolvedPlayerCache.has(key)){
@@ -1021,6 +1024,13 @@
       // over at the next scheduler chunk after it is fully ready.
       promise.catch(err=>console.warn('Live sound preload failed',err));
       return fallback.player;
+    }
+    if(nonBlocking&&!forceCurrent&&(playing||starting)&&!fallback?.player){
+      // A newly-enabled/live-created part may not have any ready player yet.
+      // Start loading it, but never stall the transport waiting for decode/network.
+      // It simply joins the mix on a later scheduler pass when ready.
+      promise.catch(err=>console.warn('Live sound preload failed',err));
+      return null;
     }
     return promise;
   }
@@ -1188,8 +1198,9 @@
     const beatSec=60/core.bpm;
     for(const p of enabledPlayable()){
       if(!playing||generation!==playbackGeneration)return;
-      const player=await playerFor(p);
+      const player=await playerFor(p,{nonBlocking:true});
       if(!playing||generation!==playbackGeneration)return;
+      if(!player)continue;
       const scheduledSound=playerSound.get(player)||outputSoundFor(p)||requestedPartSound(p);
       busFor(p,scheduledSound);
       if(p.type==='chord'){
@@ -1265,48 +1276,53 @@
       playbackClockStartAudioTime=nextAudioStart;
       playbackClockStartBeat=initialBeat;
       playbackClockBpm=Math.max(40,Math.min(240,+core.bpm||92));
-      // Keep roughly 0.65-0.7 seconds of WebAudio safely scheduled ahead.
-      // This is intentionally time-based rather than a fixed number of beats:
-      // phones get enough render headroom for SoundFont decode/UI work, while
-      // instrument/sound edits still land quickly at the next scheduler chunk.
-      let vocalsScheduledForCycle=false;
+      // v3.3.54 — keep a deeper rolling buffer made of short scheduling slices.
+      // The prior scheduler held only one ~0.68s slice and waited until late in that
+      // slice to queue the next. A sound decode, Track Master waveform redraw, page
+      // switch, or heavy scroll/layout pass could delay that timer and create a tiny
+      // underrun heard as static. We now keep ~1 second safely queued, while using
+      // ~0.22s slices so live edits still enter the mix quickly after the buffer drains.
+      const schedulerHorizonSec=1.05,schedulerChunkSec=.22,schedulerTickMs=55;
+      let vocalsScheduledForCycle=false,schedulerBusy=false,endStopScheduled=false;
 
       const scheduleNext=async()=>{
         if(!playing||generation!==playbackGeneration)return;
-        const beatSec=60/Math.max(40,Math.min(240,+core.bpm||92));
-        const chunkBeats=Math.max(1,Math.min(2.5,.68/beatSec));
-        total=computePlaybackTotal();playbackTotalBeats=total;
-        if(cursorBeat>=total-.001)cursorBeat=playbackLoopStartBeat;
-        const fromBeat=cursorBeat;
-        const toBeat=Math.min(total,fromBeat+chunkBeats);
-        const span=(toBeat-fromBeat)*beatSec;
-        const start=nextAudioStart,end=start+span;
+        if(schedulerBusy){cycleTimer=setTimeout(scheduleNext,schedulerTickMs);return;}
+        schedulerBusy=true;
+        try{
+          const horizon=audioCtx.currentTime+schedulerHorizonSec;
+          while(playing&&generation===playbackGeneration&&nextAudioStart<horizon&&!endStopScheduled){
+            const beatSec=60/Math.max(40,Math.min(240,+core.bpm||92));
+            total=computePlaybackTotal();playbackTotalBeats=total;
+            if(cursorBeat>=total-.001)cursorBeat=playbackLoopStartBeat;
+            const chunkBeats=Math.max(.25,Math.min(1.25,schedulerChunkSec/beatSec));
+            const fromBeat=cursorBeat,toBeat=Math.min(total,fromBeat+chunkBeats),span=(toBeat-fromBeat)*beatSec;
+            if(span<=.0001)break;
+            const start=nextAudioStart,end=start+span;
 
-        // Vocals stay as one continuous source for the remainder of each song cycle.
-        if(!vocalsScheduledForCycle){
-          for(const v of enabledVocals())await scheduleVocalSegment(v,start,fromBeat,total,generation);
-          vocalsScheduledForCycle=true;
-        }
-        await scheduleSegment(start,fromBeat,toBeat,generation,false);
-        if(!playing||generation!==playbackGeneration)return;
+            // Vocals stay as one continuous source for the remainder of each song cycle.
+            if(!vocalsScheduledForCycle){
+              for(const v of enabledVocals())await scheduleVocalSegment(v,start,fromBeat,total,generation);
+              vocalsScheduledForCycle=true;
+            }
+            await scheduleSegment(start,fromBeat,toBeat,generation,false);
+            if(!playing||generation!==playbackGeneration)return;
 
-        nextAudioStart=end;
-        cursorBeat=toBeat;
-        if(cursorBeat>=total-1e-7){
-          const loopSong=playbackScope?false:!!core.loop;
-          if(loopSong){cursorBeat=playbackLoopStartBeat;vocalsScheduledForCycle=false;}
-          else{
-            cycleTimer=setTimeout(()=>{if(generation===playbackGeneration)stopPlayback();},Math.max(10,(end-audioCtx.currentTime)*1000+35));
-            return;
+            nextAudioStart=end;cursorBeat=toBeat;
+            if(cursorBeat>=total-1e-7){
+              const loopSong=playbackScope?false:!!core.loop;
+              if(loopSong){cursorBeat=playbackLoopStartBeat;vocalsScheduledForCycle=false;}
+              else{
+                endStopScheduled=true;
+                cycleTimer=setTimeout(()=>{if(generation===playbackGeneration)stopPlayback();},Math.max(10,(end-audioCtx.currentTime)*1000+35));
+                break;
+              }
+            }
           }
+        }finally{
+          schedulerBusy=false;
+          if(playing&&generation===playbackGeneration&&!endStopScheduled)cycleTimer=setTimeout(scheduleNext,schedulerTickMs);
         }
-
-        // Refill while a healthy amount of already-scheduled audio is still
-        // playing. That buffer is what lets mobile switch/decode instruments
-        // without the mix crackling, starving, or restarting.
-        const wakeAhead=Math.min(.50,Math.max(.30,span*.68));
-        const wakeMs=Math.max(8,(end-audioCtx.currentTime-wakeAhead)*1000);
-        cycleTimer=setTimeout(scheduleNext,wakeMs);
       };
       scheduleNext();
     }catch(e){
@@ -1689,10 +1705,32 @@
       const rect=canvas.getBoundingClientRect(),dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1)),w=Math.max(20,Math.round(rect.width*dpr)),h=Math.max(20,Math.round(rect.height*dpr));
       canvas.width=w;canvas.height=h;const g=canvas.getContext('2d');if(!g)return;g.clearRect(0,0,w,h);g.strokeStyle='rgba(42,36,27,.72)';g.lineWidth=Math.max(1,dpr);
       const data=buf.getChannelData(0),startSec=Math.max(0,Number(event.trimStartSec)||0),endSec=Math.min(buf.duration,Number.isFinite(Number(event.trimEndSec))&&Number(event.trimEndSec)>0?Number(event.trimEndSec):buf.duration),i0=Math.max(0,Math.floor(startSec*buf.sampleRate)),i1=Math.min(data.length,Math.ceil(endSec*buf.sampleRate)),span=Math.max(1,i1-i0),mid=h/2;
-      g.beginPath();for(let x=0;x<w;x++){const a=i0+Math.floor(x/w*span),b=Math.min(i1,a+Math.max(1,Math.ceil(span/w)));let lo=1,hi=-1;for(let i=a;i<b;i++){const v=data[i]||0;if(v<lo)lo=v;if(v>hi)hi=v;}g.moveTo(x,mid-hi*mid*.82);g.lineTo(x,mid-lo*mid*.82);}g.stroke();
+      const cacheKey=`${event.takeId}|${Math.round(startSec*1000)}|${Math.round(endSec*1000)}|${w}`;
+      let peaks=voxWaveformPeakCache.get(cacheKey);
+      if(!peaks){
+        peaks=new Float32Array(w*2);
+        // Cap each pixel column to a representative sample budget. The old renderer
+        // rescanned every source sample after page/instrument/navigation changes,
+        // which could block mobile's main thread long enough to starve the audio scheduler.
+        for(let x=0;x<w;x++){
+          const a=i0+Math.floor(x/w*span),b=Math.min(i1,a+Math.max(1,Math.ceil(span/w))),count=Math.max(1,b-a),stride=Math.max(1,Math.floor(count/96));let lo=1,hi=-1;
+          for(let i=a;i<b;i+=stride){const v=data[i]||0;if(v<lo)lo=v;if(v>hi)hi=v;}
+          if(lo>hi){lo=0;hi=0;}peaks[x*2]=lo;peaks[x*2+1]=hi;
+        }
+        voxWaveformPeakCache.set(cacheKey,peaks);
+        if(voxWaveformPeakCache.size>180)voxWaveformPeakCache.delete(voxWaveformPeakCache.keys().next().value);
+      }
+      g.beginPath();for(let x=0;x<w;x++){const lo=peaks[x*2],hi=peaks[x*2+1];g.moveTo(x,mid-hi*mid*.82);g.lineTo(x,mid-lo*mid*.82);}g.stroke();
     }catch(err){console.warn('Could not draw Vox Box waveform',err);}
   }
-  function queueLiveVoxWaveform(canvas,event){if(!canvas||!event)return;if(canvas.__voxWaveRaf)return;canvas.__voxWaveRaf=requestAnimationFrame(()=>{canvas.__voxWaveRaf=0;drawVoxWaveform(canvas,event,voxRenderToken);});}
+  function queueLiveVoxWaveform(canvas,event){
+    if(!canvas||!event||canvas.__voxWaveQueued)return;
+    const token=voxRenderToken,run=()=>{canvas.__voxWaveQueued=0;drawVoxWaveform(canvas,event,token);};
+    // During playback, waveform painting is visual-only work. Let the browser do it
+    // in idle time (with a short timeout) so sound scheduling/decoding stays first.
+    if((playing||starting)&&typeof requestIdleCallback==='function')canvas.__voxWaveQueued=requestIdleCallback(run,{timeout:700});
+    else canvas.__voxWaveQueued=requestAnimationFrame(run);
+  }
   function updateVoxEventReadout(el,event){if(!el||!event)return;const b=voxEventBounds(event),time=el.querySelector('.vox-event-time');if(time)time.textContent=`${b.start.toFixed(2)}–${b.end.toFixed(2)}b`;}
 
   function voxSnapshot(){
@@ -2347,7 +2385,7 @@
           const top=document.createElement('div');top.className='vox-event-top';top.innerHTML=`<span class="vox-event-name">${escapeHtml(take?.name||'Vocal event')}</span><span class="vox-event-time">${bounds.start.toFixed(2)}–${bounds.end.toFixed(2)}b</span>`;
           const canvas=document.createElement('canvas');canvas.className='vox-event-waveform';const lh=document.createElement('span');lh.className='vox-trim-handle left';const rh=document.createElement('span');rh.className='vox-trim-handle right';ev.append(top,canvas,lh,rh);
           ev.onclick=e=>{e.stopPropagation();if(voxRangeMode){e.preventDefault();return;}if(ev.__voxDragged){ev.__voxDragged=false;return;}if((ev.__voxSuppressClickUntil||0)>performance.now())return;if(ev.__voxPointerSelected){ev.__voxPointerSelected=false;renderVoxSelectionClasses();renderVoxInspector();return;}const multi=voxToolMode==='multi',add=multi||e.ctrlKey||e.metaKey||e.shiftKey;voxSetSelection(part,event,{add,toggle:add});renderVoxSelectionClasses();renderVoxInspector();};
-          ev.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}if(e.target===lh||e.target===rh)return;beginVoxPointerEdit(e,part,event,ev,'move');};lh.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}beginVoxPointerEdit(e,part,event,ev,'trim-left');};rh.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}beginVoxPointerEdit(e,part,event,ev,'trim-right');};lane.appendChild(ev);requestAnimationFrame(()=>drawVoxWaveform(canvas,event,token));
+          ev.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}if(e.target===lh||e.target===rh)return;beginVoxPointerEdit(e,part,event,ev,'move');};lh.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}beginVoxPointerEdit(e,part,event,ev,'trim-left');};rh.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}beginVoxPointerEdit(e,part,event,ev,'trim-right');};lane.appendChild(ev);queueLiveVoxWaveform(canvas,event);
         }
         updateVoxRangeOverlay(part,lane);row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
       }
