@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.51-track-master-range-select';
+const CACHE = 'song-rider-suite-v3.3.52-track-master-polish-srp-fastload';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
   './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css',
