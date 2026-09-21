@@ -205,7 +205,7 @@
             </div>
           </div>
           <div class="lead-play-options lead-play-options-lower"><button id="leadPlaybackBtn" class="part-preview-btn" type="button">▶ Play</button><label class="part-repeat-toggle"><input id="leadRepeat" type="checkbox" checked><span>Repeat</span></label><button id="leadAutoScrollBtn" class="lead-auto-scroll-btn" type="button" aria-pressed="false" title="Follow the playing Lead/Bass note">↕ Auto</button></div>
-          <div class="lead-bar-tools"><button id="leadCopyBar" type="button">Copy</button><button id="leadPasteBar" type="button" disabled>Paste</button><button id="leadClearBar" type="button">Clear</button></div>
+          <div class="lead-bar-tools"><button id="leadCopyBar" type="button" title="Copy selected bars / octave grids">Copy</button><button id="leadPasteBar" type="button" disabled title="Paste copied bars into a chosen bar / octave grid">Paste</button><button id="leadClearBar" type="button" title="Clear selected bars / octave grids">Clear</button></div>
         </div>
         <div id="leadGridWrap" class="lead-grid-wrap"><div id="leadGrid" class="lead-grid"></div></div>
       </div>
@@ -418,11 +418,11 @@
           <div><strong>Chords Used</strong><span id="voxChordsUsed">—</span></div>
           <div><strong>Notes that fit</strong><span id="voxNotesFit">—</span></div>
         </div>
-        <span id="voxBoxStatus" class="subtle tiny">Select chooses a time range on a vocal track for Copy/Cut/Delete. Multi Select still selects whole events. On touch, long-press an event to grab and move it.</span>
+        <span id="voxBoxStatus" class="subtle tiny">Select chooses a time range on any track for Copy/Cut/Delete. Multi Select selects whole events; All selects every event on the highlighted track. On touch, long-press an event to grab and move it.</span>
       </div>
 
       <div id="voxTimelineScroller" class="vox-timeline-scroller">
-        <button id="voxToolModeBtn" class="vox-tool-mode-btn" type="button" aria-pressed="false" title="Toggle Multi Select">Multi Select</button>
+        <div class="vox-tool-mode-cluster"><button id="voxToolModeBtn" class="vox-tool-mode-btn" type="button" aria-pressed="false" title="Toggle Multi Select">Multi Select</button><label id="voxSelectAllTrackWrap" class="vox-select-all-track" hidden><input id="voxSelectAllTrack" type="checkbox"><span>All</span></label></div>
         <div id="voxTimelineInner" class="vox-timeline-inner">
           <div id="voxLocatorLayer" class="vox-locator-layer" aria-label="Song range locators">
             <div id="voxSongRangeFill" class="vox-song-range-fill" aria-hidden="true"></div>
@@ -445,7 +445,7 @@
         <button id="voxPlayTransportBtn" class="accent" type="button" title="Play" aria-label="Play">▶</button>
         <button id="voxPauseTransportBtn" type="button" title="Pause" aria-label="Pause">Ⅱ</button>
         <button id="voxRecordTransportBtn" class="vox-record-transport" type="button" title="Record into selected vocal track" aria-label="Record">●</button>
-        <button id="voxAutoScrollBtn" type="button" aria-pressed="true" title="Follow playhead">↔ Auto</button>
+        <button id="voxAutoScrollBtn" type="button" aria-pressed="true" title="AutoScroll — follow playhead" aria-label="AutoScroll">→</button>
         <button id="voxLyricsTransportBtn" type="button" title="Open Song Rider Pro lyrics">Lyrics</button>
       </div>
 
@@ -488,8 +488,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.54-GLITCH-FREE-LIVE-PLAYBACK"></script>
-  <script src="parts.js?v=3.3.54-GLITCH-FREE-LIVE-PLAYBACK"></script>
-  <script src="beat-maker.js?v=3.3.54-GLITCH-FREE-LIVE-PLAYBACK"></script>
+  <script src="app.js?v=3.3.55-BD-RANGE-TOOLS"></script>
+  <script src="parts.js?v=3.3.55-BD-RANGE-TOOLS"></script>
+  <script src="beat-maker.js?v=3.3.55-BD-RANGE-TOOLS"></script>
 </body>
 </html>

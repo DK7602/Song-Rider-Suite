@@ -4922,3 +4922,79 @@ body.workspace-chord-rider .primary-toolbar > .sustain-control{
    hides those event handles so its own boundary handles are unambiguous. */
 .vox-event.is-selected .vox-trim-handle{display:block;}
 .vox-box-page.range-select-mode .vox-event .vox-trim-handle{display:none!important;}
+
+/* =========================================================
+   v3.3.55 — BD batch edit tools + Track Master select polish
+   ========================================================= */
+/* Lead/Bass and Beat Maker selection dialogs */
+.bd-batch-backdrop{
+  position:fixed;inset:0;z-index:14000;background:rgba(4,8,12,.72);
+  display:flex;align-items:center;justify-content:center;padding:14px;
+}
+.bd-batch-card{
+  width:min(620px,calc(100vw - 24px));max-height:min(82vh,760px);overflow:auto;
+  border:1px solid #56616e;border-radius:14px;background:#151c24;color:#f4f7fa;
+  box-shadow:0 22px 70px rgba(0,0,0,.58);padding:14px;
+}
+.bd-batch-card h3{margin:0 0 6px;font-size:1.02rem}.bd-batch-card p{margin:0 0 12px}
+.bd-batch-section{margin-top:12px;padding-top:10px;border-top:1px solid #303a45}
+.bd-batch-section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.bd-batch-section-head strong{font-size:.84rem}.bd-batch-quick{display:flex;gap:5px;flex-wrap:wrap}
+.bd-batch-quick button{padding:5px 7px!important;font-size:.7rem!important}
+.bd-batch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:7px}
+.bd-batch-check{display:flex;align-items:center;gap:7px;min-height:40px;padding:7px 8px;border:1px solid #36414d;border-radius:8px;background:#10161d;font-size:.78rem}
+.bd-batch-check input{width:18px;height:18px}.bd-batch-check.is-active{border-color:#8b7135}.bd-batch-check small{opacity:.68;margin-left:auto}
+.bd-batch-field{display:grid;gap:5px;margin-top:10px;font-size:.78rem}.bd-batch-field select{min-height:40px}
+.bd-batch-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:10px;border-top:1px solid #303a45}
+.bd-batch-actions button{min-width:92px}
+@media(max-width:520px){
+  .bd-batch-backdrop{padding:7px}.bd-batch-card{width:100%;max-height:88vh;padding:11px;border-radius:11px}
+  .bd-batch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.bd-batch-actions{display:grid;grid-template-columns:1fr 1fr}.bd-batch-actions button{width:100%}
+}
+
+/* Multi Select + All stay together and sticky over the timeline. */
+.vox-tool-mode-cluster{
+  position:sticky;left:6px;top:5px;z-index:90;display:flex;align-items:center;gap:5px;
+  width:max-content;margin:5px 0 -36px 5px;
+}
+.vox-tool-mode-cluster .vox-tool-mode-btn{
+  position:static!important;left:auto!important;top:auto!important;margin:0!important;
+}
+.vox-select-all-track{
+  display:flex;align-items:center;gap:4px;min-height:31px;padding:5px 8px;border-radius:8px;
+  background:#18212b;border:1px solid #465566;color:#eef3f7;font-size:.72rem;font-weight:900;
+  box-shadow:0 4px 14px rgba(0,0,0,.28);white-space:nowrap;touch-action:manipulation;
+}
+.vox-select-all-track[hidden]{display:none!important}.vox-select-all-track input{width:16px;height:16px;margin:0}
+.vox-select-all-track.is-all{background:linear-gradient(180deg,#d8efff,#9dd8fb);border-color:#66c6ff;color:#07121a}
+@media(max-width:600px){.vox-tool-mode-cluster{gap:3px}.vox-select-all-track{min-height:29px;padding:4px 6px;font-size:.68rem}.vox-select-all-track input{width:15px;height:15px}}
+
+/* Range Select now applies to vocal, chord/lead, and drum lanes. */
+.vox-box-page.range-select-mode .vox-track-row>.vox-track-lane,
+.vox-box-page.range-select-mode .vox-track-row .vox-event,
+.vox-box-page.range-select-mode .vox-track-row .vox-instrument-event{cursor:crosshair!important}
+@media(max-width:600px){
+  .vox-box-page.range-select-mode .vox-track-row .vox-event,
+  .vox-box-page.range-select-mode .vox-track-row .vox-instrument-event{touch-action:manipulation!important}
+}
+
+/* One-line compact Track Master transport. AutoScroll is the right arrow. */
+.vox-floating-transport{flex-wrap:nowrap!important;overflow-x:hidden!important;overflow-y:hidden!important;white-space:nowrap!important}
+#voxAutoScrollBtn{min-width:36px!important;width:36px!important;padding-left:3px!important;padding-right:3px!important;font-size:1rem!important}
+#voxLyricsTransportBtn{min-width:46px!important;padding-left:5px!important;padding-right:5px!important}
+@media(max-width:600px){
+  .vox-floating-transport{width:calc(100vw - 6px)!important;max-width:calc(100vw - 6px)!important;gap:2px!important;padding:4px 3px!important;justify-content:center!important}
+  .vox-floating-transport button{min-width:27px!important;min-height:32px!important;padding:3px 2px!important;font-size:.64rem!important}
+  .vox-floating-transport .vox-transport-drag{min-width:22px!important;width:22px!important}
+  #voxAutoScrollBtn{min-width:28px!important;width:28px!important;font-size:.92rem!important}
+  #voxLyricsTransportBtn{min-width:39px!important;width:39px!important;font-size:.61rem!important}
+}
+@media(max-width:350px){
+  .vox-floating-transport button{min-width:25px!important;font-size:.60rem!important}
+  .vox-floating-transport .vox-transport-drag{min-width:20px!important;width:20px!important}
+  #voxAutoScrollBtn{min-width:26px!important;width:26px!important}
+  #voxLyricsTransportBtn{min-width:36px!important;width:36px!important;font-size:.57rem!important}
+}
+
+/* v3.3.55 — Range Select owns the lane; event resize handles stay out of the way. */
+.vox-box-page.range-select-mode .vox-inst-handle{display:none!important;}
