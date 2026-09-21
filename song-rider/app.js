@@ -3612,6 +3612,14 @@ function updateUndoRedoUI(){
   if(el.undoBtn) el.undoBtn.disabled = history.past.length === 0;
   if(el.redoBtn) el.redoBtn.disabled = history.future.length === 0;
 }
+
+function resetProjectHistory(){
+  history.past = [];
+  history.future = [];
+  history.lock = false;
+  history.lastSig = projectSignature(state.project);
+  updateUndoRedoUI();
+}
 /***********************
 ✅ HISTORY COMMIT HELPERS (correct “before” snapshots)
 - editProject(reason, fn) snapshots BEFORE fn runs
@@ -8945,7 +8953,7 @@ function getExportFullTextSource(){
         const semis = getTransposeSemis() || 0;
         const out = [];
         cards.forEach(card => {
-          const pill = card.querySelector('input.songPartPill');
+          const pill = card.querySelector('input.crpSectionTitleInput, input.songPartPill');
           const ta = card.querySelector('textarea.fullSectionText');
           const ttl = String(pill?.value || '').trim();
           let bodyText = String(ta?.value || '');
@@ -9020,36 +9028,54 @@ function transposeFullExportText(text, semis){
 
 function exportTextToHtmlBlocks(fullText){
   const lines = normalizeLineBreaks(fullText || "").split("\n");
-  const blocks = [];
-  let inPre = false;
-  let preLines = [];
+  const sections = [];
+  let current = { title:"", lines:[] };
+  let sawBreak = false;
 
-  function flushPre(){
-    if(!inPre) return;
-    blocks.push(
-      `<pre style="margin:0 0 10px 0;font-family:'Courier New',Courier,monospace;font-weight:400;color:#111;white-space:pre;line-height:1.35;">${escapeHtml(preLines.join("\n"))}</pre>`
-    );
-    inPre = false;
-    preLines = [];
+  function flushSection(){
+    const hasBody = current.lines.some(line => String(line || "").trim());
+    if(current.title || hasBody || (!sawBreak && current.lines.length)){
+      sections.push(current);
+    }
+    current = { title:"", lines:[] };
   }
 
   for(const raw of lines){
     const line = String(raw ?? "");
     const br = _parseBreakLine(line);
     if(br){
-      flushPre();
-      const headingText = String(br.title || "").trim();
-      if(headingText){
-        blocks.push(`<div style="font-family:Arial,Helvetica,sans-serif;font-weight:900;margin:20px 0 8px;letter-spacing:.3px;">${escapeHtml(headingText)}</div>`);
-      }
+      flushSection();
+      sawBreak = true;
+      current = { title:String(br.title || "").trim(), lines:[] };
       continue;
     }
 
-    if(!inPre){ inPre = true; preLines = []; }
-    preLines.push(line);
+    // Imports can occasionally contain a plain VERSE/CHORUS heading instead of
+    // an SRP break-line title. Promote it to the printable section heading when
+    // it appears at the start of a section.
+    if(!current.title && !current.lines.some(x => String(x || "").trim()) && _fullPerf_isHeadingLine(line)){
+      current.title = String(line || "").trim();
+      continue;
+    }
+    current.lines.push(line);
   }
-  flushPre();
-  return blocks.filter(Boolean);
+  flushSection();
+
+  return sections.map(section => {
+    const bodyLines = section.lines.map(rawLine => {
+      const line = String(rawLine ?? "");
+      if(!line.trim()) return `<div class="srp-export-blank">&nbsp;</div>`;
+      const isChord = lineLooksMostlyLikeChordsGlobal(line) || _fullPerf_isChordLine(line);
+      const cls = isChord ? "srp-export-line srp-export-chord" : "srp-export-line srp-export-lyric";
+      return `<div class="${cls}">${escapeHtml(line)}</div>`;
+    }).join("\n");
+
+    const titleHtml = section.title
+      ? `<div class="srp-export-section-title">${escapeHtml(section.title)}</div>`
+      : ``;
+
+    return `<section class="srp-export-section">${titleHtml}<div class="srp-export-section-body">${bodyLines}</div></section>`;
+  }).filter(Boolean);
 }
 
 function buildFullPreviewText(){
@@ -9079,9 +9105,9 @@ function buildFullPreviewHtmlDoc(title){
 
   const blocks = [];
   blocks.push(
-    `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:0 0 18px 0;">` +
-      `<div style="font-family:Arial,Helvetica,sans-serif;font-weight:900;font-size:34px;line-height:1.1;">${escapeHtml(projectName)}</div>` +
-      (metaLine ? `<div style="font-family:'Courier New',Courier,monospace;font-weight:400;font-size:16px;line-height:1.2;white-space:pre-wrap;">${escapeHtml(metaLine)}</div>` : ``) +
+    `<div class="srp-export-header">` +
+      `<div class="srp-export-title">${escapeHtml(projectName)}</div>` +
+      (metaLine ? `<div class="srp-export-meta">${escapeHtml(metaLine)}</div>` : ``) +
     `</div>`
   );
 
@@ -9097,8 +9123,28 @@ function buildFullPreviewHtmlDoc(title){
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${safeTitle}</title>
+<style>
+  @page{margin:.55in;}
+  *{box-sizing:border-box;}
+  body{margin:24px;color:#111;background:#fff;}
+  .srp-export-header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:0 0 18px 0;break-after:avoid-page;page-break-after:avoid;}
+  .srp-export-title{font-family:Arial,Helvetica,sans-serif;font-weight:900;font-size:34px;line-height:1.1;}
+  .srp-export-meta{font-family:'Courier New',Courier,monospace;font-weight:700;font-size:16px;line-height:1.2;white-space:pre-wrap;}
+  .srp-export-section{margin:0 0 18px 0;break-inside:avoid-page;page-break-inside:avoid;}
+  .srp-export-section-title{font-family:Arial,Helvetica,sans-serif;font-size:18px;line-height:1.2;font-weight:900;text-decoration:underline;text-underline-offset:3px;margin:18px 0 8px;break-after:avoid-page;page-break-after:avoid;}
+  .srp-export-section-body{break-inside:avoid-page;page-break-inside:avoid;}
+  .srp-export-line{font-family:'Courier New',Courier,monospace;font-size:16px;line-height:1.38;white-space:pre-wrap;overflow-wrap:normal;}
+  .srp-export-chord{color:#c00000;font-weight:900;}
+  .srp-export-lyric{color:#111;font-weight:700;}
+  .srp-export-blank{height:.72em;line-height:.72em;}
+  @media print{
+    body{margin:0;}
+    .srp-export-section{break-inside:avoid-page!important;page-break-inside:avoid!important;}
+    .srp-export-section-title{break-after:avoid-page!important;page-break-after:avoid!important;}
+  }
+</style>
 </head>
-<body style="margin:24px;color:#111;">
+<body>
 ${bodyHtml}
 </body>
 </html>`;
@@ -9914,11 +9960,20 @@ if(state.currentSection === "Full"){
   let commitTimer = null;
   function commitNow(){
     const newText = blocksToFullText(blocks);
-    editProject("fullBlocks", () => {
+    // The visible text edit is already recorded by quickSaveFullText(). Updating
+    // derived card/section state here must NOT create a second history entry;
+    // otherwise the first Undo appears to do nothing.
+    const wasLocked = history.lock;
+    history.lock = true;
+    try{
       state.project.fullText = newText;
       applyFullTextToProjectSections(state.project.fullText || "");
       cleanupDeletedBaseSections();
-    });
+    }finally{
+      history.lock = wasLocked;
+    }
+    history.lastSig = projectSignature(state.project);
+    updateUndoRedoUI();
     renderTabs();
     renderSheetTitleBar();
     refreshDisplayedNoteCells();
@@ -10502,19 +10557,26 @@ ta.value = state.project.fullText || "";
 
   // Debounced Full input handler (shared by typing and pill edits)
   let tmr = null;
+  let fullTextBurstBefore = null;
   function onFullTextareaInput(){
-    // keep live text in memory immediately (no history yet)
+    // Capture the PRE-edit project once for this typing burst before mutating the
+    // live fullText. This makes the on-screen Undo button actually restore text.
+    if(!fullTextBurstBefore) fullTextBurstBefore = deepClone(state.project);
     state.project.fullText = ta.value;
 
     if(tmr) clearTimeout(tmr);
     tmr = setTimeout(() => {
-      editProject("fullText", () => {
-        state.project.fullText = ta.value;
-        // Apply changes -> sections/cards
-        applyFullTextToProjectSections(state.project.fullText || "");
-        // Ensure we keep enough breaks for stable UI
-        state.project.fullText = ensureFullBreaksPresent(state.project.fullText || "");
-      });
+      const before = fullTextBurstBefore;
+      fullTextBurstBefore = null;
+
+      state.project.fullText = ta.value;
+      applyFullTextToProjectSections(state.project.fullText || "");
+      state.project.fullText = ensureFullBreaksPresent(state.project.fullText || "");
+
+      if(before && projectSignature(before) !== projectSignature(state.project)){
+        historyCommitBeforeSnapshot(before);
+      }
+      upsertProject(state.project);
       updateFullIfVisible();
       refreshKeyUI();
       // re-align pills after parsing may normalize break lines
@@ -10797,11 +10859,9 @@ card.appendChild(top);
       inp.addEventListener("blur", () => {
         const rawNow = String(inp.value || "").trim();
         inp.dataset.raw = rawNow;
-        line.notes[i] = rawNow;
-
-      editProject("note", () => {
-  // line.notes[i] already set above — just commit snapshot + save
-});
+        editProject("note", () => {
+          line.notes[i] = rawNow;
+        });
         updateKeyFromAllNotes();
         updateFullIfVisible();
 
@@ -10842,10 +10902,10 @@ card.appendChild(top);
       });
 
       inp.addEventListener("input", () => {
-        line.beats[i] = String(inp.value || "").trim();
+        const nextBeat = String(inp.value || "").trim();
         editProject("beat", () => {
-  // line.beats[i] already set above
-});
+          line.beats[i] = nextBeat;
+        });
         updateFullIfVisible();
       });
 
@@ -12256,6 +12316,7 @@ function moveProjectToArchive(projectId){
   if(state.project && state.project.id === projectId){
     state.project = getCurrentProject();
     state.currentSection = "Full";
+    resetProjectHistory();
     applyProjectSettingsToUI();
     renderAll();
     try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
@@ -12390,6 +12451,7 @@ function loadProjectById(id){
   }
   state.project = p;
   setCurrentProjectIdForScope(getStorageScope(), p.id);
+  resetProjectHistory();
 
   applyProjectSettingsToUI();
   renderAll();
@@ -16264,6 +16326,7 @@ const v = Number.isFinite(raw) ? raw : 0;
     closeNotesModal?.();
     state.project = p;
     state.currentSection = "Full";
+    resetProjectHistory();
     applyProjectSettingsToUI();
     renderAll();
     try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
@@ -16291,6 +16354,7 @@ const v = Number.isFinite(raw) ? raw : 0;
     deleteProjectById(state.project.id);
     state.project = getCurrentProject();
     state.currentSection = "Full";
+    resetProjectHistory();
     applyProjectSettingsToUI();
     renderAll();
     renderArchiveModal();
@@ -16412,8 +16476,7 @@ async function init(){
   }
   injectHeaderControlTightStyle();
 
-  pushHistory("init"); // seed the first snapshot
-  updateUndoRedoUI();
+  resetProjectHistory();
   installSectionSwipe();
   cloud.appMounted = true;
   updateAuthModalUI();
