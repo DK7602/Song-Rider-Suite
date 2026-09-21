@@ -405,7 +405,7 @@
 
       <div class="vox-box-tools">
         <div class="vox-edit-button-row" role="toolbar" aria-label="Track Master edit tools">
-          <button id="voxCropBtn" type="button">Crop</button>
+          <button id="voxCropBtn" type="button" aria-pressed="false" title="Range Select — choose a time section on a vocal track">Select</button>
           <button id="voxSplitBtn" type="button">Split</button>
           <button id="voxCopyBtn" type="button">Copy</button>
           <button id="voxCutBtn" type="button">Cut</button>
@@ -418,7 +418,7 @@
           <div><strong>Chords Used</strong><span id="voxChordsUsed">—</span></div>
           <div><strong>Notes that fit</strong><span id="voxNotesFit">—</span></div>
         </div>
-        <span id="voxBoxStatus" class="subtle tiny">Multi Select: tap events to add/remove them. Tap blank track space for Paste. On touch, long-press an event to grab and move it.</span>
+        <span id="voxBoxStatus" class="subtle tiny">Select chooses a time range on a vocal track for Copy/Cut/Delete. Multi Select still selects whole events. On touch, long-press an event to grab and move it.</span>
       </div>
 
       <div id="voxTimelineScroller" class="vox-timeline-scroller">

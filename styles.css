@@ -4824,3 +4824,101 @@ body.workspace-chord-rider .primary-toolbar > .sustain-control{
     outline-offset:1px!important;
   }
 }
+
+
+/* =========================================================
+   v3.3.51 — Track Master vocal Range Select
+   Replaces the obsolete Crop toolbar mode without changing event trim/move logic.
+   ========================================================= */
+.vox-box-page.range-select-mode .vox-track-row[data-vox-kind="vocal"]>.vox-track-lane,
+.vox-box-page.range-select-mode .vox-track-row[data-vox-kind="vocal"] .vox-event{
+  cursor:crosshair!important;
+}
+.vox-range-selection{
+  position:absolute;
+  top:7px;
+  bottom:7px;
+  z-index:18;
+  min-width:2px;
+  box-sizing:border-box;
+  border:2px solid #66c6ff;
+  border-radius:4px;
+  background:rgba(102,198,255,.15);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 0 12px rgba(102,198,255,.24);
+  pointer-events:none;
+}
+.vox-range-selection.is-pending{
+  width:2px!important;
+  border-left-width:3px;
+  border-right:0;
+  background:transparent;
+}
+.vox-range-caption{
+  position:absolute;
+  top:4px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:2;
+  padding:2px 5px;
+  border-radius:4px;
+  background:rgba(7,18,28,.86);
+  color:#c9ecff;
+  font-size:.61rem;
+  font-weight:900;
+  line-height:1.1;
+  white-space:nowrap;
+  pointer-events:none;
+}
+.vox-range-handle{
+  position:absolute!important;
+  top:-5px!important;
+  bottom:-5px!important;
+  width:14px!important;
+  min-width:14px!important;
+  height:auto!important;
+  min-height:0!important;
+  padding:0!important;
+  margin:0!important;
+  z-index:4!important;
+  border:0!important;
+  border-radius:3px!important;
+  background:#66c6ff!important;
+  box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 8px rgba(102,198,255,.7)!important;
+  cursor:ew-resize!important;
+  touch-action:none!important;
+  pointer-events:auto!important;
+}
+.vox-range-handle.start{left:-8px!important;}
+.vox-range-handle.end{right:-8px!important;}
+.vox-range-handle::after{
+  content:"";
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:28px;
+  height:100%;
+  min-height:58px;
+  transform:translate(-50%,-50%);
+}
+.vox-range-selection.is-pending .vox-range-handle.end{display:none!important;}
+#voxCropBtn.is-active{
+  border-color:#66c6ff!important;
+  background:linear-gradient(180deg,#8cddff,#47aee3)!important;
+  color:#07121a!important;
+  box-shadow:0 0 0 2px rgba(102,198,255,.18),0 3px 10px rgba(0,0,0,.25)!important;
+}
+@media(max-width:600px){
+  .vox-box-page.range-select-mode .vox-track-row[data-vox-kind="vocal"] .vox-event{
+    touch-action:manipulation!important;
+  }
+  .vox-range-selection{top:5px;bottom:5px;border-width:2px;}
+  .vox-range-handle{width:16px!important;min-width:16px!important;}
+  .vox-range-handle.start{left:-9px!important;}
+  .vox-range-handle.end{right:-9px!important;}
+  .vox-range-handle::after{width:34px;min-height:66px;}
+}
+/* Preserve the old edge-trim capability after removing the dedicated Crop mode:
+   a normally selected vocal event still exposes its trim handles. Range Select
+   hides those event handles so its own boundary handles are unambiguous. */
+.vox-event.is-selected .vox-trim-handle{display:block;}
+.vox-box-page.range-select-mode .vox-event .vox-trim-handle{display:none!important;}

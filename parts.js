@@ -71,7 +71,7 @@
   let recording=false,recordingPaused=false,recordChunks=[],recordSampleRate=48000,recordStartedAt=0,recordPausedAt=0,recordPausedTotal=0,recordTimer=null,currentPreview=null,recordInsertBeat=0,recordTargetPartId=null,recordStartedFromVox=false,recordResumeBeat=0;
   let leadBarClipboard=null, speechRec=null, speechBase='';
   let partsUpdatedAt=0;
-  let voxBoxOpen=false,voxCropMode=false,voxSelected=null,voxSelections=[],voxInstrumentSelection=null,voxInstrumentSelections=[],voxInstrumentTrackFocus=null,voxTargetPartId=null,voxClipboard=null,voxPlayheadBeat=0,voxRenderToken=0,voxAutoScroll=true,voxShowInstrumentals=false,voxOpenedFromVocal=false,voxToolMode='playhead',voxUndoStack=[],voxRedoStack=[],voxInspectorManualOverride=null;
+  let voxBoxOpen=false,voxCropMode=false,voxRangeMode=false,voxRangeSelection=null,voxSelected=null,voxSelections=[],voxInstrumentSelection=null,voxInstrumentSelections=[],voxInstrumentTrackFocus=null,voxTargetPartId=null,voxClipboard=null,voxPlayheadBeat=0,voxRenderToken=0,voxAutoScroll=true,voxShowInstrumentals=false,voxOpenedFromVocal=false,voxToolMode='playhead',voxUndoStack=[],voxRedoStack=[],voxInspectorManualOverride=null;
   // v3.3.36 — persists across Track Master rerenders so Android's synthesized dblclick/click
   // cannot create or refocus a second phantom event after a touch double-tap.
   let voxLaneAddGuard={partId:'',at:0,x:0,y:0};
@@ -1604,6 +1604,49 @@
     document.querySelectorAll('.vox-instrument-event').forEach(el=>el.classList.toggle('is-selected',voxInstrumentIsSelected(el.dataset.voxKey)));
   }
   function voxEventBounds(e){const start=Math.max(0,Number(e?.startBeat)||0),dur=Math.max(.001,voxEventDurationBeats(e));return {start,end:start+dur,dur};}
+  // v3.3.51 — Cubase-style Range Select for vocal tracks. This is transient UI
+  // state only: audio remains non-destructive until Cut/Delete is explicitly used.
+  function voxRangeMinBeat(){return voxSnapEnabled()?Math.max(.03,voxBeatStep()):.03;}
+  function voxRangeResolved(){
+    const sel=voxRangeSelection;if(!voxRangeMode||!sel||sel.awaitingEnd)return null;
+    const part=parts.find(p=>p.type==='vocal'&&String(p.id)===String(sel.partId));if(!part)return null;
+    const start=Math.max(0,Number(sel.startBeat)||0),end=Math.max(start,Number(sel.endBeat)||start);
+    if(end-start<.001)return null;return {part,start,end,dur:end-start};
+  }
+  function voxRangeBeatAt(lane,clientX){const rect=lane.getBoundingClientRect(),raw=Math.max(0,(Number(clientX)-rect.left)/voxPpb());return quantizeVoxBeat(raw);}
+  function updateVoxRangeOverlay(part,lane){
+    if(!lane)return;let box=lane.querySelector('.vox-range-selection');const sel=voxRangeSelection,same=voxRangeMode&&sel&&String(sel.partId)===String(part.id);
+    if(!same){box?.remove();return;}
+    if(!box){box=document.createElement('div');box.className='vox-range-selection';box.innerHTML='<span class="vox-range-caption"></span><button type="button" class="vox-range-handle start" aria-label="Selection start"></button><button type="button" class="vox-range-handle end" aria-label="Selection end"></button>';lane.appendChild(box);const sh=box.querySelector('.vox-range-handle.start'),eh=box.querySelector('.vox-range-handle.end');sh.onpointerdown=e=>beginVoxRangeHandleDrag(e,'start',part,lane);eh.onpointerdown=e=>beginVoxRangeHandleDrag(e,'end',part,lane);}
+    const a=Math.max(0,Number(sel.startBeat)||0),b=Math.max(a,Number(sel.endBeat)||a),left=a*voxPpb(),width=Math.max(2,(b-a)*voxPpb());box.style.left=`${left}px`;box.style.width=`${width}px`;box.classList.toggle('is-pending',!!sel.awaitingEnd);const cap=box.querySelector('.vox-range-caption');if(cap){cap.textContent=sel.awaitingEnd?'START':`${(b-a).toFixed(2)}b`;cap.hidden=!sel.awaitingEnd&&width<52;}
+  }
+  function announceVoxRange(){const r=voxRangeResolved();if(r)voxStatus(`Range selected on ${r.part.name}: ${r.start.toFixed(2)}–${r.end.toFixed(2)} beats. Copy, Cut, or Delete; drag either blue handle to adjust.`);}
+  function beginVoxRangeHandleDrag(e,edge,part,lane){
+    if(!voxRangeMode||!voxRangeSelection||String(voxRangeSelection.partId)!==String(part.id))return;if(e.button!==undefined&&e.button!==0)return;e.preventDefault();e.stopPropagation();disableVoxAutoScroll();const handle=e.currentTarget,pid=e.pointerId,min=voxRangeMinBeat();try{handle.setPointerCapture(pid)}catch{}
+    const apply=clientX=>{const beat=voxRangeBeatAt(lane,clientX),sel=voxRangeSelection;if(!sel)return;if(edge==='start')sel.startBeat=Math.max(0,Math.min((Number(sel.endBeat)||0)-min,beat));else sel.endBeat=Math.max((Number(sel.startBeat)||0)+min,beat);sel.anchorBeat=edge==='start'?sel.startBeat:sel.endBeat;sel.awaitingEnd=false;updateVoxRangeOverlay(part,lane);renderVoxInspector();};
+    const move=ev=>{if(ev.pointerId!==pid)return;ev.preventDefault();apply(ev.clientX);};const up=ev=>{if(ev.pointerId!==pid)return;try{handle.releasePointerCapture(pid)}catch{};window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',up,true);window.removeEventListener('pointercancel',up,true);apply(ev.clientX);announceVoxRange();};window.addEventListener('pointermove',move,{capture:true,passive:false});window.addEventListener('pointerup',up,true);window.addEventListener('pointercancel',up,true);
+  }
+  function beginVoxRangePointer(e,part,lane){
+    if(!voxRangeMode||!part||!lane)return false;if(e.button!==undefined&&e.button!==0)return false;e.preventDefault();e.stopPropagation();disableVoxAutoScroll();voxTargetPartId=part.id;voxInstrumentTrackFocus=null;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;
+    const capture=e.currentTarget||lane,pid=e.pointerId,downX=e.clientX,downY=e.clientY,downBeat=voxRangeBeatAt(lane,e.clientX),previous=(voxRangeSelection&&String(voxRangeSelection.partId)===String(part.id))?{...voxRangeSelection}:null;let moved=false,lastBeat=downBeat;try{capture.setPointerCapture?.(pid)}catch{}
+    const preview=beat=>{lastBeat=beat;const start=Math.min(downBeat,beat),end=Math.max(downBeat,beat);voxRangeSelection={partId:part.id,anchorBeat:downBeat,startBeat:start,endBeat:end,awaitingEnd:false};updateVoxRangeOverlay(part,lane);renderVoxInspector();};
+    const move=ev=>{if(ev.pointerId!==pid)return;if(Math.hypot(ev.clientX-downX,ev.clientY-downY)<5&&!moved)return;moved=true;ev.preventDefault();preview(voxRangeBeatAt(lane,ev.clientX));};
+    const up=ev=>{if(ev.pointerId!==pid)return;try{capture.releasePointerCapture?.(pid)}catch{};window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',up,true);window.removeEventListener('pointercancel',cancel,true);const beat=voxRangeBeatAt(lane,ev.clientX);if(moved){preview(beat);const sel=voxRangeSelection,min=voxRangeMinBeat();if(sel.endBeat-sel.startBeat<min)sel.endBeat=sel.startBeat+min;updateVoxRangeOverlay(part,lane);announceVoxRange();}
+      else if(previous?.awaitingEnd){const anchor=Math.max(0,Number(previous.anchorBeat)||0),start=Math.min(anchor,beat),end=Math.max(anchor,beat),min=voxRangeMinBeat();voxRangeSelection={partId:part.id,anchorBeat:anchor,startBeat:start,endBeat:Math.max(start+min,end),awaitingEnd:false};updateVoxRangeOverlay(part,lane);announceVoxRange();}
+      else{voxRangeSelection={partId:part.id,anchorBeat:beat,startBeat:beat,endBeat:beat,awaitingEnd:true};updateVoxRangeOverlay(part,lane);voxStatus(`Range start set at beat ${beat.toFixed(2)}. Tap the end point${e.pointerType==='touch'?' on the vocal event or track':''}.`);}renderVoxInspector();};
+    const cancel=ev=>{if(ev.pointerId!==pid)return;try{capture.releasePointerCapture?.(pid)}catch{};window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',up,true);window.removeEventListener('pointercancel',cancel,true);if(moved){preview(lastBeat);announceVoxRange();}};window.addEventListener('pointermove',move,{capture:true,passive:false});window.addEventListener('pointerup',up,{capture:true,passive:false});window.addEventListener('pointercancel',cancel,true);return true;
+  }
+  function voxRangeSegments(range){
+    const out=[];if(!range)return out;const beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92));for(const event of voxTrackEvents(range.part)){const b=voxEventBounds(event),start=Math.max(range.start,b.start),end=Math.min(range.end,b.end);if(end-start<=.001)continue;const trim0=Math.max(0,Number(event.trimStartSec)||0),seg=clone(event);seg.startBeat=start;seg.trimStartSec=Math.max(0,trim0+(start-b.start)*beatSec);seg.trimEndSec=Math.max(seg.trimStartSec+.001,trim0+(end-b.start)*beatSec);out.push({event:seg,sourcePartId:range.part.id,deltaBeat:start-range.start});}return out;
+  }
+  function removeVoxRangeContent(range){
+    if(!range)return 0;const part=range.part,beatSec=60/Math.max(40,Math.min(240,Number(core.bpm)||92)),next=[];let touched=0;for(const event of (part.voxEvents||[])){const b=voxEventBounds(event);if(range.end<=b.start+.001||range.start>=b.end-.001){next.push(event);continue;}touched++;const trim0=Math.max(0,Number(event.trimStartSec)||0),trimEnd=trim0+b.dur*beatSec,leftKeep=range.start>b.start+.001,rightKeep=range.end<b.end-.001;if(leftKeep){const left=clone(event);left.trimEndSec=Math.max(trim0+.001,trim0+(range.start-b.start)*beatSec);next.push(left);}if(rightKeep){const right=clone(event);if(leftKeep)right.id=uid();right.startBeat=range.end;right.trimStartSec=Math.max(trim0,trim0+(range.end-b.start)*beatSec);right.trimEndSec=trimEnd;next.push(right);}}
+    part.voxEvents=next.map(e=>normalizeVoxEvent(e,part)).filter(Boolean);return touched;
+  }
+  function copyVoxRange(cut=false){
+    const range=voxRangeResolved();if(!range){voxStatus('Finish the Select range first. On phone: tap the start, then tap the end.');return true;}const items=voxRangeSegments(range);if(!items.length){voxStatus('That range contains no vocal audio.');return true;}voxClipboard={kind:'vocal-range',items,durationBeats:range.dur,sourcePartId:range.part.id};if(cut){voxCheckpoint();const n=removeVoxRangeContent(range);persistVoxEdits();renderVoxBox();voxStatus(`${range.dur.toFixed(2)}-beat range cut from ${range.part.name} (${n} event${n===1?'':'s'} affected). Paste starts at the playhead.`);}else{renderVoxInspector();voxStatus(`${range.dur.toFixed(2)}-beat range copied from ${range.part.name}. Paste starts at the playhead.`);}return true;
+  }
+  function deleteVoxRange(){const range=voxRangeResolved();if(!range){voxStatus('Finish the Select range first.');return true;}const hits=voxRangeSegments(range);if(!hits.length){voxStatus('That range contains no vocal audio.');return true;}voxCheckpoint();const n=removeVoxRangeContent(range);persistVoxEdits();renderVoxBox();voxStatus(`${range.dur.toFixed(2)}-beat range deleted from ${range.part.name} (${n} event${n===1?'':'s'} affected). Original takes remain safe.`);return true;}
   function setVoxAutoScroll(on,{manual=false,persist=true}={}){
     voxAutoScroll=!!on;if(persist){try{localStorage.setItem(VOX_AUTO_KEY,voxAutoScroll?'1':'0')}catch{}}
     const b=$('voxAutoScrollBtn');if(b){b.classList.toggle('is-active',voxAutoScroll);b.setAttribute('aria-pressed',String(voxAutoScroll));b.textContent='↔ Auto';b.title=voxAutoScroll?'AutoScroll on — follows the playhead':'AutoScroll off';}
@@ -1799,7 +1842,10 @@
     if($('voxFxVolume'))$('voxFxVolume').value=String(Math.round(vol*100));if($('voxFxVolumeValue'))$('voxFxVolumeValue').textContent=`${Math.round(vol*100)}%`;
     if($('voxFxEq'))$('voxFxEq').value=fx.eq;if($('voxFxComp'))$('voxFxComp').value=fx.comp;if($('voxFxReverb'))$('voxFxReverb').value=String(fx.reverb);if($('voxFxDelay'))$('voxFxDelay').value=String(fx.delay);if($('voxFxAutotune'))$('voxFxAutotune').value=String(Math.round(Number(fx.autotune)||0));if($('voxFxAutotuneValue'))$('voxFxAutotuneValue').textContent=`${Math.round(Number(fx.autotune)||0)}%`;
     if($('voxResetEventFxBtn'))$('voxResetEventFxBtn').disabled=!(pairs.length&&pairs.some(({event:e})=>e.fx||Number(e.volume)!==1));
-    for(const id of ['voxCropBtn','voxSplitBtn','voxCopyBtn','voxCutBtn','voxDeleteBtn'])if($(id))$(id).disabled=!pairs.length;
+    const rangeReady=!!voxRangeResolved();
+    if($('voxCropBtn'))$('voxCropBtn').disabled=false;
+    if($('voxSplitBtn'))$('voxSplitBtn').disabled=!pairs.length;
+    for(const id of ['voxCopyBtn','voxCutBtn','voxDeleteBtn'])if($(id))$(id).disabled=!(pairs.length||rangeReady);
     if($('voxPasteBtn'))$('voxPasteBtn').disabled=!voxClipboard;updateVoxHistoryButtons();
   }
 
@@ -2295,18 +2341,18 @@
         const menu=document.createElement('button');menu.type='button';menu.className='vox-track-menu-btn';menu.textContent='⋮';menu.title='Track actions';menu.setAttribute('aria-label',`${part.name} track actions`);menu.onclick=e=>{e.preventDefault();e.stopPropagation();const r=menu.getBoundingClientRect();openVoxTrackContextMenu(part,label,r.right,r.bottom);};label.append(nameInput,meta,menu);appendVoxMuteSolo(label,{part});
         label.onclick=e=>{if(e.target.closest('input,button'))return;focusVoxVocalTrack(part,{announce:true});};
         label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(part,label,e.clientX,e.clientY);};
-        const lane=document.createElement('div');lane.className='vox-track-lane';lane.dataset.voxPartId=part.id;lane.dataset.voxKind='vocal';lane.onclick=e=>{if(e.target!==lane)return;focusVoxVocalTrack(part,{announce:true});/* Blank vocal space selects the paste/drop target. The ruler is the only seek surface. */};
+        const lane=document.createElement('div');lane.className='vox-track-lane';lane.dataset.voxPartId=part.id;lane.dataset.voxKind='vocal';lane.onpointerdown=e=>{if(voxRangeMode&&e.target===lane)beginVoxRangePointer(e,part,lane);};lane.onclick=e=>{if(e.target!==lane)return;if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}focusVoxVocalTrack(part,{announce:true});/* Blank vocal space selects the paste/drop target. The ruler is the only seek surface. */};
         for(const event of voxTrackEvents(part)){
           const take=voxEventTake(event),bounds=voxEventBounds(event),ev=document.createElement('div');ev.className='vox-event'+(voxIsSelected(part.id,event.id)?' is-selected':'');ev.dataset.voxEventId=event.id;ev.dataset.voxPartId=part.id;ev.style.left=`${bounds.start*ppb}px`;ev.style.width=`${Math.max(24,bounds.dur*ppb)}px`;
           const top=document.createElement('div');top.className='vox-event-top';top.innerHTML=`<span class="vox-event-name">${escapeHtml(take?.name||'Vocal event')}</span><span class="vox-event-time">${bounds.start.toFixed(2)}–${bounds.end.toFixed(2)}b</span>`;
           const canvas=document.createElement('canvas');canvas.className='vox-event-waveform';const lh=document.createElement('span');lh.className='vox-trim-handle left';const rh=document.createElement('span');rh.className='vox-trim-handle right';ev.append(top,canvas,lh,rh);
-          ev.onclick=e=>{e.stopPropagation();if(ev.__voxDragged){ev.__voxDragged=false;return;}if((ev.__voxSuppressClickUntil||0)>performance.now())return;if(ev.__voxPointerSelected){ev.__voxPointerSelected=false;renderVoxSelectionClasses();renderVoxInspector();return;}const multi=voxToolMode==='multi',add=multi||e.ctrlKey||e.metaKey||e.shiftKey;voxSetSelection(part,event,{add,toggle:add});renderVoxSelectionClasses();renderVoxInspector();};
-          ev.onpointerdown=e=>{if(e.target===lh||e.target===rh)return;beginVoxPointerEdit(e,part,event,ev,'move');};lh.onpointerdown=e=>beginVoxPointerEdit(e,part,event,ev,'trim-left');rh.onpointerdown=e=>beginVoxPointerEdit(e,part,event,ev,'trim-right');lane.appendChild(ev);requestAnimationFrame(()=>drawVoxWaveform(canvas,event,token));
+          ev.onclick=e=>{e.stopPropagation();if(voxRangeMode){e.preventDefault();return;}if(ev.__voxDragged){ev.__voxDragged=false;return;}if((ev.__voxSuppressClickUntil||0)>performance.now())return;if(ev.__voxPointerSelected){ev.__voxPointerSelected=false;renderVoxSelectionClasses();renderVoxInspector();return;}const multi=voxToolMode==='multi',add=multi||e.ctrlKey||e.metaKey||e.shiftKey;voxSetSelection(part,event,{add,toggle:add});renderVoxSelectionClasses();renderVoxInspector();};
+          ev.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}if(e.target===lh||e.target===rh)return;beginVoxPointerEdit(e,part,event,ev,'move');};lh.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}beginVoxPointerEdit(e,part,event,ev,'trim-left');};rh.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}beginVoxPointerEdit(e,part,event,ev,'trim-right');};lane.appendChild(ev);requestAnimationFrame(()=>drawVoxWaveform(canvas,event,token));
         }
-        row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
+        updateVoxRangeOverlay(part,lane);row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
       }
     }else tracks.insertAdjacentHTML('beforeend','<div class="vocal-empty" style="padding:40px">No vocal tracks yet. Open a track’s ⋮ menu to add a Vocal Track.</div>');
-    applyVoxTrackOrder();inner.classList.toggle('has-crop-mode',voxCropMode);page?.classList.toggle('crop-mode',voxCropMode);page?.classList.remove('cursor-mode');page?.classList.toggle('multi-select-mode',voxToolMode==='multi');page?.classList.add('playhead-mode');if($('voxCropBtn'))$('voxCropBtn').classList.toggle('is-active',voxCropMode);
+    applyVoxTrackOrder();inner.classList.toggle('has-crop-mode',voxCropMode);page?.classList.toggle('crop-mode',voxCropMode);page?.classList.toggle('range-select-mode',voxRangeMode);page?.classList.remove('cursor-mode');page?.classList.toggle('multi-select-mode',voxToolMode==='multi');page?.classList.add('playhead-mode');if($('voxCropBtn')){$('voxCropBtn').textContent='Select';$('voxCropBtn').classList.toggle('is-active',voxRangeMode);$('voxCropBtn').setAttribute('aria-pressed',String(voxRangeMode));$('voxCropBtn').title=voxRangeMode?'Range Select on — drag on desktop; on phone tap start, then tap end':'Range Select — choose a vocal time section for Copy/Cut/Delete';if(!vocals.length)$('voxCropBtn').disabled=true;}
     if($('voxToolModeBtn')){$('voxToolModeBtn').textContent='Multi Select';$('voxToolModeBtn').classList.toggle('is-active',voxToolMode==='multi');$('voxToolModeBtn').setAttribute('aria-pressed',String(voxToolMode==='multi'));$('voxToolModeBtn').title=voxToolMode==='multi'?'Multi Select on — Track Master behaves normally; tap events to add/remove them from the selection':'Multi Select off — normal single-event editing';}
     renderVoxSongLocators();updateVoxPlayhead(voxPlayheadBeat);renderVoxHarmonyGuide();renderVoxInspector();updateVoxTransportState();wireVoxMarquee();
   }
@@ -2350,7 +2396,7 @@
     syncLoadedChord();
     let changed=false;for(const p of vocals){if(!(p.voxEvents||[]).length&&p.activeTakeId&&p.recordings?.some(r=>r.id===p.activeTakeId)){ensureVoxEventForActiveTake(p,0);changed=true;}}
     voxOpenedFromVocal=fromVocal;if(forceInstrumentals){try{localStorage.setItem(VOX_INST_KEY,'1')}catch{}voxShowInstrumentals=true;}
-    voxBoxOpen=true;try{const savedInspector=localStorage.getItem(VOX_INSPECTOR_COLLAPSED_KEY);voxInspectorManualOverride=savedInspector===null?null:savedInspector==='1';}catch{voxInspectorManualOverride=null;}voxTargetPartId=vocals.length?(active()?.type==='vocal'?active().id:vocals[0].id):null;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=null;voxCropMode=false;voxUndoStack=[];voxRedoStack=[];const page=$('voxBoxPage');if(page){page.hidden=false;page.setAttribute('aria-hidden','false');}document.body.classList.add('vox-box-open');
+    voxBoxOpen=true;try{const savedInspector=localStorage.getItem(VOX_INSPECTOR_COLLAPSED_KEY);voxInspectorManualOverride=savedInspector===null?null:savedInspector==='1';}catch{voxInspectorManualOverride=null;}voxTargetPartId=vocals.length?(active()?.type==='vocal'?active().id:vocals[0].id):null;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=null;voxCropMode=false;voxRangeMode=false;voxRangeSelection=null;voxUndoStack=[];voxRedoStack=[];const page=$('voxBoxPage');if(page){page.hidden=false;page.setAttribute('aria-hidden','false');}document.body.classList.add('vox-box-open');
     try{$('voxSnapToBeat').checked=localStorage.getItem(VOX_SNAP_KEY)!=='0';$('voxSnapResolution').value=localStorage.getItem(VOX_RES_KEY)||'16';voxAutoScroll=localStorage.getItem(VOX_AUTO_KEY)!=='0';voxShowInstrumentals=forceInstrumentals?true:(fromVocal?false:localStorage.getItem(VOX_INST_KEY)==='1');const savedTool=localStorage.getItem(VOX_TOOL_KEY)||'playhead';voxToolMode=savedTool==='cursor'?'multi':(savedTool==='multi'?'multi':'playhead');}catch{}
     if(changed)persistVoxEdits();renderVoxBox();restoreVoxTransportPosition();updateVoxHistoryButtons();
   }
@@ -2388,8 +2434,9 @@
   }
   function removeVocalSelectionNoCheckpoint(list=voxSelectionPairs()){for(const {part,event} of list)part.voxEvents=(part.voxEvents||[]).filter(x=>x.id!==event.id);}
   function copySelectedVox(cut=false){
+    if(voxRangeMode&&voxRangeResolved())return copyVoxRange(cut);
     const vocals=voxSelectionPairs().slice().sort((a,b)=>(Number(a.event.startBeat)||0)-(Number(b.event.startBeat)||0)),inst=voxInstrumentSelectionList().slice().sort((a,b)=>(Number(a.startBeat)||0)-(Number(b.startBeat)||0));
-    if(!vocals.length&&!inst.length)return;
+    if(!vocals.length&&!inst.length){if(voxRangeMode)voxStatus('Finish the Select range first.');return;}
     const allStarts=[...vocals.map(x=>Number(x.event.startBeat)||0),...inst.map(x=>Number(x.startBeat)||0)],anchor=Math.min(...allStarts);
     if(vocals.length&&inst.length){
       const vocalTracks=allVocalParts(),baseTrack=vocalTracks.indexOf(vocals[0].part);voxClipboard={kind:'mixed',focusKeyAtCopy:String(voxInstrumentTrackFocus?.key||''),vocalItems:vocals.map(({part,event})=>({event:clone(event),sourcePartId:part.id,deltaBeat:(Number(event.startBeat)||0)-anchor,trackOffset:vocalTracks.indexOf(part)-baseTrack})),instrumentItems:serializeInstrumentClipboardItems(inst,anchor)};
@@ -2423,14 +2470,15 @@
   function pasteVox(){
     if(!voxClipboard)return;if(voxClipboard.kind==='instrument-group'){pasteInstrument();return;}voxCheckpoint();const newV=[],newI=[],vocalTracks=allVocalParts(),target=voxTargetPart()||vocalTracks[0]||null,base=target?Math.max(0,vocalTracks.indexOf(target)):0;
     const pasteVocals=items=>{if(!target)return;for(const item of items||[]){const dest=vocalTracks[Math.max(0,Math.min(vocalTracks.length-1,base+(Number(item.trackOffset)||0)))]||target,ev=normalizeVoxEvent({...clone(item.event),id:uid(),sourcePartId:item.event?.sourcePartId||item.sourcePartId,startBeat:Math.max(0,Math.round((voxPlayheadBeat+(Number(item.deltaBeat)||0))*1000)/1000)},dest);dest.voxEvents=dest.voxEvents||[];dest.voxEvents.push(ev);newV.push({partId:dest.id,eventId:ev.id});}};
-    if(voxClipboard.kind==='vocal')pasteVocals(voxClipboard.items);else if(voxClipboard.kind==='mixed'){pasteVocals(voxClipboard.vocalItems);for(const item of voxClipboard.instrumentItems||[]){const dest=destinationInstrumentPartForClip(item),s=pasteOneInstrumentClip(item,voxPlayheadBeat+(Number(item.deltaBeat)||0),dest);if(s)newI.push(s);}}else{voxUndoStack.pop();updateVoxHistoryButtons();return;}
+    if(voxClipboard.kind==='vocal'||voxClipboard.kind==='vocal-range')pasteVocals(voxClipboard.items);else if(voxClipboard.kind==='mixed'){pasteVocals(voxClipboard.vocalItems);for(const item of voxClipboard.instrumentItems||[]){const dest=destinationInstrumentPartForClip(item),s=pasteOneInstrumentClip(item,voxPlayheadBeat+(Number(item.deltaBeat)||0),dest);if(s)newI.push(s);}}else{voxUndoStack.pop();updateVoxHistoryButtons();return;}
     voxSelections=newV;voxSelected=newV[0]||null;voxInstrumentSelections=newI;voxInstrumentSelection=newI[0]||null;persistVoxEdits();renderParts();renderVoxBox();const n=newV.length+newI.length;voxStatus(`${n} event${n===1?'':'s'} pasted in order; earliest event starts at beat ${voxPlayheadBeat.toFixed(2)}.`);
   }
   function deleteInstrumentSelection(){
     const list=voxInstrumentSelectionList();if(!list.length)return false;voxCheckpoint();removeInstrumentSelectionNoCheckpoint(list);voxInstrumentSelections=[];voxInstrumentSelection=null;renderVoxBox();voxStatus(`${list.length} instrument event${list.length===1?'':'s'} deleted.`);persistVoxEditsAfterPaint({renderPartsToo:true});return true;
   }
   function deleteSelectedVox(){
-    const inst=voxInstrumentSelectionList(),voc=voxSelectionPairs();if(!inst.length&&!voc.length)return;voxCheckpoint();removeInstrumentSelectionNoCheckpoint(inst);removeVocalSelectionNoCheckpoint(voc);voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;renderVoxBox();const n=inst.length+voc.length;voxStatus(`${n} event${n===1?'':'s'} deleted. Original vocal takes remain safe.`);persistVoxEditsAfterPaint({renderPartsToo:true});
+    if(voxRangeMode&&voxRangeResolved())return deleteVoxRange();
+    const inst=voxInstrumentSelectionList(),voc=voxSelectionPairs();if(!inst.length&&!voc.length){if(voxRangeMode)voxStatus('Finish the Select range first.');return;}voxCheckpoint();removeInstrumentSelectionNoCheckpoint(inst);removeVocalSelectionNoCheckpoint(voc);voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;renderVoxBox();const n=inst.length+voc.length;voxStatus(`${n} event${n===1?'':'s'} deleted. Original vocal takes remain safe.`);persistVoxEditsAfterPaint({renderPartsToo:true});
   }
   function updateVoxFxFromUi(kind){
     const p=voxTargetPart(),selected=voxSelectionPairs(),eventMode=$('voxFxTarget')?.value==='event'&&selected.length;if(!p)return;const touchedParts=new Set();
@@ -2486,8 +2534,8 @@
     if($('voxBpmInput')){syncVoxBpmInput();$('voxBpmInput').addEventListener('change',commitVoxBpm);$('voxBpmInput').addEventListener('blur',commitVoxBpm);$('voxBpmInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitVoxBpm();e.currentTarget.blur();}});}
     if($('voxSnapToBeat'))$('voxSnapToBeat').onchange=e=>{try{localStorage.setItem(VOX_SNAP_KEY,e.target.checked?'1':'0')}catch{}voxStatus(e.target.checked?`Snap on (1/${$('voxSnapResolution')?.value||'16'})`:'Free drag enabled.');};
     if($('voxSnapResolution'))$('voxSnapResolution').onchange=e=>{try{localStorage.setItem(VOX_RES_KEY,e.target.value)}catch{}voxStatus(`Snap grid set to 1/${e.target.value}.`);};
-    if($('voxToolModeBtn'))$('voxToolModeBtn').onclick=()=>{voxToolMode=voxToolMode==='multi'?'playhead':'multi';clearVoxSelection({render:false,keepInstrumentFocus:true});try{localStorage.setItem(VOX_TOOL_KEY,voxToolMode)}catch{};renderVoxBox();voxStatus(voxToolMode==='multi'?'Multi Select on — normal Track Master behavior stays active. Tap events to add/remove them from the selection.':'Multi Select off — normal single-event editing.');};
-    if($('voxCropBtn'))$('voxCropBtn').onclick=()=>{voxCropMode=!voxCropMode;renderVoxBox();voxStatus(voxCropMode?'Crop mode: drag the blue-selected event edges.':'Crop mode off.');};
+    if($('voxToolModeBtn'))$('voxToolModeBtn').onclick=()=>{voxRangeMode=false;voxRangeSelection=null;voxToolMode=voxToolMode==='multi'?'playhead':'multi';clearVoxSelection({render:false,keepInstrumentFocus:true});try{localStorage.setItem(VOX_TOOL_KEY,voxToolMode)}catch{};renderVoxBox();voxStatus(voxToolMode==='multi'?'Multi Select on — normal Track Master behavior stays active. Tap events to add/remove them from the selection.':'Multi Select off — normal single-event editing.');};
+    if($('voxCropBtn'))$('voxCropBtn').onclick=()=>{voxRangeMode=!voxRangeMode;voxCropMode=false;voxRangeSelection=null;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=null;if(voxRangeMode){voxToolMode='playhead';try{localStorage.setItem(VOX_TOOL_KEY,'playhead')}catch{}if(allVocalParts().length&&!voxTargetPartId)voxTargetPartId=allVocalParts()[0].id;}renderVoxBox();voxStatus(voxRangeMode?(window.matchMedia?.('(pointer: coarse)')?.matches?'Select on — tap a vocal event/track for the start, then tap the end. Drag either blue handle to adjust.':'Select on — drag across a vocal track to highlight a range. Copy, Cut, or Delete use that range.'):'Select off — normal event editing restored.');};
     if($('voxSplitBtn'))$('voxSplitBtn').onclick=splitSelectedVox;
     if($('voxCopyBtn'))$('voxCopyBtn').onclick=()=>copySelectedVox(false);
     if($('voxCutBtn'))$('voxCutBtn').onclick=()=>copySelectedVox(true);
