@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.58-srp-undo-export-print';
+const CACHE = 'song-rider-suite-v3.3.59-srp-gdocs-print-layout';
 const ASSETS = [
   './vocal-autotune-worklet.js',
   './song-rider-pro-wordmark-hq.png',

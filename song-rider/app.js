@@ -9026,6 +9026,24 @@ function transposeFullExportText(text, semis){
   }).join("\n");
 }
 
+function exportHtmlPreserveSpacing(line){
+  const raw = String(line ?? "");
+  const esc = escapeHtml(raw);
+
+  // v3.3.59: Google Docs' HTML importer can ignore `white-space: pre-wrap`
+  // and collapse the spacing used to align chords above lyrics. Encode the
+  // spacing into the HTML itself so browser preview, Google Docs, and print
+  // all see the same columns. Keep one normal trailing space in interior runs
+  // so long lyric lines may still wrap naturally between words.
+  return esc.replace(/ +/g, (run, offset) => {
+    const atStart = offset === 0;
+    const atEnd = offset + run.length >= esc.length;
+    if(run.length === 1 && !atStart && !atEnd) return " ";
+    if(atStart || atEnd) return "&nbsp;".repeat(run.length);
+    return "&nbsp;".repeat(Math.max(0, run.length - 1)) + " ";
+  });
+}
+
 function exportTextToHtmlBlocks(fullText){
   const lines = normalizeLineBreaks(fullText || "").split("\n");
   const sections = [];
@@ -9067,14 +9085,18 @@ function exportTextToHtmlBlocks(fullText){
       if(!line.trim()) return `<div class="srp-export-blank">&nbsp;</div>`;
       const isChord = lineLooksMostlyLikeChordsGlobal(line) || _fullPerf_isChordLine(line);
       const cls = isChord ? "srp-export-line srp-export-chord" : "srp-export-line srp-export-lyric";
-      return `<div class="${cls}">${escapeHtml(line)}</div>`;
+      return `<div class="${cls}">${exportHtmlPreserveSpacing(line)}</div>`;
     }).join("\n");
 
     const titleHtml = section.title
       ? `<div class="srp-export-section-title">${escapeHtml(section.title)}</div>`
       : ``;
 
-    return `<section class="srp-export-section">${titleHtml}<div class="srp-export-section-body">${bodyLines}</div></section>`;
+    // A one-cell table is intentionally used instead of a generic <section>.
+    // Google Docs preserves table grouping/page flow far more reliably than
+    // modern CSS break-inside rules on arbitrary block elements. The table is
+    // borderless, so the browser preview remains visually unchanged.
+    return `<table class="srp-export-section" role="presentation"><tbody><tr><td>${titleHtml}<div class="srp-export-section-body">${bodyLines}</div></td></tr></tbody></table>`;
   }).filter(Boolean);
 }
 
@@ -9130,16 +9152,17 @@ function buildFullPreviewHtmlDoc(title){
   .srp-export-header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:0 0 18px 0;break-after:avoid-page;page-break-after:avoid;}
   .srp-export-title{font-family:Arial,Helvetica,sans-serif;font-weight:900;font-size:34px;line-height:1.1;}
   .srp-export-meta{font-family:'Courier New',Courier,monospace;font-weight:700;font-size:16px;line-height:1.2;white-space:pre-wrap;}
-  .srp-export-section{margin:0 0 18px 0;break-inside:avoid-page;page-break-inside:avoid;}
+  .srp-export-section{width:100%;border:0;border-collapse:collapse;border-spacing:0;margin:0 0 18px 0;break-inside:avoid-page;page-break-inside:avoid;}
+  .srp-export-section td{border:0;padding:0;vertical-align:top;}
   .srp-export-section-title{font-family:Arial,Helvetica,sans-serif;font-size:18px;line-height:1.2;font-weight:900;text-decoration:underline;text-underline-offset:3px;margin:18px 0 8px;break-after:avoid-page;page-break-after:avoid;}
   .srp-export-section-body{break-inside:avoid-page;page-break-inside:avoid;}
-  .srp-export-line{font-family:'Courier New',Courier,monospace;font-size:16px;line-height:1.38;white-space:pre-wrap;overflow-wrap:normal;}
+  .srp-export-line{font-family:'Courier New',Courier,monospace;font-size:16px;line-height:1.38;white-space:normal;overflow-wrap:normal;}
   .srp-export-chord{color:#c00000;font-weight:900;}
   .srp-export-lyric{color:#111;font-weight:700;}
   .srp-export-blank{height:.72em;line-height:.72em;}
   @media print{
     body{margin:0;}
-    .srp-export-section{break-inside:avoid-page!important;page-break-inside:avoid!important;}
+    .srp-export-section,.srp-export-section tr,.srp-export-section td{break-inside:avoid-page!important;page-break-inside:avoid!important;}
     .srp-export-section-title{break-after:avoid-page!important;page-break-after:avoid!important;}
   }
 </style>
