@@ -1849,7 +1849,8 @@ const cloud = {
   appMounted: false,
   authMode: "signin",
   recoveryMode: false,
-  pendingSyncReasons: []
+  pendingSyncReasons: [],
+  deferInitialMerge: false
 };
 
 function canUseCloudSync(){
@@ -2311,15 +2312,23 @@ async function handleAuthSessionChange(session, reason=""){
     cloud.ready = true;
     setCloudStatus("syncing");
     try{
-      // Only adopt guest projects when this account has no SRP cloud projects yet.
-      // Migrated/established accounts must never be polluted by a device's guest scratch data.
-      const existingRemote = await fetchCloudProjects();
-      if(!existingRemote.length) maybeSeedSignedInScopeFromGuest();
-      await mergeCloudIntoLocal();
-      if(seq !== cloud.authChangeSeq) return;
-      setCloudStatus("ok");
-      queueCloudSync(reason || "auth");
-      updateAuthModalUI();
+      /* Returning users already have a scoped local cache. During initial boot, render that cache immediately after auth and reconcile Cloudflare just after the app mounts. This removes the large SRP project-list network/JSON merge from the critical paint path. New devices with no cached projects still perform the full cloud restore before rendering, so we never create/push a stray blank project. */
+      const cachedForUser = loadAllProjectsForScope(getAuthUserId());
+      const canDeferInitialMerge = reason === "init" && Array.isArray(cachedForUser) && cachedForUser.length > 0;
+      if(canDeferInitialMerge){
+        cloud.deferInitialMerge = true;
+        updateAuthModalUI();
+      }else{
+        // Only adopt guest projects when this account has no SRP cloud projects yet.
+        // Migrated/established accounts must never be polluted by a device's guest scratch data.
+        const existingRemote = await fetchCloudProjects();
+        if(!existingRemote.length) maybeSeedSignedInScopeFromGuest();
+        await mergeCloudIntoLocal();
+        if(seq !== cloud.authChangeSeq) return;
+        setCloudStatus("ok");
+        queueCloudSync(reason || "auth");
+        updateAuthModalUI();
+      }
     }catch(err){
       if(seq !== cloud.authChangeSeq) return;
       console.error("Cloud auth sync failed", err);
@@ -16409,9 +16418,24 @@ async function init(){
   cloud.appMounted = true;
   updateAuthModalUI();
   if(cloud.user){
-    scheduleDeferredCloudAudioSync("post-init");
-    scheduleDeferredCloudNoteImageSync("post-init");
-    queueCloudSync("post-init");
+    if(cloud.deferInitialMerge){
+      cloud.deferInitialMerge = false;
+      setTimeout(() => {
+        if(!cloud.user) return;
+        mergeCloudIntoLocal().then(() => {
+          setCloudStatus("ok");
+          updateAuthModalUI();
+        }).catch(err => {
+          console.error("Deferred initial cloud merge failed", err);
+          setCloudStatus("error", err?.message || String(err || "Unknown error"));
+          updateAuthModalUI(err?.message || "Cloud sync failed.");
+        });
+      }, 60);
+    }else{
+      scheduleDeferredCloudAudioSync("post-init");
+      scheduleDeferredCloudNoteImageSync("post-init");
+      queueCloudSync("post-init");
+    }
   }
 
   stopBeatClock();
