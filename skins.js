@@ -6,7 +6,8 @@
     {id:'rider-original', name:'Rider Original', desc:'Original black + gold Bones & Rider look.', swatches:['#0d0f12','#e9c46a','#11161d','#72c98a']},
     {id:'rider-blood', name:'Rider Blood', desc:'Original Rider look with deep red accents, red editor cells and subtle red trim.', swatches:['#0d0f12','#e9c46a','#b9242d','#2a1013']},
     {id:'studio-pastel', name:'Studio Pastel', desc:'Blue, pink, warm tan + gold. Calm studio graphics.', swatches:['#f2e6d7','#7aaed8','#e89aba','#c49a43']},
-    {id:'celtic-gold', name:'Celtic Gold', desc:'Emerald green, 24-karat gold, white and cream with Celtic knot artistry.', swatches:['#1f6b46','#d2a239','#fffdf7','#f3ecda']},
+    {id:'celtic-gold', name:'Celtic Gold', desc:'Light Celtic skin with fresh green, 24-karat gold, cream and Celtic knot art.', swatches:['#2f8757','#d2a239','#fffdf7','#f3ecda']},
+    {id:'celtic-gold-dark', name:'Celtic Gold Dark', desc:'Deep green-black Celtic skin with 24-karat gold, cream highlights and Celtic knot art.', swatches:['#0f2419','#d2a239','#e7ebde','#2f8757']},
     {id:'black-label', name:'Black Label', desc:'Black, yellow and polished gold. Elegant and skull-free.', swatches:['#090a0c','#e3b84e','#f0cf57','#25272c']},
     {id:'black-label-light', name:'Black Label Light', desc:'White, gray, gold + yellow with restrained green.', swatches:['#f6f5f1','#d4aa45','#e7ca52','#4e9d65']},
     {id:'rider-light', name:'Rider Light', desc:'Light Rider palette with the current Bones & Rider buttons.', swatches:['#f4f4f2','#d8ac43','#f0cf52','#57a96f']},
@@ -19,7 +20,7 @@
   }
   function setThemeColor(skin){
     const map={
-      'rider-original':'#111111', 'rider-blood':'#111111', 'studio-pastel':'#f2e6d7', 'celtic-gold':'#f3ecda', 'black-label':'#090a0c',
+      'rider-original':'#111111', 'rider-blood':'#111111', 'studio-pastel':'#f2e6d7', 'celtic-gold':'#f3ecda', 'celtic-gold-dark':'#0f2419', 'black-label':'#090a0c',
       'black-label-light':'#f6f5f1', 'rider-light':'#f4f4f2', 'rider-blood-light':'#f4f4f2'
     };
     const meta=$('meta[name="theme-color"]'); if(meta) meta.setAttribute('content',map[skin]||map[DEFAULT]);
@@ -68,24 +69,32 @@
     celticSong:`<svg viewBox="0 0 64 64" aria-hidden="true" style="stroke:url(#srsCelticGold3)"><defs><linearGradient id="srsCelticGold3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff7c8"/><stop offset=".25" stop-color="#f4d05d"/><stop offset=".58" stop-color="#c58f11"/><stop offset=".82" stop-color="#ffe699"/><stop offset="1" stop-color="#7b5400"/></linearGradient></defs><circle cx="32" cy="32" r="18"/><path d="M32 14c6 5 10 11 10 18s-4 13-10 18c-6-5-10-11-10-18s4-13 10-18z"/><path d="M14 32c5-6 11-10 18-10s13 4 18 10c-5 6-11 10-18 10s-13-4-18-10z"/><path d="M24 24c5 1 11 1 16 0"/><path d="M24 40c5-1 11-1 16 0"/></svg>`,
     celticTrack:`<svg viewBox="0 0 64 64" aria-hidden="true" style="stroke:url(#srsCelticGold4)"><defs><linearGradient id="srsCelticGold4" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff7c8"/><stop offset=".25" stop-color="#f4d05d"/><stop offset=".58" stop-color="#c58f11"/><stop offset=".82" stop-color="#ffe699"/><stop offset="1" stop-color="#7b5400"/></linearGradient></defs><path d="M12 20h40"/><path d="M12 32h40"/><path d="M12 44h40"/><path d="M20 14c4 2 6 5 6 9-4-2-8-2-12 0 0-4 2-7 6-9z"/><path d="M32 26c4 2 6 5 6 9-4-2-8-2-12 0 0-4 2-7 6-9z"/><path d="M44 38c4 2 6 5 6 9-4-2-8-2-12 0 0-4 2-7 6-9z"/></svg>`
   };
-  function getModeSvg(kind, skin){
-    const celtic=skin==='celtic-gold';
+  function getSkinAssetUrl(file){
+    const root = window.location.pathname.includes('/song-rider/') ? '../assets/' : './assets/';
+    return new URL(root + file, window.location.href).href;
+  }
+  function getModeMarkup(kind, skin){
+    const celtic = skin==='celtic-gold' || skin==='celtic-gold-dark';
     if(celtic){
-      if(kind==='chord') return iconSvgs.celticChord;
-      if(kind==='daw') return iconSvgs.celticDaw;
-      if(kind==='song') return iconSvgs.celticSong;
-      if(kind==='track') return iconSvgs.celticTrack;
+      const map = {
+        chord:'celtic-mode-chord.png',
+        daw:'celtic-mode-daw.png',
+        song:'celtic-mode-song.png',
+        track:'celtic-mode-track.png'
+      };
+      const file = map[kind] || map.chord;
+      return `<img src="${getSkinAssetUrl(file)}" alt="" decoding="async" loading="eager">`;
     }
     return iconSvgs[kind]||iconSvgs.chord;
   }
   function refreshModeIcons(skin){
     document.querySelectorAll('.srs-theme-mode-icon').forEach(el=>{
       const kind=el.dataset.iconKind||'chord';
-      el.innerHTML=getModeSvg(kind, skin);
+      el.innerHTML=getModeMarkup(kind, skin);
     });
     document.querySelectorAll('.srs-track-master-icon').forEach(el=>{
       const kind=el.dataset.iconKind||'track';
-      el.innerHTML=getModeSvg(kind, skin);
+      el.innerHTML=getModeMarkup(kind, skin);
     });
   }
   function addModeIcons(){
@@ -96,7 +105,7 @@
       const mode=btn.dataset.workspaceMode||''; const href=btn.getAttribute('href')||'';
       if(mode==='baby-daw'||href.includes('baby-daw')||i===1)kind='daw';
       else if(mode==='song-rider'||href.includes('song-rider')||i===2)kind='song';
-      const art=document.createElement('span'); art.className=`srs-theme-mode-icon srs-theme-mode-icon-${kind}`; art.dataset.iconKind=kind; art.innerHTML=getModeSvg(kind, readSkin());
+      const art=document.createElement('span'); art.className=`srs-theme-mode-icon srs-theme-mode-icon-${kind}`; art.dataset.iconKind=kind; art.innerHTML=getModeMarkup(kind, readSkin());
       btn.prepend(art);
       if(kind==='daw'&&!btn.querySelector('.mode-copy')&&!btn.querySelector('.srs-theme-mode-copy')){
         const copy=document.createElement('span'); copy.className='mode-copy srs-theme-mode-copy'; copy.innerHTML='<strong>Baby DAW</strong><small>Production + Parts</small>'; btn.appendChild(copy);
@@ -104,7 +113,7 @@
     });
     document.querySelectorAll('.track-master-gold-btn').forEach(btn=>{
       if(btn.querySelector('.srs-track-master-icon'))return;
-      const art=document.createElement('span'); art.className='srs-track-master-icon'; art.dataset.iconKind='track'; art.innerHTML=getModeSvg('track', readSkin()); btn.prepend(art);
+      const art=document.createElement('span'); art.className='srs-track-master-icon'; art.dataset.iconKind='track'; art.innerHTML=getModeMarkup('track', readSkin()); btn.prepend(art);
     });
   }
   function buildModal(){
