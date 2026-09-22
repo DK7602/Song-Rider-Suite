@@ -218,6 +218,20 @@
     if(voxBtn){voxBtn.textContent=busy?'■ Stop':'▶ Play';voxBtn.classList.toggle('is-playing',busy);voxBtn.setAttribute('aria-pressed',busy?'true':'false');}
   }
   function loadedChord(){return parts.find(p=>p.id===loadedChordPartId&&p.type==='chord')||null;}
+  // v3.3.60 — every chord/note part is part of one song, so they all share one
+  // project key. Keep legacy/new Baby DAW chord tracks from carrying their own
+  // stale key that can overwrite CRP when the user switches parts.
+  function normalizeSongKeyValue(raw){return String(raw||'').trim();}
+  function syncSongKeyAcrossChordParts(raw){
+    const key=normalizeSongKeyValue(raw);if(!key)return key;
+    for(const part of parts){
+      if(part?.type!=='chord')continue;
+      if(!part.data)part.data=core.snapshot();
+      part.data.key=key;
+    }
+    return key;
+  }
+  function currentSongKey(){return normalizeSongKeyValue(core.snapshot()?.key)||normalizeSongKeyValue(parts.find(p=>p?.type==='chord'&&p.data?.key)?.data?.key);}
   function syncLoadedChord(){
     const p=loadedChord();
     if(!p)return;
@@ -231,10 +245,11 @@
     // open, keep the existing part/card identities stable.
     if(voxBoxOpen)return;
     p.data=core.snapshot();
+    syncSongKeyAcrossChordParts(p.data.key);
   }
   function syncActiveChord(){
     const p=active();
-    if(p?.type==='chord'&&p.id===loadedChordPartId)p.data=core.snapshot();
+    if(p?.type==='chord'&&p.id===loadedChordPartId){p.data=core.snapshot();syncSongKeyAcrossChordParts(p.data.key);}
   }
 
   function refreshBabySetupToggle(){
@@ -258,6 +273,7 @@
     const p=parts.find(x=>x.id===id);if(!p)return;
     activePartId=id;
     if(p.type==='chord'){
+      const songKey=currentSongKey();if(songKey){p.data.key=songKey;syncSongKeyAcrossChordParts(songKey);}
       core.apply(p.data);loadedChordPartId=p.id;
     }else if(p.type==='lead'){
       leadBarPage=Math.min(leadBarPage,p.bars-1);renderLeadEditor(p);
@@ -303,7 +319,8 @@
   function addPart(type){
     syncLoadedChord();let p;
     if(type==='chord'){
-      p=chordPart(`Chords ${countType('chord')+1}`,{...core.snapshot(),rows:[[]],key:''});
+      const snap=core.snapshot();
+      p=chordPart(`Chords ${countType('chord')+1}`,{...snap,rows:[[]],key:normalizeSongKeyValue(snap.key)});
       // A brand-new Baby DAW chord part always opens its setup controls so the user
       // can immediately choose Piano/Guitar, Chord/Note, Sound, Octave, Capo, etc.
       // This changes Baby DAW only; CRP keeps its own Hide/Show preference untouched.
@@ -356,10 +373,17 @@
     return raw;
   }
   function harmonyKey(data,cards){
-    const raw=String(data?.key||'').trim().replace(/♭/g,'b').replace(/♯/g,'#');
+    let raw=String(data?.key||'').trim().replace(/♭/g,'b').replace(/♯/g,'#');
     let root=null,minor=false;
     let m=raw.match(/^([A-Ga-g])([#b]?)(?:\s*(m|minor|maj|major))?$/i);
     if(m){root=m[1].toUpperCase()+m[2];minor=/^(m|minor)$/i.test(m[3]||'');}
+    // Legacy Baby DAW chord parts may have saved with an empty/per-part key. The
+    // live CRP project key is the song-level authority before any chord fallback.
+    if(root==null){
+      raw=String(core.snapshot()?.key||'').trim().replace(/♭/g,'b').replace(/♯/g,'#');
+      m=raw.match(/^([A-Ga-g])([#b]?)(?:\s*(m|minor|maj|major))?$/i);
+      if(m){root=m[1].toUpperCase()+m[2];minor=/^(m|minor)$/i.test(m[3]||'');}
+    }
     if(root==null){
       const first=cards.find(c=>c?.type==='chord');
       if(first){m=String(first.value||'').trim().match(/^([A-Ga-g])([#b]?)(.*)$/);if(m){root=m[1].toUpperCase()+m[2];const q=(m[3]||'').toLowerCase();minor=q.startsWith('m')&&!q.startsWith('maj');}}
@@ -1634,8 +1658,10 @@
     songStartBeat=Math.max(0,Number(saved?.songStartBeat)||0);songEndBeat=Number.isFinite(Number(saved?.songEndBeat))&&Number(saved.songEndBeat)>songStartBeat?Number(saved.songEndBeat):null;drumArrangementInitialized=Array.isArray(saved?.drumEvents);drumEvents=drumArrangementInitialized?saved.drumEvents.map(normalizeDrumEvent).filter(Boolean):[];
     if(saved?.items?.length){parts=saved.items.map(normalizePart).filter(Boolean);activePartId=parts.some(p=>p.id===saved.activePartId)?saved.activePartId:(parts.find(p=>p.type==='chord')||parts[0]).id;}
     else {const first=chordPart('Chords 1',core.snapshot());parts=[first];activePartId=first.id;}
+    const projectSongKey=normalizeSongKeyValue(project?.key)||normalizeSongKeyValue(core.snapshot()?.key)||normalizeSongKeyValue(parts.find(p=>p?.type==='chord'&&p.data?.key)?.data?.key);
+    if(projectSongKey)syncSongKeyAcrossChordParts(projectSongKey);
     let c=parts.find(p=>p.id===activePartId&&p.type==='chord')||parts.find(p=>p.type==='chord');
-    if(!c){c=chordPart('Chords 1',core.snapshot());parts.unshift(c);}core.apply(c.data);loadedChordPartId=c.id;
+    if(!c){c=chordPart('Chords 1',core.snapshot());parts.unshift(c);if(projectSongKey)c.data.key=projectSongKey;}core.apply(c.data);loadedChordPartId=c.id;
     if(activePartId!==c.id)selectPart(activePartId);else{setEditorMode('chord');renderParts();}
     renderSongEndEditor();
   }
@@ -2296,7 +2322,7 @@
   }
   function duplicateVoxTrack(part){if(!part)return;closeVoxTrackContextMenu();voxCheckpoint();let copy;if(part.type==='chord'){copy=normalizePart({...clone(part),id:uid(),name:`${part.name} Copy`},parts.length);}else if(part.type==='lead'){copy=normalizePart({...clone(part),id:uid(),name:`${part.name} Copy`,events:(part.events||[]).map(e=>({...clone(e),voxId:uid()}))},parts.length);}else{copy={...part,id:uid(),name:`${part.name} Copy`,recordings:(part.recordings||[]).map(r=>({...r})),voxEvents:(part.voxEvents||[]).map(e=>({...clone(e),id:uid()}))};copy.voxEvents.forEach(e=>e.sourcePartId=copy.id);}parts.splice(Math.max(0,parts.indexOf(part)+1),0,copy);persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${copy.name} duplicated.`);}
   function ensureVoxTrackDialog(){
-    let modal=document.getElementById('voxTrackDialog');if(modal)return modal;modal=document.createElement('div');modal.id='voxTrackDialog';modal.className='vox-track-dialog';modal.hidden=true;modal.innerHTML=`<div class="vox-track-dialog-backdrop"></div><div class="vox-track-dialog-card" role="dialog" aria-modal="true" aria-label="Add track"><h3>Add Track</h3><label>Name<input id="voxNewTrackName" type="text"></label><label>Type<select id="voxNewTrackType"><option value="chord">Chord / Note</option><option value="lead">Lead / Bass</option><option value="vocal">Vocal</option></select></label><label class="vox-new-mode-row">Chord/Note<select id="voxNewTrackMode"><option value="chord">Chord</option><option value="note">Note</option></select></label><label class="vox-new-inst-row">Instrument<select id="voxNewTrackInstrument"><option value="piano">Piano</option><option value="guitar">Guitar</option><option value="misc">Misc</option></select></label><label class="vox-new-inst-row">Sound<select id="voxNewTrackSound"></select></label><div class="vox-track-dialog-actions"><button type="button" data-cancel>Cancel</button><button type="button" data-add class="accent">Add Track</button></div></div>`;document.body.appendChild(modal);modal.querySelector('[data-cancel]').onclick=()=>modal.hidden=true;modal.querySelector('.vox-track-dialog-backdrop').onclick=()=>modal.hidden=true;const type=modal.querySelector('#voxNewTrackType'),inst=modal.querySelector('#voxNewTrackInstrument'),sound=modal.querySelector('#voxNewTrackSound');const fillSounds=()=>{const opts=core.sounds[inst.value]||core.sounds.piano;sound.innerHTML=opts.map(([v,l])=>`<option value="${escapeHtml(v)}">${escapeHtml(l)}</option>`).join('');};const refresh=()=>{const vocal=type.value==='vocal';modal.querySelector('.vox-new-mode-row').hidden=type.value!=='chord';modal.querySelectorAll('.vox-new-inst-row').forEach(x=>x.hidden=vocal);fillSounds();};type.onchange=refresh;inst.onchange=fillSounds;modal._refresh=refresh;modal.querySelector('[data-add]').onclick=()=>{const t=type.value,name=modal.querySelector('#voxNewTrackName').value.trim();voxCheckpoint();let p;if(t==='chord'){p=chordPart(name||`Chords ${countType('chord')+1}`,{...core.snapshot(),rows:[[]],key:''});p.data.mode=modal.querySelector('#voxNewTrackMode').value;p.data.instrument=inst.value;p.data.sound=sound.value;p.voxSetupEstablished=true;}else if(t==='lead'){p=leadPart(name||`Lead ${countType('lead')+1}`);p.instrument=inst.value;p.sound=sound.value;p.voxSetupEstablished=true;}else p=vocalPart(name||`Vocals ${countType('vocal')+1}`);parts.push(p);modal.hidden=true;persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${p.name} added.`);};refresh();return modal;
+    let modal=document.getElementById('voxTrackDialog');if(modal)return modal;modal=document.createElement('div');modal.id='voxTrackDialog';modal.className='vox-track-dialog';modal.hidden=true;modal.innerHTML=`<div class="vox-track-dialog-backdrop"></div><div class="vox-track-dialog-card" role="dialog" aria-modal="true" aria-label="Add track"><h3>Add Track</h3><label>Name<input id="voxNewTrackName" type="text"></label><label>Type<select id="voxNewTrackType"><option value="chord">Chord / Note</option><option value="lead">Lead / Bass</option><option value="vocal">Vocal</option></select></label><label class="vox-new-mode-row">Chord/Note<select id="voxNewTrackMode"><option value="chord">Chord</option><option value="note">Note</option></select></label><label class="vox-new-inst-row">Instrument<select id="voxNewTrackInstrument"><option value="piano">Piano</option><option value="guitar">Guitar</option><option value="misc">Misc</option></select></label><label class="vox-new-inst-row">Sound<select id="voxNewTrackSound"></select></label><div class="vox-track-dialog-actions"><button type="button" data-cancel>Cancel</button><button type="button" data-add class="accent">Add Track</button></div></div>`;document.body.appendChild(modal);modal.querySelector('[data-cancel]').onclick=()=>modal.hidden=true;modal.querySelector('.vox-track-dialog-backdrop').onclick=()=>modal.hidden=true;const type=modal.querySelector('#voxNewTrackType'),inst=modal.querySelector('#voxNewTrackInstrument'),sound=modal.querySelector('#voxNewTrackSound');const fillSounds=()=>{const opts=core.sounds[inst.value]||core.sounds.piano;sound.innerHTML=opts.map(([v,l])=>`<option value="${escapeHtml(v)}">${escapeHtml(l)}</option>`).join('');};const refresh=()=>{const vocal=type.value==='vocal';modal.querySelector('.vox-new-mode-row').hidden=type.value!=='chord';modal.querySelectorAll('.vox-new-inst-row').forEach(x=>x.hidden=vocal);fillSounds();};type.onchange=refresh;inst.onchange=fillSounds;modal._refresh=refresh;modal.querySelector('[data-add]').onclick=()=>{const t=type.value,name=modal.querySelector('#voxNewTrackName').value.trim();voxCheckpoint();let p;if(t==='chord'){const snap=core.snapshot();p=chordPart(name||`Chords ${countType('chord')+1}`,{...snap,rows:[[]],key:normalizeSongKeyValue(snap.key)});p.data.mode=modal.querySelector('#voxNewTrackMode').value;p.data.instrument=inst.value;p.data.sound=sound.value;p.voxSetupEstablished=true;}else if(t==='lead'){p=leadPart(name||`Lead ${countType('lead')+1}`);p.instrument=inst.value;p.sound=sound.value;p.voxSetupEstablished=true;}else p=vocalPart(name||`Vocals ${countType('vocal')+1}`);parts.push(p);modal.hidden=true;persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${p.name} added.`);};refresh();return modal;
   }
   function openVoxAddTrackDialog(type='chord'){closeVoxTrackContextMenu();const modal=ensureVoxTrackDialog();modal.hidden=false;const sel=modal.querySelector('#voxNewTrackType');sel.value=['chord','lead','vocal'].includes(type)?type:'chord';modal.querySelector('#voxNewTrackName').value='';modal._refresh?.();setTimeout(()=>modal.querySelector('#voxNewTrackName').focus(),30);}
   function ensureVoxEditTrackDialog(){

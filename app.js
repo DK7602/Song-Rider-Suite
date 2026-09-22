@@ -194,8 +194,11 @@
   }
 
   const allCards=()=>state.rows.flat();
-  function firstChord(){return allCards().find(c=>c.type==='chord')?.value||null;}
-  function inferredKey(){const c=firstChord();if(c){const p=parseChord(c);return{root:p.root,minor:p.quality.startsWith('m')&&!p.quality.startsWith('maj')}}const n=allCards().find(c=>c.type==='note')?.value||'C';return{root:n,minor:false};}
+  // v3.3.60 — the key is song/project metadata, never line metadata. When a
+  // saved/manual key exists it is authoritative for every CRP line and Baby DAW
+  // chord part. This fallback is used only before a song key has been established,
+  // and it considers the whole committed progression instead of the first card.
+  function inferredKey(){return inferKeyFromCards(allCards())||{root:'C',minor:false};}
   function enteredKey(){
     const el=$('keyInput');if(!el)return null;
     const raw=el.value.trim().replace(/♭/g,'b').replace(/♯/g,'#');if(!raw)return null;
@@ -292,11 +295,25 @@
       const n=parseNote(x);return n?{type:'note',value:n}:null;
     }).filter(Boolean);
   }
+  function cardsForSongKeyInference(){
+    // While composing the very first line, use the live Build text in place of
+    // that row so the initial key can improve as the progression is entered.
+    // Once another line exists, the established song key is locked and a later
+    // line can never re-key the project from its first chord/note.
+    const live=cardsFromEntry();
+    return state.rows.flatMap((row,ri)=>ri===state.selectedRow?live:(Array.isArray(row)?row:[])).filter(Boolean);
+  }
+  function lockAutoSongKey(){
+    const key=$('keyInput');if(key?.value.trim())key.dataset.autoKey='0';
+  }
   function autoPopulateKeyFromEntry(){
     const key=$('keyInput');if(!key)return;
-    const canAuto=!key.value.trim()||key.dataset.autoKey==='1';
-    if(!canAuto)return;
-    const inferred=inferKeyFromCards(cardsFromEntry());if(!inferred)return;
+    const hasKey=!!key.value.trim(),auto=key.dataset.autoKey==='1';
+    if(hasKey&&!auto)return;
+    // A second line means the first-line inference phase is over. From this point
+    // forward the key belongs to the song, not whichever line is selected/typed.
+    if(hasKey&&state.rows.length>1){lockAutoSongKey();return;}
+    const inferred=inferKeyFromCards(cardsForSongKeyInference());if(!inferred)return;
     key.value=inferred.root+(inferred.minor?'m':'');
     key.dataset.autoKey='1';
     renderFits();
@@ -881,6 +898,7 @@
       badge.addEventListener('click',e=>{if(suppressBadgeClick){e.preventDefault();e.stopPropagation();suppressBadgeClick=false;}});
       line.querySelector('.duplicate-line').onclick=e=>{
         e.stopPropagation();
+        lockAutoSongKey();
         const copy=JSON.parse(JSON.stringify(row));
         state.rows.splice(ri+1,0,copy);
         state.selectedRow=ri+1;
@@ -1672,7 +1690,7 @@
     $('sustainBtn').onclick=()=>{state.sustain=!state.sustain;localStorage.setItem('crp-sustain',state.sustain?'1':'0');updateSustainButton();window.CRPParts?.syncCoreLive?.();};
     updateSustainButton();
     $('capoSelect').onchange=e=>{state.capo=+e.target.value;if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:'capo'});publishLiveSrpMeta('crp');writeHardSync('crp','capo');renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;publishLiveSrpMeta('crp');renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();};
-    $('addLineBtn').onclick=()=>{state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();scheduleAutoSave();};
+    $('addLineBtn').onclick=()=>{lockAutoSongKey();state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
     $('autoScrollBtn').onclick=()=>setAutoScroll(!state.autoScroll);
     $('midiViewBtn').onclick=()=>{state.cardView=state.cardView==='midi'?'diagram':'midi';localStorage.setItem('crp-card-view',state.cardView);updateCardViewButton();renderRows();};
     updateAutoScrollButton();updateCardViewButton();
