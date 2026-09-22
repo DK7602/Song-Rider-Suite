@@ -309,7 +309,7 @@
     if(!row){row=document.createElement('div');row.id='activePartVolumeRow';row.className='active-part-volume-row';mgr.appendChild(row);}
     const p=active();if(!p){row.innerHTML='';return;}
     row.innerHTML=`<span>${escapeHtml(p.name)} volume</span><input id="activePartVolume" type="range" min="0" max="100" value="${Math.round(p.volume*100)}"><strong id="activePartVolumeValue">${Math.round(p.volume*100)}%</strong>`;
-    const slider=$('activePartVolume');const paintRange=el=>el?.style.setProperty('--range-fill',`${el.value}%`);paintRange(slider);slider.oninput=()=>{paintRange(slider);p.volume=+slider.value/100;$('activePartVolumeValue').textContent=`${slider.value}%`;const pill=[...document.querySelectorAll('.part-pill')].find(x=>x.querySelector('.part-open')?.textContent===p.name);if(pill)pill.querySelector('.part-mini-vol').textContent=`${slider.value}%`;if(p.type==='lead'&&$('leadVolume')){$('leadVolume').value=slider.value;$('leadVolumeValue').textContent=`${slider.value}%`;}if(p.type==='vocal'&&$('vocalVolume')){$('vocalVolume').value=slider.value;$('vocalVolumeValue').textContent=`${slider.value}%`;applyVocalFxLive(p);}else if((playing||starting)&&partBuses.has(p.id))busFor(p,outputSoundFor(p));core.scheduleAutoSave();};
+    const slider=$('activePartVolume');const paintRange=el=>el?.style.setProperty('--range-fill',`${el.value}%`);paintRange(slider);slider.oninput=()=>{paintRange(slider);p.volume=+slider.value/100;$('activePartVolumeValue').textContent=`${slider.value}%`;const pill=[...document.querySelectorAll('.part-pill')].find(x=>x.querySelector('.part-open')?.textContent===p.name);if(pill)pill.querySelector('.part-mini-vol').textContent=`${slider.value}%`;if(p.type==='lead'&&$('leadVolume')){$('leadVolume').value=slider.value;$('leadVolumeValue').textContent=`${slider.value}%`;}if(p.type==='vocal'&&$('vocalVolume')){$('vocalVolume').value=slider.value;$('vocalVolumeValue').textContent=`${slider.value}%`;applyVocalFxLive(p);}else if((playing||starting)&&partBuses.has(p.id))busFor(p,outputSoundFor(p));syncPartVolumeControls(p,slider.value);core.scheduleAutoSave();};
   }
   function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
 
@@ -901,6 +901,9 @@
     drumArrangementInitialized=true;let primary=primaryDrumEvent();const pat=clone(pattern),bars=Math.max(1,Number(pat?.bars)||1);
     if(!primary){const duration=Math.max(4,musicalVocalDurationBeats(),bars*4);primary=normalizeDrumEvent({id:uid(),startBeat:0,durationBeats:duration,patternOffsetBeats:0,pattern:pat});drumEvents=[primary];}
     else{primary.pattern=pat;if(Math.abs(Number(primary.startBeat)||0)<.001)primary.patternOffsetBeats=0;primary.durationBeats=Math.max(Number(primary.durationBeats)||0,bars*4,.03);}
+    // Beat Maker/CRP volume is the global Drums track volume. Preserve each
+    // region's own pattern, but keep its gain connected to that master slider.
+    const masterGain=Math.max(0,Math.min(1,Number(pat.gain)||0));for(const ev of drumEvents){if(ev?.pattern)ev.pattern.gain=masterGain;}
     markPartsDirty();playbackTotalBeats=mediaDurationBeats();if(voxBoxOpen)renderVoxBox();core.scheduleAutoSave();return true;
   }
   function musicalVocalDurationBeats(){
@@ -2157,12 +2160,59 @@
     row.append(m,s);host.append(row);
   }
 
+  // v3.3.65 — Track Master track-title volume controls are the same mix values
+  // used by CRP/Baby DAW.  There is no second Track Master volume state.
+  function clampTrackVolumePct(value){return Math.max(0,Math.min(100,Math.round(Number(value)||0)));}
+  function paintVoxTrackVolume(input,pct){
+    if(!input)return;const n=clampTrackVolumePct(pct);input.value=String(n);input.style.setProperty('--vox-track-volume-fill',`${n}%`);input.title=`Volume ${n}%`;input.setAttribute('aria-valuetext',`${n}%`);const out=input.parentElement?.querySelector('.vox-track-volume-value');if(out)out.textContent=`${n}%`;
+  }
+  function syncPartVolumeControls(part,pct){
+    if(!part)return;const n=clampTrackVolumePct(pct);updatePartMiniVolume(part);
+    // Keep any visible Track Master title slider on this exact part in lockstep
+    // when volume is changed from Baby DAW or Track Effects instead.
+    for(const input of document.querySelectorAll?.('.vox-track-volume-input[data-part-id]')||[]){if(String(input.dataset.partId)===String(part.id))paintVoxTrackVolume(input,n);}
+    if(part.type==='vocal'){const lab=document.querySelector?.(`.vox-track-label[data-vox-part-id="${String(part.id).replace(/"/g,'\"')}"][data-vox-part-type="vocal"]`),meta=lab?.querySelector?.('.vox-track-meta');if(meta)meta.textContent=`${n}% • ${(part.voxEvents||[]).length} event${(part.voxEvents||[]).length===1?'':'s'}`;}
+    const cur=active();
+    if(cur&&String(cur.id)===String(part.id)){
+      const main=$('activePartVolume');if(main){main.value=String(n);main.style.setProperty('--range-fill',`${n}%`);}if($('activePartVolumeValue'))$('activePartVolumeValue').textContent=`${n}%`;
+      if(part.type==='lead'&&$('leadVolume')){$('leadVolume').value=String(n);if($('leadVolumeValue'))$('leadVolumeValue').textContent=`${n}%`;}
+      if(part.type==='vocal'&&$('vocalVolume')){$('vocalVolume').value=String(n);if($('vocalVolumeValue'))$('vocalVolumeValue').textContent=`${n}%`;}
+    }
+    // Track Effects > Volume is the vocal track volume when Apply to = Track.
+    if(part.type==='vocal'&&String(voxTargetPartId||'')===String(part.id)&&$('voxFxTarget')?.value==='track'){if($('voxFxVolume'))$('voxFxVolume').value=String(n);if($('voxFxVolumeValue'))$('voxFxVolumeValue').textContent=`${n}%`;}
+  }
+  function setVoxPartTrackVolume(part,pct){
+    if(!part)return;const n=clampTrackVolumePct(pct);part.volume=n/100;syncPartVolumeControls(part,n);markPartsDirty();liveEditRefresh();core.scheduleAutoSave();
+  }
+  function setVoxDrumTrackVolume(pct,{commit=false}={}){
+    const n=clampTrackVolumePct(pct),gain=n/100,b=window.CRPBeatMaker?.getBeat?.();if(!b)return;
+    b.gain=gain;
+    // Drums are one mixer track even when the Track Master timeline has several
+    // drum regions. Keep every region on the same master gain.
+    for(const ev of drumEvents){if(ev?.pattern)ev.pattern.gain=gain;}
+    window.CRPBeatMaker?.setBeat?.(b,{persist:!!commit});
+    markPartsDirty();liveEditRefresh();core.scheduleAutoSave();if(commit)core.flushAutoSaveNow?.();
+  }
+  function appendVoxTrackVolume(host,{part=null,drums=false}={}){
+    if(!host||(!part&&!drums))return;host.classList.add('has-track-volume');
+    const wrap=document.createElement('div');wrap.className='vox-track-volume';
+    const input=document.createElement('input');input.type='range';input.min='0';input.max='100';input.step='1';input.className='vox-track-volume-input';
+    if(part)input.dataset.partId=String(part.id);if(drums)input.dataset.drumTrack='1';
+    input.setAttribute('aria-label',`${drums?'Drums':(part?.name||'Track')} volume`);
+    const out=document.createElement('span');out.className='vox-track-volume-value';wrap.append(input,out);host.append(wrap);
+    const pct=drums?Math.round((Number(window.CRPBeatMaker?.getBeat?.()?.gain)||0)*100):Math.round((Number(part?.volume)||0)*100);paintVoxTrackVolume(input,pct);
+    const stop=e=>e.stopPropagation();input.onclick=stop;input.ondblclick=stop;input.onpointerdown=e=>{e.stopPropagation();voxCheckpoint();};
+    input.oninput=e=>{e.stopPropagation();const n=clampTrackVolumePct(e.target.value);paintVoxTrackVolume(input,n);if(drums)setVoxDrumTrackVolume(n,{commit:false});else setVoxPartTrackVolume(part,n);};
+    input.onchange=e=>{e.stopPropagation();const n=clampTrackVolumePct(e.target.value);if(drums)setVoxDrumTrackVolume(n,{commit:true});else core.flushAutoSaveNow?.();};
+  }
+
   function makeVoxTrackLabel({name,meta,checked=null,onChecked=null,kind='vocal',part=null}){
     const label=document.createElement('div');label.className='vox-track-label'+(kind!=='vocal'?' vox-instrument-label':'');
     if(checked!==null){const top=document.createElement('label');top.className='vox-track-enable';const c=document.createElement('input');c.type='checkbox';c.checked=!!checked;c.onpointerdown=e=>e.stopPropagation();c.onchange=e=>{e.stopPropagation();onChecked?.(c.checked);};const strong=document.createElement('strong');strong.textContent=name;top.append(c,strong);label.append(top);}else{const strong=document.createElement('strong');strong.textContent=name;label.append(strong);}
     const span=document.createElement('span');span.className='vox-track-meta';span.textContent=meta||'';label.append(span);
     if(part){
       label.dataset.voxPartId=String(part.id);label.dataset.voxPartType=String(part.type);
+      appendVoxTrackVolume(label,{part});
       const menu=document.createElement('button');menu.type='button';menu.className='vox-track-menu-btn';menu.textContent='⋮';menu.title='Track actions';menu.setAttribute('aria-label',`${name} track actions`);
       menu.onclick=e=>{e.preventDefault();e.stopPropagation();const r=menu.getBoundingClientRect();openVoxTrackContextMenu(part,label,r.right,r.bottom);};label.append(menu);
       appendVoxMuteSolo(label,{part});
@@ -2264,7 +2314,7 @@
   function renderVoxDrumMap(tracks,width,ppb,clickBeat){
     if(!voxShowInstrumentals)return;ensureLegacyDrumEvent();const master=window.CRPBeatMaker?.getBeat?.()||blankDrumPattern();
     const row=document.createElement('div');row.className='vox-track-row vox-instrument-track vox-drum-region-row';row.style.width=`${width}px`;row.dataset.voxTrackKey='drum-map';row.dataset.voxKind='drum';row.classList.toggle('is-instrument-focus',voxInstrumentTrackFocus?.key==='drum-map');
-    const label=makeVoxTrackLabel({name:'Drums',meta:`${drumEvents.length} region${drumEvents.length===1?'':'s'}`,checked:master.enabled!==false,onChecked:on=>{voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;b.enabled=on;window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();},kind:'drum'});label.title='Double-click (desktop) or double-tap (touch) empty drum-lane space to add a 4-beat region.';label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('drum','Drums','drum-map',{announce:true});};appendVoxMuteSolo(label,{drums:true});
+    const label=makeVoxTrackLabel({name:'Drums',meta:`${drumEvents.length} region${drumEvents.length===1?'':'s'}`,checked:master.enabled!==false,onChecked:on=>{voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;b.enabled=on;window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();},kind:'drum'});label.title='Double-click (desktop) or double-tap (touch) empty drum-lane space to add a 4-beat region.';label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('drum','Drums','drum-map',{announce:true});};appendVoxTrackVolume(label,{drums:true});appendVoxMuteSolo(label,{drums:true});
     const drumRange={kind:'drum',trackKey:'drum-map',name:'Drums'};
     const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane vox-drum-region-lane';lane.dataset.voxKind='drum';lane.onpointerdown=e=>{if(voxRangeMode&&e.target===lane)beginVoxRangePointer(e,drumRange,lane);};lane.onclick=e=>{if(e.target!==lane)return;if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}if(recentVoxLaneAdd({id:'drum-map'},e)){e.preventDefault();e.stopPropagation();return;}focusVoxInstrumentTrack('drum','Drums','drum-map',{announce:true});/* Empty drum-lane creation is double-click/double-tap only. The ruler owns seeking. */};wireDrumLaneDoubleAdd(lane,clickBeat);
     for(const event of drumEvents){const key=`drum:${event.id}`,sel={kind:'drum',key,event,startBeat:event.startBeat,dur:event.durationBeats,name:'Drums'},ev=document.createElement('div');ev.className='vox-instrument-event vox-drum-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.style.left=`${event.startBeat*ppb}px`;ev.style.width=`${Math.max(34,event.durationBeats*ppb)}px`;const hits=drumPatternHitCount(event.pattern),bars=Math.max(1,Number(event.pattern?.bars)||1);ev.innerHTML=`<strong>Drums</strong><span>${event.durationBeats.toFixed(2)}b • ${bars}-bar pattern • ${hits} hits</span>`;ev.title='Drag to move • drag either edge to resize • Split • double-tap to edit pattern';ev.__voxSelection=sel;ev.onclick=e=>{if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}instrumentClickSelection(sel,ev,e);};ev.ondblclick=e=>{if(voxRangeMode)return;e.preventDefault();e.stopPropagation();openDrumEventEditor(sel);};ev.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,drumRange,lane);return;}if(e.target.classList.contains('vox-inst-handle'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}
@@ -2636,7 +2686,7 @@
         nameInput.onclick=e=>e.stopPropagation();nameInput.onfocus=()=>{voxCheckpoint();voxTargetPartId=part.id;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=null;renderVoxInspector();};
         nameInput.oninput=()=>{part.name=String(nameInput.value||'');markPartsDirty();core.scheduleAutoSave();};nameInput.onblur=()=>{part.name=String(nameInput.value||'').trim()||`Vocals ${allVocalParts().indexOf(part)+1}`;nameInput.value=part.name;renderParts();markPartsDirty();core.scheduleAutoSave();};
         const meta=document.createElement('span');meta.className='vox-track-meta';meta.textContent=`${Math.round((Number(part.volume)||0)*100)}% • ${(part.voxEvents||[]).length} event${(part.voxEvents||[]).length===1?'':'s'}`;
-        const menu=document.createElement('button');menu.type='button';menu.className='vox-track-menu-btn';menu.textContent='⋮';menu.title='Track actions';menu.setAttribute('aria-label',`${part.name} track actions`);menu.onclick=e=>{e.preventDefault();e.stopPropagation();const r=menu.getBoundingClientRect();openVoxTrackContextMenu(part,label,r.right,r.bottom);};label.append(nameInput,meta,menu);appendVoxMuteSolo(label,{part});
+        const menu=document.createElement('button');menu.type='button';menu.className='vox-track-menu-btn';menu.textContent='⋮';menu.title='Track actions';menu.setAttribute('aria-label',`${part.name} track actions`);menu.onclick=e=>{e.preventDefault();e.stopPropagation();const r=menu.getBoundingClientRect();openVoxTrackContextMenu(part,label,r.right,r.bottom);};label.append(nameInput,meta);appendVoxTrackVolume(label,{part});label.append(menu);appendVoxMuteSolo(label,{part});
         label.onclick=e=>{if(e.target.closest('input,button'))return;focusVoxVocalTrack(part,{announce:true});};
         label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(part,label,e.clientX,e.clientY);};
         const lane=document.createElement('div');lane.className='vox-track-lane';lane.dataset.voxPartId=part.id;lane.dataset.voxKind='vocal';lane.onpointerdown=e=>{if(voxRangeMode&&e.target===lane)beginVoxRangePointer(e,part,lane);};lane.onclick=e=>{if(e.target!==lane)return;if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}focusVoxVocalTrack(part,{announce:true});/* Blank vocal space selects the paste/drop target. The ruler is the only seek surface. */};
@@ -2782,7 +2832,7 @@
   function updateVoxFxFromUi(kind){
     const p=voxTargetPart(),selected=voxSelectionPairs(),eventMode=$('voxFxTarget')?.value==='event'&&selected.length;if(!p)return;const touchedParts=new Set();
     if(eventMode){for(const item of selected){const ev=item.event;let fx=ev.fx||(ev.fx=normalizeVocalFx(item.part.fx));if(kind==='volume')ev.volume=Math.max(0,Math.min(1.5,(Number($('voxFxVolume')?.value)||0)/100));else if(kind==='autotune')fx.autotune=Math.max(0,Math.min(100,Number($('voxFxAutotune')?.value)||0));else if(kind==='eq')fx.eq=$('voxFxEq').value;else if(kind==='comp')fx.comp=$('voxFxComp').value;else if(kind==='reverb')fx.reverb=Number($('voxFxReverb').value)||0;else if(kind==='delay')fx.delay=Number($('voxFxDelay').value)||0;touchedParts.add(item.part);}}
-    else{let fx=p.fx;if(kind==='volume'){p.volume=Math.max(0,Math.min(1.5,(Number($('voxFxVolume')?.value)||0)/100));updatePartMiniVolume(p);}else if(kind==='autotune')fx.autotune=Math.max(0,Math.min(100,Number($('voxFxAutotune')?.value)||0));else if(kind==='eq')fx.eq=$('voxFxEq').value;else if(kind==='comp')fx.comp=$('voxFxComp').value;else if(kind==='reverb')fx.reverb=Number($('voxFxReverb').value)||0;else if(kind==='delay')fx.delay=Number($('voxFxDelay').value)||0;touchedParts.add(p);}
+    else{let fx=p.fx;if(kind==='volume'){p.volume=Math.max(0,Math.min(1.5,(Number($('voxFxVolume')?.value)||0)/100));syncPartVolumeControls(p,Math.min(100,Math.round(p.volume*100)));}else if(kind==='autotune')fx.autotune=Math.max(0,Math.min(100,Number($('voxFxAutotune')?.value)||0));else if(kind==='eq')fx.eq=$('voxFxEq').value;else if(kind==='comp')fx.comp=$('voxFxComp').value;else if(kind==='reverb')fx.reverb=Number($('voxFxReverb').value)||0;else if(kind==='delay')fx.delay=Number($('voxFxDelay').value)||0;touchedParts.add(p);}
     if(kind==='volume'&&$('voxFxVolumeValue'))$('voxFxVolumeValue').textContent=`${$('voxFxVolume').value}%`;if(kind==='autotune'&&$('voxFxAutotuneValue'))$('voxFxAutotuneValue').textContent=`${$('voxFxAutotune').value}%`;for(const part of touchedParts)applyVocalFxLive(part);markPartsDirty();core.scheduleAutoSave();renderVoxInspector();
   }
   function resetSelectedVoxFx(){const selected=voxSelectionPairs();if(!selected.length)return;voxCheckpoint();const touched=new Set();for(const {part,event} of selected){event.fx=null;event.volume=1;touched.add(part);}for(const p of touched)applyVocalFxLive(p);markPartsDirty();core.scheduleAutoSave();renderVoxInspector();voxStatus(`${selected.length} selected event${selected.length===1?'':'s'} now follow track effects.`);}
@@ -2930,8 +2980,8 @@
     $('beatsSelect')?.addEventListener('change',()=>{if(active()?.type==='lead')renderLeadHarmony();});
     $('leadCopyBar').onclick=copyLeadBar;$('leadPasteBar').onclick=pasteLeadBar;
     $('leadClearBar').onclick=clearLeadBars;
-    $('leadVolume').oninput=e=>{const p=active();if(p?.type!=='lead')return;p.volume=+e.target.value/100;$('leadVolumeValue').textContent=`${e.target.value}%`;updatePartMiniVolume(p);if((playing||starting)&&partBuses.has(p.id))busFor(p,outputSoundFor(p));core.scheduleAutoSave();};
-    $('vocalVolume').oninput=e=>{const p=active();if(p?.type!=='vocal')return;p.volume=+e.target.value/100;$('vocalVolumeValue').textContent=`${e.target.value}%`;applyVocalFxLive(p);updatePartMiniVolume(p);core.scheduleAutoSave();};
+    $('leadVolume').oninput=e=>{const p=active();if(p?.type!=='lead')return;p.volume=+e.target.value/100;$('leadVolumeValue').textContent=`${e.target.value}%`;updatePartMiniVolume(p);syncPartVolumeControls(p,e.target.value);if((playing||starting)&&partBuses.has(p.id))busFor(p,outputSoundFor(p));core.scheduleAutoSave();};
+    $('vocalVolume').oninput=e=>{const p=active();if(p?.type!=='vocal')return;p.volume=+e.target.value/100;$('vocalVolumeValue').textContent=`${e.target.value}%`;applyVocalFxLive(p);updatePartMiniVolume(p);syncPartVolumeControls(p,e.target.value);core.scheduleAutoSave();};
     $('vocalArmMic').onclick=async()=>{if(recording)return;if(micStream?.active){await disableMic();core.status('Mic test off.');return;}try{await ensureMic();core.status('Mic test on. Aim for strong level without living at the far right of the meter.');}catch(e){core.status(e.message||'Could not access microphone.');}};
     if($('vocalMasterPlayBtn'))$('vocalMasterPlayBtn').onclick=toggleVocalMasterPlayback;
     $('vocalRepeat').onchange=e=>{const p=active();if(p?.type!=='vocal')return;p.repeat=e.target.checked;core.scheduleAutoSave();};
