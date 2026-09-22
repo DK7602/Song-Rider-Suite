@@ -1,0 +1,8 @@
+Song Rider Suite v3.3.59 — MIDI Duration Sync
+
+- Fixed CRP MIDI chord/note resizing when Track Master timing metadata already existed.
+- MIDI duration edits now keep CRP durationBeats and Track Master voxDurationBeats synchronized.
+- Baby DAW / Track Master playback now treats the CRP/MIDI duration as canonical when legacy data contains conflicting duration values.
+- Project load repairs previously-saved chord cards whose two duration fields disagree, preventing Lines 2–4 (or any later line) from snapping back to an older 4-beat value after save/refresh.
+- Unchanged cards rebuilt from the chord text bar retain Track Master identity/start/duration metadata.
+- Service-worker cache bumped so mobile receives the corrected code immediately.

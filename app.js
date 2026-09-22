@@ -159,6 +159,18 @@
     const n=Number(card?.durationBeats);
     return Number.isFinite(n)&&n>0?Math.max(.25,Math.min(64,Math.round(n*4)/4)):Math.max(.25,Number(fallback)||4);
   }
+  // v3.3.59 — CRP MIDI and Track Master share one chord duration. Track Master
+  // stores an explicit voxDurationBeats on timeline-aware cards, while CRP MIDI
+  // historically changed only durationBeats. That left two conflicting lengths:
+  // the MIDI grid showed the edit, but Baby DAW/Track Master playback could keep
+  // using the old (often 4-beat) value and restore it after reload. Keep both
+  // representations synchronized whenever a MIDI duration is edited.
+  function setCardDurationBeats(card,beats){
+    const n=Math.max(.25,Math.min(64,Math.round((Number(beats)||.25)*4)/4));
+    card.durationBeats=n;
+    if(Number.isFinite(Number(card?.voxDurationBeats))||Number.isFinite(Number(card?.voxStartBeat))||card?.voxId)card.voxDurationBeats=n;
+    return n;
+  }
   function cardColumnWidth(card){return Math.max(62,Math.round(cardDurationBeats(card)*MIDI_BEAT_PX));}
 
   // Canonical piano voicing: always spell chords upward from the root.
@@ -215,7 +227,14 @@
       const prior=previous[i];
       if(prior&&prior.type===card.type&&prior.value===card.value){
         if(Array.isArray(prior.midiNotes))card.midiNotes=[...prior.midiNotes];
-        if(Number.isFinite(+prior.durationBeats)&&+prior.durationBeats>0)card.durationBeats=cardDurationBeats(prior);
+        if(Number.isFinite(+prior.durationBeats)&&+prior.durationBeats>0)card.durationBeats=+prior.durationBeats;
+        // Preserve Track Master identity/timing for an unchanged card. Dropping
+        // these fields while rebuilding the text row can otherwise resurrect an
+        // older 4-beat timeline value on the next parts sync / project reload.
+        if(prior.voxId)card.voxId=prior.voxId;
+        if(Number.isFinite(+prior.voxStartBeat)&&+prior.voxStartBeat>=0)card.voxStartBeat=+prior.voxStartBeat;
+        if(Number.isFinite(+prior.voxDurationBeats)&&+prior.voxDurationBeats>0)card.voxDurationBeats=+prior.voxDurationBeats;
+        if(prior.voxBlank===true)card.voxBlank=true;
       }
     });
     state.rows[state.selectedRow]=vals;
@@ -691,7 +710,7 @@
         const dx=clientX-startX+dragScrollDelta;
         const next=Math.max(.25,Math.min(64,Math.round((startDur+dx/MIDI_BEAT_PX)*4)/4));
         if(next===lastDur)return;
-        moved=true;lastDur=next;card.durationBeats=next;
+        moved=true;lastDur=next;setCardDurationBeats(card,next);
         grid.style.gridTemplateColumns=midiGridColumns(row);
         label.textContent=`${formatBeatDuration(next)}b`;
         label.title=`${formatBeatDuration(next)} beats`;

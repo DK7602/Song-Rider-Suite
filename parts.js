@@ -50,6 +50,30 @@
     return changed;
   }
 
+
+  // v3.3.59 — repair the dual chord-duration representation used by CRP MIDI
+  // (durationBeats) and Track Master (voxDurationBeats). Current Track Master
+  // edits write both fields together, so a disagreement means an older MIDI edit
+  // was saved beside stale timeline metadata. The visible CRP/MIDI duration is the
+  // canonical value; if only the Track Master value exists, promote it so both UIs
+  // render and save the same length.
+  function normalizeChordDurations(data){
+    if(!data?.rows)return false;
+    let changed=false;
+    for(const row of data.rows)for(const card of Array.isArray(row)?row:[]){
+      if(!card||typeof card!=='object')continue;
+      const drawn=Number(card.durationBeats),timeline=Number(card.voxDurationBeats);
+      if(Number.isFinite(drawn)&&drawn>0){
+        // Do not quantize here: Track Master supports unsnapped/free durations.
+        // We only reconcile a disagreement; equal exact values stay untouched.
+        if(Number.isFinite(timeline)&&timeline>0&&Math.abs(timeline-drawn)>1e-9){card.voxDurationBeats=drawn;changed=true;}
+      }else if(Number.isFinite(timeline)&&timeline>0){
+        card.durationBeats=timeline;changed=true;
+      }
+    }
+    return changed;
+  }
+
   let parts=[];
   let activePartId=null;
   let loadedChordPartId=null;
@@ -89,7 +113,7 @@
   function chordPart(name='Chords 1', data=null){
     const d=data?clone(data):core.snapshot();
     if(!d.rows?.length)d.rows=[[]];
-    dedupeChordRows(d);
+    dedupeChordRows(d);normalizeChordDurations(d);
     return {id:uid(),type:'chord',name,enabled:true,muted:false,solo:false,voxSetupEstablished:false,volume:.85,data:d};
   }
   function leadPart(name='Lead 1'){
@@ -118,7 +142,7 @@
   function normalizePart(p,i){
     if(!p||!p.type)return null;
     const base={id:p.id||uid(),name:p.name||`${p.type==='chord'?'Chords':p.type==='lead'?'Lead':'Vocals'} ${i+1}`,enabled:p.enabled!==false,muted:p.muted===true,solo:p.solo===true,voxSetupEstablished:p.voxSetupEstablished===true,volume:Number.isFinite(+p.volume)?Math.max(0,Math.min(1,+p.volume)):.85};
-    if(p.type==='chord'){const data=clone(p.data||core.snapshot());dedupeChordRows(data);return {...base,type:'chord',data};}
+    if(p.type==='chord'){const data=clone(p.data||core.snapshot());dedupeChordRows(data);normalizeChordDurations(data);return {...base,type:'chord',data};}
     if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,sustain:p.sustain===true,instrument:['piano','guitar','misc'].includes(p.instrument)?p.instrument:'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(16,+p.bars||4)),events:normalizeLeadEvents(p.events)};
     const voxEvents=Array.isArray(p.voxEvents)?p.voxEvents.map(e=>normalizeVoxEvent(e,p)).filter(Boolean):[];
     return {...base,type:'vocal',repeat:p.repeat!==false,transcript:String(p.transcript||''),transcriptWords:Array.isArray(p.transcriptWords)?p.transcriptWords:[],recordings:Array.isArray(p.recordings)?p.recordings.map(r=>({...r,blob:null})):[],activeTakeId:p.activeTakeId||null,voxEvents,backingPartIds:Array.isArray(p.backingPartIds)?p.backingPartIds:[],backingDrums:p.backingDrums!==false,backingVolume:Number.isFinite(+p.backingVolume)?Math.max(0,Math.min(1,+p.backingVolume)):.8,fx:{eq:p.fx?.eq||'clear',comp:p.fx?.comp||'medium',reverb:Number(p.fx?.reverb??.12),delay:Number(p.fx?.delay||0),autotune:Math.max(0,Math.min(100,Number(p.fx?.autotune)||0))}};
@@ -2091,7 +2115,17 @@
   }
   function leadEventStartBeat(part,event){const stepBeats=4/Math.max(8,Number(part?.resolution)||16),exact=Number(event?.voxStartBeat);return Number.isFinite(exact)&&exact>=0?exact:(Number(event?.step)||0)*stepBeats;}
   function leadEventDurationBeats(part,event){const stepBeats=4/Math.max(8,Number(part?.resolution)||16),exact=Number(event?.voxDurationBeats);return Number.isFinite(exact)&&exact>0?exact:Math.max(stepBeats,leadDurationSteps(event)*stepBeats);}
-  function chordEventDurationBeats(part,card){const exact=Number(card?.voxDurationBeats);return Number.isFinite(exact)&&exact>0?exact:(core.cardDurationBeats?.(card,part?.data?.beats||core.beats)||core.beats);}
+  function chordEventDurationBeats(part,card){
+    // Track Master can use unsnapped/free durations, so preserve an exact
+    // voxDurationBeats when it agrees with durationBeats. A disagreement is the
+    // legacy CRP MIDI bug: the visible/drawn duration changed while the timeline
+    // copy stayed stale. In that case the drawn value wins and load normalization
+    // brings the two fields back together.
+    const drawn=Number(card?.durationBeats),exact=Number(card?.voxDurationBeats);
+    if(Number.isFinite(drawn)&&drawn>0&&Number.isFinite(exact)&&exact>0)return Math.abs(drawn-exact)<=1e-9?exact:drawn;
+    if(Number.isFinite(exact)&&exact>0)return exact;
+    return Number.isFinite(drawn)&&drawn>0?(core.cardDurationBeats?.(card,part?.data?.beats||core.beats)||drawn):(core.beats||4);
+  }
   function chordFlatItems(part){
     dedupeChordRows(part?.data);
     const out=[];let cursor=0,flatIndex=0;for(let ri=0;ri<(part.data?.rows||[]).length;ri++){const row=part.data.rows[ri]||[];for(let ci=0;ci<row.length;ci++){const card=row[ci],dur=chordEventDurationBeats(part,card),raw=Number(card?.voxStartBeat),startBeat=Number.isFinite(raw)&&raw>=0?raw:cursor;out.push({card,rowIndex:ri,cardIndex:ci,flatIndex,startBeat,dur});cursor=Math.max(cursor,startBeat+dur);flatIndex++;}}return out;
