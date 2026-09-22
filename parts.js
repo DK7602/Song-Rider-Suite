@@ -1179,6 +1179,26 @@
     }
     if(active()?.type==='lead')renderLeadHarmony();
   }
+  // v3.3.62 — dedicated CRP MIDI timeline commit. Generic core sync is designed
+  // to preserve Track Master object identity, but MIDI duration editing is
+  // explicitly sequential. Rebuild the loaded chord part from the latest CRP
+  // snapshot on EVERY completed resize so repeat edits cannot leave the first
+  // resize's absolute starts behind in Baby DAW playback.
+  function syncMidiTimelineFromCore(){
+    const p=loadedChord();if(!p)return false;
+    p.data=core.snapshot();
+    dedupeChordRows(p.data);normalizeChordDurations(p.data);
+    let cursor=0;
+    for(const row of p.data?.rows||[])for(const card of Array.isArray(row)?row:[]){
+      if(!card||typeof card!=='object')continue;
+      const drawn=Number(card.durationBeats),exact=Number(card.voxDurationBeats);
+      const dur=Number.isFinite(drawn)&&drawn>0?Math.max(.03,drawn):(Number.isFinite(exact)&&exact>0?Math.max(.03,exact):Math.max(.03,Number(core.cardDurationBeats?.(card,p.data?.beats||core.beats))||Number(core.beats)||4));
+      card.durationBeats=dur;card.voxDurationBeats=dur;card.voxStartBeat=Math.round(cursor*1000)/1000;cursor+=dur;
+    }
+    syncSongKeyAcrossChordParts(p.data.key);
+    markPartsDirty();playbackTotalBeats=mediaDurationBeats();
+    return true;
+  }
   async function auditionLeadNote(p,midi){
     if(!p||p.type!=='lead'||playing||starting)return;
     try{
@@ -2942,7 +2962,7 @@
       msUntilNextBeat=beatMs;
     }
     return {playing:true,ready:true,bpm,beatMs,currentBeat,msUntilNextBeat};
-  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncCloudAudio,openStudioExport,openAudioExport,refreshBabySetupToggle,syncBeatMakerMaster,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(!c){refreshBabySetupToggle();return;}if(activePartId!==c.id)selectPart(c.id);else{setEditorMode('chord');refreshBabySetupToggle();core.refreshSetupVisibility?.();}},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
+  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncMidiTimelineFromCore,syncCloudAudio,openStudioExport,openAudioExport,refreshBabySetupToggle,syncBeatMakerMaster,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(!c){refreshBabySetupToggle();return;}if(activePartId!==c.id)selectPart(c.id);else{setEditorMode('chord');refreshBabySetupToggle();core.refreshSetupVisibility?.();}},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
   // app.js intentionally loads first to expose CRPCore. Tell it that the parts module now
   // exists so the active saved project can be rehydrated with ALL Baby DAW parts before any
   // workspace navigation/save is allowed to capture state.

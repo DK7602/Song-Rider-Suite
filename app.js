@@ -172,13 +172,16 @@
     return n;
   }
   function cardColumnWidth(card){return Math.max(62,Math.round(cardDurationBeats(card)*MIDI_BEAT_PX));}
-  // v3.3.61 — MIDI view is a sequential progression editor. Track Master also
-  // stores absolute starts (voxStartBeat), so changing a MIDI duration without
-  // moving the following starts leaves playback on the old beat grid: stretched
-  // chords overlap the next chord and shortened chords leave a gap. Reflow the
-  // edited card and every card after it, including later CRP lines, while keeping
-  // any timing before the edit untouched. Exact Track Master durations on other
-  // cards are preserved; only their downstream start positions move.
+  // v3.3.62 — MIDI view is a sequential progression editor. A prior repair only
+  // reflowed from the currently edited card forward. That worked for the first
+  // resize, but the absolute starts created by that pass could become stale when
+  // the user made a second/third duration edit elsewhere in the progression. The
+  // MIDI blocks would show the new lengths while Baby DAW playback could still
+  // follow the older absolute pattern. Any MIDI duration edit now rebuilds the
+  // WHOLE chord/note timeline from the currently visible durations. This makes
+  // repeat edits deterministic across every line and keeps playback/save/reload on
+  // one canonical beat sequence. Exact free Track Master lengths are preserved
+  // unless that card itself was resized in MIDI view.
   function storedCardDurationBeats(card,fallback=+$('beatsSelect')?.value||4){
     const drawn=Number(card?.durationBeats);
     if(Number.isFinite(drawn)&&drawn>0)return Math.max(.03,Math.min(64,drawn));
@@ -186,31 +189,22 @@
     if(Number.isFinite(exact)&&exact>0)return Math.max(.03,Math.min(64,exact));
     return Math.max(.03,Number(fallback)||4);
   }
-  function reflowMidiTimingFrom(ri,ci){
-    const flat=[];
-    state.rows.forEach((row,rowIndex)=>(row||[]).forEach((card,cardIndex)=>flat.push({card,rowIndex,cardIndex})));
-    const at=flat.findIndex(x=>x.rowIndex===ri&&x.cardIndex===ci);
-    if(at<0)return false;
-
-    // Resolve the target's sequential start from everything before it. Existing
-    // absolute starts before the edit remain authoritative, so MIDI editing does
-    // not rewrite earlier Track Master work. From the edited event forward, the
-    // visible MIDI columns and the audible timeline become the same sequence.
-    let cursor=0;
-    for(let i=0;i<at;i++){
-      const c=flat[i].card,raw=Number(c?.voxStartBeat);
-      const start=Number.isFinite(raw)&&raw>=0?raw:cursor;
-      cursor=start+storedCardDurationBeats(c);
+  function reflowMidiTimingFrom(){
+    let cursor=0,found=false;
+    for(const row of state.rows||[]){
+      for(const card of row||[]){
+        if(!card||typeof card!=='object')continue;
+        const dur=storedCardDurationBeats(card);
+        card.voxStartBeat=Math.round(cursor*1000)/1000;
+        // Keep both duration representations identical once a card participates in
+        // the MIDI timeline. Do not quantize untouched exact values here.
+        card.durationBeats=dur;
+        card.voxDurationBeats=dur;
+        cursor+=dur;
+        found=true;
+      }
     }
-    for(let i=at;i<flat.length;i++){
-      const c=flat[i].card,dur=storedCardDurationBeats(c);
-      c.voxStartBeat=Math.round(cursor*1000)/1000;
-      // The edited card has already been synchronized by setCardDurationBeats().
-      // For downstream cards, leave exact/free duration values alone and move only
-      // the start so an unsnapped Track Master length is never quantized here.
-      cursor+=dur;
-    }
-    return true;
+    return found;
   }
 
   // Canonical piano voicing: always spell chords upward from the root.
@@ -768,7 +762,7 @@
         const next=Math.max(.25,Math.min(64,Math.round((startDur+dx/MIDI_BEAT_PX)*4)/4));
         if(next===lastDur)return;
         moved=true;lastDur=next;setCardDurationBeats(card,next);
-        reflowMidiTimingFrom(ri,ci);
+        reflowMidiTimingFrom();
         grid.style.gridTemplateColumns=midiGridColumns(row);
         label.textContent=`${formatBeatDuration(next)}b`;
         label.title=`${formatBeatDuration(next)} beats`;
@@ -813,7 +807,10 @@
           // Push the reflowed starts into the loaded Baby DAW chord part before a
           // user can immediately press Play or Save. Playback and persistence now
           // consume the exact same post-resize timeline.
-          window.CRPParts?.syncCoreLive?.();
+          // A MIDI duration edit is a full timeline edit, not just a visual card
+          // change. Force the canonical sequence into Baby DAW immediately so a
+          // second resize cannot replay the first resize's cached absolute starts.
+          if(!window.CRPParts?.syncMidiTimelineFromCore?.())window.CRPParts?.syncCoreLive?.();
           scheduleAutoSave();
           $('status').textContent=`${displayedValue(card)} set to ${formatBeatDuration(cardDurationBeats(card))} beat${cardDurationBeats(card)===1?'':'s'}.`;
         }
@@ -1831,7 +1828,7 @@
     // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
     // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.
     if(!IS_PLAYBACK_BRIDGE) checkAccount();
-    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.61-MIDI-TIMELINE-REFLOW').catch(()=>{});
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.62-MIDI-REPEAT-EDIT').catch(()=>{});
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
