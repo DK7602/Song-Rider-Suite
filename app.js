@@ -1855,7 +1855,7 @@
     // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
     // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.
     if(!IS_PLAYBACK_BRIDGE) checkAccount();
-    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.63-MIDI-CANONICAL-TIMING').catch(()=>{});
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.64-MIDI-REPEAT-EDIT-IDENTITY').catch(()=>{});
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
@@ -2308,12 +2308,33 @@
     state.player=null;state.playerName='';renderAll();syncBuildInput();autoPopulateKeyFromEntry();
   }
   function coreNotesFor(card,snapshot){
-    const saved=coreSnapshot();
+    // v3.3.64 — NEVER replace state.rows while calculating playback notes.
+    //
+    // coreNotesFor() is called for every scheduled chord. The old implementation
+    // used coreSnapshot() as a convenient way to save the current settings, then
+    // restored `state.rows` from that JSON-cloned snapshot in finally(). That
+    // silently replaced every live card object after the first playback pass.
+    // The MIDI resize handles in the already-rendered DOM still referenced the old
+    // card objects, so edit #1 worked, Play cloned/replaced the rows, and edit #2+
+    // only changed detached objects that playback/save could no longer see.
+    //
+    // Notes-for-playback only needs the scalar voicing settings below. Preserve and
+    // restore those values in place so the live state.rows/card identities survive
+    // any number of playback passes and repeated MIDI duration edits.
+    const saved={
+      instrument:state.instrument,
+      mode:state.mode,
+      sound:state.sound,
+      octave:state.octave,
+      capo:state.capo,
+      neck:state.neck,
+      transpose:state.transpose
+    };
     try{
       if(snapshot){state.instrument=normalizeInstrument(snapshot.instrument);state.mode=snapshot.mode||'chord';state.sound=(SOUNDS[state.instrument]||SOUNDS.piano).some(x=>x[0]===snapshot.sound)?snapshot.sound:SOUNDS[state.instrument][0][0];state.octave=Number(snapshot.octave)||0;state.capo=Number(snapshot.capo)||0;state.neck=snapshot.neck||'open';state.transpose=!!snapshot.transpose;}
       return midiNotesForCard(card).map(noteAtMidi);
     } finally {
-      state.instrument=saved.instrument;state.mode=saved.mode;state.sound=saved.sound;state.octave=saved.octave;state.capo=saved.capo;state.neck=saved.neck;state.transpose=saved.transpose;state.rows=saved.rows;
+      state.instrument=saved.instrument;state.mode=saved.mode;state.sound=saved.sound;state.octave=saved.octave;state.capo=saved.capo;state.neck=saved.neck;state.transpose=saved.transpose;
     }
   }
   window.CRPCore={
