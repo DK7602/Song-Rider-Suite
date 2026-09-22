@@ -1179,21 +1179,20 @@
     }
     if(active()?.type==='lead')renderLeadHarmony();
   }
-  // v3.3.62 — dedicated CRP MIDI timeline commit. Generic core sync is designed
-  // to preserve Track Master object identity, but MIDI duration editing is
-  // explicitly sequential. Rebuild the loaded chord part from the latest CRP
-  // snapshot on EVERY completed resize so repeat edits cannot leave the first
-  // resize's absolute starts behind in Baby DAW playback.
+  // v3.3.63 — dedicated CRP MIDI timeline commit. MIDI is sequential, so a
+  // completed MIDI resize removes old Track Master absolute starts instead of
+  // rewriting them. chordFlatItems() then derives every start from the CURRENT
+  // duration sequence on every playback/export/save pass. This removes the stale
+  // first-edit timeline that could survive later resizes.
   function syncMidiTimelineFromCore(){
     const p=loadedChord();if(!p)return false;
     p.data=core.snapshot();
     dedupeChordRows(p.data);normalizeChordDurations(p.data);
-    let cursor=0;
     for(const row of p.data?.rows||[])for(const card of Array.isArray(row)?row:[]){
       if(!card||typeof card!=='object')continue;
       const drawn=Number(card.durationBeats),exact=Number(card.voxDurationBeats);
       const dur=Number.isFinite(drawn)&&drawn>0?Math.max(.03,drawn):(Number.isFinite(exact)&&exact>0?Math.max(.03,exact):Math.max(.03,Number(core.cardDurationBeats?.(card,p.data?.beats||core.beats))||Number(core.beats)||4));
-      card.durationBeats=dur;card.voxDurationBeats=dur;card.voxStartBeat=Math.round(cursor*1000)/1000;cursor+=dur;
+      card.durationBeats=dur;card.voxDurationBeats=dur;delete card.voxStartBeat;
     }
     syncSongKeyAcrossChordParts(p.data.key);
     markPartsDirty();playbackTotalBeats=mediaDurationBeats();
@@ -1670,7 +1669,7 @@
     finally{try{await ctx?.close();}catch{}}
   }
 
-  function capture(){syncLoadedChord();ensureLegacyDrumEvent();drumArrangementInitialized=true;partsUpdatedAt=Math.max(partsUpdatedAt,Date.now());const safe=parts.map(p=>{const q=clone(p);delete q._recordOldStates;delete q._recordOldVolumes;delete q._recordOldDrums;delete q._recordOldDrumVol;if(q.type==='vocal')q.recordings=(q.recordings||[]).map(({blob,...r})=>r);return q;});return {version:5,updatedAt:partsUpdatedAt,activePartId,songStartBeat:effectiveSongStartBeat(),songEndBeat:Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):null,drumEvents:clone(drumEvents),items:safe};}
+  function capture(){syncLoadedChord();ensureLegacyDrumEvent();drumArrangementInitialized=true;partsUpdatedAt=Math.max(partsUpdatedAt,Date.now());const safe=parts.map(p=>{const q=clone(p);delete q._recordOldStates;delete q._recordOldVolumes;delete q._recordOldDrums;delete q._recordOldDrumVol;if(q.type==='vocal')q.recordings=(q.recordings||[]).map(({blob,...r})=>r);return q;});return {version:6,updatedAt:partsUpdatedAt,activePartId,loadedChordPartId,songStartBeat:effectiveSongStartBeat(),songEndBeat:Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):null,drumEvents:clone(drumEvents),items:safe};}
   function loadProject(project){
     stopPlayback();stopPreview();
     const saved=project?.parts;
@@ -1680,8 +1679,19 @@
     else {const first=chordPart('Chords 1',core.snapshot());parts=[first];activePartId=first.id;}
     const projectSongKey=normalizeSongKeyValue(project?.key)||normalizeSongKeyValue(core.snapshot()?.key)||normalizeSongKeyValue(parts.find(p=>p?.type==='chord'&&p.data?.key)?.data?.key);
     if(projectSongKey)syncSongKeyAcrossChordParts(projectSongKey);
-    let c=parts.find(p=>p.id===activePartId&&p.type==='chord')||parts.find(p=>p.type==='chord');
-    if(!c){c=chordPart('Chords 1',core.snapshot());parts.unshift(c);if(projectSongKey)c.data.key=projectSongKey;}core.apply(c.data);loadedChordPartId=c.id;
+    const savedLoadedChordId=String(saved?.loadedChordPartId||'');
+    let c=(savedLoadedChordId?parts.find(p=>p.type==='chord'&&String(p.id)===savedLoadedChordId):null)
+      ||parts.find(p=>p.id===activePartId&&p.type==='chord')||parts.find(p=>p.type==='chord');
+    if(!c){c=chordPart('Chords 1',core.snapshot());parts.unshift(c);if(projectSongKey)c.data.key=projectSongKey;}
+    // v3.3.63 legacy repair: older saves did not record which chord part CRP was
+    // displaying. If the saved project has top-level CRP rows but no loaded-part
+    // id, use those rows for the chord part CRP is about to restore. This prevents
+    // an older Baby DAW copy from resetting freshly saved MIDI durations on refresh.
+    if(!savedLoadedChordId&&Array.isArray(project?.rows)&&project.rows.length){
+      c.data={...(c.data||core.snapshot()),rows:clone(project.rows)};
+      dedupeChordRows(c.data);normalizeChordDurations(c.data);
+    }
+    loadedChordPartId=c.id;core.apply(c.data);
     if(activePartId!==c.id)selectPart(activePartId);else{setEditorMode('chord');renderParts();}
     renderSongEndEditor();
   }

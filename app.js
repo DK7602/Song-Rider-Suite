@@ -172,16 +172,13 @@
     return n;
   }
   function cardColumnWidth(card){return Math.max(62,Math.round(cardDurationBeats(card)*MIDI_BEAT_PX));}
-  // v3.3.62 — MIDI view is a sequential progression editor. A prior repair only
-  // reflowed from the currently edited card forward. That worked for the first
-  // resize, but the absolute starts created by that pass could become stale when
-  // the user made a second/third duration edit elsewhere in the progression. The
-  // MIDI blocks would show the new lengths while Baby DAW playback could still
-  // follow the older absolute pattern. Any MIDI duration edit now rebuilds the
-  // WHOLE chord/note timeline from the currently visible durations. This makes
-  // repeat edits deterministic across every line and keeps playback/save/reload on
-  // one canonical beat sequence. Exact free Track Master lengths are preserved
-  // unless that card itself was resized in MIDI view.
+  // v3.3.63 — MIDI view is a sequential progression editor. Do NOT write
+  // absolute voxStartBeat positions here. Those positions belong to Track Master
+  // and can outlive a later MIDI resize, causing playback/save/reload to fall back
+  // to an older pattern. A MIDI duration edit deliberately returns the loaded
+  // chord progression to sequential timing: each card starts after the duration
+  // of the card before it. Playback derives those starts fresh from the current
+  // durations, so the 2nd/3rd/etc. edit cannot reuse stale absolute positions.
   function storedCardDurationBeats(card,fallback=+$('beatsSelect')?.value||4){
     const drawn=Number(card?.durationBeats);
     if(Number.isFinite(drawn)&&drawn>0)return Math.max(.03,Math.min(64,drawn));
@@ -190,17 +187,16 @@
     return Math.max(.03,Number(fallback)||4);
   }
   function reflowMidiTimingFrom(){
-    let cursor=0,found=false;
+    let found=false;
     for(const row of state.rows||[]){
       for(const card of row||[]){
         if(!card||typeof card!=='object')continue;
         const dur=storedCardDurationBeats(card);
-        card.voxStartBeat=Math.round(cursor*1000)/1000;
-        // Keep both duration representations identical once a card participates in
-        // the MIDI timeline. Do not quantize untouched exact values here.
+        // MIDI timing is sequential. Remove Track Master's old absolute start so
+        // chordFlatItems() must derive the next start from the CURRENT durations.
+        delete card.voxStartBeat;
         card.durationBeats=dur;
         card.voxDurationBeats=dur;
-        cursor+=dur;
         found=true;
       }
     }
@@ -1122,7 +1118,16 @@
   }
 
   async function playProgression(){
-    if(window.CRPParts?.handlesPlayback)return window.CRPParts.togglePlayback();
+    if(window.CRPParts?.handlesPlayback){
+      // v3.3.63 — Play from MIDI view must consume exactly what is visible now.
+      // Clear any legacy absolute starts one last time at the transport boundary
+      // and commit the current durations before Baby DAW builds its scheduler.
+      if(state.cardView==='midi'){
+        reflowMidiTimingFrom();
+        window.CRPParts?.syncMidiTimelineFromCore?.();
+      }
+      return window.CRPParts.togglePlayback();
+    }
     if(state.playing)return stopProgression();if(!allCards().length){$('status').textContent='Add at least one chord or note first.';return;}
 
     const startRow=playbackStartRow();
@@ -1280,7 +1285,20 @@
   function capture(id,name){
     const existing=id?localProjects().find(x=>x.id===id):null;
     const liveBeat=window.CRPBeatMaker?.getBeat?.();
-    return{id:id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())),name,updatedAt:Date.now(),archived:!!existing?.archived,instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:state.rows,bpm:+$('bpmInput').value||92,beats:+$('beatsSelect').value||4,loop:$('loopToggle').checked,notes:$('notesEditor').innerHTML,key:$('keyInput').value.trim(),beatMaker:liveBeat||existing?.beatMaker,beatMakerUpdatedAt:window.CRPBeatMaker?.getUpdatedAt?.()||existing?.beatMakerUpdatedAt||0,parts:window.CRPParts?.capture?.()||existing?.parts};
+    // v3.3.63 — capture Baby DAW first, then make the project's top-level rows
+    // mirror the exact loaded chord part that Baby DAW will restore. Previously
+    // project.rows and project.parts.items[].data.rows could save two different
+    // timing patterns; loadProject() then applied the stale parts copy over CRP.
+    const partsPayload=window.CRPParts?.capture?.()||existing?.parts;
+    let canonicalRows=state.rows;
+    if(partsPayload?.items?.length){
+      const loadedId=String(partsPayload.loadedChordPartId||'');
+      const loaded=partsPayload.items.find(x=>x?.type==='chord'&&loadedId&&String(x.id)===loadedId)
+        || partsPayload.items.find(x=>x?.type==='chord'&&x?.data?.rows);
+      if(Array.isArray(loaded?.data?.rows))canonicalRows=loaded.data.rows;
+    }
+    const rowsCopy=JSON.parse(JSON.stringify(canonicalRows||[[]]));
+    return{id:id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())),name,updatedAt:Date.now(),archived:!!existing?.archived,instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:rowsCopy,bpm:+$('bpmInput').value||92,beats:+$('beatsSelect').value||4,loop:$('loopToggle').checked,notes:$('notesEditor').innerHTML,key:$('keyInput').value.trim(),beatMaker:liveBeat||existing?.beatMaker,beatMakerUpdatedAt:window.CRPBeatMaker?.getUpdatedAt?.()||existing?.beatMakerUpdatedAt||0,parts:partsPayload};
   }
   function upsertLocal(p){const ps=localProjects(),i=ps.findIndex(x=>x.id===p.id);if(i>=0)ps[i]=p;else ps.unshift(p);saveLocalProjects(ps);}
   async function refreshCloudProjects(){
@@ -1389,6 +1407,15 @@
 
   async function saveProject(){
     clearTimeout(autoSaveTimer);autoSaveTimer=null;
+    // A manual Save is the commit point. If an older autosave request is still in
+    // flight, let it finish first so it cannot land after this newer MIDI pattern
+    // and resurrect stale durations in cloud storage.
+    for(let waits=0;autoSaveRunning&&waits<200;waits++)await new Promise(resolve=>setTimeout(resolve,25));
+    autoSaveQueued=false;
+    if(state.cardView==='midi'){
+      reflowMidiTimingFrom();
+      window.CRPParts?.syncMidiTimelineFromCore?.();
+    }
     // If navigation temporarily lost the in-memory id, recover the exact saved project
     // instead of creating a duplicate with a new UUID.
     if(!state.currentProjectId){
@@ -1828,7 +1855,7 @@
     // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
     // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.
     if(!IS_PLAYBACK_BRIDGE) checkAccount();
-    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.62-MIDI-REPEAT-EDIT').catch(()=>{});
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.63-MIDI-CANONICAL-TIMING').catch(()=>{});
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
