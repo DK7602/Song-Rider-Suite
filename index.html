@@ -185,7 +185,7 @@
           <div class="lead-compact-settings-row" aria-label="Lead grid settings">
             <label class="lead-grid-octave-control">Grid octave<select id="leadGridOctave"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
             <label class="lead-resolution-control">Resolution<select id="leadResolution"><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
-            <label class="lead-bars-control">Bars<select id="leadBars"><option>1</option><option>2</option><option selected>4</option><option>8</option><option>16</option></select></label>
+            <label class="lead-bars-control">Bars<select id="leadBars"><option value="1">1</option><option value="2">2</option><option value="4" selected>4</option><option value="8">8</option><option value="16">16</option><option value="song">Length of Song</option></select></label>
             <label class="lead-sustain-control"><span>Sustain</span><span class="part-repeat-toggle"><input id="leadSustain" type="checkbox"><span>On</span></span></label>
             <button id="leadGridViewToggle" class="lead-grid-view-toggle" type="button" aria-pressed="false" title="Collapse the MIDI grid into a scrollable window">Collapse Grid</button>
           </div>
@@ -367,6 +367,7 @@
         </div>
       </div>
       <div id="accountTools" class="account-tools" hidden>
+        <button id="syncNowBtn" class="accent" type="button">↻ Sync Now</button>
         <button id="changePasswordBtn" type="button">Change password</button>
         <span class="subtle">Projects sync to your private cloud account. This device also keeps a local backup.</span>
       </div>
@@ -488,8 +489,8 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.64-MIDI-REPEAT-EDIT-IDENTITY"></script>
-  <script src="parts.js?v=3.3.65-TRACK-VOLUME-FX-SLIDERS"></script>
+  <script src="app.js?v=3.3.66-BD-PASTE-SONG-BARS-CLOUD-SYNC"></script>
+  <script src="parts.js?v=3.3.66-BD-PASTE-SONG-BARS-CLOUD-SYNC"></script>
   <script src="beat-maker.js?v=3.3.56-BATCH-UNDO-SYNC"></script>
 </body>
 </html>

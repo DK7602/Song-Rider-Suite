@@ -1199,6 +1199,11 @@
   }
   function localProjects(){try{return JSON.parse(localStorage.getItem('crp-projects')||'[]')}catch{return[]}}
   function saveLocalProjects(p){localStorage.setItem('crp-projects',JSON.stringify(p))}
+  const CLOUD_PENDING_KEY='crp-cloud-pending-v1';
+  function readCloudPending(){try{return JSON.parse(localStorage.getItem(CLOUD_PENDING_KEY)||'{}')||{}}catch{return{}}}
+  function cloudPending(id){return !!readCloudPending()[String(id||'')]}
+  function setCloudPending(id,on=true){const key=String(id||'');if(!key)return;const map=readCloudPending();if(on)map[key]=Date.now();else delete map[key];try{localStorage.setItem(CLOUD_PENDING_KEY,JSON.stringify(map))}catch{}}
+  function pendingCloudProjectIds(){return Object.keys(readCloudPending());}
   async function api(path,options={}){const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.error||`Request failed (${r.status})`);return d;}
   let allowUnsavedUnloadOnce=false,unsavedProjectTouched=false;
   function unsavedProjectHasWork(){
@@ -1301,35 +1306,65 @@
     return{id:id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())),name,updatedAt:Date.now(),archived:!!existing?.archived,instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:rowsCopy,bpm:+$('bpmInput').value||92,beats:+$('beatsSelect').value||4,loop:$('loopToggle').checked,notes:$('notesEditor').innerHTML,key:$('keyInput').value.trim(),beatMaker:liveBeat||existing?.beatMaker,beatMakerUpdatedAt:window.CRPBeatMaker?.getUpdatedAt?.()||existing?.beatMakerUpdatedAt||0,parts:partsPayload};
   }
   function upsertLocal(p){const ps=localProjects(),i=ps.findIndex(x=>x.id===p.id);if(i>=0)ps[i]=p;else ps.unshift(p);saveLocalProjects(ps);}
-  async function refreshCloudProjects(){
-    if(!accountUser){cloudProjects=null;cloudSyncState='idle';renderProjects();return;}
-    cloudSyncState='syncing';updateAccountSummary();
+  let cloudRefreshPromise=null,cloudPollTimer=null,cloudFocusTimer=null;
+  function replaceCloudProject(p){if(!p)return;const i=cloudProjects?.findIndex(x=>sameProjectId(x.id,p.id))??-1;if(i>=0)cloudProjects[i]=p;else{cloudProjects=cloudProjects||[];cloudProjects.unshift(p);}upsertLocal(p);}
+  async function pushPendingCloudProjects(){
+    if(!accountUser)return 0;let pushed=0;
+    for(const id of pendingCloudProjectIds()){
+      const local=localProjects().find(p=>sameProjectId(p.id,id));if(!local){setCloudPending(id,false);continue;}
+      try{const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:local})});const committed=d.project||local;replaceCloudProject(committed);setCloudPending(id,false);if(sameProjectId(id,state.currentProjectId))await window.CRPParts?.syncCloudAudio?.(id);pushed++;}
+      catch(e){cloudSyncState='error';updateAccountSummary();throw e;}
+    }
+    return pushed;
+  }
+  async function refreshCloudProjects({rehydrateActive=false,pushPending=true,quiet=false}={}){
+    if(!accountUser){cloudProjects=null;cloudSyncState='idle';renderProjects();return {pulled:0,pushed:0};}
+    if(cloudRefreshPromise)return cloudRefreshPromise;
+    cloudRefreshPromise=(async()=>{
+      cloudSyncState='syncing';updateAccountSummary();
+      try{
+        const d=await api('/api/projects'),incoming=d.projects||[],locals=localProjects(),localById=new Map(locals.map(p=>[String(p?.id||''),p]));
+        let pulled=0,activeShouldReload=false;
+        const merged=incoming.map(remote=>{
+          const id=String(remote?.id||''),local=localById.get(id);
+          if(local&&cloudPending(id))return local;
+          if(local){const changed=Number(local.updatedAt||0)!==Number(remote.updatedAt||0)||JSON.stringify({...local,updatedAt:0})!==JSON.stringify({...remote,updatedAt:0});if(changed){pulled++;if(sameProjectId(id,state.currentProjectId))activeShouldReload=true;}}
+          return remote;
+        });
+        const remoteIds=new Set(incoming.map(p=>String(p?.id||'')));
+        // Keep local-only backups visible while signed in. Only explicitly pending
+        // projects are uploaded; this avoids silently moving another account's old
+        // local backup into the current cloud account.
+        for(const local of locals)if(!remoteIds.has(String(local?.id||'')))merged.push(local);
+        cloudProjects=merged;for(const p of incoming){if(!cloudPending(p.id))upsertLocal(p);}renderProjects();
+        let pushed=0;if(pushPending)pushed=await pushPendingCloudProjects();
+        cloudSyncState='ready';updateAccountSummary();renderProjects();
+        if(rehydrateActive&&activeShouldReload&&state.currentProjectId&&!cloudPending(state.currentProjectId)&&!autoSaveRunning&&!autoSaveTimer){performLoadProject(state.currentProjectId);}
+        return {pulled,pushed};
+      }catch(e){cloudSyncState='error';updateAccountSummary();if(!quiet)$('status').textContent=`Cloud sync unavailable — using local backup: ${e.message}`;renderProjects();throw e;}
+      finally{cloudRefreshPromise=null;}
+    })();
+    return cloudRefreshPromise;
+  }
+  function startCloudPolling(){
+    clearInterval(cloudPollTimer);cloudPollTimer=null;
+    if(!accountUser)return;
+    cloudPollTimer=setInterval(()=>{if(document.visibilityState!=='visible'||autoSaveRunning||autoSaveTimer)return;refreshCloudProjects({rehydrateActive:true,pushPending:true,quiet:true}).catch(()=>{});},60000);
+  }
+  function scheduleFocusCloudRefresh(){clearTimeout(cloudFocusTimer);if(!accountUser||document.visibilityState==='hidden')return;cloudFocusTimer=setTimeout(()=>{if(!autoSaveRunning&&!autoSaveTimer)refreshCloudProjects({rehydrateActive:true,pushPending:true,quiet:true}).catch(()=>{});},450);}
+  async function syncNow(){
+    if(!accountUser){$('authMessage').textContent='Log in to sync projects.';return;}
+    const btn=$('syncNowBtn');if(btn){btn.disabled=true;btn.textContent='↻ Syncing…';}
+    $('authMessage').textContent='Syncing this device with your cloud account…';cloudSyncState='syncing';updateAccountSummary();
     try{
-      const d=await api('/api/projects');
-      const incoming=d.projects||[];
-      const locals=localProjects();
-      const localById=new Map(locals.map(p=>[String(p?.id||''),p]));
-      cloudProjects=incoming.map(remote=>{
-        const local=localById.get(String(remote?.id||''));
-        if(!local)return remote;
-        const localNewer=Number(local?.updatedAt||0)>Number(remote?.updatedAt||0);
-        // Merge the general project by project timestamp, but merge Baby DAW parts and drums
-        // by their own edit clocks. This prevents a deleted vocal or a newly-written beat from
-        // being resurrected/erased by an older cloud snapshot with a newer server timestamp.
-        const merged=localNewer?{...remote,...local}:{...local,...remote};
-        const lp=Number(local?.parts?.updatedAt||0), rp=Number(remote?.parts?.updatedAt||0);
-        if(lp||rp) merged.parts = lp>=rp ? local.parts : remote.parts;
-        else if(localNewer && local.parts) merged.parts=local.parts;
-        const lb=Number(local?.beatMakerUpdatedAt||0), rb=Number(remote?.beatMakerUpdatedAt||0);
-        if(lb||rb){
-          if(lb>=rb){merged.beatMaker=local.beatMaker;merged.beatMakerUpdatedAt=lb;}
-          else {merged.beatMaker=remote.beatMaker;merged.beatMakerUpdatedAt=rb;}
-        }else if(localNewer && local.beatMaker){merged.beatMaker=local.beatMaker;}
-        return merged;
-      });
-      cloudProjects.forEach(p=>upsertLocal(p));
-      cloudSyncState='ready';updateAccountSummary();renderProjects();
-    }catch(e){cloudSyncState='error';updateAccountSummary();$('status').textContent='Cloud sync unavailable — using local backup.';renderProjects();}
+      if(autoSaveTimer){clearTimeout(autoSaveTimer);autoSaveTimer=null;await runAutoSave();}
+      for(let i=0;autoSaveRunning&&i<240;i++)await new Promise(r=>setTimeout(r,25));
+      if(cloudRefreshPromise){try{await cloudRefreshPromise}catch{}}
+      const result=await refreshCloudProjects({rehydrateActive:true,pushPending:true,quiet:false});
+      $('authMessage').textContent=`Sync complete${result?.pushed?` • uploaded ${result.pushed}`:''}${result?.pulled?` • downloaded ${result.pulled}`:''}.`;
+      $('status').textContent='Cloud sync complete.';
+    }catch(e){$('authMessage').textContent=`Sync failed: ${e.message}`;}
+    finally{if(btn){btn.disabled=false;btn.textContent='↻ Sync Now';}}
   }
   let autoSaveTimer=null, autoSaveRunning=false, autoSaveQueued=false;
 
@@ -1377,6 +1412,9 @@
     const name=$('projectName').value.trim()||existing?.name||`Chord Project ${new Date().toLocaleDateString()}`;
     const p=capture(projectId,name);
 
+    // This is a real captured local edit. Mark it pending before touching local storage so
+    // a cloud refresh can never pull an older server copy over an unsent edit.
+    setCloudPending(projectId,true);
     // Local save happens synchronously first, so edits are protected even if cloud is unavailable.
     upsertLocal(p);
     publishSrpHandoff();
@@ -1385,7 +1423,8 @@
 
     if(accountUser){
       try{
-        await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
+        const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
+        const committed=d.project||p;upsertLocal(committed);updateCloudSnapshot(committed);setCloudPending(projectId,false);
         await window.CRPParts?.syncCloudAudio?.(projectId);
         cloudSyncState='ready';
         updateAccountSummary();
@@ -1425,13 +1464,13 @@
       }catch{}
     }
     const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);
-    state.currentProjectId=p.id;unsavedProjectTouched=false;try{localStorage.setItem('crp-active-project-id',String(p.id));}catch{}$('projectName').value=name;upsertLocal(p);publishSrpHandoff();
+    state.currentProjectId=p.id;unsavedProjectTouched=false;try{localStorage.setItem('crp-active-project-id',String(p.id));}catch{}$('projectName').value=name;setCloudPending(p.id,true);upsertLocal(p);publishSrpHandoff();
     if(accountUser){
       try{
         const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
-        upsertLocal(d.project);
+        upsertLocal(d.project);updateCloudSnapshot(d.project);setCloudPending(p.id,false);
         await window.CRPParts?.syncCloudAudio?.(p.id);
-        await refreshCloudProjects();
+        await refreshCloudProjects({rehydrateActive:false,pushPending:true});
         $('status').textContent=`Saved “${name}” and vocal audio to cloud.`;
       }catch(e){$('status').textContent=`Saved locally; cloud sync failed: ${e.message}`;}
     }else{$('status').textContent=`Saved “${name}” on this device.`;renderProjects();}
@@ -1469,6 +1508,7 @@
 
   async function setProjectArchived(project,archived){
     const p={...project,archived:!!archived,updatedAt:Date.now()};
+    setCloudPending(p.id,true);
     upsertLocal(p);
     publishSrpHandoff();
     updateCloudSnapshot(p);
@@ -1478,6 +1518,7 @@
       try{
         const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
         if(d?.project){upsertLocal(d.project);updateCloudSnapshot(d.project);}
+        setCloudPending(p.id,false);
         cloudSyncState='ready';
         updateAccountSummary();
         renderProjects();
@@ -1535,6 +1576,7 @@
         const n=prompt('New project name:',p.name);
         if(!n?.trim())return;
         const name=n.trim(),locals=localProjects(),i=locals.findIndex(x=>x.id===p.id);
+        setCloudPending(p.id,true);
         if(i>=0){locals[i].name=name;locals[i].updatedAt=Date.now();saveLocalProjects(locals);}
         if(cloudProjects){const ci=cloudProjects.findIndex(x=>x.id===p.id);if(ci>=0)cloudProjects[ci]={...cloudProjects[ci],name,updatedAt:Date.now()};}
         if(sameProjectId(state.currentProjectId,p.id))$('projectName').value=name;
@@ -1542,7 +1584,8 @@
         if(accountUser){
           try{
             await api('/api/projects/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({name})});
-            await refreshCloudProjects();
+            setCloudPending(p.id,false);
+            await refreshCloudProjects({rehydrateActive:false,pushPending:true});
           }catch(err){
             $('status').textContent='Rename saved locally; cloud sync failed.';
             renderProjects();
@@ -1573,10 +1616,10 @@
     });
   }
   function showAccount(){const logged=!!accountUser;const panel=$('accountPanel');panel?.classList.toggle('is-logged-in',logged);$('accountSummaryBtn').hidden=!logged;$('authForms').hidden=logged;$('accountTools').hidden=!logged;$('logoutBtn').hidden=!logged;$('accountStatus').textContent=logged?`Signed in as ${accountDisplayName()}`:'Not signed in — local projects still work.';$('projectStorageLabel').textContent=logged?'Synced to your cloud account':'Saved on this device';if(logged){updateAccountSummary();setAccountCollapsed(true);}else{setAccountCollapsed(false);cloudSyncState='idle';}renderProjects();}
-  async function checkAccount(){try{const d=await api('/api/auth/me');accountUser=d.user||null;}catch{accountUser=null;}showAccount();if(accountUser)await refreshCloudProjects();}
-  async function login(){try{const d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:$('loginEmail').value,password:$('loginPassword').value})});accountUser=d.user;$('loginPassword').value='';$('authMessage').textContent='Logged in. Syncing projects…';showAccount();await refreshCloudProjects();$('authMessage').textContent='Cloud sync ready.';}catch(e){$('authMessage').textContent=e.message;}}
-  async function register(){try{const d=await api('/api/auth/register',{method:'POST',body:JSON.stringify({displayName:$('registerName').value,email:$('registerEmail').value,password:$('registerPassword').value,inviteCode:$('inviteCode').value})});accountUser=d.user;$('registerPassword').value=$('inviteCode').value='';$('authMessage').textContent='Account created. Your projects can now sync.';showAccount();await refreshCloudProjects();}catch(e){$('authMessage').textContent=e.message;}}
-  async function logout(){try{await api('/api/auth/logout',{method:'POST',body:'{}'});}catch{}accountUser=null;cloudProjects=null;cloudSyncState='idle';showAccount();setAccountCollapsed(false);$('authMessage').textContent='Logged out. Local backup is still available.';}
+  async function checkAccount(){try{const d=await api('/api/auth/me');accountUser=d.user||null;}catch{accountUser=null;}showAccount();startCloudPolling();if(accountUser){try{await refreshCloudProjects({rehydrateActive:true,pushPending:true})}catch{}}}
+  async function login(){try{const d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:$('loginEmail').value,password:$('loginPassword').value})});accountUser=d.user;$('loginPassword').value='';$('authMessage').textContent='Logged in. Syncing projects…';showAccount();startCloudPolling();await refreshCloudProjects({rehydrateActive:true,pushPending:true});$('authMessage').textContent='Cloud sync ready.';}catch(e){$('authMessage').textContent=e.message;}}
+  async function register(){try{const d=await api('/api/auth/register',{method:'POST',body:JSON.stringify({displayName:$('registerName').value,email:$('registerEmail').value,password:$('registerPassword').value,inviteCode:$('inviteCode').value})});accountUser=d.user;$('registerPassword').value=$('inviteCode').value='';$('authMessage').textContent='Account created. Your projects can now sync.';showAccount();startCloudPolling();await refreshCloudProjects({rehydrateActive:true,pushPending:true});}catch(e){$('authMessage').textContent=e.message;}}
+  async function logout(){try{await api('/api/auth/logout',{method:'POST',body:'{}'});}catch{}accountUser=null;cloudProjects=null;cloudSyncState='idle';startCloudPolling();showAccount();setAccountCollapsed(false);$('authMessage').textContent='Logged out. Local backup is still available.';}
   async function changePassword(){const currentPassword=prompt('Current password:');if(currentPassword===null)return;const newPassword=prompt('New password (8+ characters):');if(newPassword===null)return;try{await api('/api/auth/password',{method:'POST',body:JSON.stringify({currentPassword,newPassword})});$('authMessage').textContent='Password changed successfully.';}catch(e){$('authMessage').textContent=e.message;}}
 
 
@@ -1825,7 +1868,7 @@
 
     $('projectsTabBtn').onclick=()=>setProjectBrowserMode('projects');
     $('archiveTabBtn').onclick=()=>setProjectBrowserMode('archive');
-    $('loginBtn').onclick=login;$('registerBtn').onclick=register;$('logoutBtn').onclick=logout;$('changePasswordBtn').onclick=changePassword;
+    $('loginBtn').onclick=login;$('registerBtn').onclick=register;$('logoutBtn').onclick=logout;$('changePasswordBtn').onclick=changePassword;if($('syncNowBtn'))$('syncNowBtn').onclick=syncNow;
     $('accountSummaryBtn').onclick=()=>{const panel=$('accountPanel');setAccountCollapsed(!panel.classList.contains('is-collapsed'));};
     document.querySelectorAll('.notes-toolbar [data-cmd]').forEach(b=>b.onclick=()=>{document.execCommand(b.dataset.cmd,false,null);scheduleAutoSave();});$('clearNotesBtn').onclick=()=>{if(confirm('Clear notes?')){$('notesEditor').innerHTML='';scheduleAutoSave();}};
     $('keyInput').dataset.autoKey=$('keyInput').value.trim()?'0':'1';
@@ -1854,8 +1897,8 @@
     setTimeout(applyLinkedMetaFromSrpHandoff,0);
     // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
     // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.
-    if(!IS_PLAYBACK_BRIDGE) checkAccount();
-    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.64-MIDI-REPEAT-EDIT-IDENTITY').catch(()=>{});
+    if(!IS_PLAYBACK_BRIDGE){checkAccount();window.addEventListener('focus',scheduleFocusCloudRefresh);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')scheduleFocusCloudRefresh();});}
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.66-BD-PASTE-SONG-BARS-CLOUD-SYNC').catch(()=>{});
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
@@ -2053,14 +2096,10 @@
       try{if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:m.pitchMode==='step'?'step':'capo'});}catch{}
       renderAll();
       window.CRPParts?.syncCoreLive?.();
-      if(state.currentProjectId){
-        const projects=localProjects();
-        const i=projects.findIndex(x=>String(x?.id||'')===String(state.currentProjectId));
-        if(i>=0){
-          projects[i]={...projects[i],bpm,capo,octave,updatedAt:Date.now()};
-          saveLocalProjects(projects);updateCloudSnapshot(projects[i]);
-        }
-      }
+      // Hard Sync is the fast same-device transport bus. Do not stamp the whole
+      // saved project here: doing so made a stale phone snapshot look newer than
+      // a real PC cloud save. The project-scoped handoff/autosave path persists
+      // actual transport edits through the normal pending-cloud flow.
       return true;
     }catch{return false}
   }
@@ -2078,6 +2117,7 @@
       const existing=localProjects().find(x=>String(x?.id||'')===String(state.currentProjectId));
       const nm=$('projectName').value.trim()||existing?.name||`Chord Project ${new Date().toLocaleDateString()}`;
       const snap=capture(state.currentProjectId,nm);
+      setCloudPending(state.currentProjectId,true);
       upsertLocal(snap);
       localStorage.setItem(CRP_NAV_SNAPSHOT_PREFIX+String(state.currentProjectId),JSON.stringify(snap));
       localStorage.setItem('crp-active-project-id',String(state.currentProjectId));
@@ -2086,6 +2126,10 @@
   }
   function recoverNavigationSnapshot(project){
     if(!project?.id)return project;
+    // A navigation snapshot is an emergency LOCAL recovery layer, not a second
+    // cloud authority. Once the account has a clean (non-pending) cloud project,
+    // never let an older phone/PC navigation snapshot replace that downloaded copy.
+    if(accountUser&&!cloudPending(project.id)){try{localStorage.removeItem(CRP_NAV_SNAPSHOT_PREFIX+String(project.id));}catch{}return project;}
     try{
       const raw=localStorage.getItem(CRP_NAV_SNAPSHOT_PREFIX+String(project.id));
       if(!raw)return project;
