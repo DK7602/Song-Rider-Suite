@@ -87,7 +87,7 @@
   let drumEvents=[];
   let drumArrangementInitialized=false;
   let voxLastHarmonyBeatKey='';
-  let liveEditTimer=null, mediaPositionTimer=null, mediaKeepAlive=null, mediaKeepAliveUrl='', mediaPausedBeat=0, mediaActionsInstalled=false;
+  let liveEditTimer=null,bpmRestartTimer=null,mediaPositionTimer=null,mediaKeepAlive=null,mediaKeepAliveUrl='',mediaPausedBeat=0,mediaActionsInstalled=false;
   let liveVocalFxNodes=new Map();
   let audioCtx=null, masterLimiter=null, cycleTimer=null;
   let playerCache=new Map(), resolvedPlayerCache=new Map(), lastReadyPlayer=new Map(), playerSound=new WeakMap(), partBuses=new Map(), partInstrumentFx=new Map(), highlightTimers=[], activeVoices=new Set(), vocalBufferCache=new Map(), activeVocalSources=new Set();
@@ -95,7 +95,7 @@
   // millions of audio samples on the UI thread while WebAudio playback is running.
   const voxWaveformPeakCache=new Map();
   let micStream=null,micCtx=null,micSource=null,micAnalyser=null,micProcessor=null,micSilentGain=null,micMeterRaf=0;
-  let recording=false,recordingPaused=false,recordChunks=[],recordSampleRate=48000,recordStartedAt=0,recordPausedAt=0,recordPausedTotal=0,recordTimer=null,currentPreview=null,recordInsertBeat=0,recordTargetPartId=null,recordStartedFromVox=false,recordResumeBeat=0;
+  let recording=false,recordingPaused=false,recordingResuming=false,recordChunks=[],recordSampleRate=48000,recordStartedAt=0,recordCaptureStartMicTime=0,recordInitialTrimSec=0,recordPausedAt=0,recordPausedTotal=0,recordTimer=null,recordResumeTimer=null,currentPreview=null,recordInsertBeat=0,recordTargetPartId=null,recordStartedFromVox=false,recordResumeBeat=0;
   let leadBarClipboard=null, speechRec=null, speechBase='';
   let partsUpdatedAt=0, partsFingerprint='';
   let voxBoxOpen=false,voxCropMode=false,voxRangeMode=false,voxRangeSelection=null,voxSelected=null,voxSelections=[],voxInstrumentSelection=null,voxInstrumentSelections=[],voxInstrumentTrackFocus=null,voxTargetPartId=null,voxClipboard=null,voxPlayheadBeat=0,voxRenderToken=0,voxAutoScroll=true,voxShowInstrumentals=false,voxOpenedFromVocal=false,voxToolMode='playhead',voxUndoStack=[],voxRedoStack=[],voxInspectorManualOverride=null;
@@ -783,7 +783,7 @@
   async function ensureMic(){
     if(micStream?.active)return micStream;if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone recording is not available in this browser.');
     micStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,sampleRate:{ideal:48000},sampleSize:{ideal:24},echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
-    micCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000});recordSampleRate=micCtx.sampleRate;micSource=micCtx.createMediaStreamSource(micStream);micAnalyser=micCtx.createAnalyser();micAnalyser.fftSize=1024;micAnalyser.smoothingTimeConstant=.72;micSource.connect(micAnalyser);startMicMeter();const track=micStream.getAudioTracks()[0];const st=track.getSettings?.()||{};$('vocalMicInfo').textContent=`${track.label||'Phone microphone'} • ${st.sampleRate||recordSampleRate} Hz${st.channelCount?` • ${st.channelCount} ch`:''}`;if($('vocalArmMic')){$('vocalArmMic').textContent='Mic test off';$('vocalArmMic').setAttribute('aria-pressed','true');}return micStream;
+    micCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000});if(micCtx.state==='suspended')await micCtx.resume();recordSampleRate=micCtx.sampleRate;micSource=micCtx.createMediaStreamSource(micStream);micAnalyser=micCtx.createAnalyser();micAnalyser.fftSize=1024;micAnalyser.smoothingTimeConstant=.72;micSource.connect(micAnalyser);startMicMeter();const track=micStream.getAudioTracks()[0];const st=track.getSettings?.()||{};$('vocalMicInfo').textContent=`${track.label||'Phone microphone'} • ${st.sampleRate||recordSampleRate} Hz${st.channelCount?` • ${st.channelCount} ch`:''}`;if($('vocalArmMic')){$('vocalArmMic').textContent='Mic test off';$('vocalArmMic').setAttribute('aria-pressed','true');}return micStream;
   }
   async function disableMic(){
     if(recording)return;cancelAnimationFrame(micMeterRaf);micMeterRaf=0;try{micSource?.disconnect();}catch{}try{micAnalyser?.disconnect();}catch{}for(const t of micStream?.getTracks?.()||[])try{t.stop();}catch{}micStream=null;micSource=null;micAnalyser=null;try{await micCtx?.close();}catch{}micCtx=null;if($('vocalMicMeter'))$('vocalMicMeter').style.width='0%';if($('vocalMicDb'))$('vocalMicDb').textContent='— dB';if($('vocalMicInfo'))$('vocalMicInfo').textContent='Mic test off.';if($('vocalArmMic')){$('vocalArmMic').textContent='Mic check';$('vocalArmMic').setAttribute('aria-pressed','false');}
@@ -802,7 +802,16 @@
     }catch(e){console.warn('Speech recognition unavailable',e);if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Live transcription could not start. Recording is unaffected.';}
   }
   function stopSpeechToText(){try{speechRec?.stop();}catch{}speechRec=null;}
-  function floatToWav(chunks,sampleRate){let length=chunks.reduce((n,a)=>n+a.length,0),samples=new Float32Array(length),o=0;for(const a of chunks){samples.set(a,o);o+=a.length;}const buffer=new ArrayBuffer(44+samples.length*2),view=new DataView(buffer),write=(off,str)=>{for(let i=0;i<str.length;i++)view.setUint8(off+i,str.charCodeAt(i));};write(0,'RIFF');view.setUint32(4,36+samples.length*2,true);write(8,'WAVE');write(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);write(36,'data');view.setUint32(40,samples.length*2,true);let p=44;for(let i=0;i<samples.length;i++){let x=Math.max(-1,Math.min(1,samples[i]));view.setInt16(p,x<0?x*0x8000:x*0x7fff,true);p+=2;}return new Blob([buffer],{type:'audio/wav'});}
+  function floatToWav(chunks,sampleRate,trimStartSamples=0){
+    const total=chunks.reduce((n,a)=>n+a.length,0),trim=Math.max(0,Math.min(total,Math.round(Number(trimStartSamples)||0))),length=Math.max(0,total-trim),samples=new Float32Array(length);
+    let skip=trim,o=0;
+    for(const a of chunks){
+      if(skip>=a.length){skip-=a.length;continue;}
+      const src=skip>0?a.subarray(skip):a;skip=0;
+      const n=Math.min(src.length,length-o);if(n<=0)break;samples.set(src.subarray(0,n),o);o+=n;
+    }
+    const buffer=new ArrayBuffer(44+samples.length*2),view=new DataView(buffer),write=(off,str)=>{for(let i=0;i<str.length;i++)view.setUint8(off+i,str.charCodeAt(i));};write(0,'RIFF');view.setUint32(4,36+samples.length*2,true);write(8,'WAVE');write(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);write(36,'data');view.setUint32(40,samples.length*2,true);let pos=44;for(let i=0;i<samples.length;i++){let x=Math.max(-1,Math.min(1,samples[i]));view.setInt16(pos,x<0?x*0x8000:x*0x7fff,true);pos+=2;}return new Blob([buffer],{type:'audio/wav'});
+  }
   async function beginRecording(options={}){
     const requestedPartId=options?.partId||null;
     if(requestedPartId){const rp=parts.find(x=>x.type==='vocal'&&String(x.id)===String(requestedPartId));if(rp)activePartId=rp.id;}
@@ -811,27 +820,37 @@
     const fromVox=!!options?.voxBox;
     try{
       stopPreview();await ensureMic();window.CRPParts?.stopPlayback?.();
-      recordChunks=[];recordInsertBeat=fromBeat;recordTargetPartId=p.id;recordStartedFromVox=fromVox;recordResumeBeat=fromBeat;
+      clearTimeout(recordResumeTimer);recordResumeTimer=null;recordingResuming=false;
+      recordChunks=[];recordInsertBeat=fromBeat;recordTargetPartId=p.id;recordStartedFromVox=fromVox;recordResumeBeat=fromBeat;recordInitialTrimSec=0;
       micProcessor=micCtx.createScriptProcessor(4096,1,1);micSilentGain=micCtx.createGain();micSilentGain.gain.value=0;micSource.connect(micProcessor);micProcessor.connect(micSilentGain);micSilentGain.connect(micCtx.destination);
+      recordCaptureStartMicTime=micCtx.currentTime;
       micProcessor.onaudioprocess=e=>{if(recording&&!recordingPaused)recordChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));};
       recording=true;recordingPaused=false;recordPausedAt=0;recordPausedTotal=0;recordStartedAt=performance.now();
       if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Recording clean WAV. Cloud transcription runs after the take is saved.';
       if($('vocalRecordBtn')){$('vocalRecordBtn').classList.add('recording');$('vocalRecordBtn').disabled=true;}
       if($('vocalStopBtn'))$('vocalStopBtn').disabled=false;
-      recordTimer=setInterval(()=>{const now=recordingPaused?recordPausedAt:performance.now();if($('vocalTimer'))$('vocalTimer').textContent=fmtTime(Math.max(0,(now-recordStartedAt-recordPausedTotal)/1000));updateVoxTransportState();},100);
       const oldStates=new Map(parts.map(x=>[x.id,x.enabled]));p._recordOldStates=oldStates;p._recordOldVolumes=new Map(parts.map(x=>[x.id,x.volume]));
       parts.forEach(x=>{if(x.type==='chord'||x.type==='lead'){x.enabled=p.backingPartIds.includes(x.id);x.volume=(p._recordOldVolumes.get(x.id)??x.volume)*(p.backingVolume??.8);}});
       const drumToggle=$('crpDrumsToggle');if(drumToggle){p._recordOldDrums=drumToggle.checked;drumToggle.checked=p.backingDrums!==false;drumToggle.dispatchEvent(new Event('change'));}
       const drumVol=$('crpDrumVolume');if(drumVol){p._recordOldDrumVol=drumVol.value;drumVol.value=String(Math.round(+drumVol.value*(p.backingVolume??.8)));drumVol.dispatchEvent(new Event('input'));}
       renderParts();
-      setTimeout(()=>{if(recording)startPlayback({fromBeat:recordInsertBeat});},80);
+
+      // v3.3.67 — remove arbitrary recorder delay. Start the backing, measure the
+      // actual preload + WebAudio lead-in, and trim that exact pre-roll from the
+      // saved WAV so sample 0 lands on the backing downbeat.
+      await startPlayback({fromBeat:recordInsertBeat});
+      const micElapsed=Math.max(0,(micCtx?.currentTime||0)-recordCaptureStartMicTime),backingStarted=!!((playing||starting)&&audioCtx&&playbackClockStartAudioTime);
+      recordInitialTrimSec=backingStarted?Math.max(0,micElapsed+playbackLeadRemainingSec()):0;
+      recordTimer=setInterval(()=>{const now=recordingPaused?recordPausedAt:performance.now(),elapsed=Math.max(0,(now-recordStartedAt-recordPausedTotal-recordInitialTrimSec*1000)/1000);if($('vocalTimer'))$('vocalTimer').textContent=fmtTime(elapsed);updateVoxTransportState();},100);
+
       if(fromVox){voxTargetPartId=p.id;updateVoxPlayhead(recordInsertBeat,true);voxStatus(`Recording into ${p.name} from beat ${recordInsertBeat.toFixed(2)}…`);}
-      core.status('Recording dry WAV. Use headphones so the backing does not bleed into the mic.');updateVoxTransportState();
-    }catch(e){console.error(e);core.status(e.message||'Could not start microphone.');recordStartedFromVox=false;recordTargetPartId=null;}
+      core.status('Recording dry WAV in beat sync. Use headphones so the backing does not bleed into the mic.');updateVoxTransportState();
+    }catch(e){console.error(e);core.status(e.message||'Could not start microphone.');recordStartedFromVox=false;recordTargetPartId=null;recordInitialTrimSec=0;recordCaptureStartMicTime=0;}
   }
   async function endRecording(){
     const p=parts.find(x=>x.type==='vocal'&&String(x.id)===String(recordTargetPartId))||active();if(!p||p.type!=='vocal'||!recording)return;
     const wasVox=recordStartedFromVox,insertBeat=recordInsertBeat;
+    clearTimeout(recordResumeTimer);recordResumeTimer=null;recordingResuming=false;
     if(recordingPaused&&recordPausedAt){recordPausedTotal+=performance.now()-recordPausedAt;}recordingPaused=false;recordPausedAt=0;recording=false;stopSpeechToText();clearInterval(recordTimer);recordTimer=null;
     if($('vocalRecordBtn')){$('vocalRecordBtn').classList.remove('recording');$('vocalRecordBtn').disabled=false;}
     if($('vocalStopBtn'))$('vocalStopBtn').disabled=true;
@@ -839,9 +858,11 @@
     if(p._recordOldStates){for(const x of parts)x.enabled=p._recordOldStates.get(x.id)??x.enabled;delete p._recordOldStates;}if(p._recordOldVolumes){for(const x of parts)x.volume=p._recordOldVolumes.get(x.id)??x.volume;delete p._recordOldVolumes;}
     const drumToggle=$('crpDrumsToggle');if(drumToggle&&p._recordOldDrums!==undefined){drumToggle.checked=p._recordOldDrums;drumToggle.dispatchEvent(new Event('change'));delete p._recordOldDrums;}
     const drumVol=$('crpDrumVolume');if(drumVol&&p._recordOldDrumVol!==undefined){drumVol.value=p._recordOldDrumVol;drumVol.dispatchEvent(new Event('input'));delete p._recordOldDrumVol;}
-    renderParts();const duration=Math.max(0,(performance.now()-recordStartedAt-recordPausedTotal)/1000);if($('vocalTimer'))$('vocalTimer').textContent=fmtTime(duration);
-    if(duration<.25||!recordChunks.length){core.status('Recording was too short.');recordStartedFromVox=false;recordTargetPartId=null;updateVoxTransportState();return;}
-    const blob=floatToWav(recordChunks,recordSampleRate),id=uid(),take={id,name:`Take ${p.recordings.length+1}`,createdAt:new Date().toISOString(),duration,sampleRate:recordSampleRate,size:blob.size};
+    renderParts();
+    const capturedSamples=recordChunks.reduce((n,a)=>n+a.length,0),trimSamples=Math.max(0,Math.min(capturedSamples,Math.round(recordInitialTrimSec*recordSampleRate))),usableSamples=Math.max(0,capturedSamples-trimSamples),duration=usableSamples/Math.max(1,recordSampleRate);
+    if($('vocalTimer'))$('vocalTimer').textContent=fmtTime(duration);
+    if(duration<.25||usableSamples<Math.max(1,Math.round(recordSampleRate*.25))){core.status('Recording was too short.');recordStartedFromVox=false;recordTargetPartId=null;recordInitialTrimSec=0;recordCaptureStartMicTime=0;updateVoxTransportState();return;}
+    const blob=floatToWav(recordChunks,recordSampleRate,trimSamples),id=uid(),take={id,name:`Take ${p.recordings.length+1}`,createdAt:new Date().toISOString(),duration,sampleRate:recordSampleRate,size:blob.size};
     try{
       await vocalDbPut(id,blob);vocalBufferCache.delete(id);p.recordings.push(take);p.activeTakeId=id;
       if(wasVox){
@@ -854,21 +875,40 @@
       if(voxBoxOpen){renderVoxBox();updateVoxPlayhead(insertBeat,true);voxStatus(`${take.name} recorded onto ${p.name} at beat ${insertBeat.toFixed(2)}.`);}
       if(core.loggedIn&&core.currentProjectId){try{if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Uploading and transcribing new take…';await uploadTakeToCloud(take,blob,core.currentProjectId);await transcribeTake(p,take,{quiet:true});core.status(`Saved ${take.name} to cloud and transcribed it.`);}catch(te){console.warn('Automatic cloud transcription pending',te);if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent=`Take is safe. ${te.message||'Tap Transcribe active take after saving.'}`;core.status(`Saved ${take.name}. Cloud transcription can be retried with Transcribe active take.`);}}else{if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Take is safe. Save/sign in, then tap Transcribe active take.';core.status(core.loggedIn?`Saved ${take.name} locally. Save the project to enable cloud transcription.`:`Saved ${take.name} locally. Sign in and save to use cloud transcription.`);}
     }catch(e){console.error(e);core.status('Take was recorded but could not be stored on this device.');}
-    finally{recordStartedFromVox=false;recordTargetPartId=null;recordInsertBeat=0;recordResumeBeat=0;updateVoxTransportState();}
+    finally{recordStartedFromVox=false;recordTargetPartId=null;recordInsertBeat=0;recordResumeBeat=0;recordInitialTrimSec=0;recordCaptureStartMicTime=0;recordingResuming=false;clearTimeout(recordResumeTimer);recordResumeTimer=null;updateVoxTransportState();}
   }
-  function toggleRecordingPause(){
+  async function toggleRecordingPause(){
     if(!recording)return false;
     if(!recordingPaused){
+      clearTimeout(recordResumeTimer);recordResumeTimer=null;recordingResuming=false;
       recordResumeBeat=currentCycleBeat()??voxPlayheadBeat??recordResumeBeat??0;
       if(recordStartedFromVox)updateVoxPlayhead(recordResumeBeat,false);
       recordingPaused=true;recordPausedAt=performance.now();
       try{window.CRPParts?.stopPlayback?.();}catch{}
       core.status('Recording paused.');
     }else{
-      if(recordPausedAt)recordPausedTotal+=performance.now()-recordPausedAt;
-      recordingPaused=false;recordPausedAt=0;
-      setTimeout(()=>{if(recording&&!recordingPaused)startPlayback({fromBeat:Math.max(0,Number(recordResumeBeat)||0)});},60);
-      core.status('Recording resumed.');
+      if(recordingResuming)return true;
+      recordingResuming=true;
+      core.status('Resuming recording on the backing downbeat…');
+      try{
+        await startPlayback({fromBeat:Math.max(0,Number(recordResumeBeat)||0)});
+        if(!recording||!recordingPaused){recordingResuming=false;return recordingPaused;}
+        const finishResume=()=>{
+          recordResumeTimer=null;
+          if(!recording||!recordingPaused){recordingResuming=false;return;}
+          if(recordPausedAt)recordPausedTotal+=performance.now()-recordPausedAt;
+          recordingPaused=false;recordPausedAt=0;recordingResuming=false;
+          core.status('Recording resumed in beat sync.');
+          updateVoxTransportState();
+        };
+        const delayMs=Math.max(0,playbackLeadRemainingSec()*1000);
+        if(delayMs>4)recordResumeTimer=setTimeout(finishResume,delayMs);else finishResume();
+      }catch(e){
+        console.warn('Could not resume backing playback',e);
+        if(recordPausedAt)recordPausedTotal+=performance.now()-recordPausedAt;
+        recordingPaused=false;recordPausedAt=0;recordingResuming=false;
+        core.status('Recording resumed without backing.');
+      }
     }
     updateVoxTransportState();
     return recordingPaused;
@@ -986,6 +1026,10 @@
     if(period>0&&loopSong)beat=start+((((beat-start)%period)+period)%period);
     else beat=Math.max(start,Math.min(end-.001,beat));
     return beat;
+  }
+  function playbackLeadRemainingSec(){
+    if(!(playing||starting)||!audioCtx||!playbackClockStartAudioTime)return 0;
+    return Math.max(0,playbackClockStartAudioTime-audioCtx.currentTime);
   }
   function renderSongEndEditor(){ if(!(playing||starting))updateMediaPosition(); }
   function setSongRange(start,end,{save=true,status=true}={}){
@@ -1221,6 +1265,18 @@
     // fallback; no transport restart and no scheduler stall.
     playerFor(p).catch(e=>console.warn('Live sound preload failed',e));
   }
+  function queueTempoRestartIfNeeded(){
+    if(recording||!(playing||starting))return false;
+    const nextBpm=Math.max(40,Math.min(240,Number(core.bpm)||92));
+    if(Math.abs(nextBpm-playbackClockBpm)<.001)return false;
+    clearTimeout(bpmRestartTimer);
+    const beat=currentCycleBeat(),scope=playbackScope?clone(playbackScope):null;
+    bpmRestartTimer=setTimeout(()=>{
+      if(!(playing||starting)||recording)return;
+      startPlayback({scope,fromBeat:Number.isFinite(beat)?beat:playbackClockStartBeat,preserveUi:true,liveRestart:true});
+    },18);
+    return true;
+  }
   function syncCoreLive(){
     syncLoadedChord();
     const p=loadedChord();
@@ -1228,6 +1284,7 @@
       warmLivePlayer(p);
       if(!(playing||starting))busFor(p,requestedPartSound(p));
     }
+    queueTempoRestartIfNeeded();
     if(active()?.type==='lead')renderLeadHarmony();
   }
   // v3.3.63 — dedicated CRP MIDI timeline commit. MIDI is sequential, so a
@@ -1429,7 +1486,7 @@
     const generation=++playbackGeneration;
     starting=true;updatePartPlaybackButtons();
     try{
-      core.status('Loading parts…');ensureAudio();if(vs.length)await ensureAutotuneWorklet(audioCtx);await Promise.all([preload(ps),...vs.map(v=>preloadVocalBuffers(v))]);
+      core.status('Loading parts…');ensureAudio();if(audioCtx?.state==='suspended')await audioCtx.resume();if(vs.length)await ensureAutotuneWorklet(audioCtx);await Promise.all([preload(ps),...vs.map(v=>preloadVocalBuffers(v))]);
       if(generation!==playbackGeneration)return;
 
       // Keep every playback source on the same musical downbeat. Drums use a
@@ -2987,8 +3044,20 @@
       if(inlineEditor||voxFormFocus||!widthChanged){requestAnimationFrame(()=>clampVoxTransportToViewport());return;}
       renderVoxBox();requestAnimationFrame(()=>clampVoxTransportToViewport());
     });
-    $('bpmInput')?.addEventListener('input',()=>{renderSongEndEditor();updateMediaMetadata();liveEditRefresh();});
-    let voxFollowRaf=0;const voxFollowTick=()=>{if(voxBoxOpen){let beat=null;if(playing||starting)beat=currentCycleBeat();else if(recording){const now=recordingPaused&&recordPausedAt?recordPausedAt:performance.now(),activeMs=Math.max(0,now-recordStartedAt-recordPausedTotal);beat=recordInsertBeat+(activeMs/1000)*(Math.max(40,Math.min(240,Number(core.bpm)||92))/60);}if(Number.isFinite(beat))updateVoxPlayhead(beat,voxAutoScroll);}voxFollowRaf=requestAnimationFrame(voxFollowTick);};if(voxFollowRaf)cancelAnimationFrame(voxFollowRaf);voxFollowRaf=requestAnimationFrame(voxFollowTick);
+    $('bpmInput')?.addEventListener('input',()=>{
+      renderSongEndEditor();updateMediaMetadata();
+      // Do not retime the live clock while the BPM field is still being typed.
+      // A committed tempo change below cancels old queued audio and restarts every
+      // engine from the same beat at the new BPM.
+      if(!(playing||starting))liveEditRefresh();
+    });
+    $('bpmInput')?.addEventListener('change',()=>{
+      renderSongEndEditor();updateMediaMetadata();
+      if(recording)return;
+      if(!(playing||starting)){liveEditRefresh();return;}
+      if(!queueTempoRestartIfNeeded())liveEditRefresh();
+    });
+    let voxFollowRaf=0;const voxFollowTick=()=>{if(voxBoxOpen){let beat=null;if(playing||starting)beat=currentCycleBeat();else if(recording){const now=recordingPaused&&recordPausedAt?recordPausedAt:performance.now(),activeMs=Math.max(0,now-recordStartedAt-recordPausedTotal-recordInitialTrimSec*1000);beat=recordInsertBeat+(activeMs/1000)*(Math.max(40,Math.min(240,Number(core.bpm)||92))/60);}if(Number.isFinite(beat))updateVoxPlayhead(beat,voxAutoScroll);}voxFollowRaf=requestAnimationFrame(voxFollowTick);};if(voxFollowRaf)cancelAnimationFrame(voxFollowRaf);voxFollowRaf=requestAnimationFrame(voxFollowTick);
     if(songEndUiTimer)clearInterval(songEndUiTimer);songEndUiTimer=setInterval(()=>{renderSongEndEditor();if(voxBoxOpen){updatePartPlaybackButtons();updateVoxTransportState();}},300);
     $('addPartBtn')?.addEventListener('click',openModal);$('closePartModal')?.addEventListener('click',closeModal);document.querySelector('[data-close-part-modal]')?.addEventListener('click',closeModal);document.querySelectorAll('.part-choice').forEach(b=>b.addEventListener('click',()=>addPart(b.dataset.partType)));
     document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;const nextInstrument=b.dataset.leadInstrument;if(!nextInstrument)return;/* Browsing an instrument family must be non-destructive. Keep the currently selected instrument/sound audible until the user explicitly chooses a sound from the popup. */if(typeof window.CRPShowSoundPicker!=='function')return;window.CRPShowSoundPicker(b,nextInstrument,p.sound,(value)=>{p.instrument=nextInstrument;p.sound=value;renderLeadSoundControls(p);warmLivePlayer(p);core.scheduleAutoSave();});});
@@ -3038,7 +3107,7 @@
     $('vocalArmMic').onclick=async()=>{if(recording)return;if(micStream?.active){await disableMic();core.status('Mic test off.');return;}try{await ensureMic();core.status('Mic test on. Aim for strong level without living at the far right of the meter.');}catch(e){core.status(e.message||'Could not access microphone.');}};
     if($('vocalMasterPlayBtn'))$('vocalMasterPlayBtn').onclick=toggleVocalMasterPlayback;
     $('vocalRepeat').onchange=e=>{const p=active();if(p?.type!=='vocal')return;p.repeat=e.target.checked;core.scheduleAutoSave();};
-    $('vocalRecordBtn').onclick=async()=>{await beginRecording();updateFloatRecorder();};$('vocalStopBtn').onclick=async()=>{await endRecording();updateFloatRecorder();};if($('vocalLyricsBtn'))$('vocalLyricsBtn').onclick=openLyricsOverlay;if($('srpLyricsCloseBtn'))$('srpLyricsCloseBtn').onclick=closeLyricsOverlay;if($('srpFloatRecord'))$('srpFloatRecord').onclick=async()=>{await beginRecording();updateFloatRecorder();};if($('srpFloatPause'))$('srpFloatPause').onclick=()=>{toggleRecordingPause();updateFloatRecorder();};if($('srpFloatStop'))$('srpFloatStop').onclick=async()=>{await endRecording();updateFloatRecorder();};
+    $('vocalRecordBtn').onclick=async()=>{await beginRecording();updateFloatRecorder();};$('vocalStopBtn').onclick=async()=>{await endRecording();updateFloatRecorder();};if($('vocalLyricsBtn'))$('vocalLyricsBtn').onclick=openLyricsOverlay;if($('srpLyricsCloseBtn'))$('srpLyricsCloseBtn').onclick=closeLyricsOverlay;if($('srpFloatRecord'))$('srpFloatRecord').onclick=async()=>{await beginRecording();updateFloatRecorder();};if($('srpFloatPause'))$('srpFloatPause').onclick=async()=>{await toggleRecordingPause();updateFloatRecorder();};if($('srpFloatStop'))$('srpFloatStop').onclick=async()=>{await endRecording();updateFloatRecorder();};
     window.addEventListener('message',(e)=>{
       if(e.origin!==location.origin)return;
       const d=e.data||{}; if(d.type!=='srp-playback-command')return;
