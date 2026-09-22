@@ -698,3 +698,211 @@ html[data-skin-variant="blood"] .crp-word-green{
   color:#ef3948!important;
   background-image:linear-gradient(180deg,#fff 0%,#ffd0d5 10%,#ef3e4c 28%,#fff 43%,#b70f21 59%,#ff7b86 73%,#720612 100%)!important;
 }
+
+/* =========================================================
+   v3.3.73 — Celtic Gold
+   Presentation-only skin: emerald + 24K gold + white/cream with Celtic knot art.
+   ========================================================= */
+html[data-skin="celtic-gold"]{
+  --bg:#f3ecda;
+  --panel:#fffdf7;
+  --panel2:#f6f1e6;
+  --text:#22352a;
+  --muted:#617163;
+  --accent:#1f6b46;
+  --accent2:#d2a239;
+  --line:#d8ccb3;
+  --good:#2f8757;
+  --border:#d8ccb3;
+  --panel-2:#f6f1e6;
+  --srs-skin-bg:#f3ecda;
+  --srs-skin-panel:#fffdf7;
+  --srs-skin-panel2:#f6f1e6;
+  --srs-skin-text:#22352a;
+  --srs-skin-muted:#617163;
+  --srs-skin-gold:#c9982f;
+  --srs-skin-accent:#1f6b46;
+  --srs-skin-accent2:#e6bf56;
+  --srs-skin-line:#d8ccb3;
+  --srs-skin-good:#2f8757;
+  --srs-skin-input:#fffef9;
+  --srs-skin-raised:#f6f2e7;
+  --srs-skin-shadow:0 14px 34px rgba(39,73,48,.10);
+  --srs-green-pop:#2f8757;
+  --srs-green-deep:#1f6b46;
+  --srs-green-soft:rgba(47,135,87,.14);
+  --srs-editor-bg:#f8f5ea;
+  --srs-editor-lane:#fffdfa;
+  --srs-editor-lane-alt:#f5f0e3;
+  --srs-editor-label:#ece4d2;
+  --srs-editor-line:#d9d2c0;
+  --srs-editor-beat:#b8c3b4;
+  --srs-editor-bar:#c79a31;
+  --srs-editor-text:#24372d;
+  --srs-editor-muted:#667364;
+  --srs-vox-ppb:56px;
+}
+@media(max-width:600px){html[data-skin="celtic-gold"]{--srs-vox-ppb:44px;}}
+
+.preview-celtic-gold{background:#f3ecda}
+.preview-celtic-gold .srs-preview-top{background:linear-gradient(90deg,#1f6b46,#fffdf7,#d2a239,#1f6b46)}
+.preview-celtic-gold .srs-preview-icons i{background:linear-gradient(180deg,#fffefb,#efe5ce);border-color:#cdb883;box-shadow:inset 0 0 0 1px rgba(31,107,70,.09)}
+.preview-celtic-gold .srs-preview-icons i:nth-child(2){box-shadow:inset 0 0 0 1px rgba(31,107,70,.20),0 0 0 1px rgba(210,162,57,.22)}
+
+html[data-skin="celtic-gold"] body{background:radial-gradient(circle at top,#fffef7 0%,#f5f1e4 44%,#edf4ea 100%)!important;color:var(--srs-skin-text)!important}
+html[data-skin="celtic-gold"] body .page,
+html[data-skin="celtic-gold"] body header>.panel{background:#fffdf8!important;color:#22352a!important}
+
+html[data-skin="celtic-gold"] .workspace-mode-btn .mode-art,
+html[data-skin="celtic-gold"] .workspace-mode-btn .baby-exact-art{display:none!important}
+html[data-skin="celtic-gold"] .srs-theme-mode-copy{display:flex!important;position:relative!important;z-index:2}
+html[data-skin="celtic-gold"] .srs-theme-mode-icon{
+  display:grid!important;place-items:center!important;flex:0 0 58px!important;width:58px!important;height:58px!important;padding:10px!important;border-radius:18px!important;position:relative!important;z-index:2;
+  color:#e6bd53!important;
+  border:1px solid #cba140!important;
+  background:
+    radial-gradient(circle at 30% 24%,rgba(255,255,255,.85) 0 18%,transparent 19%),
+    linear-gradient(145deg,#fffbe4 0%,#f6dd82 23%,#dda91e 53%,#996708 78%,#f3cf63 100%)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -2px 4px rgba(120,78,5,.24),0 0 0 1px rgba(31,107,70,.26),0 5px 16px rgba(31,107,70,.16)!important;
+}
+html[data-skin="celtic-gold"] .srs-theme-mode-icon svg{filter:drop-shadow(0 1px 0 rgba(255,255,255,.75)) drop-shadow(0 2px 2px rgba(91,59,7,.20))}
+html[data-skin="celtic-gold"] .workspace-mode-btn,
+html[data-skin="celtic-gold"] .track-master-gold-btn,
+html[data-skin="celtic-gold"] .panel,
+html[data-skin="celtic-gold"] .auth-box,
+html[data-skin="celtic-gold"] .project-item,
+html[data-skin="celtic-gold"] .progression-line,
+html[data-skin="celtic-gold"] .lead-part-editor,
+html[data-skin="celtic-gold"] .crp-beat-panel,
+html[data-skin="celtic-gold"] .vox-inspector,
+html[data-skin="celtic-gold"] .vox-box-header,
+html[data-skin="celtic-gold"] .vox-box-tools,
+html[data-skin="celtic-gold"] .vox-floating-transport{
+  border-color:color-mix(in srgb,#1f6b46 26%,var(--srs-skin-line))!important;
+  box-shadow:0 0 0 1px rgba(31,107,70,.12),inset 0 0 0 1px rgba(210,162,57,.15),var(--srs-skin-shadow)!important;
+}
+html[data-skin="celtic-gold"] .panel,
+html[data-skin="celtic-gold"] .auth-box,
+html[data-skin="celtic-gold"] .lead-part-editor,
+html[data-skin="celtic-gold"] .crp-beat-panel,
+html[data-skin="celtic-gold"] .vox-inspector{
+  background:
+    radial-gradient(circle at top left,rgba(31,107,70,.045) 0 26px,transparent 27px),
+    radial-gradient(circle at top right,rgba(210,162,57,.06) 0 24px,transparent 25px),
+    linear-gradient(180deg,#fffdf9 0%,#f6f1e7 100%)!important;
+}
+html[data-skin="celtic-gold"] .workspace-mode-btn.active{
+  border-color:#2f8757!important;
+  box-shadow:0 0 0 1px rgba(31,107,70,.34),0 0 16px rgba(31,107,70,.16),0 0 0 3px rgba(210,162,57,.10),0 6px 16px rgba(0,0,0,.07)!important;
+}
+html[data-skin="celtic-gold"] .seg.active,
+html[data-skin="celtic-gold"] .toggle-btn.on,
+html[data-skin="celtic-gold"] .vox-box-tools .is-active,
+html[data-skin="celtic-gold"] .crp-bar-tab.active{
+  background:linear-gradient(180deg,#51a171 0%,#2f8757 58%,#216d45 100%)!important;
+  color:#fff!important;border-color:#1f6b46!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.34),0 0 0 2px rgba(47,135,87,.10)!important;
+}
+html[data-skin="celtic-gold"] input[type="checkbox"],html[data-skin="celtic-gold"] input[type="radio"]{accent-color:#2f8757!important}
+html[data-skin="celtic-gold"] input:focus,
+html[data-skin="celtic-gold"] select:focus,
+html[data-skin="celtic-gold"] textarea:focus,
+html[data-skin="celtic-gold"] .notes-editor:focus{border-color:#2f8757!important;box-shadow:0 0 0 3px rgba(47,135,87,.13)!important}
+html[data-skin="celtic-gold"] .progression-line.selected{border-color:#2f8757!important;box-shadow:0 0 0 2px rgba(47,135,87,.10)!important}
+html[data-skin="celtic-gold"] .track-master-gold-btn{box-shadow:inset 0 1px 0 rgba(255,255,255,.82),inset 0 -2px 4px rgba(91,48,0,.4),0 0 0 1px rgba(125,77,0,.38),0 0 0 3px rgba(31,107,70,.10),0 6px 16px rgba(31,107,70,.12)!important}
+
+/* Mode copy text and title bars get a richer green/gold treatment. */
+html[data-skin="celtic-gold"] .workspace-mode-btn .mode-copy strong,
+html[data-skin="celtic-gold"] .workspace-mode-btn .srs-theme-mode-copy strong{color:#22352a!important}
+html[data-skin="celtic-gold"] .workspace-mode-btn .mode-copy small,
+html[data-skin="celtic-gold"] .workspace-mode-btn .srs-theme-mode-copy small{color:#607063!important}
+html[data-skin="celtic-gold"] .workspace-chord-rider .crp-pro-titlebar{
+  width:calc(100% + 32px)!important;margin:-16px -16px 14px!important;padding:10px 12px!important;border:0!important;border-bottom:1px solid #31493a!important;border-radius:17px 17px 0 0!important;box-sizing:border-box!important;overflow:hidden!important;
+  background:linear-gradient(180deg,#1f2f26 0%,#16211a 100%)!important;
+}
+@media(max-width:700px){html[data-skin="celtic-gold"] .workspace-chord-rider .crp-pro-titlebar{width:calc(100% + 24px)!important;margin:-12px -12px 12px!important;padding:10px 12px!important;border-radius:13px 13px 0 0!important;}}
+html[data-skin="celtic-gold"] .workspace-chord-rider .crp-controls-toggle{background:#24342b!important;color:#f7f7f2!important;border-color:#3a5647!important}
+
+/* Celtic Gold editor canvases: creamy lanes with green/gold active cells. */
+html[data-skin="celtic-gold"] .lead-part-editor{background:var(--srs-skin-panel)!important;border-color:var(--srs-skin-line)!important;color:var(--srs-skin-text)!important}
+html[data-skin="celtic-gold"] .lead-grid-wrap,
+html[data-skin="celtic-gold"] .crp-grid-wrap,
+html[data-skin="celtic-gold"] .crp-midi-roll-wrap{background:var(--srs-editor-bg)!important;border-color:var(--srs-editor-line)!important;box-shadow:0 0 0 1px rgba(31,107,70,.06),0 0 12px rgba(31,107,70,.05)!important}
+html[data-skin="celtic-gold"] .lead-grid-corner,
+html[data-skin="celtic-gold"] .lead-grid-step,
+html[data-skin="celtic-gold"] .lead-grid-note,
+html[data-skin="celtic-gold"] .crp-midi-corner,
+html[data-skin="celtic-gold"] .crp-midi-step,
+html[data-skin="celtic-gold"] .crp-midi-note,
+html[data-skin="celtic-gold"] .crp-drum-name{
+  background:#ece4d2!important;color:var(--srs-editor-text)!important;border-color:#cfc6b3!important;
+}
+html[data-skin="celtic-gold"] .crp-midi-note.black-key{background:#cfd3c7!important;color:#314038!important}
+html[data-skin="celtic-gold"] .crp-midi-cell,
+html[data-skin="celtic-gold"] .lead-cell,
+html[data-skin="celtic-gold"] .crp-step{background:var(--srs-editor-lane)!important;border-color:#d9d4c9!important}
+html[data-skin="celtic-gold"] .lead-cell.beat-edge,
+html[data-skin="celtic-gold"] .crp-midi-cell.beat-edge,
+html[data-skin="celtic-gold"] .crp-step.beat-edge{border-left-color:var(--srs-editor-beat)!important}
+html[data-skin="celtic-gold"] .lead-cell.bar-edge,
+html[data-skin="celtic-gold"] .crp-midi-cell.bar-edge,
+html[data-skin="celtic-gold"] .lead-grid-step.bar-edge,
+html[data-skin="celtic-gold"] .crp-step.beat-edge{border-left-color:var(--srs-editor-bar)!important}
+html[data-skin="celtic-gold"] .crp-step:hover{background:#f4efe1!important}
+html[data-skin="celtic-gold"] .lead-cell.on,
+html[data-skin="celtic-gold"] .lead-note-block,
+html[data-skin="celtic-gold"] .crp-step.active,
+html[data-skin="celtic-gold"] .crp-midi-cell.on,
+html[data-skin="celtic-gold"] .vox-drum-cell.on{
+  background:linear-gradient(180deg,#4da26f 0%,#2f8757 60%,#216d45 100%)!important;
+  color:#fff!important;border-color:#8bd0a2!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.25),0 0 0 1px #1a5b38,0 0 11px rgba(47,135,87,.20)!important;
+}
+html[data-skin="celtic-gold"] .crp-midi-cell.on{background-image:repeating-linear-gradient(to right,transparent 0,transparent calc(var(--midi-beat-px,24px) - 1px),rgba(255,230,170,.22) calc(var(--midi-beat-px,24px) - 1px),rgba(255,230,170,.22) var(--midi-beat-px,24px)),linear-gradient(180deg,#4da26f 0%,#2f8757 60%,#216d45 100%)!important}
+html[data-skin="celtic-gold"] .crp-step.active::after{background:#f7d777!important}
+html[data-skin="celtic-gold"] .crp-midi-duration-label{
+  background:linear-gradient(180deg,#fff4c8,#e7be54)!important;color:#63470c!important;border-color:#c9982f!important;
+}
+html[data-skin="celtic-gold"] .crp-midi-repeat,
+html[data-skin="celtic-gold"] .crp-midi-reset,
+html[data-skin="celtic-gold"] .crp-midi-remove{background:#fffef8!important;border-color:#c7c8c2!important}
+html[data-skin="celtic-gold"] .crp-bar-tab{background:#f3efe3!important;color:#4f5954!important;border-color:#cfd2ca!important}
+html[data-skin="celtic-gold"] .crp-beat-panel,
+html[data-skin="celtic-gold"] .crp-beat-head,
+html[data-skin="celtic-gold"] .crp-beat-foot,
+html[data-skin="celtic-gold"] .crp-randomizer{background:var(--srs-skin-panel2)!important;border-color:var(--srs-skin-line)!important}
+html[data-skin="celtic-gold"] .crp-drum-row{border-bottom-color:var(--srs-editor-line)!important}
+
+/* Track Master timeline adopts the light Celtic canvas with emerald selections. */
+html[data-skin="celtic-gold"] .vox-timeline-scroller{background:var(--srs-editor-bg)!important}
+html[data-skin="celtic-gold"] .vox-timeline-inner{
+  background-color:var(--srs-editor-bg)!important;
+  background-image:
+    repeating-linear-gradient(90deg,transparent 0,transparent calc((var(--srs-vox-ppb) * 4) - 2px),color-mix(in srgb,var(--srs-editor-bar) 70%,transparent) calc((var(--srs-vox-ppb) * 4) - 2px),color-mix(in srgb,var(--srs-editor-bar) 70%,transparent) calc(var(--srs-vox-ppb) * 4)),
+    repeating-linear-gradient(90deg,transparent 0,transparent calc(var(--srs-vox-ppb) - 1px),var(--srs-editor-line) calc(var(--srs-vox-ppb) - 1px),var(--srs-editor-line) var(--srs-vox-ppb))!important;
+}
+html[data-skin="celtic-gold"] .vox-track-row{background:var(--srs-editor-lane)!important;border-bottom-color:var(--srs-editor-line)!important}
+html[data-skin="celtic-gold"] .vox-track-row:nth-child(even),
+html[data-skin="celtic-gold"] .vox-drum-region-row{background:var(--srs-editor-lane-alt)!important}
+html[data-skin="celtic-gold"] .vox-track-lane,
+html[data-skin="celtic-gold"] .vox-instrument-lane,
+html[data-skin="celtic-gold"] .vox-drum-region-lane{background-color:transparent!important}
+html[data-skin="celtic-gold"] .vox-ruler{background:var(--srs-skin-panel2)!important;border-color:var(--srs-skin-line)!important;color:var(--srs-skin-muted)!important}
+html[data-skin="celtic-gold"] .vox-ruler-beat{background:var(--srs-editor-beat)!important;opacity:1!important}
+html[data-skin="celtic-gold"] .vox-ruler-beat.major{background:var(--srs-editor-bar)!important;opacity:1!important;width:2px!important}
+html[data-skin="celtic-gold"] .vox-ruler-label,
+html[data-skin="celtic-gold"] .vox-track-label span,
+html[data-skin="celtic-gold"] .vox-track-volume-value{color:#5e6f63!important}
+html[data-skin="celtic-gold"] .vox-drum-map-row,
+html[data-skin="celtic-gold"] .vox-drum-map-lane{background:var(--srs-editor-lane)!important}
+html[data-skin="celtic-gold"] .vox-drum-map-grid{background:repeating-linear-gradient(90deg,var(--srs-editor-line) 0 1px,transparent 1px var(--vox-drum-cell-width)),var(--srs-editor-lane)!important}
+html[data-skin="celtic-gold"] .vox-drum-cell{background:#fffdfa!important}
+html[data-skin="celtic-gold"] .vox-drum-cell:nth-child(4n+1){background:#f2eee0!important}
+html[data-skin="celtic-gold"] .vox-drum-cell.beat-start{border-left:1px solid var(--srs-editor-beat)!important}
+html[data-skin="celtic-gold"] .vox-drum-cell.bar-start{border-left:2px solid var(--srs-editor-bar)!important}
+html[data-skin="celtic-gold"] .vox-event.is-selected,
+html[data-skin="celtic-gold"] .vox-instrument-event.is-selected,
+html[data-skin="celtic-gold"] .vox-drum-event.is-selected{border-color:#2f8757!important;box-shadow:0 0 0 2px rgba(47,135,87,.24),0 0 14px rgba(47,135,87,.17),0 6px 18px rgba(0,0,0,.18)!important}
+html[data-skin="celtic-gold"] .vox-instrument-event.is-selected .vox-inst-handle{background:rgba(47,135,87,.28)!important}
+html[data-skin="celtic-gold"] .vox-box-page.multi-select-mode .vox-event.is-selected,
+html[data-skin="celtic-gold"] .vox-box-page.multi-select-mode .vox-instrument-event.is-selected{box-shadow:0 0 0 3px rgba(47,135,87,.28),0 0 14px rgba(47,135,87,.17),0 6px 18px rgba(0,0,0,.18)!important}
