@@ -172,6 +172,46 @@
     return n;
   }
   function cardColumnWidth(card){return Math.max(62,Math.round(cardDurationBeats(card)*MIDI_BEAT_PX));}
+  // v3.3.61 — MIDI view is a sequential progression editor. Track Master also
+  // stores absolute starts (voxStartBeat), so changing a MIDI duration without
+  // moving the following starts leaves playback on the old beat grid: stretched
+  // chords overlap the next chord and shortened chords leave a gap. Reflow the
+  // edited card and every card after it, including later CRP lines, while keeping
+  // any timing before the edit untouched. Exact Track Master durations on other
+  // cards are preserved; only their downstream start positions move.
+  function storedCardDurationBeats(card,fallback=+$('beatsSelect')?.value||4){
+    const drawn=Number(card?.durationBeats);
+    if(Number.isFinite(drawn)&&drawn>0)return Math.max(.03,Math.min(64,drawn));
+    const exact=Number(card?.voxDurationBeats);
+    if(Number.isFinite(exact)&&exact>0)return Math.max(.03,Math.min(64,exact));
+    return Math.max(.03,Number(fallback)||4);
+  }
+  function reflowMidiTimingFrom(ri,ci){
+    const flat=[];
+    state.rows.forEach((row,rowIndex)=>(row||[]).forEach((card,cardIndex)=>flat.push({card,rowIndex,cardIndex})));
+    const at=flat.findIndex(x=>x.rowIndex===ri&&x.cardIndex===ci);
+    if(at<0)return false;
+
+    // Resolve the target's sequential start from everything before it. Existing
+    // absolute starts before the edit remain authoritative, so MIDI editing does
+    // not rewrite earlier Track Master work. From the edited event forward, the
+    // visible MIDI columns and the audible timeline become the same sequence.
+    let cursor=0;
+    for(let i=0;i<at;i++){
+      const c=flat[i].card,raw=Number(c?.voxStartBeat);
+      const start=Number.isFinite(raw)&&raw>=0?raw:cursor;
+      cursor=start+storedCardDurationBeats(c);
+    }
+    for(let i=at;i<flat.length;i++){
+      const c=flat[i].card,dur=storedCardDurationBeats(c);
+      c.voxStartBeat=Math.round(cursor*1000)/1000;
+      // The edited card has already been synchronized by setCardDurationBeats().
+      // For downstream cards, leave exact/free duration values alone and move only
+      // the start so an unsnapped Track Master length is never quantized here.
+      cursor+=dur;
+    }
+    return true;
+  }
 
   // Canonical piano voicing: always spell chords upward from the root.
   // This is the single source used by playback, on-screen diagrams and PDF export.
@@ -728,6 +768,7 @@
         const next=Math.max(.25,Math.min(64,Math.round((startDur+dx/MIDI_BEAT_PX)*4)/4));
         if(next===lastDur)return;
         moved=true;lastDur=next;setCardDurationBeats(card,next);
+        reflowMidiTimingFrom(ri,ci);
         grid.style.gridTemplateColumns=midiGridColumns(row);
         label.textContent=`${formatBeatDuration(next)}b`;
         label.title=`${formatBeatDuration(next)} beats`;
@@ -768,7 +809,14 @@
         document.removeEventListener('pointermove',onMove,true);document.removeEventListener('pointerup',finish,true);document.removeEventListener('pointercancel',finish,true);
         if(autoRaf)cancelAnimationFrame(autoRaf);handle.classList.remove('dragging');
         try{handle.releasePointerCapture?.(pointerId);}catch(_){ }
-        if(moved){scheduleAutoSave();$('status').textContent=`${displayedValue(card)} set to ${formatBeatDuration(cardDurationBeats(card))} beat${cardDurationBeats(card)===1?'':'s'}.`;}
+        if(moved){
+          // Push the reflowed starts into the loaded Baby DAW chord part before a
+          // user can immediately press Play or Save. Playback and persistence now
+          // consume the exact same post-resize timeline.
+          window.CRPParts?.syncCoreLive?.();
+          scheduleAutoSave();
+          $('status').textContent=`${displayedValue(card)} set to ${formatBeatDuration(cardDurationBeats(card))} beat${cardDurationBeats(card)===1?'':'s'}.`;
+        }
       };
       document.addEventListener('pointermove',onMove,{capture:true,passive:false});
       document.addEventListener('pointerup',finish,{capture:true,passive:false});
@@ -1783,7 +1831,7 @@
     // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
     // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.
     if(!IS_PLAYBACK_BRIDGE) checkAccount();
-    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.53-INSTRUMENT-BROWSE-NONDESTRUCTIVE').catch(()=>{});
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.61-MIDI-TIMELINE-REFLOW').catch(()=>{});
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
@@ -2249,7 +2297,7 @@
     scheduleAutoSave,flushAutoSaveNow,renderAll,syncBuildInput,publishSrpHandoff,loadProjectById:loadProject,
     get beats(){return +$('beatsSelect').value||4},get bpm(){return +$('bpmInput').value||92},get loop(){return $('loopToggle').checked},
     get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
-    startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).flat().reduce((n,c)=>n+cardDurationBeats(c),0);},
+    startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).flat().reduce((n,c)=>n+storedCardDurationBeats(c),0);},
     get autoScroll(){return !!state.autoScroll;},get sustain(){return !!state.sustain;},
     setAutoScroll(on){return setAutoScroll(on);},disableAutoScroll(){disableAutoScrollForManualScroll();},updateAutoScrollUi:updateAutoScrollButton,
     followChordCard(cardIndex){
