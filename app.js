@@ -1197,6 +1197,16 @@
     const stateText=cloudSyncState==='ready'?'Synced':cloudSyncState==='error'?'Local backup':'Syncing…';
     btn.innerHTML=`<span>☁ ${esc(accountDisplayName())}</span><span class="cloud-state">${stateText} ▾</span>`;
   }
+
+  const PANEL_COLLAPSE_KEYS={projects:'crp-projects-panel-collapsed-v1',notes:'crp-notes-panel-collapsed-v1'};
+  function readPanelCollapsed(kind){try{return localStorage.getItem(PANEL_COLLAPSE_KEYS[kind])==='1'}catch{return false}}
+  function setDataPanelCollapsed(kind,collapsed,{persist=true}={}){
+    const isProjects=kind==='projects',panel=$(isProjects?'projectsPanel':'notesPanel'),body=$(isProjects?'projectsPanelBody':'notesPanelBody'),btn=$(isProjects?'projectsPanelToggleBtn':'notesPanelToggleBtn');
+    if(!panel||!body||!btn)return;
+    const on=!!collapsed;panel.classList.toggle('is-collapsed',on);body.hidden=on;btn.textContent=on?'Show':'Hide';btn.setAttribute('aria-expanded',String(!on));
+    if(persist){try{localStorage.setItem(PANEL_COLLAPSE_KEYS[kind],on?'1':'0')}catch{}}
+  }
+  function restoreDataPanelCollapse(){setDataPanelCollapsed('projects',readPanelCollapsed('projects'),{persist:false});setDataPanelCollapsed('notes',readPanelCollapsed('notes'),{persist:false});}
   function localProjects(){try{return JSON.parse(localStorage.getItem('crp-projects')||'[]')}catch{return[]}}
   function saveLocalProjects(p){localStorage.setItem('crp-projects',JSON.stringify(p))}
   const CLOUD_PENDING_KEY='crp-cloud-pending-v1';
@@ -1542,6 +1552,27 @@
   function loadProject(id){if(sameProjectId(state.currentProjectId,id)){performLoadProject(id);return;}requestProjectExit(()=>performLoadProject(id));}
 
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
+  async function renameProjectRecord(p){
+    if(!p)return;
+    const n=prompt('New project name:',p.name);
+    if(!n?.trim())return;
+    const name=n.trim(),locals=localProjects(),i=locals.findIndex(x=>sameProjectId(x.id,p.id));
+    setCloudPending(p.id,true);
+    if(i>=0){locals[i].name=name;locals[i].updatedAt=Date.now();saveLocalProjects(locals);p={...p,...locals[i]};}
+    if(cloudProjects){const ci=cloudProjects.findIndex(x=>sameProjectId(x.id,p.id));if(ci>=0)cloudProjects[ci]={...cloudProjects[ci],name,updatedAt:Date.now()};}
+    if(sameProjectId(state.currentProjectId,p.id))$('projectName').value=name;
+    if(accountUser){
+      try{await api('/api/projects/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({name})});setCloudPending(p.id,false);await refreshCloudProjects({rehydrateActive:false,pushPending:true});}
+      catch(err){$('status').textContent='Rename saved locally; cloud sync failed.';renderProjects();}
+    }else renderProjects();
+  }
+  function renameLoadedProject(){
+    const id=state.currentProjectId;
+    if(!id){$('status').textContent='Open or save a project before renaming it.';return;}
+    const p=projectSource().find(x=>sameProjectId(x.id,id))||localProjects().find(x=>sameProjectId(x.id,id));
+    if(!p){$('status').textContent='Loaded project could not be found.';return;}
+    renameProjectRecord(p);
+  }
   function renderProjects(){
     const w=$('projectList');
     const all=[...projectSource()].sort((a,b)=>{
@@ -1572,26 +1603,7 @@
 
       e.querySelector('.open').onclick=()=>loadProject(p.id);
 
-      e.querySelector('.rename').onclick=async()=>{
-        const n=prompt('New project name:',p.name);
-        if(!n?.trim())return;
-        const name=n.trim(),locals=localProjects(),i=locals.findIndex(x=>x.id===p.id);
-        setCloudPending(p.id,true);
-        if(i>=0){locals[i].name=name;locals[i].updatedAt=Date.now();saveLocalProjects(locals);}
-        if(cloudProjects){const ci=cloudProjects.findIndex(x=>x.id===p.id);if(ci>=0)cloudProjects[ci]={...cloudProjects[ci],name,updatedAt:Date.now()};}
-        if(sameProjectId(state.currentProjectId,p.id))$('projectName').value=name;
-
-        if(accountUser){
-          try{
-            await api('/api/projects/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({name})});
-            setCloudPending(p.id,false);
-            await refreshCloudProjects({rehydrateActive:false,pushPending:true});
-          }catch(err){
-            $('status').textContent='Rename saved locally; cloud sync failed.';
-            renderProjects();
-          }
-        }else renderProjects();
-      };
+      e.querySelector('.rename').onclick=()=>renameProjectRecord(p);
 
       e.querySelector('.archive-toggle').onclick=()=>setProjectArchived(p,projectBrowserMode!=='archive');
 
@@ -1868,6 +1880,10 @@
 
     $('projectsTabBtn').onclick=()=>setProjectBrowserMode('projects');
     $('archiveTabBtn').onclick=()=>setProjectBrowserMode('archive');
+    $('renameCurrentProjectBtn')?.addEventListener('click',renameLoadedProject);
+    $('projectsPanelToggleBtn')?.addEventListener('click',()=>setDataPanelCollapsed('projects',!$('projectsPanel').classList.contains('is-collapsed')));
+    $('notesPanelToggleBtn')?.addEventListener('click',()=>setDataPanelCollapsed('notes',!$('notesPanel').classList.contains('is-collapsed')));
+    restoreDataPanelCollapse();
     $('loginBtn').onclick=login;$('registerBtn').onclick=register;$('logoutBtn').onclick=logout;$('changePasswordBtn').onclick=changePassword;if($('syncNowBtn'))$('syncNowBtn').onclick=syncNow;
     $('accountSummaryBtn').onclick=()=>{const panel=$('accountPanel');setAccountCollapsed(!panel.classList.contains('is-collapsed'));};
     document.querySelectorAll('.notes-toolbar [data-cmd]').forEach(b=>b.onclick=()=>{document.execCommand(b.dataset.cmd,false,null);scheduleAutoSave();});$('clearNotesBtn').onclick=()=>{if(confirm('Clear notes?')){$('notesEditor').innerHTML='';scheduleAutoSave();}};

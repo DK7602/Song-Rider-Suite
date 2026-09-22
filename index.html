@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
   <script>(()=>{try{const s=localStorage.getItem('srs-skin-v1')||'rider-original',b=s==='rider-blood'?'rider-original':(s==='rider-blood-light'?'rider-light':s);document.documentElement.dataset.skin=b;document.documentElement.dataset.skinChoice=s;if(s==='rider-blood'||s==='rider-blood-light')document.documentElement.dataset.skinVariant='blood'}catch{document.documentElement.dataset.skin='rider-original';document.documentElement.dataset.skinChoice='rider-original'}})()</script>
-  <link rel="stylesheet" href="styles.css?v=3.3.65-TRACK-VOLUME-FX-SLIDERS" />
+  <link rel="stylesheet" href="styles.css?v=3.3.72-PROJECT-NOTES-COLLAPSE" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
   <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
@@ -175,7 +175,7 @@
             <h3 id="leadPartTitle">Lead / Bass</h3>
             <p class="subtle">Tap cells to place notes. Pitch names are real MIDI-style note/octave names.</p>
           </div>
-          <label class="part-volume-label">Volume <input id="leadVolume" type="range" min="0" max="100" value="80" /><span id="leadVolumeValue">80%</span></label>
+          <label class="part-volume-label lead-volume-bridge" hidden aria-hidden="true">Volume <input id="leadVolume" type="range" min="0" max="100" value="80" tabindex="-1" /><span id="leadVolumeValue">80%</span></label>
         </div>
         <div class="lead-controls">
           <div class="segmented compact-segmented" id="leadInstrumentTabs">
@@ -291,16 +291,20 @@
       </div>
     </section>
 
-    <section class="panel save-panel">
-      <div class="section-heading-row">
+    <section id="projectsPanel" class="panel save-panel collapsible-data-panel">
+      <div class="section-heading-row collapsible-panel-heading">
         <h2>Projects</h2>
-        <span id="projectStorageLabel" class="subtle">Saved on this device</span>
+        <div class="panel-heading-actions">
+          <span id="projectStorageLabel" class="subtle">Saved on this device</span>
+          <button id="projectsPanelToggleBtn" class="panel-collapse-toggle" type="button" aria-expanded="true" aria-controls="projectsPanelBody">Hide</button>
+        </div>
       </div>
 
       <div class="save-row project-save-row project-controls-fixed">
-        <input id="projectName" type="text" placeholder="Project name" />
+        <input id="projectName" type="text" placeholder="Project name" aria-label="Loaded project name" />
         <button id="newProjectBtn" type="button">New</button>
         <button id="saveProjectBtn" class="accent">Save</button>
+        <button id="renameCurrentProjectBtn" type="button" title="Rename the loaded project">Rename</button>
         <div class="export-wrap">
           <button id="exportBtn" class="export-btn" type="button" aria-haspopup="true" aria-expanded="false">Export ▾</button>
           <div id="exportMenu" class="export-menu" hidden>
@@ -312,35 +316,42 @@
         </div>
       </div>
 
-      <div class="project-browser-tabs" role="tablist" aria-label="Project folders">
-        <button id="projectsTabBtn" class="project-browser-tab active" type="button" role="tab" aria-selected="true">
-          Projects <span id="projectsCount" class="project-tab-count">0</span>
-        </button>
-        <button id="archiveTabBtn" class="project-browser-tab" type="button" role="tab" aria-selected="false">
-          Archive <span id="archiveCount" class="project-tab-count">0</span>
-        </button>
-      </div>
+      <div id="projectsPanelBody" class="collapsible-panel-body">
+        <div class="project-browser-tabs" role="tablist" aria-label="Project folders">
+          <button id="projectsTabBtn" class="project-browser-tab active" type="button" role="tab" aria-selected="true">
+            Projects <span id="projectsCount" class="project-tab-count">0</span>
+          </button>
+          <button id="archiveTabBtn" class="project-browser-tab" type="button" role="tab" aria-selected="false">
+            Archive <span id="archiveCount" class="project-tab-count">0</span>
+          </button>
+        </div>
 
-      <div class="project-browser-window">
-        <div id="projectList" class="project-list"></div>
+        <div class="project-browser-window">
+          <div id="projectList" class="project-list"></div>
+        </div>
       </div>
     </section>
 
-    <section class="panel notes-panel baby-daw-only">
-      <div class="section-heading-row">
+    <section id="notesPanel" class="panel notes-panel baby-daw-only collapsible-data-panel">
+      <div class="section-heading-row collapsible-panel-heading">
         <h2>Notes</h2>
-        <span class="subtle">Per project</span>
+        <div class="panel-heading-actions">
+          <span class="subtle">Per project</span>
+          <button id="notesPanelToggleBtn" class="panel-collapse-toggle" type="button" aria-expanded="true" aria-controls="notesPanelBody">Hide</button>
+        </div>
       </div>
-      <div class="notes-toolbar">
-        <button data-cmd="bold"><b>B</b></button>
-        <button data-cmd="italic"><i>I</i></button>
-        <button data-cmd="underline"><u>U</u></button>
-        <button data-cmd="insertUnorderedList">• List</button>
-        <button data-cmd="insertOrderedList">1. List</button>
-        <button id="clearNotesBtn">Clear</button>
+      <div id="notesPanelBody" class="collapsible-panel-body">
+        <div class="notes-toolbar">
+          <button data-cmd="bold"><b>B</b></button>
+          <button data-cmd="italic"><i>I</i></button>
+          <button data-cmd="underline"><u>U</u></button>
+          <button data-cmd="insertUnorderedList">• List</button>
+          <button data-cmd="insertOrderedList">1. List</button>
+          <button id="clearNotesBtn">Clear</button>
+        </div>
+        <div id="notesEditor" class="notes-editor" contenteditable="true"
+          data-placeholder="Song ideas, voicing notes, lyric notes, production reminders…"></div>
       </div>
-      <div id="notesEditor" class="notes-editor" contenteditable="true"
-        data-placeholder="Song ideas, voicing notes, lyric notes, production reminders…"></div>
     </section>
   
 
@@ -491,7 +502,7 @@
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.67-TIMING-AUDIT-FIX"></script>
+  <script src="app.js?v=3.3.72-PROJECT-NOTES-COLLAPSE"></script>
   <script src="parts.js?v=3.3.67-TIMING-AUDIT-FIX"></script>
   <script src="beat-maker.js?v=3.3.56-BATCH-UNDO-SYNC"></script>
   <script src="skins.js?v=3.3.71-RIDER-BLOOD-SKINS"></script>
