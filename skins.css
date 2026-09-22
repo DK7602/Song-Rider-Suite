@@ -1,4 +1,4 @@
-/* Song Rider Suite appearance skins — v3.3.68
+/* Song Rider Suite appearance skins — v3.3.69
    Presentation-only layer. No playback, project, transport or cloud logic lives here. */
 :root{
   --srs-skin-bg:var(--bg,#0d0f12);--srs-skin-panel:var(--panel,#171a1f);--srs-skin-panel2:var(--panel2,#20242b);
@@ -84,3 +84,332 @@ html[data-skin="studio-pastel"] .workspace-mode-btn:nth-child(2),
 html[data-skin="black-label"] .workspace-mode-btn:nth-child(2),
 html[data-skin="black-label-light"] .workspace-mode-btn:nth-child(2){padding:1.55vw 1.25vw!important;gap:1vw!important;justify-content:flex-start!important}
 @media(max-width:700px){html[data-skin="studio-pastel"] .workspace-mode-btn:nth-child(2),html[data-skin="black-label"] .workspace-mode-btn:nth-child(2),html[data-skin="black-label-light"] .workspace-mode-btn:nth-child(2){padding:7px 5px!important;gap:4px!important}}
+
+
+/* =========================================================
+   v3.3.69 — premium gold restoration + light editor cleanup
+   Presentation-only. No transport, playback, project or cloud logic.
+   ========================================================= */
+
+/* Use the approved 24-karat master header artwork in every skin. */
+html[data-skin]:not([data-skin="rider-original"]) .suite-master-header{
+  display:block!important;width:100%!important;min-height:0!important;height:auto!important;
+  margin:0!important;padding:0!important;border:0!important;background:#080a0d!important;
+  box-shadow:none!important;overflow:hidden!important;
+}
+html[data-skin]:not([data-skin="rider-original"]) .suite-master-header>img{
+  display:block!important;width:100%!important;height:auto!important;object-fit:contain!important;
+  margin:0!important;padding:0!important;
+}
+html[data-skin]:not([data-skin="rider-original"]) .suite-master-header::before,
+html[data-skin]:not([data-skin="rider-original"]) .suite-master-header::after{content:none!important;display:none!important;}
+
+/* Restore the approved 24K Track Master launcher in every skin. */
+html[data-skin]:not([data-skin="rider-original"]) .track-master-gold-btn{
+  position:relative!important;isolation:isolate!important;overflow:hidden!important;
+  background:linear-gradient(120deg,#7a5000 0%,#c98700 11%,#f3bd24 24%,#fff3a1 35%,#e8a914 48%,#9f6500 61%,#f8ce45 76%,#fff0a0 86%,#a66c00 100%)!important;
+  color:#171005!important;border:1px solid #ffe999!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.58)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.82),inset 0 -2px 4px rgba(91,48,0,.4),0 0 0 1px rgba(125,77,0,.38),0 5px 15px rgba(227,166,22,.2)!important;
+}
+html[data-skin]:not([data-skin="rider-original"]) .track-master-gold-btn::after{
+  content:""!important;position:absolute!important;z-index:-1!important;inset:-70% -20%!important;
+  transform:translateX(-65%) rotate(18deg)!important;
+  background:linear-gradient(90deg,transparent 38%,rgba(255,255,255,.7) 50%,transparent 62%)!important;
+  opacity:.48!important;pointer-events:none!important;
+}
+/* The restored launcher is intentionally the original clean gold bar. */
+html[data-skin] .srs-track-master-icon{display:none!important;}
+
+/* Light skins: CRP title gets the same black presentation surround as SRP. */
+html[data-skin="studio-pastel"] .workspace-chord-rider .crp-pro-titlebar,
+html[data-skin="black-label-light"] .workspace-chord-rider .crp-pro-titlebar,
+html[data-skin="rider-light"] .workspace-chord-rider .crp-pro-titlebar{
+  background:linear-gradient(180deg,#171b21,#0f1216)!important;
+  border:1px solid #2e343c!important;border-radius:0!important;
+  padding:5px 6px!important;box-sizing:border-box!important;
+}
+html[data-skin="studio-pastel"] .workspace-chord-rider .crp-controls-toggle,
+html[data-skin="black-label-light"] .workspace-chord-rider .crp-controls-toggle,
+html[data-skin="rider-light"] .workspace-chord-rider .crp-controls-toggle{
+  background:#20262d!important;color:#f5f6f7!important;border-color:#424b55!important;
+}
+
+/* Appearance close button: always obvious, never a black X on black. */
+.srs-skin-close{
+  display:grid!important;place-items:center!important;
+  background:linear-gradient(180deg,#fff2a8 0%,#f3c744 45%,#c88d12 100%)!important;
+  color:#171005!important;-webkit-text-fill-color:#171005!important;
+  border:1px solid #8f620b!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.78),0 3px 9px rgba(0,0,0,.22)!important;
+  font-weight:950!important;line-height:1!important;text-shadow:0 1px 0 rgba(255,255,255,.45)!important;
+}
+
+/* Skull-free mode buttons use the same polished 24K icon treatment. */
+html[data-skin="studio-pastel"] .srs-theme-mode-icon,
+html[data-skin="black-label"] .srs-theme-mode-icon,
+html[data-skin="black-label-light"] .srs-theme-mode-icon{
+  color:#d9a91f!important;
+  border:1px solid #d7ae42!important;
+  background:radial-gradient(circle at 34% 24%,#fff8ca 0%,#f2d36f 24%,#d39a19 58%,#845407 100%)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.82),inset 0 -2px 4px rgba(103,61,0,.28),0 4px 12px rgba(92,58,7,.18)!important;
+}
+html[data-skin="black-label"] .srs-theme-mode-icon{
+  border-color:#f0cb64!important;
+  box-shadow:inset 0 1px 0 rgba(255,250,207,.75),0 0 0 1px rgba(86,55,6,.8),0 5px 16px rgba(226,184,79,.2)!important;
+}
+html[data-skin="studio-pastel"] .srs-theme-mode-icon svg,
+html[data-skin="black-label"] .srs-theme-mode-icon svg,
+html[data-skin="black-label-light"] .srs-theme-mode-icon svg{
+  filter:drop-shadow(0 1px 0 rgba(255,255,255,.65)) drop-shadow(0 2px 2px rgba(83,49,0,.28));
+}
+
+/* ---------- Light editor palette ---------- */
+html[data-skin="studio-pastel"],html[data-skin="black-label-light"],html[data-skin="rider-light"]{
+  --srs-editor-bg:#f6f5f1;
+  --srs-editor-lane:#fffefa;
+  --srs-editor-lane-alt:#f8f7f2;
+  --srs-editor-label:#ecebe5;
+  --srs-editor-line:#d7d8d4;
+  --srs-editor-beat:#bcc2c6;
+  --srs-editor-bar:#c49a43;
+  --srs-editor-text:#272b30;
+  --srs-editor-muted:#697078;
+  --srs-vox-ppb:56px;
+}
+
+@media(max-width:600px){
+  html[data-skin="studio-pastel"],html[data-skin="black-label-light"],html[data-skin="rider-light"]{--srs-vox-ppb:44px;}
+}
+html[data-skin="studio-pastel"]{
+  --srs-editor-bg:#f4ece4;--srs-editor-lane:#fffaf5;--srs-editor-lane-alt:#fbf4ed;
+  --srs-editor-label:#eee2d8;--srs-editor-line:#d9cec4;--srs-editor-beat:#b8c2c8;--srs-editor-bar:#c39231;
+}
+
+/* Track Master: remove the black canvas, retain readable beat/bar geometry. */
+html[data-skin="studio-pastel"] .vox-timeline-scroller,
+html[data-skin="black-label-light"] .vox-timeline-scroller,
+html[data-skin="rider-light"] .vox-timeline-scroller{
+  background:var(--srs-editor-bg)!important;
+}
+html[data-skin="studio-pastel"] .vox-timeline-inner,
+html[data-skin="black-label-light"] .vox-timeline-inner,
+html[data-skin="rider-light"] .vox-timeline-inner{
+  background-color:var(--srs-editor-bg)!important;
+  background-image:
+    repeating-linear-gradient(90deg,transparent 0,transparent calc((var(--srs-vox-ppb) * 4) - 2px),color-mix(in srgb,var(--srs-editor-bar) 70%,transparent) calc((var(--srs-vox-ppb) * 4) - 2px),color-mix(in srgb,var(--srs-editor-bar) 70%,transparent) calc(var(--srs-vox-ppb) * 4)),
+    repeating-linear-gradient(90deg,transparent 0,transparent calc(var(--srs-vox-ppb) - 1px),var(--srs-editor-line) calc(var(--srs-vox-ppb) - 1px),var(--srs-editor-line) var(--srs-vox-ppb))!important;
+}
+html[data-skin="studio-pastel"] .vox-track-row,
+html[data-skin="black-label-light"] .vox-track-row,
+html[data-skin="rider-light"] .vox-track-row{
+  background:var(--srs-editor-lane)!important;border-bottom-color:var(--srs-editor-line)!important;
+}
+html[data-skin="studio-pastel"] .vox-track-row:nth-child(even),
+html[data-skin="black-label-light"] .vox-track-row:nth-child(even),
+html[data-skin="rider-light"] .vox-track-row:nth-child(even){background:var(--srs-editor-lane-alt)!important;}
+html[data-skin="studio-pastel"] .vox-track-lane,
+html[data-skin="studio-pastel"] .vox-instrument-lane,
+html[data-skin="studio-pastel"] .vox-drum-region-lane,
+html[data-skin="black-label-light"] .vox-track-lane,
+html[data-skin="black-label-light"] .vox-instrument-lane,
+html[data-skin="black-label-light"] .vox-drum-region-lane,
+html[data-skin="rider-light"] .vox-track-lane,
+html[data-skin="rider-light"] .vox-instrument-lane,
+html[data-skin="rider-light"] .vox-drum-region-lane{
+  background-color:transparent!important;
+  background-image:
+    repeating-linear-gradient(90deg,transparent 0,transparent calc((var(--srs-vox-ppb) * 4) - 2px),color-mix(in srgb,var(--srs-editor-bar) 72%,transparent) calc((var(--srs-vox-ppb) * 4) - 2px),color-mix(in srgb,var(--srs-editor-bar) 72%,transparent) calc(var(--srs-vox-ppb) * 4)),
+    repeating-linear-gradient(90deg,transparent 0,transparent calc(var(--srs-vox-ppb) - 1px),var(--srs-editor-line) calc(var(--srs-vox-ppb) - 1px),var(--srs-editor-line) var(--srs-vox-ppb))!important;
+  border-color:var(--srs-editor-line)!important;
+}
+html[data-skin="studio-pastel"] .vox-drum-region-row,
+html[data-skin="black-label-light"] .vox-drum-region-row,
+html[data-skin="rider-light"] .vox-drum-region-row{background:var(--srs-editor-lane-alt)!important;}
+html[data-skin="studio-pastel"] .vox-ruler,
+html[data-skin="black-label-light"] .vox-ruler,
+html[data-skin="rider-light"] .vox-ruler{
+  background:#e7e5df!important;border-color:#c9cbc9!important;color:var(--srs-editor-text)!important;
+}
+html[data-skin="studio-pastel"] .vox-ruler-beat,
+html[data-skin="black-label-light"] .vox-ruler-beat,
+html[data-skin="rider-light"] .vox-ruler-beat{background:var(--srs-editor-beat)!important;opacity:1!important;}
+html[data-skin="studio-pastel"] .vox-ruler-beat.major,
+html[data-skin="black-label-light"] .vox-ruler-beat.major,
+html[data-skin="rider-light"] .vox-ruler-beat.major{background:var(--srs-editor-bar)!important;opacity:1!important;width:2px!important;}
+html[data-skin="studio-pastel"] .vox-ruler-label,
+html[data-skin="black-label-light"] .vox-ruler-label,
+html[data-skin="rider-light"] .vox-ruler-label{color:#3a3d41!important;}
+html[data-skin="studio-pastel"] .vox-track-label span,
+html[data-skin="black-label-light"] .vox-track-label span,
+html[data-skin="rider-light"] .vox-track-label span,
+html[data-skin="studio-pastel"] .vox-track-volume-value,
+html[data-skin="black-label-light"] .vox-track-volume-value,
+html[data-skin="rider-light"] .vox-track-volume-value{color:#60676e!important;}
+
+/* Track Master drum-map grid: light canvas with visible beat and bar divisions. */
+html[data-skin="studio-pastel"] .vox-drum-map-row,
+html[data-skin="black-label-light"] .vox-drum-map-row,
+html[data-skin="rider-light"] .vox-drum-map-row,
+html[data-skin="studio-pastel"] .vox-drum-map-lane,
+html[data-skin="black-label-light"] .vox-drum-map-lane,
+html[data-skin="rider-light"] .vox-drum-map-lane{
+  background:var(--srs-editor-lane)!important;border-color:var(--srs-editor-line)!important;
+}
+html[data-skin="studio-pastel"] .vox-drum-map-grid,
+html[data-skin="black-label-light"] .vox-drum-map-grid,
+html[data-skin="rider-light"] .vox-drum-map-grid{
+  background:repeating-linear-gradient(90deg,var(--srs-editor-line) 0 1px,transparent 1px var(--vox-drum-cell-width)),var(--srs-editor-lane)!important;
+}
+html[data-skin="studio-pastel"] .vox-drum-cell,
+html[data-skin="black-label-light"] .vox-drum-cell,
+html[data-skin="rider-light"] .vox-drum-cell{
+  background:#fbfaf6!important;border-right-color:#dedfdb!important;border-bottom-color:#e1e2df!important;
+}
+html[data-skin="studio-pastel"] .vox-drum-cell:nth-child(4n+1),
+html[data-skin="black-label-light"] .vox-drum-cell:nth-child(4n+1),
+html[data-skin="rider-light"] .vox-drum-cell:nth-child(4n+1){background:#f3f1eb!important;}
+html[data-skin="studio-pastel"] .vox-drum-cell.beat-start,
+html[data-skin="black-label-light"] .vox-drum-cell.beat-start,
+html[data-skin="rider-light"] .vox-drum-cell.beat-start{border-left:1px solid var(--srs-editor-beat)!important;}
+html[data-skin="studio-pastel"] .vox-drum-cell.bar-start,
+html[data-skin="black-label-light"] .vox-drum-cell.bar-start,
+html[data-skin="rider-light"] .vox-drum-cell.bar-start{border-left:2px solid var(--srs-editor-bar)!important;}
+html[data-skin="studio-pastel"] .vox-drum-cell.on,
+html[data-skin="black-label-light"] .vox-drum-cell.on,
+html[data-skin="rider-light"] .vox-drum-cell.on{background:#edc84e!important;box-shadow:inset 0 0 0 2px rgba(106,72,8,.24)!important;}
+
+/* CRP MIDI view: light piano roll with visible subdivision and bar geometry. */
+html[data-skin="studio-pastel"] .crp-midi-roll-wrap,
+html[data-skin="black-label-light"] .crp-midi-roll-wrap,
+html[data-skin="rider-light"] .crp-midi-roll-wrap{background:var(--srs-editor-bg)!important;border-color:var(--srs-editor-line)!important;}
+html[data-skin="studio-pastel"] .crp-midi-corner,
+html[data-skin="studio-pastel"] .crp-midi-step,
+html[data-skin="black-label-light"] .crp-midi-corner,
+html[data-skin="black-label-light"] .crp-midi-step,
+html[data-skin="rider-light"] .crp-midi-corner,
+html[data-skin="rider-light"] .crp-midi-step{
+  background:#e7e5df!important;color:var(--srs-editor-text)!important;border-color:#c6c9c9!important;
+}
+html[data-skin="studio-pastel"] .crp-midi-note,
+html[data-skin="black-label-light"] .crp-midi-note,
+html[data-skin="rider-light"] .crp-midi-note{
+  background:#e9e8e4!important;color:#35393d!important;border-color:#c9ccca!important;
+}
+html[data-skin="studio-pastel"] .crp-midi-note.black-key,
+html[data-skin="black-label-light"] .crp-midi-note.black-key,
+html[data-skin="rider-light"] .crp-midi-note.black-key{background:#cfd2d2!important;color:#35393d!important;}
+html[data-skin="studio-pastel"] .crp-midi-cell,
+html[data-skin="black-label-light"] .crp-midi-cell,
+html[data-skin="rider-light"] .crp-midi-cell{
+  background-color:var(--srs-editor-lane)!important;
+  background-image:repeating-linear-gradient(to right,transparent 0,transparent calc(var(--midi-beat-px,24px) - 1px),var(--srs-editor-line) calc(var(--midi-beat-px,24px) - 1px),var(--srs-editor-line) var(--midi-beat-px,24px))!important;
+  border-color:#d9dbd8!important;
+}
+html[data-skin="studio-pastel"] .crp-midi-cell.black-key,
+html[data-skin="black-label-light"] .crp-midi-cell.black-key,
+html[data-skin="rider-light"] .crp-midi-cell.black-key{background-color:#f2f1ec!important;}
+html[data-skin="studio-pastel"] .crp-midi-cell.on,
+html[data-skin="black-label-light"] .crp-midi-cell.on,
+html[data-skin="rider-light"] .crp-midi-cell.on{
+  background-color:#edc84e!important;
+  background-image:repeating-linear-gradient(to right,transparent 0,transparent calc(var(--midi-beat-px,24px) - 1px),rgba(104,74,16,.20) calc(var(--midi-beat-px,24px) - 1px),rgba(104,74,16,.20) var(--midi-beat-px,24px))!important;
+  box-shadow:inset 0 0 0 1px #9b741f!important;
+}
+html[data-skin="studio-pastel"] .crp-midi-duration-label,
+html[data-skin="black-label-light"] .crp-midi-duration-label,
+html[data-skin="rider-light"] .crp-midi-duration-label{background:#fff8da!important;color:#765712!important;border-color:#d2a843!important;}
+html[data-skin="studio-pastel"] .crp-midi-repeat,
+html[data-skin="studio-pastel"] .crp-midi-reset,
+html[data-skin="studio-pastel"] .crp-midi-remove,
+html[data-skin="black-label-light"] .crp-midi-repeat,
+html[data-skin="black-label-light"] .crp-midi-reset,
+html[data-skin="black-label-light"] .crp-midi-remove,
+html[data-skin="rider-light"] .crp-midi-repeat,
+html[data-skin="rider-light"] .crp-midi-reset,
+html[data-skin="rider-light"] .crp-midi-remove{background:#fff!important;border-color:#bfc4c6!important;}
+
+/* Baby DAW Lead/Bass editor: match the same light, readable grid system. */
+html[data-skin="studio-pastel"] .lead-part-editor,
+html[data-skin="black-label-light"] .lead-part-editor,
+html[data-skin="rider-light"] .lead-part-editor{
+  background:var(--srs-skin-panel)!important;border-color:var(--srs-skin-line)!important;color:var(--srs-skin-text)!important;
+}
+html[data-skin="studio-pastel"] .lead-grid-wrap,
+html[data-skin="black-label-light"] .lead-grid-wrap,
+html[data-skin="rider-light"] .lead-grid-wrap{background:var(--srs-editor-bg)!important;border-color:var(--srs-editor-line)!important;}
+html[data-skin="studio-pastel"] .lead-grid-corner,
+html[data-skin="studio-pastel"] .lead-grid-step,
+html[data-skin="studio-pastel"] .lead-grid-note,
+html[data-skin="black-label-light"] .lead-grid-corner,
+html[data-skin="black-label-light"] .lead-grid-step,
+html[data-skin="black-label-light"] .lead-grid-note,
+html[data-skin="rider-light"] .lead-grid-corner,
+html[data-skin="rider-light"] .lead-grid-step,
+html[data-skin="rider-light"] .lead-grid-note{
+  background:#e8e7e2!important;color:var(--srs-editor-text)!important;border-color:#c9ccca!important;
+}
+html[data-skin="studio-pastel"] .lead-grid-step.bar-edge,
+html[data-skin="black-label-light"] .lead-grid-step.bar-edge,
+html[data-skin="rider-light"] .lead-grid-step.bar-edge{border-left-color:var(--srs-editor-bar)!important;color:#7d5c13!important;}
+html[data-skin="studio-pastel"] .lead-cell,
+html[data-skin="black-label-light"] .lead-cell,
+html[data-skin="rider-light"] .lead-cell{
+  background:var(--srs-editor-lane)!important;border-right-color:#d9dbd8!important;border-bottom-color:#dcddda!important;
+}
+html[data-skin="studio-pastel"] .lead-cell.beat-edge,
+html[data-skin="black-label-light"] .lead-cell.beat-edge,
+html[data-skin="rider-light"] .lead-cell.beat-edge{border-left-color:var(--srs-editor-beat)!important;}
+html[data-skin="studio-pastel"] .lead-cell.bar-edge,
+html[data-skin="black-label-light"] .lead-cell.bar-edge,
+html[data-skin="rider-light"] .lead-cell.bar-edge{border-left-color:var(--srs-editor-bar)!important;}
+html[data-skin="studio-pastel"] .lead-cell.on,
+html[data-skin="black-label-light"] .lead-cell.on,
+html[data-skin="rider-light"] .lead-cell.on,
+html[data-skin="studio-pastel"] .lead-note-block,
+html[data-skin="black-label-light"] .lead-note-block,
+html[data-skin="rider-light"] .lead-note-block{background:#edc84e!important;border-color:#a87b17!important;color:#211a0a!important;}
+
+/* Beat Maker: light grid/panel treatment with strong beat and bar cues. */
+html[data-skin="studio-pastel"] .crp-beat-panel,
+html[data-skin="black-label-light"] .crp-beat-panel,
+html[data-skin="rider-light"] .crp-beat-panel{background:var(--srs-skin-panel)!important;color:var(--srs-skin-text)!important;border-color:var(--srs-skin-line)!important;}
+html[data-skin="studio-pastel"] .crp-beat-head,
+html[data-skin="studio-pastel"] .crp-beat-foot,
+html[data-skin="studio-pastel"] .crp-randomizer,
+html[data-skin="black-label-light"] .crp-beat-head,
+html[data-skin="black-label-light"] .crp-beat-foot,
+html[data-skin="black-label-light"] .crp-randomizer,
+html[data-skin="rider-light"] .crp-beat-head,
+html[data-skin="rider-light"] .crp-beat-foot,
+html[data-skin="rider-light"] .crp-randomizer{background:var(--srs-skin-panel2)!important;border-color:var(--srs-skin-line)!important;}
+html[data-skin="studio-pastel"] .crp-grid-wrap,
+html[data-skin="black-label-light"] .crp-grid-wrap,
+html[data-skin="rider-light"] .crp-grid-wrap{background:var(--srs-editor-bg)!important;border-color:var(--srs-editor-line)!important;}
+html[data-skin="studio-pastel"] .crp-drum-row,
+html[data-skin="black-label-light"] .crp-drum-row,
+html[data-skin="rider-light"] .crp-drum-row{border-bottom-color:var(--srs-editor-line)!important;}
+html[data-skin="studio-pastel"] .crp-drum-name,
+html[data-skin="black-label-light"] .crp-drum-name,
+html[data-skin="rider-light"] .crp-drum-name{background:var(--srs-editor-label)!important;color:var(--srs-editor-text)!important;border-color:#c9ccca!important;}
+html[data-skin="studio-pastel"] .crp-step,
+html[data-skin="black-label-light"] .crp-step,
+html[data-skin="rider-light"] .crp-step{background:var(--srs-editor-lane)!important;border-color:#d9dbd8!important;}
+html[data-skin="studio-pastel"] .crp-step:hover,
+html[data-skin="black-label-light"] .crp-step:hover,
+html[data-skin="rider-light"] .crp-step:hover{background:#f1efe8!important;}
+html[data-skin="studio-pastel"] .crp-step.beat-edge,
+html[data-skin="black-label-light"] .crp-step.beat-edge,
+html[data-skin="rider-light"] .crp-step.beat-edge{border-left-color:var(--srs-editor-bar)!important;}
+html[data-skin="studio-pastel"] .crp-step.active,
+html[data-skin="black-label-light"] .crp-step.active,
+html[data-skin="rider-light"] .crp-step.active{background:#edc84e!important;box-shadow:inset 0 0 0 2px #f8df88!important;}
+html[data-skin="studio-pastel"] .crp-step.active::after,
+html[data-skin="black-label-light"] .crp-step.active::after,
+html[data-skin="rider-light"] .crp-step.active::after{background:#5b430f!important;}
+html[data-skin="studio-pastel"] .crp-bar-tab,
+html[data-skin="black-label-light"] .crp-bar-tab,
+html[data-skin="rider-light"] .crp-bar-tab{background:#f2f0ea!important;color:#4e555c!important;border-color:#cfd2d0!important;}
+html[data-skin="studio-pastel"] .crp-bar-tab.active,
+html[data-skin="black-label-light"] .crp-bar-tab.active,
+html[data-skin="rider-light"] .crp-bar-tab.active{background:#edc84e!important;color:#211a0a!important;border-color:#b7871d!important;}
