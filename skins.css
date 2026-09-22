@@ -1,4 +1,4 @@
-/* Song Rider Suite appearance skins — v3.3.69
+/* Song Rider Suite appearance skins — v3.3.70
    Presentation-only layer. No playback, project, transport or cloud logic lives here. */
 :root{
   --srs-skin-bg:var(--bg,#0d0f12);--srs-skin-panel:var(--panel,#171a1f);--srs-skin-panel2:var(--panel2,#20242b);
@@ -413,3 +413,164 @@ html[data-skin="rider-light"] .crp-bar-tab{background:#f2f0ea!important;color:#4
 html[data-skin="studio-pastel"] .crp-bar-tab.active,
 html[data-skin="black-label-light"] .crp-bar-tab.active,
 html[data-skin="rider-light"] .crp-bar-tab.active{background:#edc84e!important;color:#211a0a!important;border-color:#b7871d!important;}
+
+/* =========================================================
+   v3.3.70 — title surround, landscape Track Master, contrast + green accents
+   Presentation/layout-only. No playback, timing, save, sync or project logic.
+   ========================================================= */
+
+/* Light skins: make CRP's title band use the same edge-to-edge black panel-top
+   treatment as Song Rider Pro instead of looking like a black card inside a
+   white card. The negative margins consume the parent panel padding only. */
+html[data-skin="studio-pastel"] .workspace-chord-rider .crp-pro-titlebar,
+html[data-skin="black-label-light"] .workspace-chord-rider .crp-pro-titlebar,
+html[data-skin="rider-light"] .workspace-chord-rider .crp-pro-titlebar{
+  grid-template-columns:minmax(0,1fr) 56px!important;
+  column-gap:10px!important;
+  width:calc(100% + 32px)!important;
+  margin:-16px -16px 14px!important;
+  padding:10px 12px!important;
+  background:linear-gradient(180deg,#1d2229 0%,#171b21 100%)!important;
+  border:0!important;
+  border-bottom:1px solid #343c46!important;
+  border-radius:17px 17px 0 0!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+}
+html[data-skin="studio-pastel"] .workspace-chord-rider .crp-pro-wordmark-img,
+html[data-skin="black-label-light"] .workspace-chord-rider .crp-pro-wordmark-img,
+html[data-skin="rider-light"] .workspace-chord-rider .crp-pro-wordmark-img{
+  max-height:none!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+}
+@media(max-width:700px){
+  html[data-skin="studio-pastel"] .workspace-chord-rider .crp-pro-titlebar,
+  html[data-skin="black-label-light"] .workspace-chord-rider .crp-pro-titlebar,
+  html[data-skin="rider-light"] .workspace-chord-rider .crp-pro-titlebar{
+    width:calc(100% + 24px)!important;
+    margin:-12px -12px 12px!important;
+    padding:10px 12px!important;
+    border-radius:13px 13px 0 0!important;
+  }
+}
+
+/* Track Master landscape: reclaim height from the header/tool area and give an
+   expanded Track Effects inspector a meaningfully larger working area. This is
+   intentionally CSS-only and applies to desktop, tablet and phone landscape. */
+@media(orientation:landscape){
+  .vox-box-shell{grid-template-rows:auto auto minmax(120px,1fr) auto!important;}
+  .vox-box-header{padding:6px 10px!important;gap:7px!important;}
+  .vox-box-brand strong{font-size:1.08rem!important;line-height:1!important;}
+  .vox-box-brand span{margin-top:2px!important;font-size:.62rem!important;line-height:1.05!important;}
+  .vox-box-header-actions{gap:5px!important;flex-wrap:nowrap!important;}
+  .vox-box-header-actions>button{min-height:30px!important;padding:4px 8px!important;}
+  .vox-snap-toggle{gap:4px!important;font-size:.72rem!important;}
+  .vox-snap-toggle input{width:17px!important;height:17px!important;}
+  .vox-snap-resolution{gap:4px!important;font-size:.72rem!important;}
+  .vox-snap-resolution select{min-width:66px!important;min-height:30px!important;padding:4px 24px 4px 7px!important;}
+  .vox-box-tools{padding:4px 8px!important;gap:4px!important;}
+  .vox-edit-button-row{gap:4px!important;}
+  .vox-edit-button-row>button{min-height:29px!important;padding:3px 4px!important;font-size:.68rem!important;}
+  .vox-box-tools>.vox-harmony-guide,#voxBoxStatus{font-size:.66rem!important;line-height:1.15!important;}
+  .vox-inspector:not(.is-collapsed){min-height:min(260px,36vh)!important;max-height:48vh!important;}
+}
+@media(orientation:landscape) and (max-height:650px){
+  .vox-box-shell{grid-template-rows:auto auto minmax(90px,1fr) auto!important;}
+  .vox-box-header{padding:4px 7px!important;gap:4px!important;}
+  .vox-box-brand span{display:none!important;}
+  .vox-box-header-actions{gap:4px!important;}
+  .vox-box-header-actions>button{min-height:27px!important;padding:3px 6px!important;font-size:.70rem!important;}
+  .vox-snap-toggle,.vox-snap-resolution{font-size:.66rem!important;}
+  .vox-snap-resolution select{min-height:27px!important;padding-top:3px!important;padding-bottom:3px!important;}
+  .vox-box-tools{padding:3px 6px!important;gap:3px!important;}
+  .vox-edit-button-row{gap:3px!important;}
+  .vox-edit-button-row>button{min-height:27px!important;padding:2px 2px!important;font-size:.62rem!important;}
+  .vox-box-tools>.vox-harmony-guide,#voxBoxStatus{font-size:.59rem!important;line-height:1.08!important;}
+  .vox-inspector:not(.is-collapsed){min-height:38vh!important;max-height:52vh!important;}
+}
+
+/* Black Label: selected notes/steps need unmistakable contrast on the nearly
+   black editor canvas. Keep the luxury gold palette but increase fill + glow. */
+html[data-skin="black-label"] .crp-midi-cell.on,
+html[data-skin="black-label"] .lead-note-block,
+html[data-skin="black-label"] .crp-step.active,
+html[data-skin="black-label"] .vox-drum-cell.on{
+  background:linear-gradient(180deg,#ffe27a 0%,#efbd36 54%,#c98a12 100%)!important;
+  color:#171108!important;
+  border-color:#ffeaa1!important;
+  box-shadow:inset 0 0 0 2px rgba(255,247,190,.88),0 0 0 1px #8c5e0b,0 0 13px rgba(241,190,50,.42)!important;
+}
+html[data-skin="black-label"] .crp-step.active::after{background:#3e2a04!important;}
+html[data-skin="black-label"] .crp-bar-tab.active,
+html[data-skin="black-label"] .crp-midi-duration-label{
+  background:linear-gradient(180deg,#f8d765,#cf971b)!important;
+  color:#171108!important;
+  border-color:#f7df91!important;
+  box-shadow:0 0 10px rgba(226,184,79,.24)!important;
+}
+html[data-skin="black-label"] .crp-midi-cell.playing,
+html[data-skin="black-label"] .lead-note-block.playing{
+  outline:2px solid #fff0a5!important;
+  outline-offset:-2px!important;
+  filter:brightness(1.16)!important;
+}
+
+/* Black Label Light + Rider Light: restrained green pop. Gold stays the main
+   brand/accent; green is reserved for active state, focus, and thin window trim. */
+html[data-skin="black-label-light"],html[data-skin="rider-light"]{
+  --srs-green-pop:#4f9f66;
+  --srs-green-deep:#367a4c;
+  --srs-green-soft:rgba(79,159,102,.16);
+}
+html[data-skin="black-label-light"] .panel,
+html[data-skin="black-label-light"] .auth-box,
+html[data-skin="black-label-light"] .lead-part-editor,
+html[data-skin="black-label-light"] .crp-beat-panel,
+html[data-skin="black-label-light"] .vox-inspector,
+html[data-skin="rider-light"] .panel,
+html[data-skin="rider-light"] .auth-box,
+html[data-skin="rider-light"] .lead-part-editor,
+html[data-skin="rider-light"] .crp-beat-panel,
+html[data-skin="rider-light"] .vox-inspector{
+  border-color:color-mix(in srgb,var(--srs-green-pop) 28%,var(--srs-skin-line))!important;
+  box-shadow:0 0 0 1px rgba(79,159,102,.11),0 0 14px rgba(79,159,102,.055),var(--srs-skin-shadow)!important;
+}
+html[data-skin="black-label-light"] .workspace-mode-btn.active,
+html[data-skin="rider-light"] .workspace-mode-btn.active{
+  border-color:var(--srs-green-pop)!important;
+  box-shadow:0 0 0 1px rgba(79,159,102,.30),0 0 16px rgba(79,159,102,.16),0 6px 16px rgba(0,0,0,.07)!important;
+}
+html[data-skin="black-label-light"] .seg.active,
+html[data-skin="black-label-light"] .toggle-btn.on,
+html[data-skin="black-label-light"] .vox-box-tools .is-active,
+html[data-skin="black-label-light"] .crp-bar-tab.active,
+html[data-skin="rider-light"] .seg.active,
+html[data-skin="rider-light"] .toggle-btn.on,
+html[data-skin="rider-light"] .vox-box-tools .is-active,
+html[data-skin="rider-light"] .crp-bar-tab.active{
+  background:linear-gradient(180deg,#70b882 0%,#4f9f66 62%,#438d59 100%)!important;
+  color:#fff!important;
+  border-color:var(--srs-green-deep)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.34),0 0 0 2px rgba(79,159,102,.10)!important;
+}
+html[data-skin="black-label-light"] input[type="checkbox"],
+html[data-skin="black-label-light"] input[type="radio"],
+html[data-skin="rider-light"] input[type="checkbox"],
+html[data-skin="rider-light"] input[type="radio"]{accent-color:var(--srs-green-pop)!important;}
+html[data-skin="black-label-light"] input:focus,
+html[data-skin="black-label-light"] select:focus,
+html[data-skin="black-label-light"] textarea:focus,
+html[data-skin="black-label-light"] .notes-editor:focus,
+html[data-skin="rider-light"] input:focus,
+html[data-skin="rider-light"] select:focus,
+html[data-skin="rider-light"] textarea:focus,
+html[data-skin="rider-light"] .notes-editor:focus{
+  border-color:var(--srs-green-pop)!important;
+  box-shadow:0 0 0 3px rgba(79,159,102,.13)!important;
+}
+html[data-skin="black-label-light"] .progression-line.selected,
+html[data-skin="rider-light"] .progression-line.selected{
+  border-color:var(--srs-green-pop)!important;
+  box-shadow:0 0 0 2px rgba(79,159,102,.10)!important;
+}
