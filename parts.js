@@ -97,7 +97,7 @@
   let micStream=null,micCtx=null,micSource=null,micAnalyser=null,micProcessor=null,micSilentGain=null,micMeterRaf=0;
   let recording=false,recordingPaused=false,recordChunks=[],recordSampleRate=48000,recordStartedAt=0,recordPausedAt=0,recordPausedTotal=0,recordTimer=null,currentPreview=null,recordInsertBeat=0,recordTargetPartId=null,recordStartedFromVox=false,recordResumeBeat=0;
   let leadBarClipboard=null, speechRec=null, speechBase='';
-  let partsUpdatedAt=0;
+  let partsUpdatedAt=0, partsFingerprint='';
   let voxBoxOpen=false,voxCropMode=false,voxRangeMode=false,voxRangeSelection=null,voxSelected=null,voxSelections=[],voxInstrumentSelection=null,voxInstrumentSelections=[],voxInstrumentTrackFocus=null,voxTargetPartId=null,voxClipboard=null,voxPlayheadBeat=0,voxRenderToken=0,voxAutoScroll=true,voxShowInstrumentals=false,voxOpenedFromVocal=false,voxToolMode='playhead',voxUndoStack=[],voxRedoStack=[],voxInspectorManualOverride=null;
   // v3.3.36 — persists across Track Master rerenders so Android's synthesized dblclick/click
   // cannot create or refocus a second phantom event after a touch double-tap.
@@ -117,7 +117,7 @@
     return {id:uid(),type:'chord',name,enabled:true,muted:false,solo:false,voxSetupEstablished:false,volume:.85,data:d};
   }
   function leadPart(name='Lead 1'){
-    return {id:uid(),type:'lead',name,enabled:true,muted:false,solo:false,voxSetupEstablished:false,repeat:true,sustain:false,volume:.8,instrument:'piano',sound:'acoustic_grand_piano',octave:0,gridOctave:3,resolution:16,bars:4,events:[]};
+    return {id:uid(),type:'lead',name,enabled:true,muted:false,solo:false,voxSetupEstablished:false,repeat:true,sustain:false,volume:.8,instrument:'piano',sound:'acoustic_grand_piano',octave:0,gridOctave:3,resolution:16,bars:4,barsMode:'fixed',events:[]};
   }
   function vocalPart(name='Vocals 1'){
     return {id:uid(),type:'vocal',name,enabled:true,muted:false,solo:false,repeat:true,volume:1,transcript:'',recordings:[],activeTakeId:null,voxEvents:[],backingPartIds:parts.filter(x=>x.type==='chord'||x.type==='lead').filter(x=>x.enabled).map(x=>x.id),backingDrums:true,backingVolume:.8,fx:{eq:'clear',comp:'medium',reverb:.12,delay:0,autotune:0}};
@@ -143,7 +143,7 @@
     if(!p||!p.type)return null;
     const base={id:p.id||uid(),name:p.name||`${p.type==='chord'?'Chords':p.type==='lead'?'Lead':'Vocals'} ${i+1}`,enabled:p.enabled!==false,muted:p.muted===true,solo:p.solo===true,voxSetupEstablished:p.voxSetupEstablished===true,volume:Number.isFinite(+p.volume)?Math.max(0,Math.min(1,+p.volume)):.85};
     if(p.type==='chord'){const data=clone(p.data||core.snapshot());dedupeChordRows(data);normalizeChordDurations(data);return {...base,type:'chord',data};}
-    if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,sustain:p.sustain===true,instrument:['piano','guitar','misc'].includes(p.instrument)?p.instrument:'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(16,+p.bars||4)),events:normalizeLeadEvents(p.events)};
+    if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,sustain:p.sustain===true,instrument:['piano','guitar','misc'].includes(p.instrument)?p.instrument:'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(256,+p.bars||4)),barsMode:p.barsMode==='song'?'song':'fixed',events:normalizeLeadEvents(p.events)};
     const voxEvents=Array.isArray(p.voxEvents)?p.voxEvents.map(e=>normalizeVoxEvent(e,p)).filter(Boolean):[];
     return {...base,type:'vocal',repeat:p.repeat!==false,transcript:String(p.transcript||''),transcriptWords:Array.isArray(p.transcriptWords)?p.transcriptWords:[],recordings:Array.isArray(p.recordings)?p.recordings.map(r=>({...r,blob:null})):[],activeTakeId:p.activeTakeId||null,voxEvents,backingPartIds:Array.isArray(p.backingPartIds)?p.backingPartIds:[],backingDrums:p.backingDrums!==false,backingVolume:Number.isFinite(+p.backingVolume)?Math.max(0,Math.min(1,+p.backingVolume)):.8,fx:{eq:p.fx?.eq||'clear',comp:p.fx?.comp||'medium',reverb:Number(p.fx?.reverb??.12),delay:Number(p.fx?.delay||0),autotune:Math.max(0,Math.min(100,Number(p.fx?.autotune)||0))}};
   }
@@ -466,11 +466,51 @@
       for(const pc of ctx.notePcs){const chip=document.createElement('span');chip.className='lead-harmony-chip note';if(ctx.chordTonePcs.includes(pc))chip.classList.add('chord-tone');if(ctx.rootPcs.includes(pc))chip.classList.add('root-tone');chip.textContent=NOTE_NAMES[pc];chip.title=ctx.rootPcs.includes(pc)?'Chord root':ctx.chordTonePcs.includes(pc)?'Chord tone':'In-key note';notesBox.appendChild(chip);}
     }
   }
+  function leadExactEventEndBeat(p){
+    const events=p?.events||[];
+    return events.length?Math.max(0,...events.map(e=>leadEventStartBeat(p,e)+leadEventDurationBeats(p,e))):0;
+  }
+  function leadSongLengthBeats(p){
+    const explicit=Number(songEndBeat);
+    if(Number.isFinite(explicit)&&explicit>effectiveSongStartBeat()+.03)return explicit;
+    let end=0;
+    for(const q of parts){
+      if(!q||q===p)continue;
+      if(q.type==='chord')end=Math.max(end,partDurationBeats(q));
+      else if(q.type==='lead')end=Math.max(end,leadExactEventEndBeat(q),q.barsMode==='fixed'?(Number(q.bars)||0)*4:0);
+      else if(q.type==='vocal')end=Math.max(end,vocalDurationBeats(q));
+    }
+    ensureLegacyDrumEvent();
+    if(drumEvents.length)end=Math.max(end,...drumEvents.map(e=>(Number(e.startBeat)||0)+(Number(e.durationBeats)||0)));
+    end=Math.max(end,leadExactEventEndBeat(p));
+    return Math.max(4,end||4);
+  }
+  function syncLeadBarsToSong(p){
+    if(!p||p.type!=='lead'||p.barsMode!=='song')return false;
+    const eventBars=Math.max(1,Math.ceil(leadExactEventEndBeat(p)/4));
+    const songBars=Math.max(1,Math.ceil(leadSongLengthBeats(p)/4));
+    const next=Math.max(eventBars,Math.min(256,songBars));
+    if(next===p.bars)return false;
+    p.bars=next;
+    return true;
+  }
+  function paintLeadBarsControl(p){
+    const sel=$('leadBars');if(!sel)return;
+    let songOpt=sel.querySelector('option[value="song"]');
+    if(songOpt)songOpt.textContent=`Length of Song (${Math.max(1,Number(p?.bars)||1)} bars)`;
+    sel.value=p?.barsMode==='song'?'song':String(p?.bars||4);
+    if(sel.value===''){
+      const val=Math.max(1,Math.min(256,Number(p?.bars)||4));
+      let custom=sel.querySelector(`option[data-custom-bars="${val}"]`);
+      if(!custom){custom=document.createElement('option');custom.value=String(val);custom.dataset.customBars=String(val);custom.textContent=String(val);sel.insertBefore(custom,songOpt||null);}
+      sel.value=String(val);
+    }
+  }
   function renderLeadEditor(p=active()){
     if(!p||p.type!=='lead')return;
     $('leadPartTitle').textContent=p.name;p.repeat=!!core.loop;if($('leadRepeat'))$('leadRepeat').checked=!!core.loop;if($('leadSustain'))$('leadSustain').checked=p.sustain===true;
     $('leadVolume').value=Math.round(p.volume*100);$('leadVolumeValue').textContent=`${Math.round(p.volume*100)}%`;
-    renderLeadSoundControls(p);$('leadGridOctave').value=String(p.gridOctave);$('leadResolution').value=String(p.resolution);$('leadBars').value=String(p.bars);
+    syncLeadBarsToSong(p);renderLeadSoundControls(p);$('leadGridOctave').value=String(p.gridOctave);$('leadResolution').value=String(p.resolution);paintLeadBarsControl(p);
     leadBarPage=Math.max(0,Math.min(p.bars-1,leadBarPage));updateLeadBarUi(p);
     updateLeadGridViewToggle();
     renderLeadGrid(p,{scrollToBar:true});
@@ -630,7 +670,7 @@
     return [...out].filter(o=>o>=1&&o<=6).sort((a,b)=>a-b);
   }
   function closeBdBatchModal(){document.getElementById('bdBatchModal')?.remove();}
-  function openBdBatchModal({title,help='',bars=[],activeBars=[],octaves=[],activeOctaves=[],defaultBars=[],defaultOctaves=[],confirmText='Apply',targetBar=false,targetOctave=false,targetOctaves=null,onConfirm}){
+  function openBdBatchModal({title,help='',bars=[],activeBars=[],octaves=[],activeOctaves=[],defaultBars=[],defaultOctaves=[],confirmText='Apply',targetBar=false,targetOctave=false,targetOctaves=null,barsLabel='Bars',onConfirm}){
     closeBdBatchModal();
     const modal=document.createElement('div');modal.id='bdBatchModal';modal.className='bd-batch-backdrop';
     const barSet=new Set(defaultBars.map(Number)),octSet=new Set(defaultOctaves.map(Number)),activeBarSet=new Set(activeBars.map(Number)),activeOctSet=new Set(activeOctaves.map(Number));
@@ -638,13 +678,13 @@
     const octHtml=octaves.map(o=>`<label class="bd-batch-check ${activeOctSet.has(o)?'is-active':''}"><input type="checkbox" data-batch-octave="${o}" ${octSet.has(o)?'checked':''}><span>Grid ${o}</span>${activeOctSet.has(o)?'<small>active</small>':''}</label>`).join('');
     const targetBarHtml=targetBar?`<label class="bd-batch-field">Paste / duplicate starting at<select id="bdBatchTargetBar">${bars.map(b=>`<option value="${b}">Bar ${b+1}</option>`).join('')}</select></label>`:'';
     const targetGridChoices=Array.isArray(targetOctaves)?targetOctaves:octaves;const targetOctHtml=targetOctave?`<label class="bd-batch-field">Target octave grid<select id="bdBatchTargetOctave"><option value="keep">Keep original grids</option>${targetGridChoices.map(o=>`<option value="${o}">Move phrase to Grid ${o}</option>`).join('')}</select></label>`:'';
-    modal.innerHTML=`<div class="bd-batch-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}"><h3>${escapeHtml(title)}</h3>${help?`<p class="subtle tiny">${escapeHtml(help)}</p>`:''}<div class="bd-batch-section"><div class="bd-batch-section-head"><strong>Bars</strong><div class="bd-batch-quick"><button type="button" data-bars-active>Active bars</button><button type="button" data-bars-all>All bars</button><button type="button" data-bars-none>None</button></div></div><div class="bd-batch-grid">${barHtml}</div></div>${octaves.length?`<div class="bd-batch-section"><div class="bd-batch-section-head"><strong>Octave grids</strong><div class="bd-batch-quick"><button type="button" data-oct-active>Active grids</button><button type="button" data-oct-all>All grids</button><button type="button" data-oct-none>None</button></div></div><div class="bd-batch-grid">${octHtml}</div></div>`:''}${targetBarHtml}${targetOctHtml}<div class="bd-batch-actions"><button type="button" data-cancel>Cancel</button><button type="button" class="accent" data-confirm>${escapeHtml(confirmText)}</button></div></div>`;
+    modal.innerHTML=`<div class="bd-batch-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}"><h3>${escapeHtml(title)}</h3>${help?`<p class="subtle tiny">${escapeHtml(help)}</p>`:''}<div class="bd-batch-section"><div class="bd-batch-section-head"><strong>${escapeHtml(barsLabel)}</strong><div class="bd-batch-quick"><button type="button" data-bars-active>Active bars</button><button type="button" data-bars-all>All bars</button><button type="button" data-bars-none>None</button></div></div><div class="bd-batch-grid">${barHtml}</div></div>${octaves.length?`<div class="bd-batch-section"><div class="bd-batch-section-head"><strong>Octave grids</strong><div class="bd-batch-quick"><button type="button" data-oct-active>Active grids</button><button type="button" data-oct-all>All grids</button><button type="button" data-oct-none>None</button></div></div><div class="bd-batch-grid">${octHtml}</div></div>`:''}${targetBarHtml}${targetOctHtml}<div class="bd-batch-actions"><button type="button" data-cancel>Cancel</button><button type="button" class="accent" data-confirm>${escapeHtml(confirmText)}</button></div></div>`;
     document.body.appendChild(modal);
-    const checks=(sel)=>[...modal.querySelectorAll(sel)],setChecks=(sel,values)=>{const allowed=new Set(values.map(Number));for(const c of checks(sel))c.checked=allowed.has(Number(c.value||c.dataset.batchBar||c.dataset.batchOctave));};
+    const checks=(sel)=>[...modal.querySelectorAll(sel)],setChecks=(sel,values)=>{const allowed=new Set(values.map(Number));for(const c of checks(sel)){const raw=c.dataset.batchBar??c.dataset.batchOctave??c.value;c.checked=allowed.has(Number(raw));}};
     modal.querySelector('[data-bars-active]').onclick=()=>setChecks('[data-batch-bar]',activeBars);modal.querySelector('[data-bars-all]').onclick=()=>checks('[data-batch-bar]').forEach(c=>c.checked=true);modal.querySelector('[data-bars-none]').onclick=()=>checks('[data-batch-bar]').forEach(c=>c.checked=false);
     if(octaves.length){modal.querySelector('[data-oct-active]').onclick=()=>setChecks('[data-batch-octave]',activeOctaves);modal.querySelector('[data-oct-all]').onclick=()=>checks('[data-batch-octave]').forEach(c=>c.checked=true);modal.querySelector('[data-oct-none]').onclick=()=>checks('[data-batch-octave]').forEach(c=>c.checked=false);}
     modal.querySelector('[data-cancel]').onclick=closeBdBatchModal;modal.addEventListener('click',e=>{if(e.target===modal)closeBdBatchModal();});
-    if(targetBar)modal.querySelector('#bdBatchTargetBar').value=String(Math.max(0,Math.min(bars.length-1,leadBarPage)));
+    if(targetBar){const target=modal.querySelector('#bdBatchTargetBar');target.value=String(Math.max(0,Math.min(bars.length-1,leadBarPage)));target.onchange=()=>setChecks('[data-batch-bar]',[Number(target.value)]);}
     if(targetOctave)modal.querySelector('#bdBatchTargetOctave').value='keep';
     modal.querySelector('[data-confirm]').onclick=()=>{const pickedBars=checks('[data-batch-bar]:checked').map(c=>Number(c.dataset.batchBar)),pickedOctaves=checks('[data-batch-octave]:checked').map(c=>Number(c.dataset.batchOctave)),tb=targetBar?Number(modal.querySelector('#bdBatchTargetBar')?.value||0):null,to=targetOctave?String(modal.querySelector('#bdBatchTargetOctave')?.value||'keep'):null;if(!pickedBars.length){core.status('Choose at least one bar.');return;}if(octaves.length&&!pickedOctaves.length){core.status('Choose at least one octave grid.');return;}closeBdBatchModal();onConfirm?.({bars:pickedBars,octaves:pickedOctaves,targetBar:tb,targetOctave:to});};
   }
@@ -667,11 +707,15 @@
   }
   function pasteLeadBar(){
     const p=active();if(!p||p.type!=='lead'||!leadBarClipboard){core.status('Copy Lead/Bass notes first.');return;}const bars=Array.from({length:p.bars},(_,i)=>i),octaves=[1,2,3,4,5,6],activeBars=leadActiveBars(p),activeOctaves=leadActiveOctaves(p);
-    openBdBatchModal({title:'Paste Lead / Bass',help:'Choose the destination start bar and any target octave grid. “Move phrase to Grid” transposes every copied note by whole octaves while preserving intervals.',bars,activeBars,octaves:[],activeOctaves:[],defaultBars:[leadBarPage],defaultOctaves:[],targetBar:true,targetOctave:true,targetOctaves:octaves,confirmText:'Paste',onConfirm:({targetBar,targetOctave})=>{
-      const clip=leadBarClipboard,items=clip.items||[];if(!items.length)return;const needed=Math.max(1,targetBar+Math.max(1,Number(clip.spanBars)||1)),allowedBars=[1,2,4,8,16],nextBars=allowedBars.find(n=>n>=needed)||16;if(nextBars>p.bars)p.bars=nextBars;
+    openBdBatchModal({title:'Paste Lead / Bass',help:'Choose one or more destination bars. The copied phrase is pasted starting at every checked bar. “Move phrase to Grid” transposes every copied note by whole octaves while preserving intervals.',bars,activeBars,octaves:[],activeOctaves:[],defaultBars:[leadBarPage],defaultOctaves:[],targetBar:true,targetOctave:true,targetOctaves:octaves,barsLabel:'Destination bars',confirmText:'Paste',onConfirm:({bars:selectedBars,targetBar,targetOctave})=>{
+      const clip=leadBarClipboard,items=clip.items||[];if(!items.length)return;
+      const destinations=[...new Set((selectedBars?.length?selectedBars:[targetBar]).map(Number))].filter(Number.isFinite).sort((a,b)=>a-b);if(!destinations.length)return;
+      const span=Math.max(1,Number(clip.spanBars)||1),needed=Math.max(...destinations.map(b=>b+span));if(needed>p.bars){p.bars=Math.min(256,needed);if(p.barsMode==='song')p.barsMode='fixed';}
       const shift=targetOctave==='keep'?0:(Number(targetOctave)-Number(clip.sourceMinOctave||p.gridOctave))*12,stepBeats=4/Math.max(8,Number(p.resolution)||16),newEvents=[];
-      for(const item of items){const startBeat=targetBar*4+Math.max(0,Number(item.deltaBeat)||0),durationBeats=Math.max(stepBeats,Number(item.durationBeats)||stepBeats),midi=Math.max(0,Math.min(127,(Number(item.event?.midi)||60)+shift)),e={...clone(item.event),voxId:uid(),midi,voxStartBeat:startBeat,voxDurationBeats:durationBeats,step:Math.max(0,Math.round(startBeat/stepBeats)),durationSteps:Math.max(1,Math.round(durationBeats/stepBeats))};newEvents.push(e);}
-      p.events=normalizeLeadEvents([...(p.events||[]),...newEvents]);leadBarPage=Math.min(p.bars-1,targetBar);syncLeadEditViews(p,`Pasted ${newEvents.length} note${newEvents.length===1?'':'s'} starting at Bar ${targetBar+1}${targetOctave==='keep'?'':` on Grid ${targetOctave}`}.`);
+      for(const destBar of destinations){
+        for(const item of items){const startBeat=destBar*4+Math.max(0,Number(item.deltaBeat)||0);if(startBeat>=p.bars*4)continue;const durationBeats=Math.max(stepBeats,Math.min(Number(item.durationBeats)||stepBeats,p.bars*4-startBeat)),midi=Math.max(0,Math.min(127,(Number(item.event?.midi)||60)+shift)),e={...clone(item.event),voxId:uid(),midi,voxStartBeat:startBeat,voxDurationBeats:durationBeats,step:Math.max(0,Math.round(startBeat/stepBeats)),durationSteps:Math.max(1,Math.round(durationBeats/stepBeats))};newEvents.push(e);}
+      }
+      p.events=normalizeLeadEvents([...(p.events||[]),...newEvents]);leadBarPage=Math.min(p.bars-1,destinations[0]);syncLeadEditViews(p,`Pasted ${newEvents.length} note${newEvents.length===1?'':'s'} to ${destinations.length} destination bar${destinations.length===1?'':'s'}${targetOctave==='keep'?'':` on Grid ${targetOctave}`}.`);
     }});
   }
   function clearLeadBars(){
@@ -1062,6 +1106,10 @@
     clearTimeout(liveEditTimer);
     liveEditTimer=setTimeout(()=>{
       syncLoadedChord();
+      // Length-of-Song Lead/Bass parts follow the musical arrangement live, not
+      // only after Save/reload. This keeps playback and the Bars control aligned
+      // as chord rows / song markers grow.
+      for(const q of parts)if(q?.type==='lead')syncLeadBarsToSong(q);
       const now=audioCtx?.currentTime||0;
       for(const p of parts){
         const bus=partBuses.get(p.id);
@@ -1672,7 +1720,12 @@
     finally{try{await ctx?.close();}catch{}}
   }
 
-  function capture(){syncLoadedChord();ensureLegacyDrumEvent();drumArrangementInitialized=true;partsUpdatedAt=Math.max(partsUpdatedAt,Date.now());const safe=parts.map(p=>{const q=clone(p);delete q._recordOldStates;delete q._recordOldVolumes;delete q._recordOldDrums;delete q._recordOldDrumVol;if(q.type==='vocal')q.recordings=(q.recordings||[]).map(({blob,...r})=>r);return q;});return {version:6,updatedAt:partsUpdatedAt,activePartId,loadedChordPartId,songStartBeat:effectiveSongStartBeat(),songEndBeat:Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):null,drumEvents:clone(drumEvents),items:safe};}
+  function partsPayloadForSave(){
+    const safe=parts.map(p=>{const q=clone(p);delete q._recordOldStates;delete q._recordOldVolumes;delete q._recordOldDrums;delete q._recordOldDrumVol;if(q.type==='vocal')q.recordings=(q.recordings||[]).map(({blob,...r})=>r);return q;});
+    return {version:6,activePartId,loadedChordPartId,songStartBeat:effectiveSongStartBeat(),songEndBeat:Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):null,drumEvents:clone(drumEvents),items:safe};
+  }
+  function refreshPartsFingerprintBaseline(){partsFingerprint=JSON.stringify(partsPayloadForSave());}
+  function capture(){syncLoadedChord();ensureLegacyDrumEvent();drumArrangementInitialized=true;for(const p of parts)if(p?.type==='lead')syncLeadBarsToSong(p);const payload=partsPayloadForSave(),fingerprint=JSON.stringify(payload);if(fingerprint!==partsFingerprint){partsUpdatedAt=Math.max(Number(partsUpdatedAt)||0,Date.now());partsFingerprint=fingerprint;}return {...payload,updatedAt:partsUpdatedAt};}
   function loadProject(project){
     stopPlayback();stopPreview();
     const saved=project?.parts;
@@ -1696,9 +1749,9 @@
     }
     loadedChordPartId=c.id;core.apply(c.data);
     if(activePartId!==c.id)selectPart(activePartId);else{setEditorMode('chord');renderParts();}
-    renderSongEndEditor();
+    refreshPartsFingerprintBaseline();renderSongEndEditor();
   }
-  function newProject(){stopPlayback();stopPreview();partsUpdatedAt=0;songStartBeat=0;songEndBeat=null;drumEvents=[];drumArrangementInitialized=true;const p=chordPart('Chords 1',core.snapshot());parts=[p];activePartId=p.id;loadedChordPartId=p.id;setEditorMode('chord');renderParts();renderSongEndEditor();}
+  function newProject(){stopPlayback();stopPreview();partsUpdatedAt=0;partsFingerprint='';songStartBeat=0;songEndBeat=null;drumEvents=[];drumArrangementInitialized=true;const p=chordPart('Chords 1',core.snapshot());parts=[p];activePartId=p.id;loadedChordPartId=p.id;setEditorMode('chord');renderParts();renderSongEndEditor();}
 
   function openLyricsOverlay(){
     const overlay=$('srpLyricsOverlay'),frame=$('srpLyricsFrame');if(!overlay||!frame)return;
@@ -2975,7 +3028,7 @@
     }
     $('leadGridOctave').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.gridOctave=+e.target.value;renderLeadGrid(p);core.scheduleAutoSave();};
     $('leadResolution').onchange=e=>{const p=active();if(p?.type!=='lead')return;const old=p.resolution,neu=+e.target.value;if(old!==neu&&p.events.length&&!confirm('Changing resolution keeps notes at their step numbers, so their timing may shift. Continue?')){e.target.value=String(old);return;}p.resolution=neu;renderLeadEditor(p);core.scheduleAutoSave();};
-    $('leadBars').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.bars=+e.target.value;const maxSteps=leadTotalSteps(p);p.events=p.events.filter(x=>x.step<maxSteps).map(x=>({...x,durationSteps:Math.min(leadDurationSteps(x),Math.max(1,maxSteps-x.step))}));leadBarPage=Math.min(leadBarPage,p.bars-1);markPartsDirty();renderLeadEditor(p);core.scheduleAutoSave();};
+    $('leadBars').onchange=e=>{const p=active();if(p?.type!=='lead')return;if(e.target.value==='song'){p.barsMode='song';syncLeadBarsToSong(p);}else{p.barsMode='fixed';p.bars=Math.max(1,Math.min(256,+e.target.value||4));const maxSteps=leadTotalSteps(p);p.events=p.events.filter(x=>x.step<maxSteps).map(x=>({...x,durationSteps:Math.min(leadDurationSteps(x),Math.max(1,maxSteps-x.step))}));}leadBarPage=Math.min(leadBarPage,p.bars-1);markPartsDirty();renderLeadEditor(p);core.scheduleAutoSave();};
     $('leadPrevBar').onclick=()=>{const p=active();if(p?.type!=='lead')return;leadBarPage=Math.max(0,leadBarPage-1);updateLeadBarUi(p);scrollLeadGridToBar(p,true);};$('leadNextBar').onclick=()=>{const p=active();if(p?.type!=='lead')return;leadBarPage=p.bars>1?(leadBarPage+1)%p.bars:0;updateLeadBarUi(p);scrollLeadGridToBar(p,true);};
     $('beatsSelect')?.addEventListener('change',()=>{if(active()?.type==='lead')renderLeadHarmony();});
     $('leadCopyBar').onclick=copyLeadBar;$('leadPasteBar').onclick=pasteLeadBar;
