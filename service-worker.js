@@ -1,7 +1,7 @@
-const CACHE = 'song-rider-suite-v3.3.67-timing-audit-fix';
+const CACHE = 'song-rider-suite-v3.3.71-rider-blood-skins';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
-  './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css',
+  './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css','./skins.css','./skins.js',
   './vocal-autotune-worklet.js','./manifest.webmanifest',
   './assets/chord-rider-pro-wordmark-hq2.png','./assets/baby-daw-button-hq.png','./assets/suite-header-new.png',
   './assets/apple-touch-icon.png','./assets/icon-192.png','./assets/rider-and-bones-icon.png',
@@ -9,7 +9,7 @@ const ASSETS = [
   './assets/rider-and-bones-left.gif','./assets/rider-and-bones-right.gif',
   './assets/rider-and-bones-left-still.png','./assets/rider-and-bones-right-still.png',
   './assets/baby-daw-generated-source.png','./assets/rider-bones-mode-sticker.png','./assets/baby-daw-head-chain-sticker.png',
-  './song-rider/index.html','./song-rider/app.js','./song-rider/styles.css',
+  './song-rider/index.html','./song-rider/app.js','./song-rider/styles.css','./song-rider/song-rider-pro-wordmark-blood.png',
   './song-rider/branding-shell.css','./song-rider/suite-header.css','./song-rider/suite-shell-lock.css'
 ];
 async function cacheAvailable(cache,url){
