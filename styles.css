@@ -5146,3 +5146,31 @@ body.workspace-chord-rider .primary-toolbar > .sustain-control{
     padding-bottom:47px!important;
   }
 }
+
+/* v3.3.72 — compact Projects / Notes collapse + single Lead/Bass volume source */
+.lead-volume-bridge[hidden]{display:none!important}
+.collapsible-panel-heading{align-items:center}
+.panel-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0}
+.panel-collapse-toggle{flex:0 0 auto;min-width:64px;padding:8px 12px;font-weight:800}
+.collapsible-data-panel.is-collapsed{padding-top:10px;padding-bottom:10px}
+.collapsible-data-panel.is-collapsed .section-heading-row{margin-bottom:8px}
+.collapsible-panel-body[hidden]{display:none!important}
+#projectsPanel.is-collapsed .project-save-row{margin-bottom:0}
+#projectsPanel.is-collapsed #projectName{font-weight:800}
+#notesPanel.is-collapsed .section-heading-row{margin-bottom:0}
+#renameCurrentProjectBtn{white-space:nowrap}
+@media(max-width:700px){
+  .panel-heading-actions{gap:7px}
+  .panel-heading-actions .subtle{font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42vw}
+  .panel-collapse-toggle{min-width:58px;padding:8px 9px}
+  .project-save-row{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important;align-items:center!important}
+  .project-save-row #projectName{grid-column:1/-1!important;grid-row:1!important;width:100%!important;min-width:0!important}
+  .project-save-row #newProjectBtn,.project-save-row #saveProjectBtn,.project-save-row #renameCurrentProjectBtn,.project-save-row .export-wrap{grid-row:2!important;width:100%!important;min-width:0!important}
+  .project-save-row #newProjectBtn{grid-column:1!important}.project-save-row #saveProjectBtn{grid-column:2!important}.project-save-row #renameCurrentProjectBtn{grid-column:3!important}.project-save-row .export-wrap{grid-column:4!important}
+  .project-save-row .export-btn{width:100%!important}
+  .project-save-row #newProjectBtn,.project-save-row #saveProjectBtn,.project-save-row #renameCurrentProjectBtn,.project-save-row .export-btn{padding:9px 7px!important;font-size:.72rem!important}
+}
+@media(max-width:430px){
+  .project-save-row{gap:5px!important}
+  .project-save-row #newProjectBtn,.project-save-row #saveProjectBtn,.project-save-row #renameCurrentProjectBtn,.project-save-row .export-btn{padding:8px 5px!important;font-size:.68rem!important}
+}
