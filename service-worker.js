@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.70-skin-layout-polish';
+const CACHE = 'song-rider-suite-v3.3.71-rider-blood-skins';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
   './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css','./skins.css','./skins.js',
@@ -9,7 +9,7 @@ const ASSETS = [
   './assets/rider-and-bones-left.gif','./assets/rider-and-bones-right.gif',
   './assets/rider-and-bones-left-still.png','./assets/rider-and-bones-right-still.png',
   './assets/baby-daw-generated-source.png','./assets/rider-bones-mode-sticker.png','./assets/baby-daw-head-chain-sticker.png',
-  './song-rider/index.html','./song-rider/app.js','./song-rider/styles.css',
+  './song-rider/index.html','./song-rider/app.js','./song-rider/styles.css','./song-rider/song-rider-pro-wordmark-blood.png',
   './song-rider/branding-shell.css','./song-rider/suite-header.css','./song-rider/suite-shell-lock.css'
 ];
 async function cacheAvailable(cache,url){

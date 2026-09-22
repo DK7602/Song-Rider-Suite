@@ -4,10 +4,12 @@
   const DEFAULT = 'rider-original';
   const SKINS = [
     {id:'rider-original', name:'Rider Original', desc:'Original black + gold Bones & Rider look.', swatches:['#0d0f12','#e9c46a','#11161d','#72c98a']},
+    {id:'rider-blood', name:'Rider Blood', desc:'Original Rider look with deep red accents, red editor cells and subtle red trim.', swatches:['#0d0f12','#e9c46a','#b9242d','#2a1013']},
     {id:'studio-pastel', name:'Studio Pastel', desc:'Blue, pink, warm tan + gold. Calm studio graphics.', swatches:['#f2e6d7','#7aaed8','#e89aba','#c49a43']},
     {id:'black-label', name:'Black Label', desc:'Black, yellow and polished gold. Elegant and skull-free.', swatches:['#090a0c','#e3b84e','#f0cf57','#25272c']},
     {id:'black-label-light', name:'Black Label Light', desc:'White, gray, gold + yellow with restrained green.', swatches:['#f6f5f1','#d4aa45','#e7ca52','#4e9d65']},
-    {id:'rider-light', name:'Rider Light', desc:'Light Rider palette with the current Bones & Rider buttons.', swatches:['#f4f4f2','#d8ac43','#f0cf52','#57a96f']}
+    {id:'rider-light', name:'Rider Light', desc:'Light Rider palette with the current Bones & Rider buttons.', swatches:['#f4f4f2','#d8ac43','#f0cf52','#57a96f']},
+    {id:'rider-blood-light', name:'Rider Blood Light', desc:'Rider Light with deep red accents, red editor cells and subtle red trim.', swatches:['#f4f4f2','#d8ac43','#f0cf52','#c62f38']}
   ];
   const VALID = new Set(SKINS.map(s=>s.id));
   const $ = (s, root=document) => root.querySelector(s);
@@ -16,16 +18,32 @@
   }
   function setThemeColor(skin){
     const map={
-      'rider-original':'#111111', 'studio-pastel':'#f2e6d7', 'black-label':'#090a0c',
-      'black-label-light':'#f6f5f1', 'rider-light':'#f4f4f2'
+      'rider-original':'#111111', 'rider-blood':'#111111', 'studio-pastel':'#f2e6d7', 'black-label':'#090a0c',
+      'black-label-light':'#f6f5f1', 'rider-light':'#f4f4f2', 'rider-blood-light':'#f4f4f2'
     };
     const meta=$('meta[name="theme-color"]'); if(meta) meta.setAttribute('content',map[skin]||map[DEFAULT]);
   }
+  function updateSkinAssets(skin){
+    const blood=skin==='rider-blood'||skin==='rider-blood-light';
+    document.querySelectorAll('.srp-exact-wordmark').forEach(img=>{
+      if(!img.dataset.srsOriginalSrc)img.dataset.srsOriginalSrc=img.getAttribute('src')||'./song-rider-pro-wordmark-hq.png?v=3.3.12';
+      img.setAttribute('src',blood?'./song-rider-pro-wordmark-blood.png?v=3.3.71':img.dataset.srsOriginalSrc);
+    });
+  }
   function applySkin(skin, persist=true){
     skin=VALID.has(skin)?skin:DEFAULT;
-    document.documentElement.dataset.skin=skin;
-    if(document.body) document.body.dataset.skin=skin;
+    const baseSkin=skin==='rider-blood'?'rider-original':(skin==='rider-blood-light'?'rider-light':skin);
+    const variant=skin==='rider-blood'||skin==='rider-blood-light'?'blood':'';
+    document.documentElement.dataset.skin=baseSkin;
+    document.documentElement.dataset.skinChoice=skin;
+    if(variant) document.documentElement.dataset.skinVariant=variant; else delete document.documentElement.dataset.skinVariant;
+    if(document.body){
+      document.body.dataset.skin=baseSkin;
+      document.body.dataset.skinChoice=skin;
+      if(variant) document.body.dataset.skinVariant=variant; else delete document.body.dataset.skinVariant;
+    }
     setThemeColor(skin);
+    updateSkinAssets(skin);
     if(persist){ try{localStorage.setItem(KEY,skin)}catch{} }
     document.querySelectorAll('[data-srs-skin-choice]').forEach(btn=>{
       const on=btn.dataset.srsSkinChoice===skin;

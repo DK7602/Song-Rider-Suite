@@ -1,4 +1,4 @@
-/* Song Rider Suite appearance skins — v3.3.70
+/* Song Rider Suite appearance skins — v3.3.71
    Presentation-only layer. No playback, project, transport or cloud logic lives here. */
 :root{
   --srs-skin-bg:var(--bg,#0d0f12);--srs-skin-panel:var(--panel,#171a1f);--srs-skin-panel2:var(--panel2,#20242b);
@@ -12,7 +12,7 @@ html[data-skin="black-label-light"]{--bg:#f4f4f1;--panel:#fff;--panel2:#ecece8;-
 html[data-skin="rider-light"]{--bg:#f2f3f1;--panel:#fff;--panel2:#eceeeb;--text:#212429;--muted:#687078;--accent:#d5aa40;--accent2:#efca47;--line:#ced2cc;--good:#56a66d;--border:#ced2cc;--panel-2:#eceeeb;--srs-skin-bg:#f2f3f1;--srs-skin-panel:#fff;--srs-skin-panel2:#eceeeb;--srs-skin-text:#212429;--srs-skin-muted:#687078;--srs-skin-gold:#d5aa40;--srs-skin-accent:#d5aa40;--srs-skin-accent2:#efca47;--srs-skin-line:#ced2cc;--srs-skin-good:#56a66d;--srs-skin-input:#fff;--srs-skin-raised:#f0f2ef;--srs-skin-shadow:0 12px 28px rgba(25,28,25,.12)}
 
 /* Settings gear + skin picker */
-#accountPanel{position:relative}.srs-skin-gear{position:absolute;z-index:6;right:11px;top:10px;width:36px;height:36px;min-width:36px;padding:0!important;display:grid;place-items:center;border-radius:50%!important;font-size:1.15rem!important;line-height:1;background:linear-gradient(180deg,#f8d66d,#dcae38)!important;color:#211705!important;border:1px solid #c49428!important;box-shadow:0 3px 9px rgba(0,0,0,.24)!important}.account-heading,.account-summary-btn{padding-right:50px!important}.srs-skin-gear-inline{position:static!important;margin-left:auto!important;margin-right:5px!important;flex:0 0 36px}.srs-skin-modal[hidden]{display:none!important}.srs-skin-modal{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:16px}.srs-skin-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(5px)}.srs-skin-card{position:relative;width:min(760px,calc(100vw - 24px));max-height:min(760px,calc(100vh - 28px));overflow:auto;padding:18px;border:1px solid var(--srs-skin-line);border-radius:20px;background:var(--srs-skin-panel);color:var(--srs-skin-text);box-shadow:0 22px 80px rgba(0,0,0,.45)}.srs-skin-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between}.srs-skin-head h2{margin:0;font-size:1.2rem}.srs-skin-head p{margin:5px 0 0;color:var(--srs-skin-muted);font-size:.82rem;line-height:1.35}.srs-skin-close{width:38px;height:38px;min-width:38px;padding:0!important;border-radius:11px!important;font-size:1.35rem!important}.srs-skin-current{margin:13px 0 10px;font-size:.8rem;color:var(--srs-skin-muted)}.srs-skin-current strong{color:var(--srs-skin-gold)}.srs-skin-grid{display:grid;gap:10px}.srs-skin-choice{position:relative;width:100%;display:grid;grid-template-columns:130px minmax(0,1fr) 28px;align-items:center;gap:12px;padding:10px!important;text-align:left!important;border:1px solid var(--srs-skin-line)!important;border-radius:14px!important;background:var(--srs-skin-panel2)!important;color:var(--srs-skin-text)!important}.srs-skin-choice.is-selected{border-color:var(--srs-skin-gold)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--srs-skin-gold) 32%,transparent)!important}.srs-skin-choice-copy{display:grid;gap:3px}.srs-skin-choice-copy strong{font-size:.95rem}.srs-skin-choice-copy small{color:var(--srs-skin-muted);line-height:1.25}.srs-skin-check{opacity:0;font-weight:1000;color:var(--srs-skin-good);font-size:1.1rem}.srs-skin-choice.is-selected .srs-skin-check{opacity:1}.srs-skin-preview{height:72px;border-radius:11px;display:block;position:relative;overflow:hidden;border:1px solid rgba(127,127,127,.25)}.srs-preview-top{position:absolute;left:0;right:0;top:0;height:22px}.srs-preview-icons{position:absolute;left:8px;right:8px;bottom:8px;display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.srs-preview-icons i{height:31px;border-radius:8px;border:1px solid rgba(127,127,127,.24)}.preview-rider-original{background:#0d0f12}.preview-rider-original .srs-preview-top{background:linear-gradient(90deg,#111,#d4a53a,#111)}.preview-rider-original .srs-preview-icons i{background:#151a20}.preview-studio-pastel{background:#f2e6d7}.preview-studio-pastel .srs-preview-top{background:linear-gradient(90deg,#7aaed8,#c49a43,#e58caf)}.preview-studio-pastel .srs-preview-icons i:nth-child(1){background:#d8e8f3}.preview-studio-pastel .srs-preview-icons i:nth-child(2){background:#f1d7e2}.preview-studio-pastel .srs-preview-icons i:nth-child(3){background:#fff9ef}.preview-black-label{background:#090a0c}.preview-black-label .srs-preview-top{background:linear-gradient(90deg,#151515,#e2b84f,#151515)}.preview-black-label .srs-preview-icons i{background:linear-gradient(145deg,#191b1f,#0b0c0e);border-color:#5a4925}.preview-black-label-light{background:#f6f5f1}.preview-black-label-light .srs-preview-top{background:linear-gradient(90deg,#fff,#d0a643,#e5c84f,#4e9d65)}.preview-black-label-light .srs-preview-icons i{background:#ecece8}.preview-rider-light{background:#f2f3f1}.preview-rider-light .srs-preview-top{background:linear-gradient(90deg,#fff,#d5aa40,#efca47,#56a66d)}.preview-rider-light .srs-preview-icons i{background:#e9ece8}.srs-swatch-row{display:flex;gap:5px;margin-top:5px}.srs-swatch-row i{width:17px;height:17px;border-radius:50%;background:var(--sw);border:1px solid rgba(100,100,100,.25)}body.srs-skin-modal-open{overflow:hidden!important}
+#accountPanel{position:relative}.srs-skin-gear{position:absolute;z-index:6;right:11px;top:10px;width:36px;height:36px;min-width:36px;padding:0!important;display:grid;place-items:center;border-radius:50%!important;font-size:1.15rem!important;line-height:1;background:linear-gradient(180deg,#f8d66d,#dcae38)!important;color:#211705!important;border:1px solid #c49428!important;box-shadow:0 3px 9px rgba(0,0,0,.24)!important}.account-heading,.account-summary-btn{padding-right:50px!important}.srs-skin-gear-inline{position:static!important;margin-left:auto!important;margin-right:5px!important;flex:0 0 36px}.srs-skin-modal[hidden]{display:none!important}.srs-skin-modal{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:16px}.srs-skin-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(5px)}.srs-skin-card{position:relative;width:min(760px,calc(100vw - 24px));max-height:min(760px,calc(100vh - 28px));overflow:auto;padding:18px;border:1px solid var(--srs-skin-line);border-radius:20px;background:var(--srs-skin-panel);color:var(--srs-skin-text);box-shadow:0 22px 80px rgba(0,0,0,.45)}.srs-skin-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between}.srs-skin-head h2{margin:0;font-size:1.2rem}.srs-skin-head p{margin:5px 0 0;color:var(--srs-skin-muted);font-size:.82rem;line-height:1.35}.srs-skin-close{width:38px;height:38px;min-width:38px;padding:0!important;border-radius:11px!important;font-size:1.35rem!important}.srs-skin-current{margin:13px 0 10px;font-size:.8rem;color:var(--srs-skin-muted)}.srs-skin-current strong{color:var(--srs-skin-gold)}.srs-skin-grid{display:grid;gap:10px}.srs-skin-choice{position:relative;width:100%;display:grid;grid-template-columns:130px minmax(0,1fr) 28px;align-items:center;gap:12px;padding:10px!important;text-align:left!important;border:1px solid var(--srs-skin-line)!important;border-radius:14px!important;background:var(--srs-skin-panel2)!important;color:var(--srs-skin-text)!important}.srs-skin-choice.is-selected{border-color:var(--srs-skin-gold)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--srs-skin-gold) 32%,transparent)!important}.srs-skin-choice-copy{display:grid;gap:3px}.srs-skin-choice-copy strong{font-size:.95rem}.srs-skin-choice-copy small{color:var(--srs-skin-muted);line-height:1.25}.srs-skin-check{opacity:0;font-weight:1000;color:var(--srs-skin-good);font-size:1.1rem}.srs-skin-choice.is-selected .srs-skin-check{opacity:1}.srs-skin-preview{height:72px;border-radius:11px;display:block;position:relative;overflow:hidden;border:1px solid rgba(127,127,127,.25)}.srs-preview-top{position:absolute;left:0;right:0;top:0;height:22px}.srs-preview-icons{position:absolute;left:8px;right:8px;bottom:8px;display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.srs-preview-icons i{height:31px;border-radius:8px;border:1px solid rgba(127,127,127,.24)}.preview-rider-original{background:#0d0f12}.preview-rider-original .srs-preview-top{background:linear-gradient(90deg,#111,#d4a53a,#111)}.preview-rider-original .srs-preview-icons i{background:#151a20}.preview-rider-blood{background:#0d0f12}.preview-rider-blood .srs-preview-top{background:linear-gradient(90deg,#111,#d4a53a,#a51f28,#111)}.preview-rider-blood .srs-preview-icons i{background:#171317;border-color:#6d252b}.preview-rider-blood .srs-preview-icons i:nth-child(2){box-shadow:inset 0 0 0 1px rgba(198,47,56,.55)}.preview-studio-pastel{background:#f2e6d7}.preview-studio-pastel .srs-preview-top{background:linear-gradient(90deg,#7aaed8,#c49a43,#e58caf)}.preview-studio-pastel .srs-preview-icons i:nth-child(1){background:#d8e8f3}.preview-studio-pastel .srs-preview-icons i:nth-child(2){background:#f1d7e2}.preview-studio-pastel .srs-preview-icons i:nth-child(3){background:#fff9ef}.preview-black-label{background:#090a0c}.preview-black-label .srs-preview-top{background:linear-gradient(90deg,#151515,#e2b84f,#151515)}.preview-black-label .srs-preview-icons i{background:linear-gradient(145deg,#191b1f,#0b0c0e);border-color:#5a4925}.preview-black-label-light{background:#f6f5f1}.preview-black-label-light .srs-preview-top{background:linear-gradient(90deg,#fff,#d0a643,#e5c84f,#4e9d65)}.preview-black-label-light .srs-preview-icons i{background:#ecece8}.preview-rider-light{background:#f2f3f1}.preview-rider-light .srs-preview-top{background:linear-gradient(90deg,#fff,#d5aa40,#efca47,#56a66d)}.preview-rider-light .srs-preview-icons i{background:#e9ece8}.preview-rider-blood-light{background:#f2f3f1}.preview-rider-blood-light .srs-preview-top{background:linear-gradient(90deg,#fff,#d5aa40,#efca47,#c62f38)}.preview-rider-blood-light .srs-preview-icons i{background:#f0e9e9;border-color:#d8b9bb}.preview-rider-blood-light .srs-preview-icons i:nth-child(2){box-shadow:inset 0 0 0 1px rgba(198,47,56,.38)}.srs-swatch-row{display:flex;gap:5px;margin-top:5px}.srs-swatch-row i{width:17px;height:17px;border-radius:50%;background:var(--sw);border:1px solid rgba(100,100,100,.25)}body.srs-skin-modal-open{overflow:hidden!important}
 @media(max-width:560px){.srs-skin-card{padding:13px}.srs-skin-choice{grid-template-columns:92px minmax(0,1fr) 20px;gap:8px}.srs-skin-preview{height:62px}.srs-preview-icons i{height:27px}.srs-skin-choice-copy small{font-size:.7rem}}
 
 /* Functional icon artwork for skull-free skins. */
@@ -20,7 +20,7 @@ html[data-skin="rider-light"]{--bg:#f2f3f1;--panel:#fff;--panel2:#eceeeb;--text:
 html[data-skin="studio-pastel"] .srs-theme-mode-icon,html[data-skin="black-label"] .srs-theme-mode-icon,html[data-skin="black-label-light"] .srs-theme-mode-icon{display:grid!important;place-items:center!important;flex:0 0 58px!important;width:58px!important;height:58px!important;padding:10px!important;border-radius:17px!important;position:relative!important;z-index:2}
 html[data-skin="studio-pastel"] .workspace-mode-btn .mode-art,html[data-skin="studio-pastel"] .workspace-mode-btn .baby-exact-art,html[data-skin="black-label"] .workspace-mode-btn .mode-art,html[data-skin="black-label"] .workspace-mode-btn .baby-exact-art,html[data-skin="black-label-light"] .workspace-mode-btn .mode-art,html[data-skin="black-label-light"] .workspace-mode-btn .baby-exact-art{display:none!important}
 html[data-skin="studio-pastel"] .srs-theme-mode-copy,html[data-skin="black-label"] .srs-theme-mode-copy,html[data-skin="black-label-light"] .srs-theme-mode-copy{display:flex!important;position:relative!important;z-index:2}
-html[data-skin="rider-original"] .srs-theme-mode-copy,html[data-skin="rider-light"] .srs-theme-mode-copy{display:none!important}
+html[data-skin="rider-original"] .srs-theme-mode-copy,html[data-skin="rider-light"] .srs-theme-mode-copy,html[data-skin-choice="rider-blood"] .srs-theme-mode-copy,html[data-skin-choice="rider-blood-light"] .srs-theme-mode-copy{display:none!important}
 html[data-skin="studio-pastel"] .srs-theme-mode-icon-chord{color:#5c91bd;background:#e0eef6;border:1px solid #b8d1e2}html[data-skin="studio-pastel"] .srs-theme-mode-icon-daw{color:#b85f87;background:#f7e0e9;border:1px solid #ecc0d2}html[data-skin="studio-pastel"] .srs-theme-mode-icon-song{color:#a57c2e;background:#fff3d5;border:1px solid #e7d09c}
 html[data-skin="black-label"] .srs-theme-mode-icon{color:#edc75f;background:radial-gradient(circle at 40% 25%,#2f2a19,#101114 64%);border:1px solid #66542a;box-shadow:inset 0 1px 0 rgba(255,244,190,.18),0 4px 12px rgba(0,0,0,.35)}
 html[data-skin="black-label-light"] .srs-theme-mode-icon{color:#b68b28;background:linear-gradient(145deg,#fff,#ecebe6);border:1px solid #d7c386;box-shadow:0 3px 8px rgba(45,41,30,.08)}
@@ -573,4 +573,128 @@ html[data-skin="black-label-light"] .progression-line.selected,
 html[data-skin="rider-light"] .progression-line.selected{
   border-color:var(--srs-green-pop)!important;
   box-shadow:0 0 0 2px rgba(79,159,102,.10)!important;
+}
+
+
+/* =========================================================
+   v3.3.71 — Rider Blood + Rider Blood Light
+   Theme-only variants. They inherit Rider Original / Rider Light geometry and
+   artwork, then replace green/status accents with a deep blood-red treatment.
+   ========================================================= */
+html[data-skin-variant="blood"]{
+  --srs-blood:#c62f38;
+  --srs-blood-bright:#e34a52;
+  --srs-blood-deep:#8f1d25;
+  --srs-blood-soft:rgba(198,47,56,.14);
+  --good:#c62f38;
+  --srs-skin-good:#c62f38;
+  --srs-green-pop:#c62f38;
+  --srs-green-deep:#8f1d25;
+  --srs-green-soft:rgba(198,47,56,.14);
+}
+
+/* Blood variants keep the Rider artwork; never show the skull-free vector art. */
+html[data-skin-choice="rider-blood"] .srs-theme-mode-icon,
+html[data-skin-choice="rider-blood-light"] .srs-theme-mode-icon{display:none!important;}
+html[data-skin-choice="rider-blood"] .workspace-mode-btn .mode-art,
+html[data-skin-choice="rider-blood"] .workspace-mode-btn .baby-exact-art,
+html[data-skin-choice="rider-blood-light"] .workspace-mode-btn .mode-art,
+html[data-skin-choice="rider-blood-light"] .workspace-mode-btn .baby-exact-art{display:block!important;}
+
+/* Thin blood-red trim around the main cards/windows and section separators. */
+html[data-skin-variant="blood"] .panel,
+html[data-skin-variant="blood"] .auth-box,
+html[data-skin-variant="blood"] .lead-part-editor,
+html[data-skin-variant="blood"] .crp-beat-panel,
+html[data-skin-variant="blood"] .vox-inspector,
+html[data-skin-variant="blood"] .vox-box-header,
+html[data-skin-variant="blood"] .vox-box-tools,
+html[data-skin-variant="blood"] .vox-floating-transport,
+html[data-skin-variant="blood"] .project-item,
+html[data-skin-variant="blood"] .progression-line{
+  border-color:color-mix(in srgb,var(--srs-blood) 52%,var(--srs-skin-line,#343a43))!important;
+  box-shadow:0 0 0 1px rgba(198,47,56,.16),0 0 11px rgba(198,47,56,.09)!important;
+}
+html[data-skin-choice="rider-blood-light"] .panel,
+html[data-skin-choice="rider-blood-light"] .auth-box,
+html[data-skin-choice="rider-blood-light"] .lead-part-editor,
+html[data-skin-choice="rider-blood-light"] .crp-beat-panel,
+html[data-skin-choice="rider-blood-light"] .vox-inspector{
+  box-shadow:0 0 0 1px rgba(198,47,56,.14),0 0 14px rgba(198,47,56,.075),var(--srs-skin-shadow)!important;
+}
+
+/* Active navigation / controls use red instead of Rider Light's green pop. */
+html[data-skin-variant="blood"] .workspace-mode-btn.active{
+  border-color:var(--srs-blood)!important;
+  box-shadow:0 0 0 1px rgba(198,47,56,.34),0 0 17px rgba(198,47,56,.19),0 6px 16px rgba(0,0,0,.08)!important;
+}
+html[data-skin-variant="blood"] .seg.active,
+html[data-skin-variant="blood"] .toggle-btn.on,
+html[data-skin-variant="blood"] .vox-box-tools .is-active,
+html[data-skin-variant="blood"] .crp-bar-tab.active{
+  background:linear-gradient(180deg,#e45860 0%,#c62f38 58%,#9f222b 100%)!important;
+  color:#fff!important;
+  border-color:var(--srs-blood-deep)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 0 0 2px rgba(198,47,56,.11),0 0 9px rgba(198,47,56,.12)!important;
+}
+html[data-skin-variant="blood"] input[type="checkbox"],
+html[data-skin-variant="blood"] input[type="radio"]{accent-color:var(--srs-blood)!important;}
+html[data-skin-variant="blood"] input:focus,
+html[data-skin-variant="blood"] select:focus,
+html[data-skin-variant="blood"] textarea:focus,
+html[data-skin-variant="blood"] .notes-editor:focus{
+  border-color:var(--srs-blood)!important;
+  box-shadow:0 0 0 3px rgba(198,47,56,.14)!important;
+}
+html[data-skin-variant="blood"] .progression-line.selected{
+  border-color:var(--srs-blood)!important;
+  box-shadow:0 0 0 2px rgba(198,47,56,.13),0 0 10px rgba(198,47,56,.08)!important;
+}
+
+/* Editor/event fills: MIDI, Lead/Bass, Beat Maker and Track Master selections. */
+html[data-skin-variant="blood"] .crp-midi-cell.on,
+html[data-skin-variant="blood"] .lead-cell.on,
+html[data-skin-variant="blood"] .lead-note-block,
+html[data-skin-variant="blood"] .crp-step.active,
+html[data-skin-variant="blood"] .vox-drum-cell.on{
+  background:linear-gradient(180deg,#e65a62 0%,#c72f38 56%,#98202a 100%)!important;
+  color:#fff!important;
+  border-color:#ef7b81!important;
+  box-shadow:inset 0 0 0 1px rgba(255,221,223,.44),0 0 0 1px #7f1820,0 0 11px rgba(198,47,56,.28)!important;
+}
+html[data-skin-variant="blood"] .crp-midi-cell.on{
+  background-image:repeating-linear-gradient(to right,transparent 0,transparent calc(var(--midi-beat-px,24px) - 1px),rgba(255,220,222,.22) calc(var(--midi-beat-px,24px) - 1px),rgba(255,220,222,.22) var(--midi-beat-px,24px)),linear-gradient(180deg,#e65a62 0%,#c72f38 56%,#98202a 100%)!important;
+}
+html[data-skin-variant="blood"] .crp-step.active::after{background:#5d1016!important;}
+html[data-skin-variant="blood"] .crp-midi-duration-label{
+  background:linear-gradient(180deg,#f06d74,#b82731)!important;
+  color:#fff!important;
+  border-color:#8f1d25!important;
+}
+html[data-skin-variant="blood"] .vox-event.is-selected,
+html[data-skin-variant="blood"] .vox-instrument-event.is-selected,
+html[data-skin-variant="blood"] .vox-drum-event.is-selected{
+  border-color:#ee646b!important;
+  box-shadow:0 0 0 2px rgba(198,47,56,.30),0 0 14px rgba(198,47,56,.22),0 6px 18px rgba(0,0,0,.30)!important;
+}
+html[data-skin-variant="blood"] .vox-instrument-event.is-selected .vox-inst-handle{background:rgba(198,47,56,.34)!important;}
+html[data-skin-variant="blood"] .vox-box-page.multi-select-mode .vox-event.is-selected,
+html[data-skin-variant="blood"] .vox-box-page.multi-select-mode .vox-instrument-event.is-selected{
+  box-shadow:0 0 0 3px rgba(198,47,56,.38),0 0 14px rgba(198,47,56,.20),0 6px 18px rgba(0,0,0,.30)!important;
+}
+
+/* Light Blood keeps Rider Light's readable editor canvases but makes the red
+   cells and red trim the visual pop instead of green. */
+html[data-skin-choice="rider-blood-light"] .crp-midi-roll-wrap,
+html[data-skin-choice="rider-blood-light"] .lead-grid-wrap,
+html[data-skin-choice="rider-blood-light"] .crp-grid-wrap{
+  border-color:rgba(198,47,56,.30)!important;
+  box-shadow:0 0 0 1px rgba(198,47,56,.08),0 0 10px rgba(198,47,56,.055)!important;
+}
+
+/* The chrome PRO word changes from green to blood red while CHORD/RIDER keep
+   their original pink/blue chrome. SRP swaps to a color-matched PNG in skins.js. */
+html[data-skin-variant="blood"] .crp-word-green{
+  color:#ef3948!important;
+  background-image:linear-gradient(180deg,#fff 0%,#ffd0d5 10%,#ef3e4c 28%,#fff 43%,#b70f21 59%,#ff7b86 73%,#720612 100%)!important;
 }
