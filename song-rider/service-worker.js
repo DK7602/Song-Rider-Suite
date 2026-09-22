@@ -1,5 +1,7 @@
-const CACHE = 'song-rider-suite-v3.3.60-srp-gdocs-print-layout';
+const CACHE = 'song-rider-suite-v3.3.68-skins-srp';
 const ASSETS = [
+  '../skins.css',
+  '../skins.js',
   './vocal-autotune-worklet.js',
   './song-rider-pro-wordmark-hq.png',
   './baby-daw-button-hq.png',
