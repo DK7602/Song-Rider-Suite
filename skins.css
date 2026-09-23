@@ -1867,61 +1867,39 @@ html[data-skin="black-label"][data-skin-choice="black-label"] .card{
 }
 
 
-/* v3.3.97: add subtle light diamond background to Rider Light + Black Label Light */
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .panel,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .auth-box,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .project-item,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .progression-line,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .composer-panel,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .save-panel,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .notes-panel,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .account-panel,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .project-browser-window,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .part-manager,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .part-modal-card,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .lead-part-editor,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .vocal-panel,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .vocal-part-editor,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .vocal-editor-card,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .vocal-transcript-panel,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .crp-beat-panel,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .vox-box-shell,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .vox-inspector,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .panel-body,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .crp-beat-head,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .crp-beat-foot,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .crp-randomizer,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .sheet,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .fullSectionCard,
-html[data-skin="rider-light"][data-skin-choice="rider-light"] .card,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .panel,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .auth-box,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .project-item,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .progression-line,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .composer-panel,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .save-panel,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .notes-panel,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .account-panel,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .project-browser-window,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .part-manager,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .part-modal-card,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .lead-part-editor,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .vocal-panel,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .vocal-part-editor,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .vocal-editor-card,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .vocal-transcript-panel,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .crp-beat-panel,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .vox-box-shell,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .vox-inspector,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .panel-body,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .crp-beat-head,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .crp-beat-foot,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .crp-randomizer,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .sheet,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .fullSectionCard,
-html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .card{
+/* =========================================================
+   v3.3.98 — Studio Pastel subtle pattern background
+   Visual-only change: keep Studio Pastel skin colors/controls intact and
+   place the supplied subtle light geometric artwork on window/panel backgrounds.
+   ========================================================= */
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .auth-box,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .project-item,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .progression-line,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .composer-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .save-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .notes-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .account-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .project-browser-window,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .part-manager,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .part-modal-card,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .lead-part-editor,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vocal-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vocal-part-editor,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vocal-editor-card,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vocal-transcript-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .crp-beat-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vox-box-shell,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vox-inspector,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .panel-body,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .crp-beat-head,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .crp-beat-foot,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .crp-randomizer,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .sheet,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .fullSectionCard,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .card{
   background-color:var(--srs-skin-panel)!important;
-  background-image:linear-gradient(rgba(255,255,255,.14),rgba(255,255,255,.14)),url('./assets/light-diamond-pattern.jpg')!important;
+  background-image:linear-gradient(rgba(255,255,255,.08),rgba(255,255,255,.08)),url('./assets/studio-pastel-pattern.jpg')!important;
   background-size:auto,430px auto!important;
   background-repeat:repeat,repeat!important;
   background-position:0 0,center top!important;
