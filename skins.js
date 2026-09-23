@@ -92,10 +92,8 @@
       const kind=el.dataset.iconKind||'chord';
       el.innerHTML=getModeMarkup(kind, skin);
     });
-    document.querySelectorAll('.srs-track-master-icon').forEach(el=>{
-      const kind=el.dataset.iconKind||'track';
-      el.innerHTML=getModeMarkup(kind, skin);
-    });
+    // Celtic Gold keeps the Track Master button as a clean 24-karat gold button with no icon.
+    document.querySelectorAll('.srs-track-master-icon').forEach(el=>el.remove());
   }
   function addModeIcons(){
 

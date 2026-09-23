@@ -1,0 +1,14 @@
+Song Rider Suite v3.3.76 - Celtic Gold Beauty Refresh
+
+Included in this upload-only package:
+- skins.css
+- skins.js
+- assets/celtic-frame-light.svg
+- assets/celtic-frame-dark.svg
+
+What changed:
+- Celtic Gold and Celtic Gold Dark mode buttons now use true icon-only 24-karat PNG knot icons (no gold tile behind them).
+- Track Master button remains a clean 24-karat gold bar with no icon.
+- Workspace mode text styling cleaned up for CRP / BD / SRP buttons.
+- Straight corner lines replaced with Celtic knot frame overlays for panels, buttons, windows, and blank spaces.
+- Dark Celtic Gold refreshed so buttons, chord/note cells, and step cells use gold/cream styling.
