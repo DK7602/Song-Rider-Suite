@@ -78,9 +78,9 @@
     if(celtic){
       const map = {
         chord:'celtic-mode-chord.png',
-        daw:'celtic-mode-daw.png',
-        song:'celtic-mode-chord.png',
-        track:'celtic-mode-chord.png'
+        daw:'celtic-mode-song.png',
+        song:'celtic-mode-daw.png',
+        track:'celtic-mode-track.png'
       };
       const file = map[kind] || map.chord;
       return `<img class="srs-celtic-mode-icon-image srs-celtic-mode-icon-image-${kind}" src="${getSkinAssetUrl(file)}" alt="" decoding="async" loading="eager">`;
@@ -127,6 +127,12 @@
   function closeModal(){ const m=$('#srsSkinModal'); if(!m)return; m.hidden=true; document.body.classList.remove('srs-skin-modal-open'); }
   function addGear(){
     if($('#srsSkinSettingsBtn'))return;
+    const loginBox=$('#authForms .auth-box');
+    if(loginBox){
+      loginBox.classList.add('srs-skin-gear-host');
+      const b=document.createElement('button'); b.id='srsSkinSettingsBtn'; b.className='srs-skin-gear'; b.type='button'; b.title='Appearance / Skins'; b.setAttribute('aria-label','Appearance and skins'); b.innerHTML='<span aria-hidden="true">⚙</span>';
+      loginBox.appendChild(b); b.addEventListener('click',openModal); return;
+    }
     const rootPanel=$('#accountPanel');
     if(rootPanel){
       const b=document.createElement('button'); b.id='srsSkinSettingsBtn'; b.className='srs-skin-gear'; b.type='button'; b.title='Appearance / Skins'; b.setAttribute('aria-label','Appearance and skins'); b.innerHTML='<span aria-hidden="true">⚙</span>';

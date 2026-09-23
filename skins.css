@@ -2014,3 +2014,45 @@ html[data-skin="celtic-gold-dark"] .vox-box-header{
   html[data-skin="celtic-gold"] .auth-card::after,
   html[data-skin="celtic-gold-dark"] .auth-card::after{background-size:18px 18px,18px 18px!important}
 }
+
+
+/* v3.3.79 fixes: restore skin settings gear to the top-right of the Log in box */
+#authForms .auth-box{position:relative}
+#authForms .auth-box.srs-skin-gear-host{padding-top:18px}
+#authForms .auth-box .srs-skin-gear{right:12px;top:12px;left:auto;bottom:auto;z-index:7}
+#authForms .auth-box .srs-skin-gear span{display:block;transform:translateY(1px)}
+
+/* Ensure Celtic mode art has enough breathing room and never clips */
+html[data-skin="celtic-gold"] .srs-theme-mode-icon,
+html[data-skin="celtic-gold-dark"] .srs-theme-mode-icon{flex:0 0 64px!important;width:64px!important;height:64px!important}
+html[data-skin="celtic-gold"] .srs-theme-mode-icon img,
+html[data-skin="celtic-gold-dark"] .srs-theme-mode-icon img{object-fit:contain!important}
+
+/* Keep decorative Celtic corners subtle and safely out of the way */
+html[data-skin="celtic-gold"] .workspace-mode-btn::after,
+html[data-skin="celtic-gold"] .track-master-gold-btn::after,
+html[data-skin="celtic-gold"] .panel::after,
+html[data-skin="celtic-gold"] .auth-box::after,
+html[data-skin="celtic-gold"] .project-item::after,
+html[data-skin="celtic-gold"] .progression-line::after,
+html[data-skin="celtic-gold"] .lead-part-editor::after,
+html[data-skin="celtic-gold"] .crp-beat-panel::after,
+html[data-skin="celtic-gold"] .vox-inspector::after,
+html[data-skin="celtic-gold"] .vox-box-header::after,
+html[data-skin="celtic-gold"] .vox-box-tools::after,
+html[data-skin="celtic-gold"] .vox-floating-transport::after,
+html[data-skin="celtic-gold-dark"] .workspace-mode-btn::after,
+html[data-skin="celtic-gold-dark"] .track-master-gold-btn::after,
+html[data-skin="celtic-gold-dark"] .panel::after,
+html[data-skin="celtic-gold-dark"] .auth-box::after,
+html[data-skin="celtic-gold-dark"] .project-item::after,
+html[data-skin="celtic-gold-dark"] .progression-line::after,
+html[data-skin="celtic-gold-dark"] .lead-part-editor::after,
+html[data-skin="celtic-gold-dark"] .crp-beat-panel::after,
+html[data-skin="celtic-gold-dark"] .vox-inspector::after,
+html[data-skin="celtic-gold-dark"] .vox-box-header::after,
+html[data-skin="celtic-gold-dark"] .vox-box-tools::after,
+html[data-skin="celtic-gold-dark"] .vox-floating-transport::after{
+  inset:8px!important;
+  opacity:.58!important;
+}
