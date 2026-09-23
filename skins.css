@@ -1438,3 +1438,85 @@ body[data-skin-choice="royal-wave"] .vox-drum-cell.on{
   border-color:#B96500!important;
   opacity:1!important;
 }
+
+
+/* =========================================================
+   v3.3.88 — CANDY POP ONLY
+   Hard final override so active cells become SOLID YELLOW.
+   This covers both data-skin and data-skin-choice, plus body/html.
+   ========================================================= */
+html[data-skin="candy-pop"] .crp-midi-cell.on,
+html[data-skin-choice="candy-pop"] .crp-midi-cell.on,
+body[data-skin="candy-pop"] .crp-midi-cell.on,
+body[data-skin-choice="candy-pop"] .crp-midi-cell.on,
+html[data-skin="candy-pop"] .crp-midi-cell.on.playing,
+html[data-skin-choice="candy-pop"] .crp-midi-cell.on.playing,
+body[data-skin="candy-pop"] .crp-midi-cell.on.playing,
+body[data-skin-choice="candy-pop"] .crp-midi-cell.on.playing,
+html[data-skin="candy-pop"] .crp-midi-cell.playing.on,
+html[data-skin-choice="candy-pop"] .crp-midi-cell.playing.on,
+body[data-skin="candy-pop"] .crp-midi-cell.playing.on,
+body[data-skin-choice="candy-pop"] .crp-midi-cell.playing.on{
+  background:#FFF600!important;
+  background-color:#FFF600!important;
+  background-image:none!important;
+  color:#2B2900!important;
+  border-color:#B8B000!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,210,.88)!important;
+  opacity:1!important;
+}
+
+html[data-skin="candy-pop"] .lead-cell.on,
+html[data-skin-choice="candy-pop"] .lead-cell.on,
+body[data-skin="candy-pop"] .lead-cell.on,
+body[data-skin-choice="candy-pop"] .lead-cell.on,
+html[data-skin="candy-pop"] .lead-note-block,
+html[data-skin-choice="candy-pop"] .lead-note-block,
+body[data-skin="candy-pop"] .lead-note-block,
+body[data-skin-choice="candy-pop"] .lead-note-block,
+html[data-skin="candy-pop"] .lead-note-block.playing,
+html[data-skin-choice="candy-pop"] .lead-note-block.playing,
+body[data-skin="candy-pop"] .lead-note-block.playing,
+body[data-skin-choice="candy-pop"] .lead-note-block.playing{
+  background:#FFF600!important;
+  background-color:#FFF600!important;
+  background-image:none!important;
+  color:#2B2900!important;
+  border-color:#B8B000!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,210,.88)!important;
+  opacity:1!important;
+}
+
+html[data-skin="candy-pop"] .lead-note-block-fill,
+html[data-skin-choice="candy-pop"] .lead-note-block-fill,
+body[data-skin="candy-pop"] .lead-note-block-fill,
+body[data-skin-choice="candy-pop"] .lead-note-block-fill{
+  background:#FFF600!important;
+  background-color:#FFF600!important;
+  background-image:none!important;
+  opacity:1!important;
+}
+
+html[data-skin="candy-pop"] .crp-step.active,
+html[data-skin-choice="candy-pop"] .crp-step.active,
+body[data-skin="candy-pop"] .crp-step.active,
+body[data-skin-choice="candy-pop"] .crp-step.active,
+html[data-skin="candy-pop"] .vox-drum-cell.on,
+html[data-skin-choice="candy-pop"] .vox-drum-cell.on,
+body[data-skin="candy-pop"] .vox-drum-cell.on,
+body[data-skin-choice="candy-pop"] .vox-drum-cell.on{
+  background:#FFF600!important;
+  background-color:#FFF600!important;
+  background-image:none!important;
+  color:#2B2900!important;
+  border-color:#B8B000!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,210,.88)!important;
+  opacity:1!important;
+}
+
+html[data-skin="candy-pop"] .crp-step.active::after,
+html[data-skin-choice="candy-pop"] .crp-step.active::after,
+body[data-skin="candy-pop"] .crp-step.active::after,
+body[data-skin-choice="candy-pop"] .crp-step.active::after{
+  background:#6F6A00!important;
+}
