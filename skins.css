@@ -1779,3 +1779,24 @@ html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #crpBeatGrid
 html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #crpBeatGrid button.crp-step.active::after{
   background:#650008!important;
 }
+
+/* =========================================================
+   v3.3.93 — Rider Blood Light Baby DAW artwork preservation
+   Keep the selected Baby DAW card red, but do not tint/overlay
+   the gold skull, microphone, black details, or white lettering.
+   ========================================================= */
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art::after,
+html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  box-shadow:none!important;
+}
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art img,
+html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art img{
+  content:url('./assets/baby-daw-button-hq-rider-blood-light-active.png')!important;
+  mix-blend-mode:normal!important;
+  opacity:1!important;
+  filter:none!important;
+  background:transparent!important;
+}
