@@ -1281,3 +1281,160 @@ html[data-skin="candy-pop"] .vox-drum-cell.on{
   border-color:#B6AF00!important;
   opacity:1!important;
 }
+
+/* =========================================================
+   v3.3.87 — ROYAL WAVE ONLY
+   Exact palette supplied by user:
+   Royal blue #005CF7 / baby blue #98D6FF / orange #FF9700 / cream #EEE8C6
+   ========================================================= */
+
+/* Make ordinary Royal Wave controls truly ROYAL BLUE instead of baby blue.
+   Keep the permanent gold Track Master/skin controls untouched. */
+html[data-skin="royal-wave"] button:not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close),
+html[data-skin-choice="royal-wave"] button:not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close),
+body[data-skin="royal-wave"] button:not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close),
+body[data-skin-choice="royal-wave"] button:not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close){
+  background:#005CF7!important;
+  background-color:#005CF7!important;
+  background-image:none!important;
+  color:#EEE8C6!important;
+  border-color:#98D6FF!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18)!important;
+}
+
+/* Selected/toggled buttons stay royal blue, but get a clear orange state ring.
+   The actual NOTE/CHORD/BEAT CELLS below are the elements that fill orange. */
+html[data-skin="royal-wave"] .seg.active,
+html[data-skin-choice="royal-wave"] .seg.active,
+html[data-skin="royal-wave"] .toggle-btn.on,
+html[data-skin-choice="royal-wave"] .toggle-btn.on,
+html[data-skin="royal-wave"] button[aria-pressed="true"]:not(.srs-skin-choice),
+html[data-skin-choice="royal-wave"] button[aria-pressed="true"]:not(.srs-skin-choice),
+html[data-skin="royal-wave"] .workspace-mode-btn.active,
+html[data-skin-choice="royal-wave"] .workspace-mode-btn.active,
+html[data-skin="royal-wave"] .project-browser-tab.active,
+html[data-skin-choice="royal-wave"] .project-browser-tab.active,
+html[data-skin="royal-wave"] .part-pill.active,
+html[data-skin-choice="royal-wave"] .part-pill.active{
+  background:#005CF7!important;
+  background-color:#005CF7!important;
+  background-image:none!important;
+  color:#EEE8C6!important;
+  border-color:#FF9700!important;
+  box-shadow:inset 0 0 0 1px #FF9700,0 0 0 1px rgba(255,151,0,.25)!important;
+}
+
+/* Workspace tiles use the supplied four-color palette without reverting to the
+   old dark/navy treatment. */
+html[data-skin="royal-wave"] .workspace-mode-switch,
+html[data-skin-choice="royal-wave"] .workspace-mode-switch{
+  background:#005CF7!important;
+  border-bottom-color:#FF9700!important;
+}
+html[data-skin="royal-wave"] .workspace-mode-btn,
+html[data-skin-choice="royal-wave"] .workspace-mode-btn{
+  background:#005CF7!important;
+  color:#EEE8C6!important;
+  border-color:#98D6FF!important;
+}
+html[data-skin="royal-wave"] .workspace-mode-btn.active,
+html[data-skin-choice="royal-wave"] .workspace-mode-btn.active{
+  border-color:#FF9700!important;
+  box-shadow:inset 0 0 0 1px #FF9700,0 0 18px rgba(255,151,0,.28)!important;
+}
+html[data-skin="royal-wave"] .workspace-mode-btn .mode-copy strong,
+html[data-skin-choice="royal-wave"] .workspace-mode-btn .mode-copy strong,
+html[data-skin="royal-wave"] .workspace-mode-btn .mode-copy small,
+html[data-skin-choice="royal-wave"] .workspace-mode-btn .mode-copy small{
+  color:#EEE8C6!important;
+}
+
+/* Inputs stay cream so Royal Wave retains all four supplied colors. */
+html[data-skin="royal-wave"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+html[data-skin-choice="royal-wave"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+html[data-skin="royal-wave"] select,
+html[data-skin-choice="royal-wave"] select,
+html[data-skin="royal-wave"] textarea,
+html[data-skin-choice="royal-wave"] textarea{
+  background:#EEE8C6!important;
+  background-color:#EEE8C6!important;
+  color:#12325A!important;
+  border-color:#98D6FF!important;
+}
+
+/* CRITICAL FIX: an active CRP MIDI chord/note cell is a SOLID ORANGE CELL.
+   Do not leave the baby-blue base showing through. */
+html[data-skin="royal-wave"] .crp-midi-cell.on,
+html[data-skin-choice="royal-wave"] .crp-midi-cell.on,
+body[data-skin="royal-wave"] .crp-midi-cell.on,
+body[data-skin-choice="royal-wave"] .crp-midi-cell.on,
+html[data-skin="royal-wave"] .crp-midi-cell.on.playing,
+html[data-skin-choice="royal-wave"] .crp-midi-cell.on.playing{
+  background:#FF9700!important;
+  background-color:#FF9700!important;
+  background-image:none!important;
+  color:#211300!important;
+  border-color:#B96500!important;
+  box-shadow:inset 0 0 0 1px rgba(255,235,195,.55)!important;
+  opacity:1!important;
+}
+
+/* Lead/Bass editor: every placed note block/cell is solid orange. */
+html[data-skin="royal-wave"] .lead-cell.on,
+html[data-skin-choice="royal-wave"] .lead-cell.on,
+body[data-skin="royal-wave"] .lead-cell.on,
+body[data-skin-choice="royal-wave"] .lead-cell.on,
+html[data-skin="royal-wave"] .lead-note-block,
+html[data-skin-choice="royal-wave"] .lead-note-block,
+body[data-skin="royal-wave"] .lead-note-block,
+body[data-skin-choice="royal-wave"] .lead-note-block{
+  background:#FF9700!important;
+  background-color:#FF9700!important;
+  background-image:none!important;
+  color:#211300!important;
+  border-color:#B96500!important;
+  box-shadow:inset 0 0 0 1px rgba(255,235,195,.55)!important;
+  opacity:1!important;
+}
+html[data-skin="royal-wave"] .lead-note-block-fill,
+html[data-skin-choice="royal-wave"] .lead-note-block-fill,
+body[data-skin="royal-wave"] .lead-note-block-fill,
+body[data-skin-choice="royal-wave"] .lead-note-block-fill{
+  background:#FF9700!important;
+  background-color:#FF9700!important;
+  background-image:none!important;
+  opacity:1!important;
+}
+
+/* Beat Maker: the ENTIRE selected square turns orange, not just the outline/dot. */
+html[data-skin="royal-wave"] .crp-step.active,
+html[data-skin-choice="royal-wave"] .crp-step.active,
+body[data-skin="royal-wave"] .crp-step.active,
+body[data-skin-choice="royal-wave"] .crp-step.active{
+  background:#FF9700!important;
+  background-color:#FF9700!important;
+  background-image:none!important;
+  color:#211300!important;
+  border-color:#B96500!important;
+  box-shadow:inset 0 0 0 1px rgba(255,235,195,.55)!important;
+  opacity:1!important;
+}
+html[data-skin="royal-wave"] .crp-step.active::after,
+html[data-skin-choice="royal-wave"] .crp-step.active::after,
+body[data-skin="royal-wave"] .crp-step.active::after,
+body[data-skin-choice="royal-wave"] .crp-step.active::after{
+  background:#6B3900!important;
+}
+
+/* Track Master drum cells, where the same drum pattern is rendered. */
+html[data-skin="royal-wave"] .vox-drum-cell.on,
+html[data-skin-choice="royal-wave"] .vox-drum-cell.on,
+body[data-skin="royal-wave"] .vox-drum-cell.on,
+body[data-skin-choice="royal-wave"] .vox-drum-cell.on{
+  background:#FF9700!important;
+  background-color:#FF9700!important;
+  background-image:none!important;
+  color:#211300!important;
+  border-color:#B96500!important;
+  opacity:1!important;
+}

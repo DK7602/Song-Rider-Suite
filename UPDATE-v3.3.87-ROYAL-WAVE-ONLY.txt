@@ -1,0 +1,18 @@
+Song Rider Suite v3.3.87 — Royal Wave only
+
+Exact supplied palette:
+- Royal blue #005CF7
+- Baby blue #98D6FF
+- Orange #FF9700
+- Cream #EEE8C6
+
+Fixes:
+1. Active CRP MIDI chord/note cells now fill completely orange.
+2. Active Lead/Bass notes/blocks now fill completely orange.
+3. Active Beat Maker steps now fill completely orange.
+4. Track Master drum on-cells are orange as well.
+5. Ordinary Royal Wave buttons now use the supplied royal blue instead of baby blue.
+6. Selected/toggled buttons remain royal blue with an orange state ring.
+7. Added a new CSS cache-buster in both root and SRP pages plus a new service-worker cache name.
+
+No playback, save, sync, timing, MIDI-duration, or project logic changed.
