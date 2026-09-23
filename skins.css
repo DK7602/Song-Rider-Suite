@@ -1975,3 +1975,63 @@ html[data-skin-choice="rider-blood"] #babyDawModeBtn.active .baby-exact-art img{
   filter:none!important;
   background:transparent!important;
 }
+
+/* v3.3.102: restore light diamond background to Rider Light + Black Label Light */
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .auth-box,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .project-item,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .progression-line,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .composer-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .save-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .notes-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .account-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .project-browser-window,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .part-manager,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .part-modal-card,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .lead-part-editor,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .vocal-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .vocal-part-editor,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .vocal-editor-card,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .vocal-transcript-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .crp-beat-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .vox-box-shell,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .vox-inspector,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .panel-body,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .crp-beat-head,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .crp-beat-foot,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .crp-randomizer,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .sheet,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .fullSectionCard,
+html[data-skin="rider-light"][data-skin-choice="rider-light"] .card,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .panel,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .auth-box,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .project-item,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .progression-line,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .composer-panel,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .save-panel,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .notes-panel,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .account-panel,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .project-browser-window,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .part-manager,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .part-modal-card,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .lead-part-editor,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .vocal-panel,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .vocal-part-editor,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .vocal-editor-card,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .vocal-transcript-panel,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .crp-beat-panel,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .vox-box-shell,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .vox-inspector,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .panel-body,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .crp-beat-head,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .crp-beat-foot,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .crp-randomizer,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .sheet,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .fullSectionCard,
+html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .card{
+  background-color:var(--srs-skin-panel)!important;
+  background-image:linear-gradient(rgba(255,255,255,.14),rgba(255,255,255,.14)),url('./assets/light-diamond-pattern.jpg')!important;
+  background-size:auto,430px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+}
