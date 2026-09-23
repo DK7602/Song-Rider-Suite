@@ -2035,3 +2035,38 @@ html[data-skin="black-label-light"][data-skin-choice="black-label-light"] .card{
   background-repeat:repeat,repeat!important;
   background-position:0 0,center top!important;
 }
+
+/* v3.3.103: add supplied cream swirl pattern to Studio Pastel backgrounds,
+   while keeping Rider Light / Black Label Light background treatment intact. */
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .auth-box,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .project-item,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .progression-line,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .composer-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .save-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .notes-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .account-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .project-browser-window,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .part-manager,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .part-modal-card,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .lead-part-editor,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vocal-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vocal-part-editor,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vocal-editor-card,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vocal-transcript-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .crp-beat-panel,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vox-box-shell,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vox-inspector,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .panel-body,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .crp-beat-head,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .crp-beat-foot,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .crp-randomizer,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .sheet,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .fullSectionCard,
+html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .card{
+  background-color:var(--srs-skin-panel)!important;
+  background-image:linear-gradient(rgba(255,250,244,.18),rgba(255,250,244,.18)),url('./assets/studio-pastel-pattern.jpg')!important;
+  background-size:auto,700px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+}
