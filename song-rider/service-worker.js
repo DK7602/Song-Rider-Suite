@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.91-active-cell-root-fix-srp';
+const CACHE = 'song-rider-suite-v3.3.94-dark-gold-pattern-srp';
 const ASSETS = [
   '../skins.css',
   '../skins.js',
@@ -7,6 +7,7 @@ const ASSETS = [
   './song-rider-pro-wordmark-blood.png',
   './baby-daw-button-hq.png',
   '../assets/rider-blood-light-pattern.png',
+  '../assets/rider-dark-gold-pattern.jpg',
 './assets/song-rider-pro-wordmark-hq.png',
   './assets/baby-daw-button-hq.png',
   './baby-daw-mic.png',
