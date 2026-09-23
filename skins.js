@@ -111,10 +111,7 @@
         const copy=document.createElement('span'); copy.className='mode-copy srs-theme-mode-copy'; copy.innerHTML='<strong>Baby DAW</strong><small>Production + Parts</small>'; btn.appendChild(copy);
       }
     });
-    document.querySelectorAll('.track-master-gold-btn').forEach(btn=>{
-      if(btn.querySelector('.srs-track-master-icon'))return;
-      const art=document.createElement('span'); art.className='srs-track-master-icon'; art.dataset.iconKind='track'; art.innerHTML=getModeMarkup('track', readSkin()); btn.prepend(art);
-    });
+    document.querySelectorAll('.track-master-gold-btn .srs-track-master-icon').forEach(el=>el.remove());
   }
   function buildModal(){
     if($('#srsSkinModal'))return;
