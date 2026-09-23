@@ -2949,6 +2949,54 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
 @media(max-width:700px){html.crp-integrated .track-master-nav-row{margin:5px 0 8px;padding:0 10px}html.crp-integrated .track-master-gold-btn{width:100%;max-width:none;min-height:38px;padding:7px 18px;border-radius:12px;font-size:.78rem}}
 </style>
   <link rel="stylesheet" href="../skins.css?v=3.3.100-RIDER-BLOOD-ACTIVE-MODES">
+
+  <!-- Smooth CRP / Baby DAW / SRP workspace transitions (skin-independent) -->
+  <style id="srsWorkspaceTransitionStyles">
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation-duration: 165ms;
+      animation-timing-function: cubic-bezier(.22,.72,.2,1);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      html.srs-workspace-enter body {
+        animation: srsWorkspaceEnter 150ms cubic-bezier(.22,.72,.2,1) both;
+      }
+      body.srs-workspace-leave {
+        pointer-events: none;
+        animation: srsWorkspaceLeave 72ms cubic-bezier(.4,0,.6,1) both;
+      }
+      body.srs-workspace-return {
+        animation: srsWorkspaceReturn 145ms cubic-bezier(.22,.72,.2,1) both;
+      }
+      @keyframes srsWorkspaceLeave {
+        from { opacity: 1; }
+        to   { opacity: .64; }
+      }
+      @keyframes srsWorkspaceEnter {
+        from { opacity: .64; }
+        to   { opacity: 1; }
+      }
+      @keyframes srsWorkspaceReturn {
+        from { opacity: .64; }
+        to   { opacity: 1; }
+      }
+    }
+  </style>
+  <script id="srsWorkspaceTransitionBoot">
+    (()=>{
+      try {
+        if (sessionStorage.getItem('srs-workspace-nav-transition') === '1') {
+          sessionStorage.removeItem('srs-workspace-nav-transition');
+          document.documentElement.classList.add('srs-workspace-enter');
+          window.addEventListener('pageshow', () => {
+            window.setTimeout(() => document.documentElement.classList.remove('srs-workspace-enter'), 180);
+          }, { once:true });
+        }
+      } catch (_) {}
+    })();
+  </script>
+
 </head>
 
 <body>
@@ -3400,6 +3448,97 @@ html.crp-integrated #srpHeaderAutoScroll.on{background:linear-gradient(180deg,#f
  html.crp-integrated #srpHeaderAutoScroll,html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedPlayBtn,html.crp-integrated #srpLinkedStopBtn{width:40px!important;min-width:40px!important;height:38px!important;}
 }
 </style>
+
+  <script id="srsWorkspaceTransitionController">
+    (()=>{
+      const SELECTOR = '.workspace-mode-btn';
+      const REDUCED = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let busy = false;
+
+      function isCurrent(el){
+        return el.classList.contains('active') || el.getAttribute('aria-current') === 'page' || el.getAttribute('aria-pressed') === 'true';
+      }
+
+      function finishSameDocumentTransition(el){
+        // Also set the hand-off flag here: the main-page Song Rider button may navigate
+        // from inside the app's existing click handler, while CRP <-> Baby DAW stays in-page.
+        try { sessionStorage.setItem('srs-workspace-nav-transition', '1'); } catch (_) {}
+        window.setTimeout(() => {
+          try { sessionStorage.removeItem('srs-workspace-nav-transition'); } catch (_) {}
+        }, 320);
+
+        // Let the app's existing handler swap CRP/Baby DAW first, while the old view is faded.
+        el.dataset.srsTransitionPass = '1';
+        el.click();
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          document.body.classList.remove('srs-workspace-leave');
+          document.body.classList.add('srs-workspace-return');
+          window.setTimeout(() => {
+            document.body.classList.remove('srs-workspace-return');
+            busy = false;
+          }, 175);
+        }));
+      }
+
+      document.addEventListener('click', (event) => {
+        const el = event.target.closest?.(SELECTOR);
+        if (!el) return;
+
+        if (el.dataset.srsTransitionPass === '1') {
+          delete el.dataset.srsTransitionPass;
+          return;
+        }
+        if (isCurrent(el) || busy || REDUCED()) return;
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+        const href = el.tagName === 'A' ? el.href : '';
+
+        // Modern Chrome/Android: use the browser's native View Transition for a true
+        // cross-fade instead of hiding/repainting the workspace abruptly. Anchors can
+        // use cross-document transitions automatically via @view-transition above.
+        if (document.startViewTransition && !href) {
+          busy = true;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          el.dataset.srsTransitionPass = '1';
+          let transition;
+          try {
+            transition = document.startViewTransition(() => el.click());
+          } catch (_) {
+            transition = null;
+            el.click();
+          }
+          if (transition?.finished) {
+            transition.finished.catch(()=>{}).finally(() => { busy = false; });
+          } else {
+            window.setTimeout(() => { busy = false; }, 180);
+          }
+          return;
+        }
+
+        // Fallback for browsers without View Transitions.
+        busy = true;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        document.body.classList.add('srs-workspace-leave');
+        window.setTimeout(() => {
+          if (href) {
+            try { sessionStorage.setItem('srs-workspace-nav-transition', '1'); } catch (_) {}
+            window.location.assign(href);
+            return;
+          }
+          finishSameDocumentTransition(el);
+        }, 74);
+      }, true);
+
+      // Never leave the interface faded if a navigation is cancelled/restored from bfcache.
+      window.addEventListener('pageshow', () => {
+        document.body?.classList.remove('srs-workspace-leave');
+        busy = false;
+      });
+    })();
+  </script>
+
 </body>
 
 <style id="srpLightSkinWindowParityV3383">

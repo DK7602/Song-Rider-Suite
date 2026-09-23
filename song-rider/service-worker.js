@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.100-rider-blood-active-modes-srp';
+const CACHE = 'song-rider-suite-v3.3.101-smooth-workspace-transitions-srp';
 const ASSETS = [
   '../skins.css',
   '../skins.js',
