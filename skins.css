@@ -1738,3 +1738,44 @@ html[data-skin="candy-pop"] .lead-note-block-fill{background:transparent!importa
 html[data-skin="candy-pop"] .crp-step.active::after{content:none!important;display:none!important;}
 html[data-skin="candy-pop"] .crp-step:hover:not(.active){background:#FFFCEF!important;}
 html[data-skin="candy-pop"] .crp-step.active:hover{background:#FFF600!important;}
+
+/* =========================================================
+   v3.3.92 — RIDER BLOOD LIGHT MIDI + BEAT ACTIVE CELL FIX
+   Scope is intentionally narrow: only the active cells in CRP MIDI View and
+   Beat Maker for Rider Blood Light. No other skin surfaces are changed.
+
+   Rider Blood Light's general dark action-button rule has intentionally high
+   specificity. MIDI cells and Beat Maker steps are also <button> elements, so
+   that rule could win even when the cell carried its active/on class. The IDs
+   below raise specificity only inside the two editor grids so active cells can
+   render as a full solid blood red while inactive cells keep their current look.
+   ========================================================= */
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #progression button.crp-midi-cell.on,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #progression button.crp-midi-cell.on.playing{
+  background:#E60000!important;
+  background-color:#E60000!important;
+  background-image:none!important;
+  color:#FFF!important;
+  border-color:#FF5A5A!important;
+  opacity:1!important;
+  box-shadow:inset 0 0 0 2px rgba(255,214,214,.72),0 0 0 1px #9F0000!important;
+}
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #progression button.crp-midi-cell.on:hover{
+  background:#E60000!important;
+  background-color:#E60000!important;
+  background-image:none!important;
+}
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #crpBeatGrid button.crp-step.active,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #crpBeatGrid button.crp-step.active.playing,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #crpBeatGrid button.crp-step.active:hover{
+  background:#E60000!important;
+  background-color:#E60000!important;
+  background-image:none!important;
+  color:#FFF!important;
+  border-color:#FF5A5A!important;
+  opacity:1!important;
+  box-shadow:inset 0 0 0 2px rgba(255,214,214,.72),0 0 0 1px #9F0000!important;
+}
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #crpBeatGrid button.crp-step.active::after{
+  background:#650008!important;
+}
