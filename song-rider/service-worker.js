@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.90-royal-candy-rebuild-srp';
+const CACHE = 'song-rider-suite-v3.3.91-active-cell-root-fix-srp';
 const ASSETS = [
   '../skins.css',
   '../skins.js',
