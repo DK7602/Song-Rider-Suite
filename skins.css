@@ -1934,3 +1934,44 @@ html[data-skin-choice="rider-blood"] .card{
   background-repeat:repeat,repeat!important;
   background-position:0 0,center top!important;
 }
+
+/* =========================================================
+   v3.3.100 — Rider Blood active workspace buttons
+   Match Rider Blood Light behavior: whichever CRP / Baby DAW / SRP mode is
+   selected gets a true blood-red card background (not just a red outline).
+   Rider Blood Light and every other skin are intentionally untouched.
+   ========================================================= */
+html[data-skin-choice="rider-blood"] .workspace-mode-btn.active{
+  background:linear-gradient(180deg,#E94A53 0%,#C62F38 58%,#8F1D25 100%)!important;
+  background-color:#C62F38!important;
+  background-image:linear-gradient(180deg,#E94A53 0%,#C62F38 58%,#8F1D25 100%)!important;
+  color:#FFF!important;
+  border-color:#7D1720!important;
+  box-shadow:0 0 0 1px rgba(255,92,100,.34),0 0 18px rgba(198,47,56,.25),0 6px 16px rgba(0,0,0,.16)!important;
+}
+html[data-skin-choice="rider-blood"] .workspace-mode-btn.active .mode-copy,
+html[data-skin-choice="rider-blood"] .workspace-mode-btn.active .mode-copy *{
+  color:#FFF!important;
+}
+
+/* Baby DAW artwork is a full-card image, so use the already-established
+   red-background active artwork rather than tinting/overlaying the gold skull
+   and microphone. This keeps the artwork crisp while the card itself reads red. */
+html[data-skin-choice="rider-blood"] #babyDawModeBtn.active{
+  background:linear-gradient(180deg,#E94A53 0%,#C62F38 58%,#8F1D25 100%)!important;
+  background-color:#C62F38!important;
+  border-color:#7D1720!important;
+}
+html[data-skin-choice="rider-blood"] #babyDawModeBtn.active .baby-exact-art::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  box-shadow:none!important;
+}
+html[data-skin-choice="rider-blood"] #babyDawModeBtn.active .baby-exact-art img{
+  content:url('./assets/baby-daw-button-hq-rider-blood-light-active.png')!important;
+  mix-blend-mode:normal!important;
+  opacity:1!important;
+  filter:none!important;
+  background:transparent!important;
+}
