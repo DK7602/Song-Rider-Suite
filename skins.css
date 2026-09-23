@@ -1282,241 +1282,78 @@ html[data-skin="candy-pop"] .vox-drum-cell.on{
   opacity:1!important;
 }
 
-/* =========================================================
-   v3.3.87 — ROYAL WAVE ONLY
-   Exact palette supplied by user:
-   Royal blue #005CF7 / baby blue #98D6FF / orange #FF9700 / cream #EEE8C6
-   ========================================================= */
-
-/* Make ordinary Royal Wave controls truly ROYAL BLUE instead of baby blue.
-   Keep the permanent gold Track Master/skin controls untouched. */
-html[data-skin="royal-wave"] button:not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close),
-html[data-skin-choice="royal-wave"] button:not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close),
-body[data-skin="royal-wave"] button:not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close),
-body[data-skin-choice="royal-wave"] button:not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close){
-  background:#005CF7!important;
-  background-color:#005CF7!important;
-  background-image:none!important;
-  color:#EEE8C6!important;
-  border-color:#98D6FF!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.18)!important;
-}
-
-/* Selected/toggled buttons stay royal blue, but get a clear orange state ring.
-   The actual NOTE/CHORD/BEAT CELLS below are the elements that fill orange. */
-html[data-skin="royal-wave"] .seg.active,
-html[data-skin-choice="royal-wave"] .seg.active,
-html[data-skin="royal-wave"] .toggle-btn.on,
-html[data-skin-choice="royal-wave"] .toggle-btn.on,
-html[data-skin="royal-wave"] button[aria-pressed="true"]:not(.srs-skin-choice),
-html[data-skin-choice="royal-wave"] button[aria-pressed="true"]:not(.srs-skin-choice),
-html[data-skin="royal-wave"] .workspace-mode-btn.active,
-html[data-skin-choice="royal-wave"] .workspace-mode-btn.active,
-html[data-skin="royal-wave"] .project-browser-tab.active,
-html[data-skin-choice="royal-wave"] .project-browser-tab.active,
-html[data-skin="royal-wave"] .part-pill.active,
-html[data-skin-choice="royal-wave"] .part-pill.active{
-  background:#005CF7!important;
-  background-color:#005CF7!important;
-  background-image:none!important;
-  color:#EEE8C6!important;
-  border-color:#FF9700!important;
-  box-shadow:inset 0 0 0 1px #FF9700,0 0 0 1px rgba(255,151,0,.25)!important;
-}
-
-/* Workspace tiles use the supplied four-color palette without reverting to the
-   old dark/navy treatment. */
-html[data-skin="royal-wave"] .workspace-mode-switch,
-html[data-skin-choice="royal-wave"] .workspace-mode-switch{
-  background:#005CF7!important;
-  border-bottom-color:#FF9700!important;
-}
-html[data-skin="royal-wave"] .workspace-mode-btn,
-html[data-skin-choice="royal-wave"] .workspace-mode-btn{
-  background:#005CF7!important;
-  color:#EEE8C6!important;
-  border-color:#98D6FF!important;
-}
-html[data-skin="royal-wave"] .workspace-mode-btn.active,
-html[data-skin-choice="royal-wave"] .workspace-mode-btn.active{
-  border-color:#FF9700!important;
-  box-shadow:inset 0 0 0 1px #FF9700,0 0 18px rgba(255,151,0,.28)!important;
-}
-html[data-skin="royal-wave"] .workspace-mode-btn .mode-copy strong,
-html[data-skin-choice="royal-wave"] .workspace-mode-btn .mode-copy strong,
-html[data-skin="royal-wave"] .workspace-mode-btn .mode-copy small,
-html[data-skin-choice="royal-wave"] .workspace-mode-btn .mode-copy small{
-  color:#EEE8C6!important;
-}
-
-/* Inputs stay cream so Royal Wave retains all four supplied colors. */
-html[data-skin="royal-wave"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
-html[data-skin-choice="royal-wave"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
-html[data-skin="royal-wave"] select,
-html[data-skin-choice="royal-wave"] select,
-html[data-skin="royal-wave"] textarea,
-html[data-skin-choice="royal-wave"] textarea{
-  background:#EEE8C6!important;
-  background-color:#EEE8C6!important;
-  color:#12325A!important;
-  border-color:#98D6FF!important;
-}
-
-/* CRITICAL FIX: an active CRP MIDI chord/note cell is a SOLID ORANGE CELL.
-   Do not leave the baby-blue base showing through. */
-html[data-skin="royal-wave"] .crp-midi-cell.on,
-html[data-skin-choice="royal-wave"] .crp-midi-cell.on,
-body[data-skin="royal-wave"] .crp-midi-cell.on,
-body[data-skin-choice="royal-wave"] .crp-midi-cell.on,
-html[data-skin="royal-wave"] .crp-midi-cell.on.playing,
-html[data-skin-choice="royal-wave"] .crp-midi-cell.on.playing{
-  background:#FF9700!important;
-  background-color:#FF9700!important;
-  background-image:none!important;
-  color:#211300!important;
-  border-color:#B96500!important;
-  box-shadow:inset 0 0 0 1px rgba(255,235,195,.55)!important;
-  opacity:1!important;
-}
-
-/* Lead/Bass editor: every placed note block/cell is solid orange. */
-html[data-skin="royal-wave"] .lead-cell.on,
-html[data-skin-choice="royal-wave"] .lead-cell.on,
-body[data-skin="royal-wave"] .lead-cell.on,
-body[data-skin-choice="royal-wave"] .lead-cell.on,
-html[data-skin="royal-wave"] .lead-note-block,
-html[data-skin-choice="royal-wave"] .lead-note-block,
-body[data-skin="royal-wave"] .lead-note-block,
-body[data-skin-choice="royal-wave"] .lead-note-block{
-  background:#FF9700!important;
-  background-color:#FF9700!important;
-  background-image:none!important;
-  color:#211300!important;
-  border-color:#B96500!important;
-  box-shadow:inset 0 0 0 1px rgba(255,235,195,.55)!important;
-  opacity:1!important;
-}
-html[data-skin="royal-wave"] .lead-note-block-fill,
-html[data-skin-choice="royal-wave"] .lead-note-block-fill,
-body[data-skin="royal-wave"] .lead-note-block-fill,
-body[data-skin-choice="royal-wave"] .lead-note-block-fill{
-  background:#FF9700!important;
-  background-color:#FF9700!important;
-  background-image:none!important;
-  opacity:1!important;
-}
-
-/* Beat Maker: the ENTIRE selected square turns orange, not just the outline/dot. */
-html[data-skin="royal-wave"] .crp-step.active,
-html[data-skin-choice="royal-wave"] .crp-step.active,
-body[data-skin="royal-wave"] .crp-step.active,
-body[data-skin-choice="royal-wave"] .crp-step.active{
-  background:#FF9700!important;
-  background-color:#FF9700!important;
-  background-image:none!important;
-  color:#211300!important;
-  border-color:#B96500!important;
-  box-shadow:inset 0 0 0 1px rgba(255,235,195,.55)!important;
-  opacity:1!important;
-}
-html[data-skin="royal-wave"] .crp-step.active::after,
-html[data-skin-choice="royal-wave"] .crp-step.active::after,
-body[data-skin="royal-wave"] .crp-step.active::after,
-body[data-skin-choice="royal-wave"] .crp-step.active::after{
-  background:#6B3900!important;
-}
-
-/* Track Master drum cells, where the same drum pattern is rendered. */
-html[data-skin="royal-wave"] .vox-drum-cell.on,
-html[data-skin-choice="royal-wave"] .vox-drum-cell.on,
-body[data-skin="royal-wave"] .vox-drum-cell.on,
-body[data-skin-choice="royal-wave"] .vox-drum-cell.on{
-  background:#FF9700!important;
-  background-color:#FF9700!important;
-  background-image:none!important;
-  color:#211300!important;
-  border-color:#B96500!important;
-  opacity:1!important;
-}
-
 
 /* =========================================================
-   v3.3.88 — CANDY POP ONLY
-   Hard final override so active cells become SOLID YELLOW.
-   This covers both data-skin and data-skin-choice, plus body/html.
+   v3.3.89 — RIDER BLOOD LIGHT final active-fill + BD tile fix
+   User-requested final overrides:
+   1) active beat/note/chord cells are SOLID RED, not black with red highlight
+   2) Baby DAW selected tile uses a red background state, not a red overlay
    ========================================================= */
-html[data-skin="candy-pop"] .crp-midi-cell.on,
-html[data-skin-choice="candy-pop"] .crp-midi-cell.on,
-body[data-skin="candy-pop"] .crp-midi-cell.on,
-body[data-skin-choice="candy-pop"] .crp-midi-cell.on,
-html[data-skin="candy-pop"] .crp-midi-cell.on.playing,
-html[data-skin-choice="candy-pop"] .crp-midi-cell.on.playing,
-body[data-skin="candy-pop"] .crp-midi-cell.on.playing,
-body[data-skin-choice="candy-pop"] .crp-midi-cell.on.playing,
-html[data-skin="candy-pop"] .crp-midi-cell.playing.on,
-html[data-skin-choice="candy-pop"] .crp-midi-cell.playing.on,
-body[data-skin="candy-pop"] .crp-midi-cell.playing.on,
-body[data-skin-choice="candy-pop"] .crp-midi-cell.playing.on{
-  background:#FFF600!important;
-  background-color:#FFF600!important;
+
+/* 1) Rider Blood Light: make all active note/beat/chord cells fully solid red */
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-step.active,
+html[data-skin-choice="rider-blood-light"] .crp-step.active,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .vox-drum-cell.on,
+html[data-skin-choice="rider-blood-light"] .vox-drum-cell.on,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-midi-cell.on,
+html[data-skin-choice="rider-blood-light"] .crp-midi-cell.on,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-midi-cell.on.playing,
+html[data-skin-choice="rider-blood-light"] .crp-midi-cell.on.playing,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-midi-cell.playing.on,
+html[data-skin-choice="rider-blood-light"] .crp-midi-cell.playing.on,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .lead-cell.on,
+html[data-skin-choice="rider-blood-light"] .lead-cell.on,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .lead-note-block,
+html[data-skin-choice="rider-blood-light"] .lead-note-block,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .lead-note-block.playing,
+html[data-skin-choice="rider-blood-light"] .lead-note-block.playing,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .lead-note-block-fill,
+html[data-skin-choice="rider-blood-light"] .lead-note-block-fill{
+  background:#C40012!important;
+  background-color:#C40012!important;
   background-image:none!important;
-  color:#2B2900!important;
-  border-color:#B8B000!important;
-  box-shadow:inset 0 0 0 1px rgba(255,255,210,.88)!important;
+  color:#FFF!important;
+  border-color:#7F0009!important;
   opacity:1!important;
+  box-shadow:inset 0 0 0 1px rgba(255,232,232,.22),0 0 0 1px rgba(127,0,9,.65)!important;
 }
 
-html[data-skin="candy-pop"] .lead-cell.on,
-html[data-skin-choice="candy-pop"] .lead-cell.on,
-body[data-skin="candy-pop"] .lead-cell.on,
-body[data-skin-choice="candy-pop"] .lead-cell.on,
-html[data-skin="candy-pop"] .lead-note-block,
-html[data-skin-choice="candy-pop"] .lead-note-block,
-body[data-skin="candy-pop"] .lead-note-block,
-body[data-skin-choice="candy-pop"] .lead-note-block,
-html[data-skin="candy-pop"] .lead-note-block.playing,
-html[data-skin-choice="candy-pop"] .lead-note-block.playing,
-body[data-skin="candy-pop"] .lead-note-block.playing,
-body[data-skin-choice="candy-pop"] .lead-note-block.playing{
-  background:#FFF600!important;
-  background-color:#FFF600!important;
-  background-image:none!important;
-  color:#2B2900!important;
-  border-color:#B8B000!important;
-  box-shadow:inset 0 0 0 1px rgba(255,255,210,.88)!important;
-  opacity:1!important;
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-step.active::after,
+html[data-skin-choice="rider-blood-light"] .crp-step.active::after{
+  background:#5E0007!important;
 }
 
-html[data-skin="candy-pop"] .lead-note-block-fill,
-html[data-skin-choice="candy-pop"] .lead-note-block-fill,
-body[data-skin="candy-pop"] .lead-note-block-fill,
-body[data-skin-choice="candy-pop"] .lead-note-block-fill{
-  background:#FFF600!important;
-  background-color:#FFF600!important;
-  background-image:none!important;
-  opacity:1!important;
+/* 2) Rider Blood Light: Baby DAW active card should turn red by background,
+   not by an overlay sitting on top of the artwork */
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #babyDawModeBtn.active,
+html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active{
+  background:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
+  background-color:#E60000!important;
+  background-image:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
+  border-color:#8F0008!important;
+  box-shadow:0 0 0 1px rgba(255,66,66,.34),0 0 18px rgba(214,0,0,.22)!important;
+  isolation:isolate!important;
 }
-
-html[data-skin="candy-pop"] .crp-step.active,
-html[data-skin-choice="candy-pop"] .crp-step.active,
-body[data-skin="candy-pop"] .crp-step.active,
-body[data-skin-choice="candy-pop"] .crp-step.active,
-html[data-skin="candy-pop"] .vox-drum-cell.on,
-html[data-skin-choice="candy-pop"] .vox-drum-cell.on,
-body[data-skin="candy-pop"] .vox-drum-cell.on,
-body[data-skin-choice="candy-pop"] .vox-drum-cell.on{
-  background:#FFF600!important;
-  background-color:#FFF600!important;
-  background-image:none!important;
-  color:#2B2900!important;
-  border-color:#B8B000!important;
-  box-shadow:inset 0 0 0 1px rgba(255,255,210,.88)!important;
-  opacity:1!important;
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art,
+html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art{
+  position:relative!important;
+  overflow:hidden!important;
+  border-radius:inherit!important;
+  background:transparent!important;
 }
-
-html[data-skin="candy-pop"] .crp-step.active::after,
-html[data-skin-choice="candy-pop"] .crp-step.active::after,
-body[data-skin="candy-pop"] .crp-step.active::after,
-body[data-skin-choice="candy-pop"] .crp-step.active::after{
-  background:#6F6A00!important;
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art::after,
+html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  box-shadow:none!important;
+}
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art img,
+html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art img{
+  position:relative!important;
+  z-index:2!important;
+  mix-blend-mode:screen!important;
+  opacity:1!important;
+  filter:contrast(1.02) saturate(1.02)!important;
+  background:transparent!important;
 }
