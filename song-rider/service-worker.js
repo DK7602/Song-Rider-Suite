@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.96-dark-gold-subtle-srp';
+const CACHE = 'song-rider-suite-v3.3.98-studio-pastel-pattern-srp';
 const ASSETS = [
   '../skins.css',
   '../skins.js',
