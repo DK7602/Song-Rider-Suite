@@ -1,0 +1,15 @@
+Song Rider Suite v3.3.91 — Royal Wave + Candy Pop Active Cell Root Fix
+
+ROOT CAUSE FIXED
+- The global Royal Wave/Candy Pop button skin rule was also matching MIDI, Lead/Bass, Beat Maker, and Track Master drum cells because those editor cells are buttons.
+- That rule had higher CSS specificity plus !important, so it was overriding the intended orange/yellow active fills.
+
+ROYAL WAVE
+- Inactive editor cells: cream.
+- Active chord/note, Lead/Bass, Beat Maker and Track Master drum cells: SOLID ORANGE (#FF9700).
+
+CANDY POP
+- Inactive editor cells: cream.
+- Active chord/note, Lead/Bass, Beat Maker and Track Master drum cells: SOLID YELLOW (#FFF600).
+
+No playback, project, cloud, timing, or editor logic was changed.
