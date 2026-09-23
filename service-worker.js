@@ -1,9 +1,10 @@
-const CACHE = 'song-rider-suite-v3.3.82-skin-palette-fix';
+const CACHE = 'song-rider-suite-v3.3.83-light-srp-blood-light';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
   './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css','./skins.css','./skins.js',
   './vocal-autotune-worklet.js','./manifest.webmanifest',
-  './assets/chord-rider-pro-wordmark-hq2.png','./assets/baby-daw-button-hq.png','./assets/suite-header-new.png',
+    './assets/rider-blood-light-pattern.png',
+'./assets/chord-rider-pro-wordmark-hq2.png','./assets/baby-daw-button-hq.png','./assets/suite-header-new.png',
   './assets/apple-touch-icon.png','./assets/icon-192.png','./assets/rider-and-bones-icon.png',
   './assets/crp-rider-bones-sticker.png','./assets/srp-rider-bones-sticker.png',
   './assets/rider-and-bones-left.gif','./assets/rider-and-bones-right.gif',

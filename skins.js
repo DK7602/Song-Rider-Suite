@@ -11,7 +11,7 @@
     {id:'royal-wave', name:'Royal Wave', desc:'Royal blue, baby blue, orange + cream with the polished studio icon set.', swatches:['#005CF7','#98D6FF','#FF9700','#EEE8C6']},
     {id:'candy-pop', name:'Candy Pop', desc:'Pink, teal, yellow + cream with the polished studio icon set.', swatches:['#FFB2F6','#87FFF5','#FFF600','#EFEAD7']},
     {id:'rider-light', name:'Rider Light', desc:'Light Rider palette with the current Bones & Rider buttons.', swatches:['#f4f4f2','#d8ac43','#f0cf52','#57a96f']},
-    {id:'rider-blood-light', name:'Rider Blood Light', desc:'Rider Light with deep red accents, red editor cells and subtle red trim.', swatches:['#f4f4f2','#d8ac43','#f0cf52','#c62f38']}
+    {id:'rider-blood-light', name:'Rider Blood Light', desc:'Red, patterned white, cream and polished gold with Rider artwork.', swatches:['#e60000','#fffdf7','#efe8cf','#d7a63c']}
   ];
   const VALID = new Set(SKINS.map(s=>s.id));
   const $ = (s, root=document) => root.querySelector(s);
@@ -21,7 +21,7 @@
   function setThemeColor(skin){
     const map={
       'rider-original':'#111111', 'rider-blood':'#111111', 'studio-pastel':'#f2e6d7', 'black-label':'#090a0c',
-      'black-label-light':'#f6f5f1', 'royal-wave':'#005CF7', 'candy-pop':'#EFEAD7', 'rider-light':'#f4f4f2', 'rider-blood-light':'#f4f4f2'
+      'black-label-light':'#f6f5f1', 'royal-wave':'#005CF7', 'candy-pop':'#EFEAD7', 'rider-light':'#f4f4f2', 'rider-blood-light':'#efe8cf'
     };
     const meta=$('meta[name="theme-color"]'); if(meta) meta.setAttribute('content',map[skin]||map[DEFAULT]);
   }

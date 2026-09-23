@@ -821,3 +821,94 @@ html[data-skin="candy-pop"] .workspace-mode-btn .mode-copy small{color:#536966!i
 html[data-skin="candy-pop"] .chord-pill,html[data-skin="candy-pop"] .fit-chord,html[data-skin="candy-pop"] .note-chip{background:#EFEAD7!important;color:#264340!important;border-color:#de98d6!important}
 html[data-skin="candy-pop"] .crp-midi-cell.on,html[data-skin="candy-pop"] .lead-note-block,html[data-skin="candy-pop"] .lead-cell.on,html[data-skin="candy-pop"] .crp-step.active,html[data-skin="candy-pop"] .vox-drum-cell.on{background:#FFF600!important;color:#292800!important;border-color:#d4cc00!important;box-shadow:inset 0 0 0 2px #fffca7!important}
 html[data-skin="candy-pop"] .crp-step.active::after{background:#706d00!important}
+
+
+/* =========================================================
+   v3.3.83 — Light SRP windows + Rider Blood Light refresh
+   ========================================================= */
+
+/* Rider Blood Light: red / patterned white / cream / polished gold */
+html[data-skin-choice="rider-blood-light"]{
+  --bg:#efe8cf;
+  --panel:#fffdf7;
+  --panel2:#f6f0df;
+  --text:#201b16;
+  --muted:#71695d;
+  --accent:#d7a63c;
+  --accent2:#e60000;
+  --line:#d8caa8;
+  --good:#e60000;
+  --border:#d8caa8;
+  --panel-2:#f6f0df;
+  --srs-skin-bg:#efe8cf;
+  --srs-skin-panel:#fffdf7;
+  --srs-skin-panel2:#f6f0df;
+  --srs-skin-text:#201b16;
+  --srs-skin-muted:#71695d;
+  --srs-skin-gold:#d7a63c;
+  --srs-skin-accent:#d7a63c;
+  --srs-skin-accent2:#e60000;
+  --srs-skin-line:#d8caa8;
+  --srs-skin-good:#e60000;
+  --srs-skin-input:#fffdf7;
+  --srs-skin-raised:#f4ecd7;
+  --srs-skin-shadow:0 12px 28px rgba(63,49,18,.13);
+  --srs-blood:#e60000;
+  --srs-blood-bright:#ff2b2b;
+  --srs-blood-deep:#a80000;
+}
+html[data-skin-choice="rider-blood-light"] body{
+  background:#efe8cf!important;
+  color:#201b16!important;
+}
+html[data-skin-choice="rider-blood-light"] .panel,
+html[data-skin-choice="rider-blood-light"] .auth-box,
+html[data-skin-choice="rider-blood-light"] .project-item,
+html[data-skin-choice="rider-blood-light"] .progression-line,
+html[data-skin-choice="rider-blood-light"] .lead-part-editor,
+html[data-skin-choice="rider-blood-light"] .crp-beat-panel,
+html[data-skin-choice="rider-blood-light"] .vox-inspector,
+html[data-skin-choice="rider-blood-light"] .vox-box-header{
+  background-color:#fffdf7!important;
+  background-image:url('./assets/rider-blood-light-pattern.png')!important;
+  background-size:220px auto!important;
+  background-repeat:repeat!important;
+  color:#201b16!important;
+  border-color:#d8caa8!important;
+}
+html[data-skin-choice="rider-blood-light"] .workspace-mode-btn.active,
+html[data-skin-choice="rider-blood-light"] .seg.active,
+html[data-skin-choice="rider-blood-light"] .toggle-btn.on,
+html[data-skin-choice="rider-blood-light"] .vox-box-tools .is-active,
+html[data-skin-choice="rider-blood-light"] .crp-bar-tab.active,
+html[data-skin-choice="rider-blood-light"] .btn-primary{
+  background:linear-gradient(180deg,#ff2525 0%,#e60000 58%,#b40000 100%)!important;
+  color:#fff!important;
+  border-color:#9f0000!important;
+}
+html[data-skin-choice="rider-blood-light"] .gold-btn,
+html[data-skin-choice="rider-blood-light"] .track-master-gold-btn{
+  background:linear-gradient(90deg,#a87312 0%,#e4b747 24%,#fff19b 48%,#d7a63c 72%,#9a680d 100%)!important;
+  color:#1c1607!important;
+}
+html[data-skin-choice="rider-blood-light"] .crp-midi-cell.on,
+html[data-skin-choice="rider-blood-light"] .lead-cell.on,
+html[data-skin-choice="rider-blood-light"] .lead-note-block,
+html[data-skin-choice="rider-blood-light"] .crp-step.active,
+html[data-skin-choice="rider-blood-light"] .vox-drum-cell.on{
+  background:#e60000!important;
+  color:#fff!important;
+  border-color:#ff5a5a!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.32),0 0 0 1px #9f0000!important;
+}
+html[data-skin-choice="rider-blood-light"] .crp-midi-cell.on{
+  background-image:repeating-linear-gradient(to right,transparent 0,transparent calc(var(--midi-beat-px,24px) - 1px),rgba(255,255,255,.25) calc(var(--midi-beat-px,24px) - 1px),rgba(255,255,255,.25) var(--midi-beat-px,24px)),linear-gradient(#e60000,#c90000)!important;
+}
+
+/* Appearance preview refresh for Rider Blood Light */
+.preview-rider-blood-light{background:#efe8cf!important}
+.preview-rider-blood-light .srs-preview-top{background:linear-gradient(90deg,#e60000,#fffdf7,#efe8cf,#d7a63c)!important}
+.preview-rider-blood-light .srs-preview-icons i{background:#fffdf7!important;border-color:#d8caa8!important}
+.preview-rider-blood-light .srs-preview-icons i:nth-child(1){background:#e60000!important}
+.preview-rider-blood-light .srs-preview-icons i:nth-child(2){background:#fffdf7!important;box-shadow:inset 0 0 0 1px rgba(215,166,60,.35)!important}
+.preview-rider-blood-light .srs-preview-icons i:nth-child(3){background:#efe8cf!important}
