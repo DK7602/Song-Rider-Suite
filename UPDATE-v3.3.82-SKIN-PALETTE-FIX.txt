@@ -1,0 +1,14 @@
+Song Rider Suite v3.3.82 — Royal Wave + Candy Pop palette fix
+
+Exact palette colors sampled from the user's references:
+Royal Wave: #005CF7, #98D6FF, #FF9700, #EEE8C6
+Candy Pop: #FFB2F6, #87FFF5, #FFF600, #EFEAD7
+
+Fixes:
+- Royal Wave CRP title surround now matches SRP black title band.
+- Royal Wave uses visibly brighter royal blue plus baby blue, orange and cream.
+- Royal Wave MIDI notes, lead notes and drum steps now have strong highlighted/off-state contrast.
+- Candy Pop now uses unmistakable pink, teal, yellow and cream throughout the skin.
+- Cache/query versions bumped so the corrected skins load immediately after deploy/refresh.
+
+Presentation-only. No playback, save, sync, project or timing logic changed.

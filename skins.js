@@ -8,8 +8,8 @@
     {id:'studio-pastel', name:'Studio Pastel', desc:'Blue, pink, warm tan + gold. Calm studio graphics.', swatches:['#f2e6d7','#7aaed8','#e89aba','#c49a43']},
     {id:'black-label', name:'Black Label', desc:'Black, yellow and polished gold. Elegant and skull-free.', swatches:['#090a0c','#e3b84e','#f0cf57','#25272c']},
     {id:'black-label-light', name:'Black Label Light', desc:'White, gray, gold + yellow with restrained green.', swatches:['#f6f5f1','#d4aa45','#e7ca52','#4e9d65']},
-    {id:'royal-wave', name:'Royal Wave', desc:'Royal blue, baby blue, orange + cream with the polished studio icon set.', swatches:['#162a64','#8ecfff','#f38a32','#fff4e3']},
-    {id:'candy-pop', name:'Candy Pop', desc:'Pink, teal, yellow + cream with the polished studio icon set.', swatches:['#fbf4e8','#ef7bb4','#39beb5','#f1cf4d']},
+    {id:'royal-wave', name:'Royal Wave', desc:'Royal blue, baby blue, orange + cream with the polished studio icon set.', swatches:['#005CF7','#98D6FF','#FF9700','#EEE8C6']},
+    {id:'candy-pop', name:'Candy Pop', desc:'Pink, teal, yellow + cream with the polished studio icon set.', swatches:['#FFB2F6','#87FFF5','#FFF600','#EFEAD7']},
     {id:'rider-light', name:'Rider Light', desc:'Light Rider palette with the current Bones & Rider buttons.', swatches:['#f4f4f2','#d8ac43','#f0cf52','#57a96f']},
     {id:'rider-blood-light', name:'Rider Blood Light', desc:'Rider Light with deep red accents, red editor cells and subtle red trim.', swatches:['#f4f4f2','#d8ac43','#f0cf52','#c62f38']}
   ];
@@ -21,7 +21,7 @@
   function setThemeColor(skin){
     const map={
       'rider-original':'#111111', 'rider-blood':'#111111', 'studio-pastel':'#f2e6d7', 'black-label':'#090a0c',
-      'black-label-light':'#f6f5f1', 'royal-wave':'#162a64', 'candy-pop':'#fbf4e8', 'rider-light':'#f4f4f2', 'rider-blood-light':'#f4f4f2'
+      'black-label-light':'#f6f5f1', 'royal-wave':'#005CF7', 'candy-pop':'#EFEAD7', 'rider-light':'#f4f4f2', 'rider-blood-light':'#f4f4f2'
     };
     const meta=$('meta[name="theme-color"]'); if(meta) meta.setAttribute('content',map[skin]||map[DEFAULT]);
   }
