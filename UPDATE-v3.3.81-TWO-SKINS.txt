@@ -1,0 +1,11 @@
+Song Rider Suite v3.3.81 — Two New Skins
+
+Added two skull-free appearance skins using the same polished icon approach as Studio Pastel / Black Label / Black Label Light.
+
+New skins:
+- Royal Wave — royal blue, baby blue, orange, cream
+- Candy Pop — pink, teal, yellow, cream
+
+Also refreshed cache/version strings so the new skins appear after upload and refresh.
+
+Presentation-only update. No playback, project, cloud, or editor logic changed.

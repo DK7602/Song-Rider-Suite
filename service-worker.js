@@ -1,9 +1,10 @@
-const CACHE = 'song-rider-suite-v3.3.72-project-notes-collapse';
+const CACHE = 'song-rider-suite-v3.3.93-rider-blood-light-bd-art-fix';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
   './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css','./skins.css','./skins.js',
   './vocal-autotune-worklet.js','./manifest.webmanifest',
-  './assets/chord-rider-pro-wordmark-hq2.png','./assets/baby-daw-button-hq.png','./assets/suite-header-new.png',
+    './assets/rider-blood-light-pattern.png','./assets/baby-daw-button-hq-rider-blood-light-active.png',
+'./assets/chord-rider-pro-wordmark-hq2.png','./assets/baby-daw-button-hq.png','./assets/suite-header-new.png',
   './assets/apple-touch-icon.png','./assets/icon-192.png','./assets/rider-and-bones-icon.png',
   './assets/crp-rider-bones-sticker.png','./assets/srp-rider-bones-sticker.png',
   './assets/rider-and-bones-left.gif','./assets/rider-and-bones-right.gif',

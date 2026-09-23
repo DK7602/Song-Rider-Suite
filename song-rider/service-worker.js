@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.71-rider-blood-skins-srp';
+const CACHE = 'song-rider-suite-v3.3.91-active-cell-root-fix-srp';
 const ASSETS = [
   '../skins.css',
   '../skins.js',
@@ -6,7 +6,8 @@ const ASSETS = [
   './song-rider-pro-wordmark-hq.png',
   './song-rider-pro-wordmark-blood.png',
   './baby-daw-button-hq.png',
-  './assets/song-rider-pro-wordmark-hq.png',
+  '../assets/rider-blood-light-pattern.png',
+'./assets/song-rider-pro-wordmark-hq.png',
   './assets/baby-daw-button-hq.png',
   './baby-daw-mic.png',
   './baby-daw-head-chain-sticker.png',
