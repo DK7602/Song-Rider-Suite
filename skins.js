@@ -79,11 +79,11 @@
       const map = {
         chord:'celtic-mode-chord.png',
         daw:'celtic-mode-daw.png',
-        song:'celtic-mode-song.png',
-        track:'celtic-mode-track.png'
+        song:'celtic-mode-chord.png',
+        track:'celtic-mode-chord.png'
       };
       const file = map[kind] || map.chord;
-      return `<img src="${getSkinAssetUrl(file)}" alt="" decoding="async" loading="eager">`;
+      return `<img class="srs-celtic-mode-icon-image srs-celtic-mode-icon-image-${kind}" src="${getSkinAssetUrl(file)}" alt="" decoding="async" loading="eager">`;
     }
     return iconSvgs[kind]||iconSvgs.chord;
   }
