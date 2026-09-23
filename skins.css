@@ -1868,39 +1868,69 @@ html[data-skin="black-label"][data-skin-choice="black-label"] .card{
 
 
 /* =========================================================
-   v3.3.98 — Studio Pastel subtle pattern background
-   Visual-only change: keep Studio Pastel skin colors/controls intact and
-   place the supplied subtle light geometric artwork on window/panel backgrounds.
+   v3.3.99 — Rider Blood background pattern
+   Keep the Rider Blood skin the same, but use the supplied dark red pattern
+   as the background artwork across the main app windows/panels.
    ========================================================= */
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .panel,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .auth-box,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .project-item,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .progression-line,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .composer-panel,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .save-panel,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .notes-panel,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .account-panel,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .project-browser-window,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .part-manager,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .part-modal-card,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .lead-part-editor,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vocal-panel,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vocal-part-editor,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vocal-editor-card,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vocal-transcript-panel,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .crp-beat-panel,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vox-box-shell,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .vox-inspector,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .panel-body,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .crp-beat-head,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .crp-beat-foot,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .crp-randomizer,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .sheet,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .fullSectionCard,
-html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .card{
-  background-color:var(--srs-skin-panel)!important;
-  background-image:linear-gradient(rgba(255,255,255,.08),rgba(255,255,255,.08)),url('./assets/studio-pastel-pattern.jpg')!important;
-  background-size:auto,430px auto!important;
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .panel,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .auth-box,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .project-item,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .progression-line,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .composer-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .save-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .notes-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .account-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .project-browser-window,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .part-manager,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .part-modal-card,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .lead-part-editor,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .vocal-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .vocal-part-editor,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .vocal-editor-card,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .vocal-transcript-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .crp-beat-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .vox-box-shell,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .vox-box-header,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .vox-box-tools,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .vox-inspector,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .panel-body,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .crp-beat-head,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .crp-beat-foot,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .crp-randomizer,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .sheet,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .fullSectionCard,
+html[data-skin="rider-original"][data-skin-choice="rider-blood"] .card,
+html[data-skin-choice="rider-blood"] .panel,
+html[data-skin-choice="rider-blood"] .auth-box,
+html[data-skin-choice="rider-blood"] .project-item,
+html[data-skin-choice="rider-blood"] .progression-line,
+html[data-skin-choice="rider-blood"] .composer-panel,
+html[data-skin-choice="rider-blood"] .save-panel,
+html[data-skin-choice="rider-blood"] .notes-panel,
+html[data-skin-choice="rider-blood"] .account-panel,
+html[data-skin-choice="rider-blood"] .project-browser-window,
+html[data-skin-choice="rider-blood"] .part-manager,
+html[data-skin-choice="rider-blood"] .part-modal-card,
+html[data-skin-choice="rider-blood"] .lead-part-editor,
+html[data-skin-choice="rider-blood"] .vocal-panel,
+html[data-skin-choice="rider-blood"] .vocal-part-editor,
+html[data-skin-choice="rider-blood"] .vocal-editor-card,
+html[data-skin-choice="rider-blood"] .vocal-transcript-panel,
+html[data-skin-choice="rider-blood"] .crp-beat-panel,
+html[data-skin-choice="rider-blood"] .vox-box-shell,
+html[data-skin-choice="rider-blood"] .vox-box-header,
+html[data-skin-choice="rider-blood"] .vox-box-tools,
+html[data-skin-choice="rider-blood"] .vox-inspector,
+html[data-skin-choice="rider-blood"] .panel-body,
+html[data-skin-choice="rider-blood"] .crp-beat-head,
+html[data-skin-choice="rider-blood"] .crp-beat-foot,
+html[data-skin-choice="rider-blood"] .crp-randomizer,
+html[data-skin-choice="rider-blood"] .sheet,
+html[data-skin-choice="rider-blood"] .fullSectionCard,
+html[data-skin-choice="rider-blood"] .card{
+  background-color:#0d0a0b!important;
+  background-image:linear-gradient(rgba(12,0,0,.18),rgba(12,0,0,.18)),url('./assets/rider-blood-pattern.jpg')!important;
+  background-size:auto,520px auto!important;
   background-repeat:repeat,repeat!important;
   background-position:0 0,center top!important;
 }
