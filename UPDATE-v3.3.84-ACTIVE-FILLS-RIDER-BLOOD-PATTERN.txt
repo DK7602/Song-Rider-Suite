@@ -1,0 +1,8 @@
+Song Rider Suite v3.3.84 — Active Fills + Rider Blood Light Pattern
+
+Fixes:
+- Royal Wave selected chord/note cells, beat/drum steps, and Lead/Bass notes now fill solid orange.
+- Candy Pop selected chord/note cells, beat/drum steps, and Lead/Bass notes now fill solid yellow.
+- Rider Blood Light uses the provided cream/gold geometric pattern across window surfaces.
+- Rider Blood Light selected controls such as Piano and Chord now fill blood red.
+- Presentation only; no playback, sync, save, timing, or project logic changed.

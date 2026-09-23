@@ -912,3 +912,124 @@ html[data-skin-choice="rider-blood-light"] .crp-midi-cell.on{
 .preview-rider-blood-light .srs-preview-icons i:nth-child(1){background:#e60000!important}
 .preview-rider-blood-light .srs-preview-icons i:nth-child(2){background:#fffdf7!important;box-shadow:inset 0 0 0 1px rgba(215,166,60,.35)!important}
 .preview-rider-blood-light .srs-preview-icons i:nth-child(3){background:#efe8cf!important}
+
+
+/* =========================================================
+   v3.3.84 — Active-fill + Rider Blood Light pattern refinement
+   ========================================================= */
+
+/* Royal Wave: selected chord/note MIDI cells, Lead/Bass notes and beat/drum
+   steps are SOLID orange, not merely orange outlines. */
+html[data-skin="royal-wave"] .crp-midi-cell.on,
+html[data-skin="royal-wave"] .lead-cell.on,
+html[data-skin="royal-wave"] .lead-note-block,
+html[data-skin="royal-wave"] .crp-step.active,
+html[data-skin="royal-wave"] .vox-drum-cell.on{
+  background:#FF9700!important;
+  background-image:none!important;
+  color:#241400!important;
+  border-color:#B96500!important;
+  box-shadow:inset 0 0 0 1px rgba(255,235,195,.72),0 0 0 1px #B96500!important;
+}
+html[data-skin="royal-wave"] .crp-midi-cell.on{
+  background-image:repeating-linear-gradient(to right,transparent 0,transparent calc(var(--midi-beat-px,24px) - 1px),rgba(110,58,0,.18) calc(var(--midi-beat-px,24px) - 1px),rgba(110,58,0,.18) var(--midi-beat-px,24px)),linear-gradient(#FF9700,#FF9700)!important;
+}
+html[data-skin="royal-wave"] .crp-step.active::after{background:#6B3900!important}
+
+/* Candy Pop: selected chord/note MIDI cells, Lead/Bass notes and beat/drum
+   steps are SOLID yellow, not merely yellow outlines. */
+html[data-skin="candy-pop"] .crp-midi-cell.on,
+html[data-skin="candy-pop"] .lead-cell.on,
+html[data-skin="candy-pop"] .lead-note-block,
+html[data-skin="candy-pop"] .crp-step.active,
+html[data-skin="candy-pop"] .vox-drum-cell.on{
+  background:#FFF600!important;
+  background-image:none!important;
+  color:#292800!important;
+  border-color:#BDB600!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,210,.9),0 0 0 1px #BDB600!important;
+}
+html[data-skin="candy-pop"] .crp-midi-cell.on{
+  background-image:repeating-linear-gradient(to right,transparent 0,transparent calc(var(--midi-beat-px,24px) - 1px),rgba(95,91,0,.16) calc(var(--midi-beat-px,24px) - 1px),rgba(95,91,0,.16) var(--midi-beat-px,24px)),linear-gradient(#FFF600,#FFF600)!important;
+}
+html[data-skin="candy-pop"] .crp-step.active::after{background:#706D00!important}
+
+/* Rider Blood Light: support the actual applied skin attribute as well as the
+   chooser attribute. The uploaded cream/gold geometric pattern is integrated
+   into window surfaces, while selected controls are true blood red. */
+html[data-skin="rider-blood-light"],
+html[data-skin-choice="rider-blood-light"]{
+  --bg:#EFE8CF;--panel:#FFFDF7;--panel2:#F6F0DF;--text:#201B16;--muted:#71695D;
+  --accent:#D7A63C;--accent2:#E60000;--line:#D8CAA8;--good:#E60000;--border:#D8CAA8;
+  --srs-skin-bg:#EFE8CF;--srs-skin-panel:#FFFDF7;--srs-skin-panel2:#F6F0DF;
+  --srs-skin-text:#201B16;--srs-skin-muted:#71695D;--srs-skin-gold:#D7A63C;
+  --srs-skin-accent:#D7A63C;--srs-skin-accent2:#E60000;--srs-skin-line:#D8CAA8;
+  --srs-skin-good:#E60000;--srs-skin-input:#FFFDF7;--srs-skin-raised:#F4ECD7;
+  --srs-blood:#E60000;--srs-blood-bright:#FF2B2B;--srs-blood-deep:#A80000;
+}
+html[data-skin="rider-blood-light"] body,
+html[data-skin-choice="rider-blood-light"] body{background:#EFE8CF!important;color:#201B16!important}
+
+html[data-skin="rider-blood-light"] .panel,
+html[data-skin="rider-blood-light"] .auth-box,
+html[data-skin="rider-blood-light"] .project-item,
+html[data-skin="rider-blood-light"] .progression-line,
+html[data-skin="rider-blood-light"] .lead-part-editor,
+html[data-skin="rider-blood-light"] .crp-beat-panel,
+html[data-skin="rider-blood-light"] .vox-inspector,
+html[data-skin="rider-blood-light"] .vox-box-header,
+html[data-skin-choice="rider-blood-light"] .panel,
+html[data-skin-choice="rider-blood-light"] .auth-box,
+html[data-skin-choice="rider-blood-light"] .project-item,
+html[data-skin-choice="rider-blood-light"] .progression-line,
+html[data-skin-choice="rider-blood-light"] .lead-part-editor,
+html[data-skin-choice="rider-blood-light"] .crp-beat-panel,
+html[data-skin-choice="rider-blood-light"] .vox-inspector,
+html[data-skin-choice="rider-blood-light"] .vox-box-header{
+  background-color:#FFFDF7!important;
+  background-image:linear-gradient(rgba(255,253,247,.10),rgba(255,253,247,.10)),url('./assets/rider-blood-light-pattern.png')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#201B16!important;
+  border-color:#D8CAA8!important;
+}
+
+/* Make obvious selected choices (Piano, Chord, etc.) red. */
+html[data-skin="rider-blood-light"] .seg.active,
+html[data-skin="rider-blood-light"] .toggle-btn.on,
+html[data-skin="rider-blood-light"] button.accent,
+html[data-skin="rider-blood-light"] .vox-box-tools .is-active,
+html[data-skin="rider-blood-light"] .crp-bar-tab.active,
+html[data-skin="rider-blood-light"] .btn-primary,
+html[data-skin-choice="rider-blood-light"] .seg.active,
+html[data-skin-choice="rider-blood-light"] .toggle-btn.on,
+html[data-skin-choice="rider-blood-light"] button.accent,
+html[data-skin-choice="rider-blood-light"] .vox-box-tools .is-active,
+html[data-skin-choice="rider-blood-light"] .crp-bar-tab.active,
+html[data-skin-choice="rider-blood-light"] .btn-primary{
+  background:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
+  background-image:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
+  color:#FFF!important;
+  border-color:#9F0000!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 2px 6px rgba(150,0,0,.16)!important;
+}
+html[data-skin="rider-blood-light"] .seg.active *,
+html[data-skin="rider-blood-light"] .toggle-btn.on *,
+html[data-skin-choice="rider-blood-light"] .seg.active *,
+html[data-skin-choice="rider-blood-light"] .toggle-btn.on *{color:#FFF!important}
+
+/* Rider Blood Light selected editor cells remain fully red as well. */
+html[data-skin="rider-blood-light"] .crp-midi-cell.on,
+html[data-skin="rider-blood-light"] .lead-cell.on,
+html[data-skin="rider-blood-light"] .lead-note-block,
+html[data-skin="rider-blood-light"] .crp-step.active,
+html[data-skin="rider-blood-light"] .vox-drum-cell.on,
+html[data-skin-choice="rider-blood-light"] .crp-midi-cell.on,
+html[data-skin-choice="rider-blood-light"] .lead-cell.on,
+html[data-skin-choice="rider-blood-light"] .lead-note-block,
+html[data-skin-choice="rider-blood-light"] .crp-step.active,
+html[data-skin-choice="rider-blood-light"] .vox-drum-cell.on{
+  background:#E60000!important;color:#FFF!important;border-color:#FF5A5A!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.32),0 0 0 1px #9F0000!important;
+}
