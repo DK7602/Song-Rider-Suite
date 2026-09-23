@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="goldLine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f0e2b6" stop-opacity=".92"/>
+      <stop offset=".45" stop-color="#b99f61" stop-opacity=".88"/>
+      <stop offset="1" stop-color="#e7d298" stop-opacity=".9"/>
+    </linearGradient>
+    <linearGradient id="greenLine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f8757" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#2f8757" stop-opacity=".08"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="388" height="248" rx="20" fill="none" stroke="url(#greenLine)" stroke-width="1.2"/>
+  <rect x="11" y="11" width="378" height="238" rx="18" fill="none" stroke="url(#goldLine)" stroke-width="1.15" opacity=".32"/>
+  <g fill="none" stroke="url(#goldLine)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" opacity=".78">
+    <!-- top left -->
+    <path d="M22 38C22 24 34 14 48 14h18"/>
+    <path d="M22 38v18"/>
+    <path d="M36 38c8-12 19-12 27 0-8 12-19 12-27 0Z"/>
+    <path d="M50 24c6 8 6 19 0 27-6-8-6-19 0-27Z"/>
+    <!-- top right -->
+    <path d="M378 38c0-14-12-24-26-24h-18"/>
+    <path d="M378 38v18"/>
+    <path d="M364 38c-8-12-19-12-27 0 8 12 19 12 27 0Z"/>
+    <path d="M350 24c-6 8-6 19 0 27 6-8 6-19 0-27Z"/>
+    <!-- bottom left -->
+    <path d="M22 222c0 14 12 24 26 24h18"/>
+    <path d="M22 222v-18"/>
+    <path d="M36 222c8 12 19 12 27 0-8-12-19-12-27 0Z"/>
+    <path d="M50 236c6-8 6-19 0-27-6 8-6 19 0 27Z"/>
+    <!-- bottom right -->
+    <path d="M378 222c0 14-12 24-26 24h-18"/>
+    <path d="M378 222v-18"/>
+    <path d="M364 222c-8 12-19 12-27 0 8-12 19-12 27 0Z"/>
+    <path d="M350 236c-6-8-6-19 0-27 6 8 6 19 0 27Z"/>
+  </g>
+</svg>
