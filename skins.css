@@ -2356,3 +2356,23 @@ html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light
   font-weight:800!important;
   opacity:1!important;
 }
+
+
+/* v3.3.113 — all-skins Line label readability */
+html[data-skin] .line-badge,
+html[data-skin] .progression-line.selected .line-badge{
+  background:var(--srs-skin-panel,var(--panel,#111820))!important;
+  color:var(--srs-skin-text,var(--text,#f5f7fa))!important;
+  border:1px solid var(--srs-skin-line,var(--line,#59626d))!important;
+  font-weight:900!important;
+  opacity:1!important;
+  text-shadow:none!important;
+}
+html[data-skin] .mobile-line-indicator{
+  background:var(--srs-skin-panel,var(--panel,#111820))!important;
+  color:var(--srs-skin-text,var(--text,#f5f7fa))!important;
+  border-color:var(--srs-skin-line,var(--line,#59626d))!important;
+  font-weight:900!important;
+  opacity:1!important;
+  text-shadow:none!important;
+}

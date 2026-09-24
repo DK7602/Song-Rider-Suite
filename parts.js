@@ -636,7 +636,7 @@
       const label=document.createElement('div');label.className='lead-grid-note';label.textContent=midiName(midi);label.style.gridColumn='1';label.style.gridRow=String(rowIndex);grid.appendChild(label);
       for(let s=0;s<totalSteps;s++){
         const cell=document.createElement('button');cell.type='button';cell.className='lead-cell'+(s%subdiv===0?' beat-edge':'')+(s%p.resolution===0?' bar-edge':'');cell.dataset.step=String(s);cell.dataset.midi=String(midi);cell.title=`${midiName(midi)} • bar ${Math.floor(s/p.resolution)+1}`;cell.style.gridColumn=String(s+2);cell.style.gridRow=String(rowIndex);
-        cell.onclick=()=>{if(leadEventCovering(p,midi,s))return;const ev={step:s,midi,durationSteps:1};p.events.push(ev);p.events=normalizeLeadEvents(p.events);if(!(playing||starting))auditionLeadNote(p,midi);markPartsDirty();renderLeadGrid(p);core.scheduleAutoSave();};
+        cell.onclick=()=>{if(leadEventCovering(p,midi,s))return;const ev={step:s,midi,durationSteps:1};p.events.push(ev);p.events=normalizeLeadEvents(p.events);auditionLeadNote(p,midi);markPartsDirty();renderLeadGrid(p);core.scheduleAutoSave();};
         grid.appendChild(cell);
       }
     }
@@ -1176,7 +1176,12 @@
     if(!audioCtx){
       audioCtx=new (window.AudioContext||window.webkitAudioContext)();
       audioCtx.addEventListener?.('statechange',()=>{
-        if((playing||starting)&&audioCtx?.state==='suspended'){audioCtx.resume().catch(()=>{});} 
+        // Mobile browsers can temporarily suspend/interupt WebAudio when the UI,
+        // audio route, or page focus changes. While transport is active, make a
+        // best-effort resume instead of letting the rolling scheduler silently die.
+        if((playing||starting)&&audioCtx&&audioCtx.state!=='running'&&audioCtx.state!=='closed'){
+          audioCtx.resume().catch(()=>{});
+        }
       });
     }
     if(audioCtx.state==='suspended')audioCtx.resume().catch(()=>{});
@@ -1307,19 +1312,25 @@
     return true;
   }
   async function auditionLeadNote(p,midi){
-    if(!p||p.type!=='lead'||playing||starting)return;
+    if(!p||p.type!=='lead')return;
     try{
-      const player=await playerFor(p);
-      busFor(p);
+      const transportActive=!!(playing||starting);
+      // Tapping/placing Lead or Bass notes should remain audible while the song is
+      // already playing. Never block the transport waiting on a network/sample load:
+      // use the ready player when available and warm the requested sound in parallel.
+      const player=await playerFor(p,{nonBlocking:transportActive});
+      if(!player){warmLivePlayer(p);return;}
+      const scheduledSound=playerSound.get(player)||outputSoundFor(p)||requestedPartSound(p);
+      busFor(p,scheduledSound);
       let soundingMidi=midi+(Number(p.octave)||0)*12;
-      if(core.isBassSound?.(p.sound)||p.sound==='electric_bass_finger')soundingMidi-=12;
-      const at=(audioCtx?.currentTime||0)+.01;
+      if(core.isBassSound?.(scheduledSound)||scheduledSound==='electric_bass_finger')soundingMidi-=12;
+      const at=(audioCtx?.currentTime||0)+(transportActive?.012:.01);
       const beatSec=60/Math.max(40,Math.min(240,+core.bpm||92));
-      const auditionDuration=p.sustain?sustainedPartSeconds(p.sound,beatSec):.42;
-      playTracked(player,midiName(soundingMidi),at,{duration:auditionDuration,gain:.96});
+      const auditionDuration=p.sustain?sustainedPartSeconds(scheduledSound,beatSec):.42;
+      playTracked(player,midiName(soundingMidi),at,{duration:auditionDuration,gain:transportActive?.88:.96});
     }catch(e){
       console.warn('Could not audition lead/bass note',e);
-      core.status('Could not preview that note.');
+      if(!(playing||starting))core.status('Could not preview that note.');
     }
   }
   async function vocalBufferForTake(takeId,sourcePartId=''){
@@ -1530,7 +1541,9 @@
       // switch, or heavy scroll/layout pass could delay that timer and create a tiny
       // underrun heard as static. We now keep ~1 second safely queued, while using
       // ~0.22s slices so live edits still enter the mix quickly after the buffer drains.
-      const schedulerHorizonSec=1.05,schedulerChunkSec=.22,schedulerTickMs=55;
+      // Keep enough audio queued to survive a short mobile layout/network/UI stall,
+      // while retaining short chunks so live edits join the mix promptly.
+      const schedulerHorizonSec=1.20,schedulerChunkSec=.20,schedulerTickMs=45;
       let vocalsScheduledForCycle=false,schedulerBusy=false,endStopScheduled=false;
 
       const scheduleNext=async()=>{
@@ -1538,6 +1551,8 @@
         if(schedulerBusy){cycleTimer=setTimeout(scheduleNext,schedulerTickMs);return;}
         schedulerBusy=true;
         try{
+          if(audioCtx?.state!=='running'&&audioCtx?.state!=='closed')await audioCtx.resume().catch(()=>{});
+          if(!playing||generation!==playbackGeneration)return;
           const horizon=audioCtx.currentTime+schedulerHorizonSec;
           while(playing&&generation===playbackGeneration&&nextAudioStart<horizon&&!endStopScheduled){
             const beatSec=60/Math.max(40,Math.min(240,+core.bpm||92));
@@ -1567,6 +1582,11 @@
               }
             }
           }
+        }catch(err){
+          // A transient decode/context hiccup should not kill the transport loop.
+          // Log it, keep the scheduler alive, and let the next short tick recover.
+          console.warn('Playback scheduler recovered from a transient error',err);
+          if(audioCtx&&audioCtx.state!=='running'&&audioCtx.state!=='closed')audioCtx.resume().catch(()=>{});
         }finally{
           schedulerBusy=false;
           if(playing&&generation===playbackGeneration&&!endStopScheduled)cycleTimer=setTimeout(scheduleNext,schedulerTickMs);
@@ -1597,7 +1617,7 @@
   }
   function togglePlayback(){if(playing||starting)stopPlayback();else startPlayback();}
   document.addEventListener('visibilitychange',()=>{
-    if((playing||starting)&&audioCtx?.state==='suspended')audioCtx.resume().catch(()=>{});
+    if((playing||starting)&&audioCtx&&audioCtx.state!=='running'&&audioCtx.state!=='closed')audioCtx.resume().catch(()=>{});
     if(playing||starting){ensureMediaSession();mediaKeepAlive?.play?.().catch(()=>{});updateMediaPosition();}
   });
   function toggleLeadPartPlayback(){

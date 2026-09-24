@@ -1,0 +1,17 @@
+v3.3.113 — Playback resilience + live Lead/Bass tap + Line label readability
+
+Playback audit / fixes
+- Lead/Bass note placement now auditions while transport is already playing (previous code explicitly blocked audition during playback).
+- Live audition uses an already-ready sample player during transport and will not block playback waiting for a network/sample decode.
+- WebAudio resume handling now covers any non-running active context, not only the suspended state.
+- Rolling scheduler buffer was modestly strengthened (1.20 s horizon, 0.20 s chunks, 45 ms tick).
+- Scheduler now catches transient context/decode errors and continues instead of allowing a one-off async error to break the rolling playback loop.
+
+Skin readability
+- Line 1 / Line 2 badges and the mobile Line x / y indicator now use each skin's panel/text/border variables with bold, fully opaque text across every skin.
+
+Files to upload
+- parts.js
+- skins.css
+- service-worker.js
+- song-rider/service-worker.js
