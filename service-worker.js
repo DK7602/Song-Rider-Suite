@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.108-rider-blood-light-og';
+const CACHE = 'song-rider-suite-v3.3.109-rider-blood-light-og-repair';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
   './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css','./skins.css','./skins.js',
