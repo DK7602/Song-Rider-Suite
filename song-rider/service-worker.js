@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.103-studio-pastel-pattern-srp';
+const CACHE = 'song-rider-suite-v3.3.107-rider-light-og-bg-update-srp';
 const ASSETS = [
   '../skins.css',
   '../skins.js',
@@ -6,7 +6,7 @@ const ASSETS = [
   './song-rider-pro-wordmark-hq.png',
   './song-rider-pro-wordmark-blood.png',
   './baby-daw-button-hq.png',
-  '../assets/rider-blood-light-pattern.png','../assets/light-diamond-pattern.jpg','../assets/studio-pastel-pattern.jpg',
+  '../assets/rider-blood-light-pattern.png','../assets/light-diamond-pattern.jpg','../assets/studio-pastel-pattern.jpg','../assets/rider-og-pattern.jpg','../assets/rider-light-og-pattern.jpg',
   '../assets/rider-dark-gold-pattern.jpg',
 './assets/song-rider-pro-wordmark-hq.png',
   './assets/baby-daw-button-hq.png',
