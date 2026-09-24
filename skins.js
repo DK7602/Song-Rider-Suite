@@ -14,6 +14,7 @@
     {id:'rider-light', name:'Rider Light', desc:'Light Rider palette with the current Bones & Rider buttons.', swatches:['#f4f4f2','#d8ac43','#f0cf52','#57a96f']},
     {id:'rider-light-og', name:'Rider Light OG', desc:'Rider Light with the supplied mint paisley background.', swatches:['#f4f4f2','#d8ac43','#f0cf52','#99d79f']},
     {id:'rider-blood-light', name:'Rider Blood Light', desc:'Red, patterned white, cream and polished gold with Rider artwork.', swatches:['#e60000','#fffdf7','#efe8cf','#d7a63c']}
+    ,{id:'rider-blood-light-og', name:'Rider Blood Light OG', desc:'Rider Blood Light with the supplied red-and-silver paisley background.', swatches:['#e60000','#fffdf7','#d4c3c3','#ff6b63']}
   ];
   const VALID = new Set(SKINS.map(s=>s.id));
   const $ = (s, root=document) => root.querySelector(s);
@@ -23,12 +24,12 @@
   function setThemeColor(skin){
     const map={
       'rider-original':'#111111', 'rider-og':'#111111', 'rider-blood':'#111111', 'studio-pastel':'#f2e6d7', 'black-label':'#090a0c',
-      'black-label-light':'#f6f5f1', 'royal-wave':'#005CF7', 'candy-pop':'#EFEAD7', 'rider-light':'#f4f4f2', 'rider-light-og':'#f4f4f2', 'rider-blood-light':'#efe8cf'
+      'black-label-light':'#f6f5f1', 'royal-wave':'#005CF7', 'candy-pop':'#EFEAD7', 'rider-light':'#f4f4f2', 'rider-light-og':'#f4f4f2', 'rider-blood-light':'#efe8cf', 'rider-blood-light-og':'#efe8cf'
     };
     const meta=$('meta[name="theme-color"]'); if(meta) meta.setAttribute('content',map[skin]||map[DEFAULT]);
   }
   function updateSkinAssets(skin){
-    const blood=skin==='rider-blood'||skin==='rider-blood-light';
+    const blood=skin==='rider-blood'||skin==='rider-blood-light'||skin==='rider-blood-light-og';
     document.querySelectorAll('.srp-exact-wordmark').forEach(img=>{
       if(!img.dataset.srsOriginalSrc)img.dataset.srsOriginalSrc=img.getAttribute('src')||'./song-rider-pro-wordmark-hq.png?v=3.3.12';
       img.setAttribute('src',blood?'./song-rider-pro-wordmark-blood.png?v=3.3.71':img.dataset.srsOriginalSrc);
@@ -36,8 +37,8 @@
   }
   function applySkin(skin, persist=true){
     skin=VALID.has(skin)?skin:DEFAULT;
-    const baseSkin=(skin==='rider-blood'||skin==='rider-og')?'rider-original':((skin==='rider-blood-light'||skin==='rider-light-og')?'rider-light':skin);
-    const variant=skin==='rider-blood'||skin==='rider-blood-light'?'blood':'';
+    const baseSkin=(skin==='rider-blood'||skin==='rider-og')?'rider-original':(((skin==='rider-blood-light'||skin==='rider-blood-light-og')||skin==='rider-light-og')?'rider-light':skin);
+    const variant=skin==='rider-blood'||skin==='rider-blood-light'||skin==='rider-blood-light-og'?'blood':'';
     document.documentElement.dataset.skin=baseSkin;
     document.documentElement.dataset.skinChoice=skin;
     if(variant) document.documentElement.dataset.skinVariant=variant; else delete document.documentElement.dataset.skinVariant;
