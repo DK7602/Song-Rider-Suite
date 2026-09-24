@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.109-rider-blood-light-og-repair-srp';
+const CACHE = 'song-rider-suite-v3.3.110-rider-blood-light-og-full-window-srp';
 const ASSETS = [
   '../skins.css',
   '../skins.js',
