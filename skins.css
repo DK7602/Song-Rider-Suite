@@ -2234,3 +2234,50 @@ html[data-skin-choice="rider-blood-light-og"] .crp-grid-wrap{
   color:#201b16!important;
   border-color:#d8caa8!important;
 }
+
+/* =========================================================
+   v3.3.110 — Rider Blood Light OG full-window background fix
+   The shared Rider Blood Light rules use a more-specific selector and were
+   winning on CRP / Baby DAW outer panels. Match that specificity here so the
+   OG red/silver paisley fills the COMPLETE app windows, not just nested areas.
+   No palette, controls, active-state colors, or other skins are changed.
+   ========================================================= */
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .auth-box,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .project-item,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .progression-line,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .composer-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .save-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .notes-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .account-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .project-browser-window,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .part-manager,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .part-modal-card,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .lead-part-editor,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vocal-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vocal-part-editor,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vocal-editor-card,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vocal-transcript-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .crp-beat-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vox-box-shell,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vox-box-header,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vox-box-tools,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vox-inspector,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .panel-body,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .crp-beat-head,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .crp-beat-foot,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .crp-randomizer,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .sheet,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .fullSectionCard,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .card,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .sheetHeader,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .fullPerf,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .fullPerfScroll{
+  background-color:#fffdf7!important;
+  background-image:linear-gradient(rgba(255,253,247,.08),rgba(255,253,247,.08)),url('./assets/rider-blood-light-og-pattern.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#201b16!important;
+  border-color:#d8caa8!important;
+}
