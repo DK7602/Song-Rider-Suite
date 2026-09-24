@@ -26,6 +26,17 @@ async function createSession(userId,env){const token=randomToken(),id=crypto.ran
 function validPassword(p){return typeof p==='string'&&p.length>=8&&p.length<=200;}
 function validEmail(e){return typeof e==='string'&&e.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);}
 
+const VALID_SKINS=new Set(['rider-original','rider-og','rider-blood','studio-pastel','black-label','black-label-plain','black-label-light','royal-wave','candy-pop','rider-light','rider-light-og','rider-blood-light','rider-blood-light-og']);
+let userPreferencesSchemaReady=false;
+async function ensureUserPreferencesSchema(env){
+  if(userPreferencesSchemaReady)return;
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS user_preferences (
+    user_id TEXT PRIMARY KEY,
+    skin TEXT,
+    updated_at INTEGER NOT NULL DEFAULT 0
+  )`).run();
+  userPreferencesSchemaReady=true;
+}
 
 let srpSchemaReady=false;
 async function ensureSrpSchema(env){
@@ -103,6 +114,21 @@ async function api(request,env,url){
     const salt=b64(crypto.getRandomValues(new Uint8Array(16))),hash=await hashPassword(newP,salt),now=Date.now();await env.DB.batch([env.DB.prepare('UPDATE users SET password_hash=?,password_salt=?,password_iterations=?,updated_at=? WHERE id=?').bind(hash,salt,ITERATIONS,now,u.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(u.id)]);const token=await createSession(u.id,env);return json({ok:true},200,{'Set-Cookie':sessionCookie(token)});
   }
   const u=await userFor(request,env);if(!u)return json({ok:false,error:'Please log in.'},401);
+
+  if(path==='/api/preferences/skin'&&method==='GET'){
+    await ensureUserPreferencesSchema(env);
+    const row=await env.DB.prepare('SELECT skin,updated_at FROM user_preferences WHERE user_id=?').bind(u.id).first();
+    return json({ok:true,skin:VALID_SKINS.has(String(row?.skin||''))?row.skin:null,updatedAt:Number(row?.updated_at)||0});
+  }
+  if(path==='/api/preferences/skin'&&method==='POST'){
+    await ensureUserPreferencesSchema(env);
+    const b=await body(request),skin=String(b.skin||'').trim();
+    if(!VALID_SKINS.has(skin))return json({ok:false,error:'Unknown skin.'},400);
+    const now=Date.now();
+    await env.DB.prepare(`INSERT INTO user_preferences(user_id,skin,updated_at) VALUES(?,?,?)
+      ON CONFLICT(user_id) DO UPDATE SET skin=excluded.skin,updated_at=excluded.updated_at`).bind(u.id,skin,now).run();
+    return json({ok:true,skin,updatedAt:now});
+  }
 
   // Song Rider Pro projects now use the same Song Rider Suite account/session as CRP.
   if(path==='/api/srp/projects'&&method==='GET'){

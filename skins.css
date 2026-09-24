@@ -14,7 +14,7 @@ html[data-skin="candy-pop"]{--bg:#EFEAD7;--panel:#FFB2F6;--panel2:#87FFF5;--text
 html[data-skin="rider-light"]{--bg:#f2f3f1;--panel:#fff;--panel2:#eceeeb;--text:#212429;--muted:#687078;--accent:#d5aa40;--accent2:#efca47;--line:#ced2cc;--good:#56a66d;--border:#ced2cc;--panel-2:#eceeeb;--srs-skin-bg:#f2f3f1;--srs-skin-panel:#fff;--srs-skin-panel2:#eceeeb;--srs-skin-text:#212429;--srs-skin-muted:#687078;--srs-skin-gold:#d5aa40;--srs-skin-accent:#d5aa40;--srs-skin-accent2:#efca47;--srs-skin-line:#ced2cc;--srs-skin-good:#56a66d;--srs-skin-input:#fff;--srs-skin-raised:#f0f2ef;--srs-skin-shadow:0 12px 28px rgba(25,28,25,.12)}
 
 /* Settings gear + skin picker */
-#accountPanel{position:relative}.srs-skin-gear{position:absolute;z-index:6;right:11px;top:10px;width:36px;height:36px;min-width:36px;padding:0!important;display:grid;place-items:center;border-radius:50%!important;font-size:1.15rem!important;line-height:1;background:linear-gradient(180deg,#f8d66d,#dcae38)!important;color:#211705!important;border:1px solid #c49428!important;box-shadow:0 3px 9px rgba(0,0,0,.24)!important}.account-heading,.account-summary-btn{padding-right:50px!important}.srs-skin-gear-inline{position:static!important;margin-left:auto!important;margin-right:5px!important;flex:0 0 36px}.srs-skin-modal[hidden]{display:none!important}.srs-skin-modal{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:16px}.srs-skin-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(5px)}.srs-skin-card{position:relative;width:min(760px,calc(100vw - 24px));max-height:min(760px,calc(100vh - 28px));overflow:auto;padding:18px;border:1px solid var(--srs-skin-line);border-radius:20px;background:var(--srs-skin-panel);color:var(--srs-skin-text);box-shadow:0 22px 80px rgba(0,0,0,.45)}.srs-skin-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between}.srs-skin-head h2{margin:0;font-size:1.2rem}.srs-skin-head p{margin:5px 0 0;color:var(--srs-skin-muted);font-size:.82rem;line-height:1.35}.srs-skin-close{width:38px;height:38px;min-width:38px;padding:0!important;border-radius:11px!important;font-size:1.35rem!important}.srs-skin-current{margin:13px 0 10px;font-size:.8rem;color:var(--srs-skin-muted)}.srs-skin-current strong{color:var(--srs-skin-gold)}.srs-skin-grid{display:grid;gap:10px}.srs-skin-choice{position:relative;width:100%;display:grid;grid-template-columns:130px minmax(0,1fr) 28px;align-items:center;gap:12px;padding:10px!important;text-align:left!important;border:1px solid var(--srs-skin-line)!important;border-radius:14px!important;background:var(--srs-skin-panel2)!important;color:var(--srs-skin-text)!important}.srs-skin-choice.is-selected{border-color:var(--srs-skin-gold)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--srs-skin-gold) 32%,transparent)!important}.srs-skin-choice-copy{display:grid;gap:3px}.srs-skin-choice-copy strong{font-size:.95rem}.srs-skin-choice-copy small{color:var(--srs-skin-muted);line-height:1.25}.srs-skin-check{opacity:0;font-weight:1000;color:var(--srs-skin-good);font-size:1.1rem}.srs-skin-choice.is-selected .srs-skin-check{opacity:1}.srs-skin-preview{height:72px;border-radius:11px;display:block;position:relative;overflow:hidden;border:1px solid rgba(127,127,127,.25)}.srs-preview-top{position:absolute;left:0;right:0;top:0;height:22px}.srs-preview-icons{position:absolute;left:8px;right:8px;bottom:8px;display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.srs-preview-icons i{height:31px;border-radius:8px;border:1px solid rgba(127,127,127,.24)}.preview-rider-original{background:#0d0f12}.preview-rider-original .srs-preview-top{background:linear-gradient(90deg,#111,#d4a53a,#111)}.preview-rider-original .srs-preview-icons i{background:#151a20}.preview-rider-blood{background:#0d0f12}.preview-rider-blood .srs-preview-top{background:linear-gradient(90deg,#111,#d4a53a,#a51f28,#111)}.preview-rider-blood .srs-preview-icons i{background:#171317;border-color:#6d252b}.preview-rider-blood .srs-preview-icons i:nth-child(2){box-shadow:inset 0 0 0 1px rgba(198,47,56,.55)}.preview-studio-pastel{background:#f2e6d7}.preview-studio-pastel .srs-preview-top{background:linear-gradient(90deg,#7aaed8,#c49a43,#e58caf)}.preview-studio-pastel .srs-preview-icons i:nth-child(1){background:#d8e8f3}.preview-studio-pastel .srs-preview-icons i:nth-child(2){background:#f1d7e2}.preview-studio-pastel .srs-preview-icons i:nth-child(3){background:#fff9ef}.preview-black-label{background:#090a0c}.preview-black-label .srs-preview-top{background:linear-gradient(90deg,#151515,#e2b84f,#151515)}.preview-black-label .srs-preview-icons i{background:linear-gradient(145deg,#191b1f,#0b0c0e);border-color:#5a4925}.preview-black-label-light{background:#f6f5f1}.preview-black-label-light .srs-preview-top{background:linear-gradient(90deg,#fff,#d0a643,#e5c84f,#4e9d65)}.preview-black-label-light .srs-preview-icons i{background:#ecece8}.preview-royal-wave{background:#005CF7}.preview-royal-wave .srs-preview-top{background:linear-gradient(90deg,#005CF7,#98D6FF,#FF9700,#EEE8C6)}.preview-royal-wave .srs-preview-icons i:nth-child(1){background:#98D6FF}.preview-royal-wave .srs-preview-icons i:nth-child(2){background:#FF9700}.preview-royal-wave .srs-preview-icons i:nth-child(3){background:#EEE8C6;border-color:#005CF7}.preview-candy-pop{background:#EFEAD7}.preview-candy-pop .srs-preview-top{background:linear-gradient(90deg,#FFB2F6,#87FFF5,#FFF600,#EFEAD7)}.preview-candy-pop .srs-preview-icons i:nth-child(1){background:#FFB2F6}.preview-candy-pop .srs-preview-icons i:nth-child(2){background:#87FFF5}.preview-candy-pop .srs-preview-icons i:nth-child(3){background:#FFF600;border-color:#d1c700}.preview-rider-light{background:#f2f3f1}.preview-rider-light .srs-preview-top{background:linear-gradient(90deg,#fff,#d5aa40,#efca47,#56a66d)}.preview-rider-light .srs-preview-icons i{background:#e9ece8}.preview-rider-blood-light{background:#f2f3f1}.preview-rider-blood-light .srs-preview-top{background:linear-gradient(90deg,#fff,#d5aa40,#efca47,#c62f38)}.preview-rider-blood-light .srs-preview-icons i{background:#f0e9e9;border-color:#d8b9bb}.preview-rider-blood-light .srs-preview-icons i:nth-child(2){box-shadow:inset 0 0 0 1px rgba(198,47,56,.38)}.srs-swatch-row{display:flex;gap:5px;margin-top:5px}.srs-swatch-row i{width:17px;height:17px;border-radius:50%;background:var(--sw);border:1px solid rgba(100,100,100,.25)}body.srs-skin-modal-open{overflow:hidden!important}
+#accountPanel{position:relative}.srs-skin-gear{position:absolute;z-index:6;right:11px;top:10px;width:36px;height:36px;min-width:36px;padding:0!important;display:grid;place-items:center;border-radius:50%!important;font-size:1.15rem!important;line-height:1;background:linear-gradient(180deg,#f8d66d,#dcae38)!important;color:#211705!important;border:1px solid #c49428!important;box-shadow:0 3px 9px rgba(0,0,0,.24)!important}.account-heading,.account-summary-btn{padding-right:50px!important}.srs-skin-gear-inline{position:static!important;margin-left:auto!important;margin-right:5px!important;flex:0 0 36px}.srs-skin-modal[hidden]{display:none!important}.srs-skin-modal{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:16px}.srs-skin-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(5px)}.srs-skin-card{position:relative;width:min(760px,calc(100vw - 24px));max-height:min(760px,calc(100vh - 28px));overflow:auto;padding:18px;border:1px solid var(--srs-skin-line);border-radius:20px;background:var(--srs-skin-panel);color:var(--srs-skin-text);box-shadow:0 22px 80px rgba(0,0,0,.45)}.srs-skin-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between}.srs-skin-head h2{margin:0;font-size:1.2rem}.srs-skin-head p{margin:5px 0 0;color:var(--srs-skin-muted);font-size:.82rem;line-height:1.35}.srs-skin-close{width:38px;height:38px;min-width:38px;padding:0!important;border-radius:11px!important;font-size:1.35rem!important}.srs-skin-current{margin:13px 0 10px;font-size:.8rem;color:var(--srs-skin-muted)}.srs-skin-current strong{color:var(--srs-skin-gold)}.srs-skin-grid{display:grid;gap:10px}.srs-skin-choice{position:relative;width:100%;display:grid;grid-template-columns:130px minmax(0,1fr) 28px;align-items:center;gap:12px;padding:10px!important;text-align:left!important;border:1px solid var(--srs-skin-line)!important;border-radius:14px!important;background:var(--srs-skin-panel2)!important;color:var(--srs-skin-text)!important}.srs-skin-choice.is-selected{border-color:var(--srs-skin-gold)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--srs-skin-gold) 32%,transparent)!important}.srs-skin-choice-copy{display:grid;gap:3px}.srs-skin-choice-copy strong{font-size:.95rem}.srs-skin-choice-copy small{color:var(--srs-skin-muted);line-height:1.25}.srs-skin-check{opacity:0;font-weight:1000;color:var(--srs-skin-good);font-size:1.1rem}.srs-skin-choice.is-selected .srs-skin-check{opacity:1}.srs-skin-preview{height:72px;border-radius:11px;display:block;position:relative;overflow:hidden;border:1px solid rgba(127,127,127,.25)}.srs-preview-top{position:absolute;left:0;right:0;top:0;height:22px}.srs-preview-icons{position:absolute;left:8px;right:8px;bottom:8px;display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.srs-preview-icons i{height:31px;border-radius:8px;border:1px solid rgba(127,127,127,.24)}.preview-rider-original{background:#0d0f12}.preview-rider-original .srs-preview-top{background:linear-gradient(90deg,#111,#d4a53a,#111)}.preview-rider-original .srs-preview-icons i{background:#151a20}.preview-rider-og{background:#0d0f12}.preview-rider-og .srs-preview-top{background:linear-gradient(90deg,#111,#8a7a25,#111)}.preview-rider-og .srs-preview-icons i{background:#151a20;border-color:#6a5f22}.preview-rider-blood{background:#0d0f12}.preview-rider-blood .srs-preview-top{background:linear-gradient(90deg,#111,#d4a53a,#a51f28,#111)}.preview-rider-blood .srs-preview-icons i{background:#171317;border-color:#6d252b}.preview-rider-blood .srs-preview-icons i:nth-child(2){box-shadow:inset 0 0 0 1px rgba(198,47,56,.55)}.preview-studio-pastel{background:#f2e6d7}.preview-studio-pastel .srs-preview-top{background:linear-gradient(90deg,#7aaed8,#c49a43,#e58caf)}.preview-studio-pastel .srs-preview-icons i:nth-child(1){background:#d8e8f3}.preview-studio-pastel .srs-preview-icons i:nth-child(2){background:#f1d7e2}.preview-studio-pastel .srs-preview-icons i:nth-child(3){background:#fff9ef}.preview-black-label{background:#090a0c}.preview-black-label .srs-preview-top{background:linear-gradient(90deg,#151515,#e2b84f,#151515)}.preview-black-label .srs-preview-icons i{background:linear-gradient(145deg,#191b1f,#0b0c0e);border-color:#5a4925}.preview-black-label-plain{background:#090a0c}.preview-black-label-plain .srs-preview-top{background:linear-gradient(90deg,#151515,#e2b84f,#151515)}.preview-black-label-plain .srs-preview-icons i{background:linear-gradient(145deg,#191b1f,#0b0c0e);border-color:#5a4925}.preview-black-label-light{background:#f6f5f1}.preview-black-label-light .srs-preview-top{background:linear-gradient(90deg,#fff,#d0a643,#e5c84f,#4e9d65)}.preview-black-label-light .srs-preview-icons i{background:#ecece8}.preview-royal-wave{background:#005CF7}.preview-royal-wave .srs-preview-top{background:linear-gradient(90deg,#005CF7,#98D6FF,#FF9700,#EEE8C6)}.preview-royal-wave .srs-preview-icons i:nth-child(1){background:#98D6FF}.preview-royal-wave .srs-preview-icons i:nth-child(2){background:#FF9700}.preview-royal-wave .srs-preview-icons i:nth-child(3){background:#EEE8C6;border-color:#005CF7}.preview-candy-pop{background:#EFEAD7}.preview-candy-pop .srs-preview-top{background:linear-gradient(90deg,#FFB2F6,#87FFF5,#FFF600,#EFEAD7)}.preview-candy-pop .srs-preview-icons i:nth-child(1){background:#FFB2F6}.preview-candy-pop .srs-preview-icons i:nth-child(2){background:#87FFF5}.preview-candy-pop .srs-preview-icons i:nth-child(3){background:#FFF600;border-color:#d1c700}.preview-rider-light{background:#f2f3f1}.preview-rider-light .srs-preview-top{background:linear-gradient(90deg,#fff,#d5aa40,#efca47,#56a66d)}.preview-rider-light .srs-preview-icons i{background:#e9ece8}.preview-rider-light-og{background:#f2f3f1}.preview-rider-light-og .srs-preview-top{background:linear-gradient(90deg,#fff,#d5aa40,#efca47,#99d79f)}.preview-rider-light-og .srs-preview-icons i{background:#eef5ee;border-color:#b6d7b8}.preview-rider-blood-light{background:#f2f3f1}.preview-rider-blood-light .srs-preview-top{background:linear-gradient(90deg,#fff,#d5aa40,#efca47,#c62f38)}.preview-rider-blood-light .srs-preview-icons i{background:#f0e9e9;border-color:#d8b9bb}.preview-rider-blood-light .srs-preview-icons i:nth-child(2){box-shadow:inset 0 0 0 1px rgba(198,47,56,.38)}.srs-swatch-row{display:flex;gap:5px;margin-top:5px}.srs-swatch-row i{width:17px;height:17px;border-radius:50%;background:var(--sw);border:1px solid rgba(100,100,100,.25)}body.srs-skin-modal-open{overflow:hidden!important}
 @media(max-width:560px){.srs-skin-card{padding:13px}.srs-skin-choice{grid-template-columns:92px minmax(0,1fr) 20px;gap:8px}.srs-skin-preview{height:62px}.srs-preview-icons i{height:27px}.srs-skin-choice-copy small{font-size:.7rem}}
 
 /* Functional icon artwork for skull-free skins. */
@@ -22,7 +22,7 @@ html[data-skin="rider-light"]{--bg:#f2f3f1;--panel:#fff;--panel2:#eceeeb;--text:
 html[data-skin="studio-pastel"] .srs-theme-mode-icon,html[data-skin="black-label"] .srs-theme-mode-icon,html[data-skin="black-label-light"] .srs-theme-mode-icon,html[data-skin="royal-wave"] .srs-theme-mode-icon,html[data-skin="candy-pop"] .srs-theme-mode-icon{display:grid!important;place-items:center!important;flex:0 0 58px!important;width:58px!important;height:58px!important;padding:10px!important;border-radius:17px!important;position:relative!important;z-index:2}
 html[data-skin="studio-pastel"] .workspace-mode-btn .mode-art,html[data-skin="studio-pastel"] .workspace-mode-btn .baby-exact-art,html[data-skin="black-label"] .workspace-mode-btn .mode-art,html[data-skin="black-label"] .workspace-mode-btn .baby-exact-art,html[data-skin="black-label-light"] .workspace-mode-btn .mode-art,html[data-skin="black-label-light"] .workspace-mode-btn .baby-exact-art,html[data-skin="royal-wave"] .workspace-mode-btn .mode-art,html[data-skin="royal-wave"] .workspace-mode-btn .baby-exact-art,html[data-skin="candy-pop"] .workspace-mode-btn .mode-art,html[data-skin="candy-pop"] .workspace-mode-btn .baby-exact-art{display:none!important}
 html[data-skin="studio-pastel"] .srs-theme-mode-copy,html[data-skin="black-label"] .srs-theme-mode-copy,html[data-skin="black-label-light"] .srs-theme-mode-copy,html[data-skin="royal-wave"] .srs-theme-mode-copy,html[data-skin="candy-pop"] .srs-theme-mode-copy{display:flex!important;position:relative!important;z-index:2}
-html[data-skin="rider-original"] .srs-theme-mode-copy,html[data-skin="rider-light"] .srs-theme-mode-copy,html[data-skin-choice="rider-blood"] .srs-theme-mode-copy,html[data-skin-choice="rider-blood-light"] .srs-theme-mode-copy{display:none!important}
+html[data-skin="rider-original"] .srs-theme-mode-copy,html[data-skin="rider-light"] .srs-theme-mode-copy,html[data-skin-choice="rider-blood"] .srs-theme-mode-copy,html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .srs-theme-mode-copy{display:none!important}
 html[data-skin="studio-pastel"] .srs-theme-mode-icon-chord{color:#5c91bd;background:#e0eef6;border:1px solid #b8d1e2}html[data-skin="studio-pastel"] .srs-theme-mode-icon-daw{color:#b85f87;background:#f7e0e9;border:1px solid #ecc0d2}html[data-skin="studio-pastel"] .srs-theme-mode-icon-song{color:#a57c2e;background:#fff3d5;border:1px solid #e7d09c}
 html[data-skin="black-label"] .srs-theme-mode-icon{color:#edc75f;background:radial-gradient(circle at 40% 25%,#2f2a19,#101114 64%);border:1px solid #66542a;box-shadow:inset 0 1px 0 rgba(255,244,190,.18),0 4px 12px rgba(0,0,0,.35)}
 html[data-skin="black-label-light"] .srs-theme-mode-icon{color:#b68b28;background:linear-gradient(145deg,#fff,#ecebe6);border:1px solid #d7c386;box-shadow:0 3px 8px rgba(45,41,30,.08)}
@@ -647,11 +647,11 @@ html[data-skin-variant="blood"]{
 
 /* Blood variants keep the Rider artwork; never show the skull-free vector art. */
 html[data-skin-choice="rider-blood"] .srs-theme-mode-icon,
-html[data-skin-choice="rider-blood-light"] .srs-theme-mode-icon{display:none!important;}
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .srs-theme-mode-icon{display:none!important;}
 html[data-skin-choice="rider-blood"] .workspace-mode-btn .mode-art,
 html[data-skin-choice="rider-blood"] .workspace-mode-btn .baby-exact-art,
-html[data-skin-choice="rider-blood-light"] .workspace-mode-btn .mode-art,
-html[data-skin-choice="rider-blood-light"] .workspace-mode-btn .baby-exact-art{display:block!important;}
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .workspace-mode-btn .mode-art,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .workspace-mode-btn .baby-exact-art{display:block!important;}
 
 /* Thin blood-red trim around the main cards/windows and section separators. */
 html[data-skin-variant="blood"] .panel,
@@ -667,11 +667,11 @@ html[data-skin-variant="blood"] .progression-line{
   border-color:color-mix(in srgb,var(--srs-blood) 52%,var(--srs-skin-line,#343a43))!important;
   box-shadow:0 0 0 1px rgba(198,47,56,.16),0 0 11px rgba(198,47,56,.09)!important;
 }
-html[data-skin-choice="rider-blood-light"] .panel,
-html[data-skin-choice="rider-blood-light"] .auth-box,
-html[data-skin-choice="rider-blood-light"] .lead-part-editor,
-html[data-skin-choice="rider-blood-light"] .crp-beat-panel,
-html[data-skin-choice="rider-blood-light"] .vox-inspector{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .auth-box,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-part-editor,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-inspector{
   box-shadow:0 0 0 1px rgba(198,47,56,.14),0 0 14px rgba(198,47,56,.075),var(--srs-skin-shadow)!important;
 }
 
@@ -737,9 +737,9 @@ html[data-skin-variant="blood"] .vox-box-page.multi-select-mode .vox-instrument-
 
 /* Light Blood keeps Rider Light's readable editor canvases but makes the red
    cells and red trim the visual pop instead of green. */
-html[data-skin-choice="rider-blood-light"] .crp-midi-roll-wrap,
-html[data-skin-choice="rider-blood-light"] .lead-grid-wrap,
-html[data-skin-choice="rider-blood-light"] .crp-grid-wrap{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-midi-roll-wrap,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-grid-wrap,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-grid-wrap{
   border-color:rgba(198,47,56,.30)!important;
   box-shadow:0 0 0 1px rgba(198,47,56,.08),0 0 10px rgba(198,47,56,.055)!important;
 }
@@ -828,7 +828,7 @@ html[data-skin="candy-pop"] .crp-step.active::after{background:#706d00!important
    ========================================================= */
 
 /* Rider Blood Light: red / patterned white / cream / polished gold */
-html[data-skin-choice="rider-blood-light"]{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]){
   --bg:#efe8cf;
   --panel:#fffdf7;
   --panel2:#f6f0df;
@@ -857,18 +857,18 @@ html[data-skin-choice="rider-blood-light"]{
   --srs-blood-bright:#ff2b2b;
   --srs-blood-deep:#a80000;
 }
-html[data-skin-choice="rider-blood-light"] body{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) body{
   background:#efe8cf!important;
   color:#201b16!important;
 }
-html[data-skin-choice="rider-blood-light"] .panel,
-html[data-skin-choice="rider-blood-light"] .auth-box,
-html[data-skin-choice="rider-blood-light"] .project-item,
-html[data-skin-choice="rider-blood-light"] .progression-line,
-html[data-skin-choice="rider-blood-light"] .lead-part-editor,
-html[data-skin-choice="rider-blood-light"] .crp-beat-panel,
-html[data-skin-choice="rider-blood-light"] .vox-inspector,
-html[data-skin-choice="rider-blood-light"] .vox-box-header{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .auth-box,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .project-item,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .progression-line,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-part-editor,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-inspector,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-header{
   background-color:#fffdf7!important;
   background-image:url('./assets/rider-blood-light-pattern.png')!important;
   background-size:220px auto!important;
@@ -876,32 +876,32 @@ html[data-skin-choice="rider-blood-light"] .vox-box-header{
   color:#201b16!important;
   border-color:#d8caa8!important;
 }
-html[data-skin-choice="rider-blood-light"] .workspace-mode-btn.active,
-html[data-skin-choice="rider-blood-light"] .seg.active,
-html[data-skin-choice="rider-blood-light"] .toggle-btn.on,
-html[data-skin-choice="rider-blood-light"] .vox-box-tools .is-active,
-html[data-skin-choice="rider-blood-light"] .crp-bar-tab.active,
-html[data-skin-choice="rider-blood-light"] .btn-primary{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .workspace-mode-btn.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .seg.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .toggle-btn.on,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-tools .is-active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-bar-tab.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .btn-primary{
   background:linear-gradient(180deg,#ff2525 0%,#e60000 58%,#b40000 100%)!important;
   color:#fff!important;
   border-color:#9f0000!important;
 }
-html[data-skin-choice="rider-blood-light"] .gold-btn,
-html[data-skin-choice="rider-blood-light"] .track-master-gold-btn{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .gold-btn,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .track-master-gold-btn{
   background:linear-gradient(90deg,#a87312 0%,#e4b747 24%,#fff19b 48%,#d7a63c 72%,#9a680d 100%)!important;
   color:#1c1607!important;
 }
-html[data-skin-choice="rider-blood-light"] .crp-midi-cell.on,
-html[data-skin-choice="rider-blood-light"] .lead-cell.on,
-html[data-skin-choice="rider-blood-light"] .lead-note-block,
-html[data-skin-choice="rider-blood-light"] .crp-step.active,
-html[data-skin-choice="rider-blood-light"] .vox-drum-cell.on{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-midi-cell.on,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-cell.on,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-note-block,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-step.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-drum-cell.on{
   background:#e60000!important;
   color:#fff!important;
   border-color:#ff5a5a!important;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.32),0 0 0 1px #9f0000!important;
 }
-html[data-skin-choice="rider-blood-light"] .crp-midi-cell.on{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-midi-cell.on{
   background-image:repeating-linear-gradient(to right,transparent 0,transparent calc(var(--midi-beat-px,24px) - 1px),rgba(255,255,255,.25) calc(var(--midi-beat-px,24px) - 1px),rgba(255,255,255,.25) var(--midi-beat-px,24px)),linear-gradient(#e60000,#c90000)!important;
 }
 
@@ -958,7 +958,7 @@ html[data-skin="candy-pop"] .crp-step.active::after{background:#706D00!important
    chooser attribute. The uploaded cream/gold geometric pattern is integrated
    into window surfaces, while selected controls are true blood red. */
 html[data-skin="rider-blood-light"],
-html[data-skin-choice="rider-blood-light"]{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]){
   --bg:#EFE8CF;--panel:#FFFDF7;--panel2:#F6F0DF;--text:#201B16;--muted:#71695D;
   --accent:#D7A63C;--accent2:#E60000;--line:#D8CAA8;--good:#E60000;--border:#D8CAA8;
   --srs-skin-bg:#EFE8CF;--srs-skin-panel:#FFFDF7;--srs-skin-panel2:#F6F0DF;
@@ -968,7 +968,7 @@ html[data-skin-choice="rider-blood-light"]{
   --srs-blood:#E60000;--srs-blood-bright:#FF2B2B;--srs-blood-deep:#A80000;
 }
 html[data-skin="rider-blood-light"] body,
-html[data-skin-choice="rider-blood-light"] body{background:#EFE8CF!important;color:#201B16!important}
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) body{background:#EFE8CF!important;color:#201B16!important}
 
 html[data-skin="rider-blood-light"] .panel,
 html[data-skin="rider-blood-light"] .auth-box,
@@ -978,14 +978,14 @@ html[data-skin="rider-blood-light"] .lead-part-editor,
 html[data-skin="rider-blood-light"] .crp-beat-panel,
 html[data-skin="rider-blood-light"] .vox-inspector,
 html[data-skin="rider-blood-light"] .vox-box-header,
-html[data-skin-choice="rider-blood-light"] .panel,
-html[data-skin-choice="rider-blood-light"] .auth-box,
-html[data-skin-choice="rider-blood-light"] .project-item,
-html[data-skin-choice="rider-blood-light"] .progression-line,
-html[data-skin-choice="rider-blood-light"] .lead-part-editor,
-html[data-skin-choice="rider-blood-light"] .crp-beat-panel,
-html[data-skin-choice="rider-blood-light"] .vox-inspector,
-html[data-skin-choice="rider-blood-light"] .vox-box-header{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .auth-box,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .project-item,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .progression-line,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-part-editor,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-inspector,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-header{
   background-color:#FFFDF7!important;
   background-image:linear-gradient(rgba(255,253,247,.10),rgba(255,253,247,.10)),url('./assets/rider-blood-light-pattern.png')!important;
   background-size:auto,270px auto!important;
@@ -1002,12 +1002,12 @@ html[data-skin="rider-blood-light"] button.accent,
 html[data-skin="rider-blood-light"] .vox-box-tools .is-active,
 html[data-skin="rider-blood-light"] .crp-bar-tab.active,
 html[data-skin="rider-blood-light"] .btn-primary,
-html[data-skin-choice="rider-blood-light"] .seg.active,
-html[data-skin-choice="rider-blood-light"] .toggle-btn.on,
-html[data-skin-choice="rider-blood-light"] button.accent,
-html[data-skin-choice="rider-blood-light"] .vox-box-tools .is-active,
-html[data-skin-choice="rider-blood-light"] .crp-bar-tab.active,
-html[data-skin-choice="rider-blood-light"] .btn-primary{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .seg.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .toggle-btn.on,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) button.accent,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-tools .is-active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-bar-tab.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .btn-primary{
   background:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
   background-image:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
   color:#FFF!important;
@@ -1016,8 +1016,8 @@ html[data-skin-choice="rider-blood-light"] .btn-primary{
 }
 html[data-skin="rider-blood-light"] .seg.active *,
 html[data-skin="rider-blood-light"] .toggle-btn.on *,
-html[data-skin-choice="rider-blood-light"] .seg.active *,
-html[data-skin-choice="rider-blood-light"] .toggle-btn.on *{color:#FFF!important}
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .seg.active *,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .toggle-btn.on *{color:#FFF!important}
 
 /* Rider Blood Light selected editor cells remain fully red as well. */
 html[data-skin="rider-blood-light"] .crp-midi-cell.on,
@@ -1025,11 +1025,11 @@ html[data-skin="rider-blood-light"] .lead-cell.on,
 html[data-skin="rider-blood-light"] .lead-note-block,
 html[data-skin="rider-blood-light"] .crp-step.active,
 html[data-skin="rider-blood-light"] .vox-drum-cell.on,
-html[data-skin-choice="rider-blood-light"] .crp-midi-cell.on,
-html[data-skin-choice="rider-blood-light"] .lead-cell.on,
-html[data-skin-choice="rider-blood-light"] .lead-note-block,
-html[data-skin-choice="rider-blood-light"] .crp-step.active,
-html[data-skin-choice="rider-blood-light"] .vox-drum-cell.on{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-midi-cell.on,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-cell.on,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-note-block,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-step.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-drum-cell.on{
   background:#E60000!important;color:#FFF!important;border-color:#FF5A5A!important;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.32),0 0 0 1px #9F0000!important;
 }
@@ -1041,36 +1041,36 @@ html[data-skin-choice="rider-blood-light"] .vox-drum-cell.on{
 /* Rider Blood Light uses rider-light as the base skin plus data-skin-choice
    plus data-skin-variant=blood. Apply the cream/gold pattern to the actual
    app windows across CRP, Baby DAW and SRP-integrated surfaces. */
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .panel,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .auth-box,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .project-item,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .progression-line,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .lead-part-editor,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .vocal-editor-card,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-beat-panel,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .vox-inspector,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .vox-box-header,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .vox-box-tools,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .vox-box-shell,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .panel-body,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-beat-head,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-beat-foot,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-randomizer,
-html[data-skin-choice="rider-blood-light"] .panel,
-html[data-skin-choice="rider-blood-light"] .auth-box,
-html[data-skin-choice="rider-blood-light"] .project-item,
-html[data-skin-choice="rider-blood-light"] .progression-line,
-html[data-skin-choice="rider-blood-light"] .lead-part-editor,
-html[data-skin-choice="rider-blood-light"] .vocal-editor-card,
-html[data-skin-choice="rider-blood-light"] .crp-beat-panel,
-html[data-skin-choice="rider-blood-light"] .vox-inspector,
-html[data-skin-choice="rider-blood-light"] .vox-box-header,
-html[data-skin-choice="rider-blood-light"] .vox-box-tools,
-html[data-skin-choice="rider-blood-light"] .vox-box-shell,
-html[data-skin-choice="rider-blood-light"] .panel-body,
-html[data-skin-choice="rider-blood-light"] .crp-beat-head,
-html[data-skin-choice="rider-blood-light"] .crp-beat-foot,
-html[data-skin-choice="rider-blood-light"] .crp-randomizer{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .panel,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .auth-box,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .project-item,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .progression-line,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-part-editor,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vocal-editor-card,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-panel,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-inspector,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-header,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-tools,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-shell,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .panel-body,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-head,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-foot,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-randomizer,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .auth-box,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .project-item,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .progression-line,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-part-editor,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vocal-editor-card,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-inspector,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-header,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-tools,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-shell,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .panel-body,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-head,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-foot,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-randomizer{
   background-color:#FFFDF7!important;
   background-image:linear-gradient(rgba(255,253,247,.10),rgba(255,253,247,.10)),url('./assets/rider-blood-light-pattern.png')!important;
   background-size:auto,270px auto!important;
@@ -1082,45 +1082,45 @@ html[data-skin-choice="rider-blood-light"] .crp-randomizer{
 
 /* Rider Blood Light: selected buttons/tabs/toggles should go blood red in CRP,
    Baby DAW and SRP-integrated screens. */
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .workspace-mode-btn.active,
-html[data-skin-choice="rider-blood-light"] .workspace-mode-btn.active,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .seg.active,
-html[data-skin-choice="rider-blood-light"] .seg.active,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .toggle-btn.on,
-html[data-skin-choice="rider-blood-light"] .toggle-btn.on,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .project-browser-tab.active,
-html[data-skin-choice="rider-blood-light"] .project-browser-tab.active,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .part-choice.active,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .part-choice.is-selected,
-html[data-skin-choice="rider-blood-light"] .part-choice.active,
-html[data-skin-choice="rider-blood-light"] .part-choice.is-selected,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] button[aria-pressed="true"]:not(.srs-skin-choice),
-html[data-skin-choice="rider-blood-light"] button[aria-pressed="true"]:not(.srs-skin-choice),
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .vox-box-tools .is-active,
-html[data-skin-choice="rider-blood-light"] .vox-box-tools .is-active,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-bar-tab.active,
-html[data-skin-choice="rider-blood-light"] .crp-bar-tab.active,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .btn-primary,
-html[data-skin-choice="rider-blood-light"] .btn-primary{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .workspace-mode-btn.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .workspace-mode-btn.active,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .seg.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .seg.active,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .toggle-btn.on,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .toggle-btn.on,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .project-browser-tab.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .project-browser-tab.active,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .part-choice.active,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .part-choice.is-selected,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .part-choice.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .part-choice.is-selected,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) button[aria-pressed="true"]:not(.srs-skin-choice),
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) button[aria-pressed="true"]:not(.srs-skin-choice),
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-tools .is-active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-tools .is-active,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-bar-tab.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-bar-tab.active,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .btn-primary,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .btn-primary{
   background:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
   background-image:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
   color:#FFF!important;
   border-color:#9F0000!important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 2px 6px rgba(150,0,0,.16)!important;
 }
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .workspace-mode-btn.active .mode-copy,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .workspace-mode-btn.active .mode-copy *,
-html[data-skin-choice="rider-blood-light"] .workspace-mode-btn.active .mode-copy,
-html[data-skin-choice="rider-blood-light"] .workspace-mode-btn.active .mode-copy *,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .seg.active *,
-html[data-skin-choice="rider-blood-light"] .seg.active *,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .toggle-btn.on *,
-html[data-skin-choice="rider-blood-light"] .toggle-btn.on *{color:#FFF!important;}
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .workspace-mode-btn.active .mode-copy,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .workspace-mode-btn.active .mode-copy *,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .workspace-mode-btn.active .mode-copy,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .workspace-mode-btn.active .mode-copy *,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .seg.active *,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .seg.active *,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .toggle-btn.on *,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .toggle-btn.on *{color:#FFF!important;}
 
 /* Keep general action buttons in Rider Blood Light on the red/dark family so the
    skin matches the original Rider Blood Light look again. */
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] button:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.gold-btn):not(.seg):not(.toggle-btn):not(.btn-primary),
-html[data-skin-choice="rider-blood-light"] button:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.gold-btn):not(.seg):not(.toggle-btn):not(.btn-primary){
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) button:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.gold-btn):not(.seg):not(.toggle-btn):not(.btn-primary),
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) button:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.gold-btn):not(.seg):not(.toggle-btn):not(.btn-primary){
   background:#1E2430!important;
   color:#FFF5F5!important;
   border-color:#B3222A!important;
@@ -1179,23 +1179,23 @@ html[data-skin="candy-pop"] .crp-step.active::after{background:#706D00!important
 
 /* Rider Blood Light — extend the patterned window treatment across all
    CRP / Baby DAW / utility window containers without patterning controls. */
-html[data-skin-choice="rider-blood-light"] .composer-panel,
-html[data-skin-choice="rider-blood-light"] .save-panel,
-html[data-skin-choice="rider-blood-light"] .notes-panel,
-html[data-skin-choice="rider-blood-light"] .account-panel,
-html[data-skin-choice="rider-blood-light"] .project-browser-window,
-html[data-skin-choice="rider-blood-light"] .part-manager,
-html[data-skin-choice="rider-blood-light"] .part-modal-card,
-html[data-skin-choice="rider-blood-light"] .lead-part-editor,
-html[data-skin-choice="rider-blood-light"] .vocal-panel,
-html[data-skin-choice="rider-blood-light"] .vocal-part-editor,
-html[data-skin-choice="rider-blood-light"] .vocal-editor-card,
-html[data-skin-choice="rider-blood-light"] .vocal-transcript-panel,
-html[data-skin-choice="rider-blood-light"] .crp-beat-panel,
-html[data-skin-choice="rider-blood-light"] .vox-box-shell,
-html[data-skin-choice="rider-blood-light"] .vox-box-header,
-html[data-skin-choice="rider-blood-light"] .vox-box-tools,
-html[data-skin-choice="rider-blood-light"] .vox-inspector{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .composer-panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .save-panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .notes-panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .account-panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .project-browser-window,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .part-manager,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .part-modal-card,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-part-editor,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vocal-panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vocal-part-editor,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vocal-editor-card,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vocal-transcript-panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-panel,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-shell,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-header,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-tools,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-inspector{
   background-color:#FFFDF7!important;
   background-image:url('./assets/rider-blood-light-pattern.png')!important;
   background-repeat:repeat!important;
@@ -1206,13 +1206,13 @@ html[data-skin-choice="rider-blood-light"] .vox-inspector{
 }
 
 /* Rider Blood Light — primary/action buttons return to the red family. */
-html[data-skin-choice="rider-blood-light"] button.accent,
-html[data-skin-choice="rider-blood-light"] .add-part-btn,
-html[data-skin-choice="rider-blood-light"] .part-preview-btn,
-html[data-skin-choice="rider-blood-light"] .vocal-record-btn,
-html[data-skin-choice="rider-blood-light"] .vocal-master-play-btn,
-html[data-skin-choice="rider-blood-light"] .vox-record-transport,
-html[data-skin-choice="rider-blood-light"] .vox-box-launch{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) button.accent,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .add-part-btn,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .part-preview-btn,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vocal-record-btn,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vocal-master-play-btn,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-record-transport,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-launch{
   background:linear-gradient(180deg,#FF2424 0%,#E60000 58%,#B70000 100%)!important;
   background-image:linear-gradient(180deg,#FF2424 0%,#E60000 58%,#B70000 100%)!important;
   color:#FFF!important;
@@ -1222,17 +1222,17 @@ html[data-skin-choice="rider-blood-light"] .vox-box-launch{
 
 /* Rider Blood Light — the Baby DAW tile uses a full-card image that hid the
    red active background. Tint that image red only while BD is selected. */
-html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active{
   background:#E60000!important;
   border-color:#930000!important;
   box-shadow:0 0 0 2px rgba(199,0,0,.28),0 0 18px rgba(220,0,0,.34)!important;
 }
-html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art{
   position:relative!important;
   overflow:hidden!important;
   border-radius:inherit!important;
 }
-html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art::after{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art::after{
   content:"";
   position:absolute;
   inset:0;
@@ -1241,7 +1241,7 @@ html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-ar
   background:rgba(226,0,0,.32);
   box-shadow:inset 0 0 0 2px rgba(255,50,50,.72);
 }
-html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art img{
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art img{
   position:relative!important;
   z-index:2!important;
 }
@@ -1291,24 +1291,24 @@ html[data-skin="candy-pop"] .vox-drum-cell.on{
    ========================================================= */
 
 /* 1) Rider Blood Light: make all active note/beat/chord cells fully solid red */
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-step.active,
-html[data-skin-choice="rider-blood-light"] .crp-step.active,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .vox-drum-cell.on,
-html[data-skin-choice="rider-blood-light"] .vox-drum-cell.on,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-midi-cell.on,
-html[data-skin-choice="rider-blood-light"] .crp-midi-cell.on,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-midi-cell.on.playing,
-html[data-skin-choice="rider-blood-light"] .crp-midi-cell.on.playing,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-midi-cell.playing.on,
-html[data-skin-choice="rider-blood-light"] .crp-midi-cell.playing.on,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .lead-cell.on,
-html[data-skin-choice="rider-blood-light"] .lead-cell.on,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .lead-note-block,
-html[data-skin-choice="rider-blood-light"] .lead-note-block,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .lead-note-block.playing,
-html[data-skin-choice="rider-blood-light"] .lead-note-block.playing,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .lead-note-block-fill,
-html[data-skin-choice="rider-blood-light"] .lead-note-block-fill{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-step.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-step.active,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-drum-cell.on,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-drum-cell.on,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-midi-cell.on,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-midi-cell.on,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-midi-cell.on.playing,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-midi-cell.on.playing,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-midi-cell.playing.on,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-midi-cell.playing.on,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-cell.on,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-cell.on,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-note-block,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-note-block,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-note-block.playing,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-note-block.playing,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-note-block-fill,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .lead-note-block-fill{
   background:#C40012!important;
   background-color:#C40012!important;
   background-image:none!important;
@@ -1318,15 +1318,15 @@ html[data-skin-choice="rider-blood-light"] .lead-note-block-fill{
   box-shadow:inset 0 0 0 1px rgba(255,232,232,.22),0 0 0 1px rgba(127,0,9,.65)!important;
 }
 
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] .crp-step.active::after,
-html[data-skin-choice="rider-blood-light"] .crp-step.active::after{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-step.active::after,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-step.active::after{
   background:#5E0007!important;
 }
 
 /* 2) Rider Blood Light: Baby DAW active card should turn red by background,
    not by an overlay sitting on top of the artwork */
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #babyDawModeBtn.active,
-html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active{
   background:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
   background-color:#E60000!important;
   background-image:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
@@ -1334,22 +1334,22 @@ html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active{
   box-shadow:0 0 0 1px rgba(255,66,66,.34),0 0 18px rgba(214,0,0,.22)!important;
   isolation:isolate!important;
 }
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art,
-html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art{
   position:relative!important;
   overflow:hidden!important;
   border-radius:inherit!important;
   background:transparent!important;
 }
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art::after,
-html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art::after{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art::after,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art::after{
   content:none!important;
   display:none!important;
   background:none!important;
   box-shadow:none!important;
 }
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art img,
-html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art img{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art img,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art img{
   position:relative!important;
   z-index:2!important;
   mix-blend-mode:screen!important;
@@ -1750,8 +1750,8 @@ html[data-skin="candy-pop"] .crp-step.active:hover{background:#FFF600!important;
    below raise specificity only inside the two editor grids so active cells can
    render as a full solid blood red while inactive cells keep their current look.
    ========================================================= */
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #progression button.crp-midi-cell.on,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #progression button.crp-midi-cell.on.playing{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #progression button.crp-midi-cell.on,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #progression button.crp-midi-cell.on.playing{
   background:#E60000!important;
   background-color:#E60000!important;
   background-image:none!important;
@@ -1760,14 +1760,14 @@ html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #progression
   opacity:1!important;
   box-shadow:inset 0 0 0 2px rgba(255,214,214,.72),0 0 0 1px #9F0000!important;
 }
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #progression button.crp-midi-cell.on:hover{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #progression button.crp-midi-cell.on:hover{
   background:#E60000!important;
   background-color:#E60000!important;
   background-image:none!important;
 }
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #crpBeatGrid button.crp-step.active,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #crpBeatGrid button.crp-step.active.playing,
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #crpBeatGrid button.crp-step.active:hover{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #crpBeatGrid button.crp-step.active,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #crpBeatGrid button.crp-step.active.playing,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #crpBeatGrid button.crp-step.active:hover{
   background:#E60000!important;
   background-color:#E60000!important;
   background-image:none!important;
@@ -1776,7 +1776,7 @@ html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #crpBeatGrid
   opacity:1!important;
   box-shadow:inset 0 0 0 2px rgba(255,214,214,.72),0 0 0 1px #9F0000!important;
 }
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #crpBeatGrid button.crp-step.active::after{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #crpBeatGrid button.crp-step.active::after{
   background:#650008!important;
 }
 
@@ -1785,15 +1785,15 @@ html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #crpBeatGrid
    Keep the selected Baby DAW card red, but do not tint/overlay
    the gold skull, microphone, black details, or white lettering.
    ========================================================= */
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art::after,
-html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art::after{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art::after,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art::after{
   content:none!important;
   display:none!important;
   background:none!important;
   box-shadow:none!important;
 }
-html[data-skin="rider-light"][data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art img,
-html[data-skin-choice="rider-blood-light"] #babyDawModeBtn.active .baby-exact-art img{
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art img,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art img{
   content:url('./assets/baby-daw-button-hq-rider-blood-light-active.png')!important;
   mix-blend-mode:normal!important;
   opacity:1!important;
@@ -2069,4 +2069,310 @@ html[data-skin="studio-pastel"][data-skin-choice="studio-pastel"] .card{
   background-size:auto,700px auto!important;
   background-repeat:repeat,repeat!important;
   background-position:0 0,center top!important;
+}
+
+
+/* =========================================================
+   v3.3.105 — Rider OG skin
+   Same Rider Original skin and artwork, with the supplied black-and-gold
+   paisley pattern used as the background on the main app windows/panels.
+   ========================================================= */
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .panel,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .auth-box,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .project-item,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .progression-line,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .composer-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .save-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .notes-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .account-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .project-browser-window,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .part-manager,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .part-modal-card,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .lead-part-editor,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .vocal-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .vocal-part-editor,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .vocal-editor-card,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .vocal-transcript-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .crp-beat-panel,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .vox-box-shell,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .vox-box-header,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .vox-box-tools,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .vox-inspector,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .panel-body,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .crp-beat-head,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .crp-beat-foot,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .crp-randomizer,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .sheet,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .fullSectionCard,
+html[data-skin="rider-original"][data-skin-choice="rider-og"] .card,
+html[data-skin-choice="rider-og"] .panel,
+html[data-skin-choice="rider-og"] .auth-box,
+html[data-skin-choice="rider-og"] .project-item,
+html[data-skin-choice="rider-og"] .progression-line,
+html[data-skin-choice="rider-og"] .composer-panel,
+html[data-skin-choice="rider-og"] .save-panel,
+html[data-skin-choice="rider-og"] .notes-panel,
+html[data-skin-choice="rider-og"] .account-panel,
+html[data-skin-choice="rider-og"] .project-browser-window,
+html[data-skin-choice="rider-og"] .part-manager,
+html[data-skin-choice="rider-og"] .part-modal-card,
+html[data-skin-choice="rider-og"] .lead-part-editor,
+html[data-skin-choice="rider-og"] .vocal-panel,
+html[data-skin-choice="rider-og"] .vocal-part-editor,
+html[data-skin-choice="rider-og"] .vocal-editor-card,
+html[data-skin-choice="rider-og"] .vocal-transcript-panel,
+html[data-skin-choice="rider-og"] .crp-beat-panel,
+html[data-skin-choice="rider-og"] .vox-box-shell,
+html[data-skin-choice="rider-og"] .vox-box-header,
+html[data-skin-choice="rider-og"] .vox-box-tools,
+html[data-skin-choice="rider-og"] .vox-inspector,
+html[data-skin-choice="rider-og"] .panel-body,
+html[data-skin-choice="rider-og"] .crp-beat-head,
+html[data-skin-choice="rider-og"] .crp-beat-foot,
+html[data-skin-choice="rider-og"] .crp-randomizer,
+html[data-skin-choice="rider-og"] .sheet,
+html[data-skin-choice="rider-og"] .fullSectionCard,
+html[data-skin-choice="rider-og"] .card{
+  background-color:#0d0f12!important;
+  background-image:linear-gradient(rgba(5,7,10,.16),rgba(5,7,10,.16)),url('./assets/rider-og-pattern.jpg')!important;
+  background-size:auto,520px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+}
+
+
+/* =========================================================
+   v3.3.107 — Rider Light OG background update
+   Same Rider Light skin and artwork, using the supplied green paisley
+   background on the main app windows/panels.
+   ========================================================= */
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .auth-box,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .project-item,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .progression-line,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .composer-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .save-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .notes-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .account-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .project-browser-window,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .part-manager,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .part-modal-card,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .lead-part-editor,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .vocal-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .vocal-part-editor,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .vocal-editor-card,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .vocal-transcript-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .crp-beat-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .vox-box-shell,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .vox-inspector,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .panel-body,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .crp-beat-head,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .crp-beat-foot,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .crp-randomizer,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .sheet,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .fullSectionCard,
+html[data-skin="rider-light"][data-skin-choice="rider-light-og"] .card{
+  background-color:var(--srs-skin-panel)!important;
+  background-image:linear-gradient(rgba(255,255,255,.12),rgba(255,255,255,.12)),url('./assets/rider-light-og-pattern.jpg')!important;
+  background-size:auto,520px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+}
+
+
+/* =========================================================
+   v3.3.109 — Rider Blood Light OG repair
+   Shares Rider Blood Light behavior without broad/global selectors.
+   Only the window/background artwork differs.
+   ========================================================= */
+.preview-rider-blood-light-og{background:#efe8cf!important}
+.preview-rider-blood-light-og .srs-preview-top{background:linear-gradient(90deg,#e60000,#fffdf7,#d4c3c3,#ff6b63)!important}
+.preview-rider-blood-light-og .srs-preview-icons i{background:#fffdf7!important;border-color:#d8caa8!important}
+.preview-rider-blood-light-og .srs-preview-icons i:nth-child(1){background:#e60000!important}
+.preview-rider-blood-light-og .srs-preview-icons i:nth-child(2){background:#d4c3c3!important;box-shadow:inset 0 0 0 1px rgba(215,166,60,.2)!important}
+.preview-rider-blood-light-og .srs-preview-icons i:nth-child(3){background:#ff6b63!important}
+
+html[data-skin-choice="rider-blood-light-og"] .panel,
+html[data-skin-choice="rider-blood-light-og"] .auth-box,
+html[data-skin-choice="rider-blood-light-og"] .project-item,
+html[data-skin-choice="rider-blood-light-og"] .progression-line,
+html[data-skin-choice="rider-blood-light-og"] .composer-panel,
+html[data-skin-choice="rider-blood-light-og"] .save-panel,
+html[data-skin-choice="rider-blood-light-og"] .notes-panel,
+html[data-skin-choice="rider-blood-light-og"] .account-panel,
+html[data-skin-choice="rider-blood-light-og"] .project-browser-window,
+html[data-skin-choice="rider-blood-light-og"] .part-manager,
+html[data-skin-choice="rider-blood-light-og"] .part-modal-card,
+html[data-skin-choice="rider-blood-light-og"] .lead-part-editor,
+html[data-skin-choice="rider-blood-light-og"] .vocal-panel,
+html[data-skin-choice="rider-blood-light-og"] .vocal-part-editor,
+html[data-skin-choice="rider-blood-light-og"] .vocal-editor-card,
+html[data-skin-choice="rider-blood-light-og"] .vocal-transcript-panel,
+html[data-skin-choice="rider-blood-light-og"] .crp-beat-panel,
+html[data-skin-choice="rider-blood-light-og"] .vox-box-shell,
+html[data-skin-choice="rider-blood-light-og"] .vox-box-header,
+html[data-skin-choice="rider-blood-light-og"] .vox-box-tools,
+html[data-skin-choice="rider-blood-light-og"] .vox-inspector,
+html[data-skin-choice="rider-blood-light-og"] .panel-body,
+html[data-skin-choice="rider-blood-light-og"] .crp-beat-head,
+html[data-skin-choice="rider-blood-light-og"] .crp-beat-foot,
+html[data-skin-choice="rider-blood-light-og"] .crp-randomizer,
+html[data-skin-choice="rider-blood-light-og"] .sheet,
+html[data-skin-choice="rider-blood-light-og"] .fullSectionCard,
+html[data-skin-choice="rider-blood-light-og"] .card,
+html[data-skin-choice="rider-blood-light-og"] .sheetHeader,
+html[data-skin-choice="rider-blood-light-og"] .fullPerf,
+html[data-skin-choice="rider-blood-light-og"] .fullPerfScroll,
+html[data-skin-choice="rider-blood-light-og"] .crp-midi-roll-wrap,
+html[data-skin-choice="rider-blood-light-og"] .lead-grid-wrap,
+html[data-skin-choice="rider-blood-light-og"] .crp-grid-wrap{
+  background-color:#fffdf7!important;
+  background-image:linear-gradient(rgba(255,253,247,.08),rgba(255,253,247,.08)),url('./assets/rider-blood-light-og-pattern.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#201b16!important;
+  border-color:#d8caa8!important;
+}
+
+/* =========================================================
+   v3.3.110 — Rider Blood Light OG full-window background fix
+   The shared Rider Blood Light rules use a more-specific selector and were
+   winning on CRP / Baby DAW outer panels. Match that specificity here so the
+   OG red/silver paisley fills the COMPLETE app windows, not just nested areas.
+   No palette, controls, active-state colors, or other skins are changed.
+   ========================================================= */
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .auth-box,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .project-item,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .progression-line,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .composer-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .save-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .notes-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .account-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .project-browser-window,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .part-manager,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .part-modal-card,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .lead-part-editor,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vocal-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vocal-part-editor,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vocal-editor-card,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vocal-transcript-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .crp-beat-panel,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vox-box-shell,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vox-box-header,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vox-box-tools,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .vox-inspector,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .panel-body,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .crp-beat-head,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .crp-beat-foot,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .crp-randomizer,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .sheet,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .fullSectionCard,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .card,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .sheetHeader,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .fullPerf,
+html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .fullPerfScroll{
+  background-color:#fffdf7!important;
+  background-image:linear-gradient(rgba(255,253,247,.08),rgba(255,253,247,.08)),url('./assets/rider-blood-light-og-pattern.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#201b16!important;
+  border-color:#d8caa8!important;
+}
+
+/* =========================================================
+   v3.3.111 — Light Rider family fine-text readability
+   Rider Light OG + Rider Blood Light + Rider Blood Light OG only.
+   Make secondary/fine labels black + bold across CRP, Baby DAW and SRP
+   without changing backgrounds, artwork, active cells, or button palettes.
+   ========================================================= */
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) :is(
+  .octave-control,
+  .sustain-control,
+  .bpm-control,
+  .beats-control,
+  .transport-label,
+  .beats-label,
+  #keyHint,
+  .check-label,
+  .crp-volume-main,
+  .crp-beat-tool,
+  .part-repeat-toggle,
+  .part-volume-label,
+  .vocal-playback-level,
+  .lead-grid-octave-control,
+  .lead-resolution-control,
+  .lead-bars-control,
+  .lead-sustain-control,
+  .lead-harmony-label,
+  .active-part-volume-row > span,
+  #activePartVolumeValue,
+  #projectStorageLabel,
+  .tinyLbl,
+  #sheetTitle,
+  .sheetHeader .hint
+){
+  color:#111111!important;
+  font-weight:800!important;
+  opacity:1!important;
+}
+
+/* Muted helper copy on the patterned/light work surfaces must stay readable. */
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) :is(
+  .composer-panel,
+  .lead-part-editor,
+  .vocal-part-editor,
+  .save-panel,
+  .account-panel,
+  .sheet,
+  .fullSectionCard,
+  .card
+) .subtle{
+  color:#111111!important;
+  font-weight:800!important;
+  opacity:1!important;
+}
+
+/* The small CRP line/transport controls called out in the screenshots. */
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #addLineBtn,
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-controls .check-label,
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-controls .crp-volume-main,
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .active-part-volume-row > span,
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .active-part-volume-row > strong{
+  color:#111111!important;
+  font-weight:800!important;
+}
+
+/* SRP header/meta copy: keep the dark action buttons untouched. */
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) :is(
+  #panelBody .tinyLbl,
+  #sheetTitle,
+  #sheetHint,
+  .archiveLoadedName
+){
+  color:#111111!important;
+  font-weight:800!important;
+  opacity:1!important;
+}
+
+
+/* v3.3.113 — all-skins Line label readability */
+html[data-skin] .line-badge,
+html[data-skin] .progression-line.selected .line-badge{
+  background:var(--srs-skin-panel,var(--panel,#111820))!important;
+  color:var(--srs-skin-text,var(--text,#f5f7fa))!important;
+  border:1px solid var(--srs-skin-line,var(--line,#59626d))!important;
+  font-weight:900!important;
+  opacity:1!important;
+  text-shadow:none!important;
+}
+html[data-skin] .mobile-line-indicator{
+  background:var(--srs-skin-panel,var(--panel,#111820))!important;
+  color:var(--srs-skin-text,var(--text,#f5f7fa))!important;
+  border-color:var(--srs-skin-line,var(--line,#59626d))!important;
+  font-weight:900!important;
+  opacity:1!important;
+  text-shadow:none!important;
 }

@@ -1,0 +1,12 @@
+Rider Blood Light OG v3.3.112 — lighter background refresh
+
+What changed
+- Replaced assets/rider-blood-light-og-pattern.jpg with the new lighter red/silver paisley background supplied by the user.
+- Kept the v3.3.111 readability styling intact so secondary/fine text stays black, bold, and fully opaque.
+- Bumped both service-worker cache names so the new background asset refreshes cleanly in CRP, Baby DAW, and SRP.
+
+Files included
+- assets/rider-blood-light-og-pattern.jpg
+- service-worker.js
+- song-rider/service-worker.js
+- UPLOAD-v3.3.112.txt

@@ -1,0 +1,10 @@
+Song Rider Suite v3.3.114 — Black Label Plain + cloud skin preference
+
+Changes
+- Adds Black Label Plain: the clean Black Label look before the patterned background.
+- Black Label Plain is the default skin for a fresh install/device with no saved preference.
+- Logged-in users save their selected skin to D1 user_preferences.
+- On app open/login, the cloud skin preference is restored across CRP, Baby DAW and SRP.
+- Existing logged-in users with no cloud skin row are seeded from their current local skin so their present choice is preserved.
+
+No project/audio/playback data is changed.

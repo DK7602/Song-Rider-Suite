@@ -1,0 +1,13 @@
+Rider Blood Light OG v3.3.110 — full-window background fix
+
+Upload these files to the same paths in the dev repo:
+- skins.css
+- index.html
+- service-worker.js
+- song-rider/index.html
+- song-rider/service-worker.js
+
+Fix:
+The Rider Blood Light base rules had higher CSS specificity than the Rider Blood Light OG background override on CRP and Baby DAW outer panels. The OG selector now matches that specificity, so the red/silver paisley fills the complete CRP, Baby DAW, and SRP window surfaces.
+
+No artwork, button colors, active-cell behavior, or other skins were changed.
