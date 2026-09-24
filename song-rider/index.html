@@ -9,7 +9,7 @@
   <link rel="icon" href="./icon-192.png?v=3.2.5" type="image/png">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=3.2.5">
   <link rel="manifest" href="./manifest.webmanifest?v=3.2.5">
-  <script>(()=>{try{const s=localStorage.getItem('srs-skin-v1')||'rider-original',b=(s==='rider-blood'||s==='rider-og')?'rider-original':((s==='rider-blood-light'||s==='rider-light-og')?'rider-light':s);document.documentElement.dataset.skin=b;document.documentElement.dataset.skinChoice=s;if(s==='rider-blood'||s==='rider-blood-light')document.documentElement.dataset.skinVariant='blood'}catch{document.documentElement.dataset.skin='rider-original';document.documentElement.dataset.skinChoice='rider-original'}})()</script>
+  <script>(()=>{try{const s=localStorage.getItem('srs-skin-v1')||'rider-original',b=(s==='rider-blood'||s==='rider-og')?'rider-original':(((s==='rider-blood-light'||s==='rider-blood-light-og')||s==='rider-light-og')?'rider-light':s);document.documentElement.dataset.skin=b;document.documentElement.dataset.skinChoice=s;if(s==='rider-blood'||s==='rider-blood-light'||s==='rider-blood-light-og')document.documentElement.dataset.skinVariant='blood'}catch{document.documentElement.dataset.skin='rider-original';document.documentElement.dataset.skinChoice='rider-original'}})()</script>
   <style>
     :root{
     --horseRunH: 74px;   /* running GIF size */
@@ -2948,7 +2948,7 @@ html.crp-integrated .track-master-gold-btn:active{transform:translateY(1px) scal
 html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0a0;outline-offset:3px}
 @media(max-width:700px){html.crp-integrated .track-master-nav-row{margin:5px 0 8px;padding:0 10px}html.crp-integrated .track-master-gold-btn{width:100%;max-width:none;min-height:38px;padding:7px 18px;border-radius:12px;font-size:.78rem}}
 </style>
-  <link rel="stylesheet" href="../skins.css?v=3.3.107-RIDER-LIGHT-OG-BG-UPDATE">
+  <link rel="stylesheet" href="../skins.css?v=3.3.108-RIDER-BLOOD-LIGHT-OG">
 </head>
 
 <body>
@@ -3332,7 +3332,7 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
 </script>
 <!-- cache-buster -->
 <script src="./app.js?v=3.3.60-SRP-GDOCS-PRINT-LAYOUT"></script>
-<script src="../skins.js?v=3.3.107-RIDER-LIGHT-OG-BG-UPDATE"></script>
+<script src="../skins.js?v=3.3.108-RIDER-BLOOD-LIGHT-OG"></script>
 
 
 <script>
@@ -3625,5 +3625,32 @@ html.crp-integrated[data-skin-choice="rider-blood-light"] .fullPerfScroll{
   background-position:center top!important;
   color:#201B16!important;
   border-color:#D8CAA8!important;
+}
+
+
+/* v3.3.108 — Rider Blood Light OG SRP background override */
+html[data-skin-choice="rider-blood-light-og"] .panel,
+html[data-skin-choice="rider-blood-light-og"] .auth-box,
+html[data-skin-choice="rider-blood-light-og"] .project-item,
+html[data-skin-choice="rider-blood-light-og"] .composer-panel,
+html[data-skin-choice="rider-blood-light-og"] .save-panel,
+html[data-skin-choice="rider-blood-light-og"] .notes-panel,
+html[data-skin-choice="rider-blood-light-og"] .account-panel,
+html[data-skin-choice="rider-blood-light-og"] .project-browser-window,
+html[data-skin-choice="rider-blood-light-og"] .part-manager,
+html[data-skin-choice="rider-blood-light-og"] .part-modal-card,
+html[data-skin-choice="rider-blood-light-og"] .vocal-panel,
+html[data-skin-choice="rider-blood-light-og"] .vocal-part-editor,
+html[data-skin-choice="rider-blood-light-og"] .vocal-editor-card,
+html[data-skin-choice="rider-blood-light-og"] .vocal-transcript-panel,
+html[data-skin-choice="rider-blood-light-og"] .vox-box-shell,
+html[data-skin-choice="rider-blood-light-og"] .vox-box-header,
+html[data-skin-choice="rider-blood-light-og"] .vox-box-tools,
+html[data-skin-choice="rider-blood-light-og"] .vox-inspector{
+  background-color:#fffdf7!important;
+  background-image:linear-gradient(rgba(255,253,247,.08),rgba(255,253,247,.08)),url('../assets/rider-blood-light-og-pattern.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
 }
 </style>
