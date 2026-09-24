@@ -2626,3 +2626,111 @@ html[data-skin-choice="sapphire-paisley-light"] .vox-ruler{background:#eef7ff!im
 html[data-skin-choice="sapphire-paisley-light"] :is(.subtle,.tinyLbl,.check-label,.crp-volume-main,.transport-label,.beats-label,#keyHint,#sheetTitle,#sheetHint,.active-part-volume-row>span,.active-part-volume-row>strong){
   color:#102b4f!important;font-weight:750!important;opacity:1!important;
 }
+
+/* =========================================================
+   v3.3.117 — Sapphire Paisley full-window background parity
+   Give Sapphire Paisley (dark + light) the same full-window treatment as the
+   other pattern skins, with exact base-skin specificity so CRP + Baby DAW
+   keep the paisley consistently across the whole workspace.
+   ========================================================= */
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .panel,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .auth-box,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .project-item,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .progression-line,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .composer-panel,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .save-panel,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .notes-panel,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .account-panel,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .project-browser-window,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .part-manager,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .part-modal-card,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .lead-part-editor,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .vocal-panel,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .vocal-part-editor,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .vocal-editor-card,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .vocal-transcript-panel,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .crp-beat-panel,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .vox-box-shell,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .vox-box-header,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .vox-box-tools,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .vox-inspector,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .panel-body,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .crp-beat-head,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .crp-beat-foot,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .crp-randomizer,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .sheet,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .fullSectionCard,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .card,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .sheetHeader,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .fullPerf,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .fullPerfScroll,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .part-strip,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .active-part-volume-row{
+  background-color:#0c1220!important;
+  background-image:linear-gradient(rgba(4,7,13,.10),rgba(4,7,13,.10)),url('./assets/sapphire-paisley-dark.jpg')!important;
+  background-size:auto,430px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#f8f8f2!important;
+  border-color:#456cb7!important;
+}
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] body .page,
+html[data-skin="black-label"][data-skin-choice="sapphire-paisley"] body header>.panel{
+  background-color:#080d18!important;
+  background-image:linear-gradient(rgba(4,7,13,.12),rgba(4,7,13,.12)),url('./assets/sapphire-paisley-dark.jpg')!important;
+  background-size:auto,430px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#f8f8f2!important;
+}
+
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .panel,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .auth-box,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .project-item,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .progression-line,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .composer-panel,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .save-panel,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .notes-panel,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .account-panel,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .project-browser-window,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .part-manager,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .part-modal-card,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .lead-part-editor,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .vocal-panel,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .vocal-part-editor,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .vocal-editor-card,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .vocal-transcript-panel,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .crp-beat-panel,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .vox-box-shell,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .vox-box-header,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .vox-box-tools,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .vox-inspector,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .panel-body,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .crp-beat-head,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .crp-beat-foot,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .crp-randomizer,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .sheet,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .fullSectionCard,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .card,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .sheetHeader,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .fullPerf,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .fullPerfScroll,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .part-strip,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .active-part-volume-row{
+  background-color:rgba(255,255,255,.95)!important;
+  background-image:linear-gradient(rgba(255,255,255,.24),rgba(255,255,255,.24)),url('./assets/sapphire-paisley-light.png')!important;
+  background-size:auto,430px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#102b4f!important;
+  border-color:#9fc4e8!important;
+}
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] body .page,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] body header>.panel{
+  background-color:#fff!important;
+  background-image:linear-gradient(rgba(255,255,255,.28),rgba(255,255,255,.28)),url('./assets/sapphire-paisley-light.png')!important;
+  background-size:auto,430px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#102b4f!important;
+}
