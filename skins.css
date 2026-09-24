@@ -2281,3 +2281,78 @@ html[data-skin="rider-light"][data-skin-choice="rider-blood-light-og"] .fullPerf
   color:#201b16!important;
   border-color:#d8caa8!important;
 }
+
+/* =========================================================
+   v3.3.111 — Light Rider family fine-text readability
+   Rider Light OG + Rider Blood Light + Rider Blood Light OG only.
+   Make secondary/fine labels black + bold across CRP, Baby DAW and SRP
+   without changing backgrounds, artwork, active cells, or button palettes.
+   ========================================================= */
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) :is(
+  .octave-control,
+  .sustain-control,
+  .bpm-control,
+  .beats-control,
+  .transport-label,
+  .beats-label,
+  #keyHint,
+  .check-label,
+  .crp-volume-main,
+  .crp-beat-tool,
+  .part-repeat-toggle,
+  .part-volume-label,
+  .vocal-playback-level,
+  .lead-grid-octave-control,
+  .lead-resolution-control,
+  .lead-bars-control,
+  .lead-sustain-control,
+  .lead-harmony-label,
+  .active-part-volume-row > span,
+  #activePartVolumeValue,
+  #projectStorageLabel,
+  .tinyLbl,
+  #sheetTitle,
+  .sheetHeader .hint
+){
+  color:#111111!important;
+  font-weight:800!important;
+  opacity:1!important;
+}
+
+/* Muted helper copy on the patterned/light work surfaces must stay readable. */
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) :is(
+  .composer-panel,
+  .lead-part-editor,
+  .vocal-part-editor,
+  .save-panel,
+  .account-panel,
+  .sheet,
+  .fullSectionCard,
+  .card
+) .subtle{
+  color:#111111!important;
+  font-weight:800!important;
+  opacity:1!important;
+}
+
+/* The small CRP line/transport controls called out in the screenshots. */
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #addLineBtn,
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-controls .check-label,
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-controls .crp-volume-main,
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .active-part-volume-row > span,
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .active-part-volume-row > strong{
+  color:#111111!important;
+  font-weight:800!important;
+}
+
+/* SRP header/meta copy: keep the dark action buttons untouched. */
+html:is([data-skin-choice="rider-light-og"],[data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) :is(
+  #panelBody .tinyLbl,
+  #sheetTitle,
+  #sheetHint,
+  .archiveLoadedName
+){
+  color:#111111!important;
+  font-weight:800!important;
+  opacity:1!important;
+}
