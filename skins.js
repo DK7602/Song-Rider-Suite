@@ -35,7 +35,7 @@
     cloudSaveTimer=setTimeout(async()=>{
       try{await skinApi('POST',{skin});}
       catch(err){if(err?.status!==401)console.warn('Could not save skin preference to cloud',err);}
-    },120);
+    },150);
   }
   async function syncCloudSkin({seedIfMissing=true,force=false}={}){
     const now=Date.now();
