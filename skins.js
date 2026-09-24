@@ -4,6 +4,7 @@
   const DEFAULT = 'rider-original';
   const SKINS = [
     {id:'rider-original', name:'Rider Original', desc:'Original black + gold Bones & Rider look.', swatches:['#0d0f12','#e9c46a','#11161d','#72c98a']},
+    {id:'rider-og', name:'Rider OG', desc:'Rider Original with the new black-and-gold paisley background.', swatches:['#0d0f12','#887a27','#11161d','#e9c46a']},
     {id:'rider-blood', name:'Rider Blood', desc:'Original Rider look with deep red accents, red editor cells and subtle red trim.', swatches:['#0d0f12','#e9c46a','#b9242d','#2a1013']},
     {id:'studio-pastel', name:'Studio Pastel', desc:'Blue, pink, warm tan + gold. Calm studio graphics.', swatches:['#f2e6d7','#7aaed8','#e89aba','#c49a43']},
     {id:'black-label', name:'Black Label', desc:'Black, yellow and polished gold. Elegant and skull-free.', swatches:['#090a0c','#e3b84e','#f0cf57','#25272c']},
@@ -20,7 +21,7 @@
   }
   function setThemeColor(skin){
     const map={
-      'rider-original':'#111111', 'rider-blood':'#111111', 'studio-pastel':'#f2e6d7', 'black-label':'#090a0c',
+      'rider-original':'#111111', 'rider-og':'#111111', 'rider-blood':'#111111', 'studio-pastel':'#f2e6d7', 'black-label':'#090a0c',
       'black-label-light':'#f6f5f1', 'royal-wave':'#005CF7', 'candy-pop':'#EFEAD7', 'rider-light':'#f4f4f2', 'rider-blood-light':'#efe8cf'
     };
     const meta=$('meta[name="theme-color"]'); if(meta) meta.setAttribute('content',map[skin]||map[DEFAULT]);
@@ -34,7 +35,7 @@
   }
   function applySkin(skin, persist=true){
     skin=VALID.has(skin)?skin:DEFAULT;
-    const baseSkin=skin==='rider-blood'?'rider-original':(skin==='rider-blood-light'?'rider-light':skin);
+    const baseSkin=(skin==='rider-blood'||skin==='rider-og')?'rider-original':(skin==='rider-blood-light'?'rider-light':skin);
     const variant=skin==='rider-blood'||skin==='rider-blood-light'?'blood':'';
     document.documentElement.dataset.skin=baseSkin;
     document.documentElement.dataset.skinChoice=skin;
