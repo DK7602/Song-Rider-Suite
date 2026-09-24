@@ -1,0 +1,17 @@
+Upload these files to the SAME paths in your srs-dev repo, replacing the existing files where applicable:
+
+/index.html
+/skins.css
+/skins.js
+/worker.js
+/service-worker.js
+/song-rider/index.html
+/assets/sapphire-paisley-dark.jpg
+/assets/sapphire-paisley-light.png
+
+This adds:
+- Sapphire Paisley
+- Sapphire Paisley Light
+
+Black Label Plain remains the default skin for a new/local user with no saved skin preference.
+Cloud skin persistence supports both new skin IDs.

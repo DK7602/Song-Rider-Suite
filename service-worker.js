@@ -1,9 +1,9 @@
-const CACHE = 'song-rider-suite-v3.3.115-black-label-plain-repair';
+const CACHE = 'song-rider-suite-v3.3.117-sapphire-paisley-bg-fix';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
   './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css','./skins.css','./skins.js',
   './vocal-autotune-worklet.js','./manifest.webmanifest',
-    './assets/rider-blood-light-pattern.png','./assets/light-diamond-pattern.jpg','./assets/studio-pastel-pattern.jpg','./assets/rider-dark-gold-pattern.jpg','./assets/rider-og-pattern.jpg','./assets/rider-light-og-pattern.jpg','./assets/rider-blood-light-og-pattern.jpg','./assets/baby-daw-button-hq-rider-blood-light-active.png',
+    './assets/rider-blood-light-pattern.png','./assets/light-diamond-pattern.jpg','./assets/studio-pastel-pattern.jpg','./assets/rider-dark-gold-pattern.jpg','./assets/rider-og-pattern.jpg','./assets/rider-light-og-pattern.jpg','./assets/rider-blood-light-og-pattern.jpg','./assets/sapphire-paisley-dark.jpg','./assets/sapphire-paisley-light.png','./assets/baby-daw-button-hq-rider-blood-light-active.png',
 './assets/chord-rider-pro-wordmark-hq2.png','./assets/baby-daw-button-hq.png','./assets/suite-header-new.png',
   './assets/apple-touch-icon.png','./assets/icon-192.png','./assets/rider-and-bones-icon.png',
   './assets/crp-rider-bones-sticker.png','./assets/srp-rider-bones-sticker.png',

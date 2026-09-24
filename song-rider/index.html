@@ -9,7 +9,7 @@
   <link rel="icon" href="./icon-192.png?v=3.2.5" type="image/png">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=3.2.5">
   <link rel="manifest" href="./manifest.webmanifest?v=3.2.5">
-  <script>(()=>{try{const s=localStorage.getItem('srs-skin-v1')||'black-label-plain',b=(s==='rider-blood'||s==='rider-og')?'rider-original':(s==='black-label-plain'?'black-label':(((s==='rider-blood-light'||s==='rider-blood-light-og')||s==='rider-light-og')?'rider-light':s));document.documentElement.dataset.skin=b;document.documentElement.dataset.skinChoice=s;if(s==='rider-blood'||s==='rider-blood-light'||s==='rider-blood-light-og')document.documentElement.dataset.skinVariant='blood'}catch{document.documentElement.dataset.skin='black-label';document.documentElement.dataset.skinChoice='black-label-plain'}})()</script>
+  <script>(()=>{try{const s=localStorage.getItem('srs-skin-v1')||'black-label-plain',b=(s==='sapphire-paisley'?'black-label':(s==='sapphire-paisley-light'?'black-label-light':((s==='rider-blood'||s==='rider-og')?'rider-original':(s==='black-label-plain'?'black-label':(((s==='rider-blood-light'||s==='rider-blood-light-og')||s==='rider-light-og')?'rider-light':s)))));document.documentElement.dataset.skin=b;document.documentElement.dataset.skinChoice=s;if(s==='rider-blood'||s==='rider-blood-light'||s==='rider-blood-light-og')document.documentElement.dataset.skinVariant='blood'}catch{document.documentElement.dataset.skin='black-label';document.documentElement.dataset.skinChoice='black-label-plain'}})()</script>
   <style>
     :root{
     --horseRunH: 74px;   /* running GIF size */
@@ -2948,7 +2948,7 @@ html.crp-integrated .track-master-gold-btn:active{transform:translateY(1px) scal
 html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0a0;outline-offset:3px}
 @media(max-width:700px){html.crp-integrated .track-master-nav-row{margin:5px 0 8px;padding:0 10px}html.crp-integrated .track-master-gold-btn{width:100%;max-width:none;min-height:38px;padding:7px 18px;border-radius:12px;font-size:.78rem}}
 </style>
-  <link rel="stylesheet" href="../skins.css?v=3.3.115-BLACK-LABEL-PLAIN-REPAIR">
+  <link rel="stylesheet" href="../skins.css?v=3.3.116-SAPPHIRE-PAISLEY">
 </head>
 
 <body>
@@ -3332,7 +3332,7 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
 </script>
 <!-- cache-buster -->
 <script src="./app.js?v=3.3.60-SRP-GDOCS-PRINT-LAYOUT"></script>
-<script src="../skins.js?v=3.3.115-BLACK-LABEL-PLAIN-REPAIR"></script>
+<script src="../skins.js?v=3.3.116-SAPPHIRE-PAISLEY"></script>
 
 
 <script>
@@ -3648,5 +3648,66 @@ html.crp-integrated[data-skin-choice="rider-blood-light-og"] .fullPerfScroll{
   background-position:0 0,center top!important;
   color:#201b16!important;
   border-color:#d8caa8!important;
+}
+</style>
+
+<style id="srp33117SapphirePaisleyParity">
+/* v3.3.117 — bring Sapphire Paisley / Light into integrated SRP with the
+   same full-window background treatment used by the other pattern skins. */
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"]{
+  --srp-light-text:#F4F7FF;
+  --srp-light-muted:#C4D3F5;
+  --srp-light-line:#456CB7;
+  --srp-light-panel:#0C1220;
+  --srp-light-panel2:#101A2D;
+  --srp-light-input:#101A2D;
+}
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"]{
+  --srp-light-text:#102B4F;
+  --srp-light-muted:#556E8F;
+  --srp-light-line:#9FC4E8;
+  --srp-light-panel:#FFFFFF;
+  --srp-light-panel2:#F6FBFF;
+  --srp-light-input:#FFFFFF;
+}
+
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .panel,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .sheet,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .sheetHeader,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .fullSectionCard,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .card,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .archiveAddPanel,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .archiveCard,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .archiveModal,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .projectModal,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .fullPerf,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .fullPerfScroll{
+  background-color:#0C1220!important;
+  background-image:linear-gradient(rgba(4,7,13,.10),rgba(4,7,13,.10)),url('../assets/sapphire-paisley-dark.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#F4F7FF!important;
+  border-color:#456CB7!important;
+}
+
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .panel,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .sheet,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .sheetHeader,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .fullSectionCard,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .card,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .archiveAddPanel,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .archiveCard,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .archiveModal,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .projectModal,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .fullPerf,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .fullPerfScroll{
+  background-color:#FFFFFF!important;
+  background-image:linear-gradient(rgba(255,255,255,.24),rgba(255,255,255,.24)),url('../assets/sapphire-paisley-light.png')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#102B4F!important;
+  border-color:#9FC4E8!important;
 }
 </style>

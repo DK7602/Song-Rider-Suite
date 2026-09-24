@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.113-playback-line-labels-srp';
+const CACHE = 'song-rider-suite-v3.3.117-sapphire-paisley-bg-fix-srp';
 const ASSETS = [
   '../skins.css',
   '../skins.js',
