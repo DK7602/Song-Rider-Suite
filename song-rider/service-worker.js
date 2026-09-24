@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.112-rbl-og-lighter-pattern-srp';
+const CACHE = 'song-rider-suite-v3.3.113-playback-line-labels-srp';
 const ASSETS = [
   '../skins.css',
   '../skins.js',
