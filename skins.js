@@ -10,6 +10,8 @@
     {id:'black-label', name:'Black Label', desc:'Black, yellow and polished gold with the patterned background.', swatches:['#090a0c','#e3b84e','#f0cf57','#25272c']},
     {id:'black-label-plain', name:'Black Label Plain', desc:'Classic Black Label before the patterned background — clean black, gold and yellow.', swatches:['#090a0c','#e3b84e','#f0cf57','#25272c']},
     {id:'black-label-light', name:'Black Label Light', desc:'White, gray, gold + yellow with restrained green.', swatches:['#f6f5f1','#d4aa45','#e7ca52','#4e9d65']},
+    {id:'sapphire-paisley', name:'Sapphire Paisley', desc:'Midnight paisley with sapphire blue, baby blue, vivid yellow and polished gold.', swatches:['#0D00FF','#FFE933','#A4DCFF','#D6BC67']},
+    {id:'sapphire-paisley-light', name:'Sapphire Paisley Light', desc:'Bright ivory paisley with sapphire blue, baby blue, vivid yellow and polished gold.', swatches:['#FFFFFF','#0D00FF','#A4DCFF','#D6BC67']},
     {id:'royal-wave', name:'Royal Wave', desc:'Royal blue, baby blue, orange + cream with the polished studio icon set.', swatches:['#005CF7','#98D6FF','#FF9700','#EEE8C6']},
     {id:'candy-pop', name:'Candy Pop', desc:'Pink, teal, yellow + cream with the polished studio icon set.', swatches:['#FFB2F6','#87FFF5','#FFF600','#EFEAD7']},
     {id:'rider-light', name:'Rider Light', desc:'Light Rider palette with the current Bones & Rider buttons.', swatches:['#f4f4f2','#d8ac43','#f0cf52','#57a96f']},
@@ -63,7 +65,7 @@
   function setThemeColor(skin){
     const map={
       'rider-original':'#111111', 'rider-og':'#111111', 'rider-blood':'#111111', 'studio-pastel':'#f2e6d7', 'black-label':'#090a0c',
-      'black-label-plain':'#090a0c', 'black-label-light':'#f6f5f1', 'royal-wave':'#005CF7', 'candy-pop':'#EFEAD7', 'rider-light':'#f4f4f2', 'rider-light-og':'#f4f4f2', 'rider-blood-light':'#efe8cf', 'rider-blood-light-og':'#efe8cf'
+      'black-label-plain':'#090a0c', 'black-label-light':'#f6f5f1', 'sapphire-paisley':'#05070d', 'sapphire-paisley-light':'#f7f7f4', 'royal-wave':'#005CF7', 'candy-pop':'#EFEAD7', 'rider-light':'#f4f4f2', 'rider-light-og':'#f4f4f2', 'rider-blood-light':'#efe8cf', 'rider-blood-light-og':'#efe8cf'
     };
     const meta=$('meta[name="theme-color"]'); if(meta) meta.setAttribute('content',map[skin]||map[DEFAULT]);
   }
@@ -76,7 +78,7 @@
   }
   function applySkin(skin, persist=true){
     skin=VALID.has(skin)?skin:DEFAULT;
-    const baseSkin=(skin==='rider-blood'||skin==='rider-og')?'rider-original':(skin==='black-label-plain'?'black-label':(((skin==='rider-blood-light'||skin==='rider-blood-light-og')||skin==='rider-light-og')?'rider-light':skin));
+    const baseSkin=skin==='sapphire-paisley'?'black-label':(skin==='sapphire-paisley-light'?'black-label-light':((skin==='rider-blood'||skin==='rider-og')?'rider-original':(skin==='black-label-plain'?'black-label':(((skin==='rider-blood-light'||skin==='rider-blood-light-og')||skin==='rider-light-og')?'rider-light':skin))));
     const variant=skin==='rider-blood'||skin==='rider-blood-light'||skin==='rider-blood-light-og'?'blood':'';
     document.documentElement.dataset.skin=baseSkin;
     document.documentElement.dataset.skinChoice=skin;

@@ -26,7 +26,7 @@ async function createSession(userId,env){const token=randomToken(),id=crypto.ran
 function validPassword(p){return typeof p==='string'&&p.length>=8&&p.length<=200;}
 function validEmail(e){return typeof e==='string'&&e.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);}
 
-const VALID_SKINS=new Set(['rider-original','rider-og','rider-blood','studio-pastel','black-label','black-label-plain','black-label-light','royal-wave','candy-pop','rider-light','rider-light-og','rider-blood-light','rider-blood-light-og']);
+const VALID_SKINS=new Set(['rider-original','rider-og','rider-blood','studio-pastel','black-label','black-label-plain','black-label-light','sapphire-paisley','sapphire-paisley-light','royal-wave','candy-pop','rider-light','rider-light-og','rider-blood-light','rider-blood-light-og']);
 let userPreferencesSchemaReady=false;
 async function ensureUserPreferencesSchema(env){
   if(userPreferencesSchemaReady)return;

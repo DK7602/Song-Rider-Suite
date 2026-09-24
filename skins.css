@@ -2376,3 +2376,253 @@ html[data-skin] .mobile-line-indicator{
   opacity:1!important;
   text-shadow:none!important;
 }
+
+/* =========================================================
+   v3.3.116 — Sapphire Paisley skin set
+   Two presentation-only skins built from the supplied paisley artwork and
+   sapphire / baby-blue / yellow / polished-gold palette. No playback,
+   project, sync, editor geometry, or transport logic is changed.
+   ========================================================= */
+
+/* Skin picker previews */
+.preview-sapphire-paisley{
+  background:#05070d url('./assets/sapphire-paisley-dark.jpg') center/150px auto repeat!important;
+}
+.preview-sapphire-paisley .srs-preview-top{
+  background:linear-gradient(90deg,#0D00FF 0 31%,#A4DCFF 31% 56%,#FFE933 56% 77%,#D6BC67 77% 100%)!important;
+}
+.preview-sapphire-paisley .srs-preview-icons i{background:#111a2c!important;border-color:#7896d0!important}
+.preview-sapphire-paisley .srs-preview-icons i:nth-child(1){background:#0D00FF!important}
+.preview-sapphire-paisley .srs-preview-icons i:nth-child(2){background:#A4DCFF!important}
+.preview-sapphire-paisley .srs-preview-icons i:nth-child(3){background:#FFE933!important}
+
+.preview-sapphire-paisley-light{
+  background:#fff url('./assets/sapphire-paisley-light.png') center/150px auto repeat!important;
+}
+.preview-sapphire-paisley-light .srs-preview-top{
+  background:linear-gradient(90deg,#FFFFFF 0 22%,#0D00FF 22% 47%,#A4DCFF 47% 71%,#D6BC67 71% 86%,#FFE933 86% 100%)!important;
+}
+.preview-sapphire-paisley-light .srs-preview-icons i{background:#fff!important;border-color:#A4C7EC!important}
+.preview-sapphire-paisley-light .srs-preview-icons i:nth-child(1){background:#0D00FF!important}
+.preview-sapphire-paisley-light .srs-preview-icons i:nth-child(2){background:#A4DCFF!important}
+.preview-sapphire-paisley-light .srs-preview-icons i:nth-child(3){background:#FFE933!important}
+
+/* ---------- SAPPHIRE PAISLEY (dark) ---------- */
+html[data-skin-choice="sapphire-paisley"]{
+  --bg:#05070d!important;--panel:#0c1220!important;--panel2:#111a2d!important;
+  --text:#f8f8f2!important;--muted:#c3cee4!important;--accent:#FFE933!important;
+  --accent2:#A4DCFF!important;--line:#456cb7!important;--good:#FFE933!important;
+  --border:#456cb7!important;--panel-2:#111a2d!important;
+  --srs-skin-bg:#05070d!important;--srs-skin-panel:#0c1220!important;--srs-skin-panel2:#111a2d!important;
+  --srs-skin-text:#f8f8f2!important;--srs-skin-muted:#c3cee4!important;--srs-skin-gold:#D6BC67!important;
+  --srs-skin-accent:#0D00FF!important;--srs-skin-accent2:#A4DCFF!important;--srs-skin-line:#456cb7!important;
+  --srs-skin-good:#FFE933!important;--srs-skin-input:#08101d!important;--srs-skin-raised:#14213b!important;
+  --srs-skin-shadow:0 14px 38px rgba(0,0,0,.48)!important;
+  --srs-editor-bg:#07101d!important;--srs-editor-lane:#0d1727!important;--srs-editor-lane-alt:#111d31!important;
+  --srs-editor-label:#17264a!important;--srs-editor-line:#365c9f!important;--srs-editor-beat:#6fa7da!important;
+  --srs-editor-bar:#D6BC67!important;--srs-editor-text:#f8f8f2!important;--srs-editor-muted:#bac8e0!important;
+}
+html[data-skin-choice="sapphire-paisley"] body{
+  background:#05070d!important;color:#f8f8f2!important;
+}
+
+/* Supplied dark paisley fills the app windows across CRP, Baby DAW and SRP. */
+html[data-skin-choice="sapphire-paisley"] :is(
+  .panel,.auth-box,.project-item,.progression-line,.composer-panel,.save-panel,.notes-panel,.account-panel,
+  .project-browser-window,.part-manager,.part-modal-card,.lead-part-editor,.vocal-panel,.vocal-part-editor,
+  .vocal-editor-card,.vocal-transcript-panel,.crp-beat-panel,.vox-box-shell,.vox-box-header,.vox-box-tools,
+  .vox-inspector,.panel-body,.crp-beat-head,.crp-beat-foot,.crp-randomizer,.sheet,.fullSectionCard,.card,
+  .sheetHeader,.fullPerf,.fullPerfScroll
+){
+  background-color:#0c1220!important;
+  background-image:linear-gradient(rgba(4,7,13,.10),rgba(4,7,13,.10)),url('./assets/sapphire-paisley-dark.jpg')!important;
+  background-size:auto,430px auto!important;background-repeat:repeat,repeat!important;background-position:0 0,center top!important;
+  color:#f8f8f2!important;border-color:#456cb7!important;
+}
+html[data-skin-choice="sapphire-paisley"] body .page,
+html[data-skin-choice="sapphire-paisley"] body header>.panel{
+  background-color:#080d18!important;
+  background-image:linear-gradient(rgba(4,7,13,.12),rgba(4,7,13,.12)),url('./assets/sapphire-paisley-dark.jpg')!important;
+  background-size:auto,430px auto!important;background-repeat:repeat,repeat!important;background-position:0 0,center top!important;
+  color:#f8f8f2!important;
+}
+
+/* Dark inputs + button family. */
+html[data-skin-choice="sapphire-paisley"] :is(input,select,textarea,.notes-editor,.segmented){
+  background:#08101d!important;color:#f8f8f2!important;border-color:#5b7fc0!important;
+}
+html[data-skin-choice="sapphire-paisley"] button:where(:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.crp-midi-cell):not(.lead-cell):not(.lead-note-block):not(.crp-step):not(.vox-drum-cell)){
+  background:#0D00FF!important;color:#fff!important;border-color:#6d82ff!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 4px 12px rgba(13,0,255,.22)!important;
+}
+html[data-skin-choice="sapphire-paisley"] :is(button.accent,.seg.active,.toggle-btn.on,.project-browser-tab.active,.part-choice.active,.part-choice.is-selected),
+html[data-skin-choice="sapphire-paisley"] button[aria-pressed="true"]:not(.srs-skin-choice):not(.workspace-mode-btn){
+  background:#FFE933!important;background-image:none!important;color:#111522!important;border-color:#D6BC67!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 0 0 1px rgba(214,188,103,.42)!important;
+}
+html[data-skin-choice="sapphire-paisley"] input[type="checkbox"],
+html[data-skin-choice="sapphire-paisley"] input[type="radio"]{accent-color:#FFE933!important}
+
+/* Navigation tiles: black/navy foundation, sapphire active state, gold/yellow trim. */
+html[data-skin-choice="sapphire-paisley"] .workspace-mode-switch{background:#05070d!important;border-bottom-color:#D6BC67!important}
+html[data-skin-choice="sapphire-paisley"] .workspace-mode-btn{
+  background:linear-gradient(145deg,#111a2d,#080d18)!important;color:#f8f8f2!important;border-color:#506fa9!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 6px 16px rgba(0,0,0,.34)!important;
+}
+html[data-skin-choice="sapphire-paisley"] .workspace-mode-btn.active{
+  background:#0D00FF!important;background-image:none!important;color:#fff!important;border-color:#FFE933!important;
+  box-shadow:0 0 0 2px rgba(255,233,51,.34),0 0 20px rgba(13,0,255,.34)!important;
+}
+html[data-skin-choice="sapphire-paisley"] .workspace-mode-btn .mode-copy small{color:#c8d3e8!important}
+html[data-skin-choice="sapphire-paisley"] .workspace-mode-btn.active .mode-copy small{color:#fff6a6!important}
+html[data-skin-choice="sapphire-paisley"] .srs-theme-mode-icon{background:#A4DCFF!important;color:#D6BC67!important;border-color:#D6BC67!important}
+html[data-skin-choice="sapphire-paisley"] .workspace-mode-btn.active .srs-theme-mode-icon{background:#FFE933!important;border-color:#D6BC67!important}
+html[data-skin-choice="sapphire-paisley"] .crp-pro-titlebar,
+html[data-skin-choice="sapphire-paisley"] .crp-srp-app-header{background:#070b13!important;border-color:#D6BC67!important}
+
+/* Editor geometry stays untouched; inactive vs active cells are intentionally unmistakable. */
+html[data-skin-choice="sapphire-paisley"] :is(.crp-midi-roll-wrap,.lead-grid-wrap,.crp-grid-wrap){background:#07101d!important;border-color:#456cb7!important}
+html[data-skin-choice="sapphire-paisley"] :is(.crp-midi-corner,.crp-midi-step,.crp-midi-note,.lead-grid-corner,.lead-grid-step,.lead-grid-note,.crp-drum-name){
+  background:#A4DCFF!important;color:#0a1d3b!important;border-color:#4d86cb!important;
+}
+html[data-skin-choice="sapphire-paisley"] .crp-midi-note.black-key{background:#739fc8!important;color:#07101d!important}
+html[data-skin-choice="sapphire-paisley"] :is(.crp-midi-cell,.lead-cell,.crp-step,.vox-drum-cell){
+  background:#111a2d!important;background-color:#111a2d!important;background-image:none!important;color:#f8f8f2!important;
+  border-color:#365c9f!important;
+}
+html[data-skin-choice="sapphire-paisley"] .crp-midi-cell.black-key,
+html[data-skin-choice="sapphire-paisley"] .vox-drum-cell:nth-child(4n+1){background:#0b1322!important;background-color:#0b1322!important}
+html[data-skin-choice="sapphire-paisley"] #progression button.crp-midi-cell.on,
+html[data-skin-choice="sapphire-paisley"] #progression button.crp-midi-cell.on.playing,
+html[data-skin-choice="sapphire-paisley"] .lead-cell.on,
+html[data-skin-choice="sapphire-paisley"] .lead-note-block,
+html[data-skin-choice="sapphire-paisley"] .lead-note-block.playing,
+html[data-skin-choice="sapphire-paisley"] #crpBeatGrid button.crp-step.active,
+html[data-skin-choice="sapphire-paisley"] #crpBeatGrid button.crp-step.active.playing,
+html[data-skin-choice="sapphire-paisley"] .vox-drum-cell.on{
+  background:#FFE933!important;background-color:#FFE933!important;background-image:none!important;color:#111522!important;
+  border-color:#D6BC67!important;opacity:1!important;box-shadow:inset 0 0 0 2px rgba(255,255,255,.5),0 0 0 1px #9f872f!important;
+}
+html[data-skin-choice="sapphire-paisley"] .lead-note-block-fill{background:transparent!important;background-image:none!important}
+html[data-skin-choice="sapphire-paisley"] .crp-step.active::after{background:#0D00FF!important}
+html[data-skin-choice="sapphire-paisley"] .crp-bar-tab{background:#A4DCFF!important;color:#0a1d3b!important;border-color:#4d86cb!important}
+html[data-skin-choice="sapphire-paisley"] .crp-bar-tab.active,
+html[data-skin-choice="sapphire-paisley"] .crp-midi-duration-label{background:#FFE933!important;color:#111522!important;border-color:#D6BC67!important}
+html[data-skin-choice="sapphire-paisley"] :is(.vox-drum-map-row,.vox-drum-map-lane){background:#0c1220!important;color:#f8f8f2!important}
+html[data-skin-choice="sapphire-paisley"] .vox-drum-map-grid{background:#111a2d!important}
+html[data-skin-choice="sapphire-paisley"] .vox-drum-cell.beat-start{border-left-color:#A4DCFF!important}
+html[data-skin-choice="sapphire-paisley"] .vox-drum-cell.bar-start{border-left-color:#D6BC67!important}
+html[data-skin-choice="sapphire-paisley"] :is(.chord-pill,.fit-chord,.note-chip){background:#111a2d!important;color:#f8f8f2!important;border-color:#5a7fc1!important}
+
+/* Track Master keeps dark lanes but picks up sapphire/yellow/gold guide colors. */
+html[data-skin-choice="sapphire-paisley"] .vox-timeline-scroller{background:#07101d!important}
+html[data-skin-choice="sapphire-paisley"] :is(.vox-track-label,.vox-instrument-label,.vox-drum-track-head){background:#142348!important;color:#fff!important;border-color:#456cb7!important}
+html[data-skin-choice="sapphire-paisley"] :is(.vox-track-lane,.vox-instrument-lane,.vox-drum-region-lane){background-color:#0b1322!important;border-color:#365c9f!important}
+html[data-skin-choice="sapphire-paisley"] .vox-ruler{background:#111a2d!important;color:#c8d3e8!important;border-color:#456cb7!important}
+
+/* ---------- SAPPHIRE PAISLEY LIGHT ---------- */
+html[data-skin-choice="sapphire-paisley-light"]{
+  --bg:#f7f7f4!important;--panel:#ffffff!important;--panel2:#eef7ff!important;
+  --text:#102b4f!important;--muted:#536b85!important;--accent:#0D00FF!important;
+  --accent2:#A4DCFF!important;--line:#9fc4e8!important;--good:#0D00FF!important;
+  --border:#9fc4e8!important;--panel-2:#eef7ff!important;
+  --srs-skin-bg:#f7f7f4!important;--srs-skin-panel:#ffffff!important;--srs-skin-panel2:#eef7ff!important;
+  --srs-skin-text:#102b4f!important;--srs-skin-muted:#536b85!important;--srs-skin-gold:#D6BC67!important;
+  --srs-skin-accent:#0D00FF!important;--srs-skin-accent2:#A4DCFF!important;--srs-skin-line:#9fc4e8!important;
+  --srs-skin-good:#0D00FF!important;--srs-skin-input:#ffffff!important;--srs-skin-raised:#eaf5ff!important;
+  --srs-skin-shadow:0 12px 28px rgba(28,60,100,.12)!important;
+  --srs-editor-bg:#f8fbff!important;--srs-editor-lane:#ffffff!important;--srs-editor-lane-alt:#f0f7fd!important;
+  --srs-editor-label:#d7efff!important;--srs-editor-line:#9cc7eb!important;--srs-editor-beat:#6caee3!important;
+  --srs-editor-bar:#D6BC67!important;--srs-editor-text:#102b4f!important;--srs-editor-muted:#536b85!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] body{background:#f7f7f4!important;color:#102b4f!important}
+
+html[data-skin-choice="sapphire-paisley-light"] :is(
+  .panel,.auth-box,.project-item,.progression-line,.composer-panel,.save-panel,.notes-panel,.account-panel,
+  .project-browser-window,.part-manager,.part-modal-card,.lead-part-editor,.vocal-panel,.vocal-part-editor,
+  .vocal-editor-card,.vocal-transcript-panel,.crp-beat-panel,.vox-box-shell,.vox-box-header,.vox-box-tools,
+  .vox-inspector,.panel-body,.crp-beat-head,.crp-beat-foot,.crp-randomizer,.sheet,.fullSectionCard,.card,
+  .sheetHeader,.fullPerf,.fullPerfScroll
+){
+  background-color:rgba(255,255,255,.95)!important;
+  background-image:linear-gradient(rgba(255,255,255,.24),rgba(255,255,255,.24)),url('./assets/sapphire-paisley-light.png')!important;
+  background-size:auto,430px auto!important;background-repeat:repeat,repeat!important;background-position:0 0,center top!important;
+  color:#102b4f!important;border-color:#9fc4e8!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] body .page,
+html[data-skin-choice="sapphire-paisley-light"] body header>.panel{
+  background-color:#fff!important;
+  background-image:linear-gradient(rgba(255,255,255,.28),rgba(255,255,255,.28)),url('./assets/sapphire-paisley-light.png')!important;
+  background-size:auto,430px auto!important;background-repeat:repeat,repeat!important;background-position:0 0,center top!important;
+  color:#102b4f!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] :is(input,select,textarea,.notes-editor,.segmented){background:#fff!important;color:#102b4f!important;border-color:#9fc4e8!important}
+html[data-skin-choice="sapphire-paisley-light"] button:where(:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.crp-midi-cell):not(.lead-cell):not(.lead-note-block):not(.crp-step):not(.vox-drum-cell)){
+  background:#A4DCFF!important;color:#102b4f!important;border-color:#69aee3!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] :is(button.accent,.seg.active,.toggle-btn.on,.project-browser-tab.active,.part-choice.active,.part-choice.is-selected),
+html[data-skin-choice="sapphire-paisley-light"] button[aria-pressed="true"]:not(.srs-skin-choice):not(.workspace-mode-btn){
+  background:#0D00FF!important;background-image:none!important;color:#fff!important;border-color:#D6BC67!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 0 0 1px rgba(214,188,103,.35)!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] input[type="checkbox"],
+html[data-skin-choice="sapphire-paisley-light"] input[type="radio"]{accent-color:#0D00FF!important}
+
+html[data-skin-choice="sapphire-paisley-light"] .workspace-mode-switch{background:#fff!important;border-bottom-color:#D6BC67!important}
+html[data-skin-choice="sapphire-paisley-light"] .workspace-mode-btn{
+  background:rgba(255,255,255,.94)!important;color:#102b4f!important;border-color:#9fc4e8!important;box-shadow:0 5px 14px rgba(39,84,128,.10)!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] .workspace-mode-btn:nth-child(2){background:#eef7ff!important}
+html[data-skin-choice="sapphire-paisley-light"] .workspace-mode-btn.active{
+  background:#0D00FF!important;background-image:none!important;color:#fff!important;border-color:#FFE933!important;
+  box-shadow:0 0 0 2px rgba(255,233,51,.32),0 0 18px rgba(13,0,255,.18)!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] .workspace-mode-btn .mode-copy small{color:#536b85!important}
+html[data-skin-choice="sapphire-paisley-light"] .workspace-mode-btn.active .mode-copy small{color:#fff7a4!important}
+html[data-skin-choice="sapphire-paisley-light"] .srs-theme-mode-icon{background:#FFE933!important;color:#D6BC67!important;border-color:#D6BC67!important}
+html[data-skin-choice="sapphire-paisley-light"] .workspace-mode-btn.active .srs-theme-mode-icon{background:#A4DCFF!important;border-color:#FFE933!important}
+html[data-skin-choice="sapphire-paisley-light"] .crp-pro-titlebar,
+html[data-skin-choice="sapphire-paisley-light"] .crp-srp-app-header{background:#0c1119!important;border-color:#D6BC67!important}
+
+/* Light editor: baby-blue inactive cells, SOLID sapphire active cells. */
+html[data-skin-choice="sapphire-paisley-light"] :is(.crp-midi-roll-wrap,.lead-grid-wrap,.crp-grid-wrap){background:#fff!important;border-color:#9fc4e8!important}
+html[data-skin-choice="sapphire-paisley-light"] :is(.crp-midi-corner,.crp-midi-step,.crp-midi-note,.lead-grid-corner,.lead-grid-step,.lead-grid-note,.crp-drum-name){
+  background:#eef7ff!important;color:#102b4f!important;border-color:#9fc4e8!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] .crp-midi-note.black-key{background:#d7efff!important;color:#102b4f!important}
+html[data-skin-choice="sapphire-paisley-light"] :is(.crp-midi-cell,.lead-cell,.crp-step,.vox-drum-cell){
+  background:#A4DCFF!important;background-color:#A4DCFF!important;background-image:none!important;color:#102b4f!important;border-color:#70b4e7!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] .crp-midi-cell.black-key,
+html[data-skin-choice="sapphire-paisley-light"] .vox-drum-cell:nth-child(4n+1){background:#8fcdf4!important;background-color:#8fcdf4!important}
+html[data-skin-choice="sapphire-paisley-light"] #progression button.crp-midi-cell.on,
+html[data-skin-choice="sapphire-paisley-light"] #progression button.crp-midi-cell.on.playing,
+html[data-skin-choice="sapphire-paisley-light"] .lead-cell.on,
+html[data-skin-choice="sapphire-paisley-light"] .lead-note-block,
+html[data-skin-choice="sapphire-paisley-light"] .lead-note-block.playing,
+html[data-skin-choice="sapphire-paisley-light"] #crpBeatGrid button.crp-step.active,
+html[data-skin-choice="sapphire-paisley-light"] #crpBeatGrid button.crp-step.active.playing,
+html[data-skin-choice="sapphire-paisley-light"] .vox-drum-cell.on{
+  background:#0D00FF!important;background-color:#0D00FF!important;background-image:none!important;color:#fff!important;border-color:#FFE933!important;
+  opacity:1!important;box-shadow:inset 0 0 0 2px rgba(255,233,51,.82),0 0 0 1px #0800a8!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] .lead-note-block-fill{background:transparent!important;background-image:none!important}
+html[data-skin-choice="sapphire-paisley-light"] .crp-step.active::after{background:#FFE933!important}
+html[data-skin-choice="sapphire-paisley-light"] .crp-bar-tab{background:#A4DCFF!important;color:#102b4f!important;border-color:#70b4e7!important}
+html[data-skin-choice="sapphire-paisley-light"] .crp-bar-tab.active,
+html[data-skin-choice="sapphire-paisley-light"] .crp-midi-duration-label{background:#FFE933!important;color:#111522!important;border-color:#D6BC67!important}
+html[data-skin-choice="sapphire-paisley-light"] :is(.vox-drum-map-row,.vox-drum-map-lane){background:#fff!important;color:#102b4f!important}
+html[data-skin-choice="sapphire-paisley-light"] .vox-drum-map-grid{background:#A4DCFF!important}
+html[data-skin-choice="sapphire-paisley-light"] .vox-drum-cell.beat-start{border-left-color:#0D00FF!important}
+html[data-skin-choice="sapphire-paisley-light"] .vox-drum-cell.bar-start{border-left-color:#D6BC67!important}
+html[data-skin-choice="sapphire-paisley-light"] :is(.chord-pill,.fit-chord,.note-chip){background:#fff!important;color:#102b4f!important;border-color:#9fc4e8!important}
+
+html[data-skin-choice="sapphire-paisley-light"] .vox-timeline-scroller{background:#f8fbff!important}
+html[data-skin-choice="sapphire-paisley-light"] :is(.vox-track-label,.vox-instrument-label,.vox-drum-track-head){background:#d7efff!important;color:#102b4f!important;border-color:#9fc4e8!important}
+html[data-skin-choice="sapphire-paisley-light"] :is(.vox-track-lane,.vox-instrument-lane,.vox-drum-region-lane){background-color:#fff!important;border-color:#9fc4e8!important}
+html[data-skin-choice="sapphire-paisley-light"] .vox-ruler{background:#eef7ff!important;color:#102b4f!important;border-color:#9fc4e8!important}
+
+/* Keep fine text and line labels readable in the light version. */
+html[data-skin-choice="sapphire-paisley-light"] :is(.subtle,.tinyLbl,.check-label,.crp-volume-main,.transport-label,.beats-label,#keyHint,#sheetTitle,#sheetHint,.active-part-volume-row>span,.active-part-volume-row>strong){
+  color:#102b4f!important;font-weight:750!important;opacity:1!important;
+}
