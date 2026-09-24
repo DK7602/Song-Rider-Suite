@@ -1,510 +1,3652 @@
-<!DOCTYPE html>
+<!-- index.html (FULL REPLACE MAIN v50 - active audio player follows recording row) -->
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#111111" />
-  <meta name="description" content="Song Rider Suite - Chord Rider, Baby DAW, and Song Rider Pro." />
-  <title>Song Rider Suite</title>
-  <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
-  <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <meta name="theme-color" content="#e9e9ea"/>
+  <title>Song Rider Pro</title>
+  <link rel="icon" href="./icon-192.png?v=3.2.5" type="image/png">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=3.2.5">
+  <link rel="manifest" href="./manifest.webmanifest?v=3.2.5">
   <script>(()=>{try{const s=localStorage.getItem('srs-skin-v1')||'rider-original',b=(s==='rider-blood'||s==='rider-og')?'rider-original':(((s==='rider-blood-light'||s==='rider-blood-light-og')||s==='rider-light-og')?'rider-light':s);document.documentElement.dataset.skin=b;document.documentElement.dataset.skinChoice=s;if(s==='rider-blood'||s==='rider-blood-light'||s==='rider-blood-light-og')document.documentElement.dataset.skinVariant='blood'}catch{document.documentElement.dataset.skin='rider-original';document.documentElement.dataset.skinChoice='rider-original'}})()</script>
-  <link rel="stylesheet" href="styles.css?v=3.3.72-PROJECT-NOTES-COLLAPSE" />
-  <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
-<link rel="stylesheet" href="branding-shell.css?v=3.3.12">
-  <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
-  <link rel="stylesheet" href="crp-layout-lock.css?v=3.3.19-STABILITY">
-  <!-- v3.3.19 critical CRP layout fallback. Duplicates only the tiny setup grid
-       so a stale/missed external stylesheet cannot restore the stretched layout. -->
-  <style id="crp-critical-layout-v3-3-19">
-    #chordPartControls>.primary-toolbar{display:grid!important;grid-template-columns:minmax(0,1fr) 104px 72px!important;grid-auto-flow:row!important;grid-auto-rows:max-content!important;gap:12px!important;align-items:end!important;align-content:start!important;width:100%!important;min-width:0!important}
-    #chordPartControls>.primary-toolbar[hidden],#chordPartControls>.primary-toolbar.crp-controls-hidden{display:none!important}
-    #chordPartControls>.primary-toolbar>#instrumentTabs{grid-column:1/-1!important;width:100%!important;min-width:0!important}
-    #chordPartControls>.primary-toolbar>#modeTabs{grid-column:1!important;width:100%!important;min-width:0!important}
-    #chordPartControls>.primary-toolbar>.sound-control{grid-column:1!important;width:100%!important;min-width:0!important}
-    #chordPartControls>.primary-toolbar>.sound-control #soundSelect{width:100%!important;min-width:0!important}
-    #chordPartControls>.primary-toolbar>.octave-control{grid-column:2!important;width:104px!important;min-width:104px!important;justify-self:end!important}
-    #chordPartControls>.primary-toolbar>.sustain-control{grid-column:3!important;width:72px!important;min-width:72px!important;justify-self:end!important}
-    #chordPartControls>.primary-toolbar>.capo-shape-mode-row{grid-column:1/-1!important;width:100%!important}
-    @media(max-width:390px){#chordPartControls>.primary-toolbar{grid-template-columns:minmax(0,1fr) 88px 58px!important;gap:7px!important}#chordPartControls>.primary-toolbar>.octave-control{width:88px!important;min-width:88px!important}#chordPartControls>.primary-toolbar>.sustain-control{width:58px!important;min-width:58px!important}#chordPartControls>.primary-toolbar>#modeTabs .seg{padding-left:7px!important;padding-right:7px!important}}
-  </style>
-  <link rel="stylesheet" href="skins.css?v=3.3.111-LIGHT-FINE-TEXT-READABILITY" />
-</head>
-<body>
-  <header class="app-header suite-master-header"><img src="assets/suite-header-new.png?v=3.3.12" alt="Song Rider Suite — Ride the progression. See it. Hear it. Build it."></header>
-
-  <nav id="workspaceModeSwitch" class="workspace-mode-switch" aria-label="Workspace mode">
-    <button id="chordRiderModeBtn" class="workspace-mode-btn active" type="button" data-workspace-mode="chord-rider" aria-pressed="true">
-      <span class="mode-art rider-mode-art"><img src="assets/crp-rider-bones-sticker.png?v=3.0.1" alt="" /></span>
-      <span class="mode-copy"><strong>Chord Rider</strong><small>Chords + Beat</small></span>
-    </button>
-    <button id="babyDawModeBtn" class="workspace-mode-btn" type="button" data-workspace-mode="baby-daw" aria-pressed="false" aria-label="Baby DAW">
-      <span class="baby-exact-art" aria-hidden="true"><img src="assets/baby-daw-button-hq.png?v=3.3.12" alt=""></span>
-    </button>
-    <button id="songRiderModeBtn" class="workspace-mode-btn" type="button" data-workspace-mode="song-rider" aria-pressed="false">
-      <span class="mode-art song-mode-art" aria-hidden="true"><img src="assets/srp-rider-bones-sticker.png?v=3.0.1" alt="" /></span>
-      <span class="mode-copy"><strong>Song Rider</strong><small>Lyrics + Flow</small></span>
-    </button>
-  </nav>
-  <div class="track-master-nav-row" aria-label="Track editor shortcut">
-    <button id="trackMasterBtn" class="track-master-gold-btn" type="button" title="Open Track Master">Track Master</button>
-  </div>
+  <style>
+    :root{
+    --horseRunH: 74px;   /* running GIF size */
+--horseParkH: 120px;  /* parked horse size */
 
 
-  <!-- Song Rider Pro now opens as a native same-origin workspace page (no iframe). -->
+      --bg:#e9e9ea;
+      --card:#ffffff;
+      --ink:#151515;
+      --muted:#666;
+      --shadow: 0 10px 24px rgba(0,0,0,.10);
+      --radius:16px;
+
+      --beatHL:#ffd54a;
+
+       --hiYellow:#ffeb3b; /* highlighter yellow */
+
+      --noteBlue:#5CE1FF;
+      --lyricPink:#FF5FB8;
+      --backbeatGreen:#86EFAC;
+
+      --dangerRed:#dc2626;
+
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+
+      /* ✅ OFFLINE title font (no internet needed) */
+      --titleFont: Impact, Haettenschweiler, "Arial Black", "Franklin Gothic Heavy", var(--sans);
+
+      /* ✅ ONE source of truth for horse height (GIF + parked horse) */
+      --horseH: 130px;
+
+      /* ✅ gets set by the tiny script below */
+      --headerH: 160px;
+    }
+
+    *, *::before, *::after{ box-sizing:border-box; }
+
+    /* ✅ IMPORTANT: flex page so main can fill screen */
+    html, body{ height:100%; }
+    body{
+      margin:0;
+      font-family:var(--sans);
+      background:var(--bg);
+      color:var(--ink);
+      display:flex;
+      flex-direction:column;
+      min-height:100vh;
+    }
+
+    header{
+      position:sticky; top:0; z-index:51;
+      background:linear-gradient(#efeff1, #e9e9ea);
+      border-bottom:1px solid rgba(0,0,0,.08);
+      padding:10px 12px 10px;
+    }
+
+    /* ✅ HORSE RUNNER LAYER (fixed, pointer-events none) */
+    .horseWrap{
+      position:fixed;
+      left:0; right:0;
+      top:6px;
+     height:var(--horseRunH);
+      z-index:120;
+      pointer-events:none;
+      overflow:visible;
+    }
+    .horseWrap img{
+      position:absolute;
+      top:0;
+     height:var(--horseRunH);
+      width:auto;
+      display:none;
+      will-change:transform;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.18));
+    }
+
+    @keyframes horseRunRight{
+      from{ transform: translateX(-180px); }
+      to{ transform: translateX(calc(100vw + 180px)); }
+    }
+    @keyframes horseRunLeft{
+      from{ transform: translateX(calc(100vw + 180px)); }
+      to{ transform: translateX(-180px); }
+    }
+
+    .horseRunRight{
+      left:0;
+      animation-name: horseRunRight;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+    }
+    .horseRunLeft{
+      left:0;
+      animation-name: horseRunLeft;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+    }
+
+    .panel{
+      margin-top:0;
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      border:1px solid rgba(0,0,0,.06);
+      overflow:hidden;
+    }
+    .panelTop{
+       position:relative;
+      padding:10px 12px;
+      border-bottom:1px solid rgba(0,0,0,.06);
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+    }
+
+    /* ✅ OFFLINE TITLE STYLE + MULTI-COLOR OUTLINE */
+    .panelTop .left{
+      font-family: var(--titleFont);
+      font-weight: 900;
+      font-size: 24px;
+      letter-spacing: 1.0px;
+      line-height: 1;
+      display:flex;
+      align-items:baseline;
+      gap:6px;
+      text-transform: uppercase;
+    }
+
+.panelTop .left span{
+  text-shadow:
+    /* thin black outline */
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+
+    /* existing SRP color pop */
+    -1px  0   var(--noteBlue),
+     1px  0   var(--lyricPink),
+     0    1px var(--backbeatGreen),
+     0   -1px var(--backbeatGreen),
+     0    2px rgba(0,0,0,.10);
+}
+    .srp-pink{ color: var(--lyricPink); }
+    .srp-blue{ color: var(--noteBlue); }
+    .srp-green{ color: var(--backbeatGreen); }
+
+    /* ✅ Parked horse: same height as GIF horse */
+ #horseParked{
+  position:absolute;
+  right:90px;
+  top:-15px;              /* stays in title row */
+  height:var(--horseParkH);
+  width:auto;
+  display:block;
+  pointer-events:none;
+  filter:drop-shadow(0 6px 12px rgba(0,0,0,.10));
+}
 
 
-  <main class="app-shell">
+    .miniBar{ display:none; padding:10px 12px; border-bottom:1px solid rgba(0,0,0,.06); }
+    .miniBar.show{ display:block; }
+
+    #panelBody{ max-height:28vh; overflow:auto; -webkit-overflow-scrolling: touch; }
+    #panelBody.hidden{ display:none; }
+
+    .row{
+      padding:10px 12px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:nowrap;
+      overflow-x:hidden;
+    }
+.row.nowrap{
+  flex-wrap:nowrap;
+  overflow:hidden;
+  gap:6px;
+  min-width:0;                 /* 🔥 allows shrinking */
+}
+   /* ✅ allow children in the top header row to shrink instead of pushing Key off-screen */
+#panelBody .row.nowrap > *{ min-width:0; }
+#topControlsRow{ gap:4px !important; }
+#topControlsRow .miniIconBtn{ width:32px; height:32px; font-size:14px; }
+#cloudSyncBtn{ font-size:13px; }
+
+#panelBody .row.nowrap > *{
+  min-width:0;
+}
+    .pill{
+      border:1px solid #111;
+      background:#111;
+      border-radius:999px;
+      padding:7px 9px;
+      font-weight:1100;
+      font-size:13px;
+      cursor:pointer;
+      user-select:none;
+      white-space:nowrap;
+      height:34px;
+      flex:0 0 auto;
+      color:#fff;
+    }
+    .pill.active{
+      background:#16a34a;
+      border-color:#16a34a;
+      color:#fff;
+    }
+
+    .instIconBtn{
+      min-width:60px;
+      padding:7px 0;
+      font-size:20px;
+      line-height:1;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .tinyBtn{
+      border:1px solid rgba(0,0,0,.12);
+      background:transparent;
+      border-radius:12px;
+      padding:7px 9px;
+      font-weight:1100;
+      font-size:13px;
+      cursor:pointer;
+      user-select:none;
+      white-space:nowrap;
+      height:34px;
+      flex:0 0 auto;
+      color:#111;
+      min-width:34px;
+      text-align:center;
+    }
+    .tinyBtn.active{ background:#111; color:#fff; border-color:#111; }
+
+    .exportBtn{
+      width:34px; height:34px;
+      border-radius:999px;
+      display:flex; align-items:center; justify-content:center;
+      border:1px solid rgba(0,0,0,.12);
+      background:transparent;
+      font-size:16px;
+      flex:0 0 auto;
+      cursor:pointer;
+      user-select:none;
+      line-height:1;
+      padding:0;
+      color:#111;
+    }
+
+    .tinyField input{
+      width:70px;
+      padding:7px 8px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.12);
+      background:transparent;
+      font-size:13px;
+      outline:none;
+      height:34px;
+      text-align:center;
+    }
+/* ✅ BPM pill with tiny label inside (label + input share one capsule) */
+ .tinyCombo{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  height:32px;
+  padding:0 6px;                 /* ✅ compact */
+  border-radius:12px;
+  border:1px solid rgba(0,0,0,.12);
+  background:transparent;
+  flex:0 0 auto;
+}
+
+.tinyCombo .tinyLbl{
+  font-size:10px;
+  font-weight:1100;
+  letter-spacing:.4px;
+  color:#666;
+  line-height:1;
+  user-select:none;
+}
+
+/* ✅ hard-force compact BPM input */
+#bpmInput{
+  width:34px !important;
+  min-width:34px !important;
+  max-width:34px !important;
+  height:32px;
+  border:none;
+  outline:none;
+  background:transparent;
+  padding:0;
+  font-size:13px;
+  text-align:center;
+  -webkit-appearance:none;
+  appearance:none;
+}
+
+ .tinyCombo input{
+  width:34px;            /* ✅ keeps it compact so the row doesn’t squish */
+  height:32px;
+  border:none;
+  outline:none;
+  background:transparent;
+  padding:0;
+  font-size:13px;
+  text-align:center;
+  -webkit-appearance:none;
+  appearance:none;
+}
+
+ .tinyField.key input{
+  width:50px;
+  min-width:0;                /* 🔥 critical */
+  padding-left:0;
+ }
     
-    <section class="panel composer-panel">
-      <div class="crp-pro-titlebar">
-        <img class="crp-pro-wordmark-img" src="assets/chord-rider-pro-wordmark-hq2.png?v=3.3.12" alt="Chord Rider Pro" />
-        <div class="crp-pro-wordmark" aria-hidden="true"><span class="crp-word-pink">CHORD</span><span class="crp-word-blue">RIDER</span><span class="crp-word-green">PRO</span></div>
-        <button id="toggleCrpControlsBtn" class="crp-controls-toggle" type="button" aria-expanded="true">Hide</button>
-      </div>
-      <div id="chordPartControls" class="chord-part-controls">
-      <div class="toolbar primary-toolbar">
-        <div class="segmented" id="instrumentTabs" aria-label="Instrument">
-          <button class="seg active" data-instrument="piano">Piano</button>
-          <button class="seg" data-instrument="guitar">Guitar</button>
-          <button class="seg" data-instrument="misc">Misc</button>
-        </div>
+@media (min-width: 420px){
+  .tinyField.key input{ width:72px; }  /* ✅ a little bigger on wider phones */
+}
 
-        <div class="segmented" id="modeTabs" aria-label="Chord or note mode">
-          <button class="seg active" data-mode="chord">Chord</button>
-          <button class="seg" data-mode="note">Note</button>
-        </div>
+    .tinyField input[readonly]{ background:#f6f6f7; }
 
-        <label class="sound-control legacy-sound-control" aria-hidden="true">
-          Sound
-          <select id="soundSelect" tabindex="-1"></select>
-        </label>
+    .compactSelect{
+      height:34px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.12);
+      background:#fff;
+      color:#111;
+      font-weight:900;
+      font-size:13px;
+      padding:0 10px;
+      flex:0 1 auto;
+      min-width:0;
+      outline:none;
+    }
+    .compactSelect.miniSelect{
+      padding:0 8px;
+      font-size:12px;
+    }
+    #panelBody .controlSelectRow,
+    #miniBar .controlSelectRow{
+      display:flex;
+      align-items:center;
+      gap:4px;
+      flex-wrap:nowrap;
+      overflow:hidden;
+      min-width:0;
+      justify-content:flex-start;
+    }
+    #panelBody .controlSelectRow > *,
+    #miniBar .controlSelectRow > *{
+      min-width:0;
+    }
+    #panelBody .controlSelectRow .compactSelect,
+    #miniBar .controlSelectRow .compactSelect{
+      flex:1 1 0;
+      width:auto;
+      min-width:0;
+      padding:0 8px;
+    }
+    #drumSelect, #mDrumSelect{ flex:1.5 1 0; width:auto; min-width:0; }
+    #instrumentSelect, #mInstrumentSelect{ flex:1.0 1 0; width:auto; min-width:0; }
+    #noteLenSelect, #mNoteLenSelect{ flex:.9 1 0; width:auto; min-width:0; }
+    #panelBody .controlSelectRow .iconCircle,
+    #panelBody .controlSelectRow .transportStop,
+    #panelBody .controlSelectRow .recCircle,
+    #miniBar .iconCircle, #miniBar .transportStop, #miniBar .recCircle{ width:32px; height:32px; min-width:32px; flex:0 0 32px; }
+    #miniBar .scrollCircle{ font-size:14px; }
+    #miniBar #mRecordBtn{ width:32px; height:32px; min-width:32px; padding:0; font-size:0; flex:0 0 32px; }
+    #recordBtn, #mRecordBtn{ margin-left:0; }
+    
+    .btn{
+      border:none;
+      border-radius:12px;
+      padding:9px 11px;
+      font-weight:1100;
+      background:#111827;
+      color:#fff;
+      cursor:pointer;
+      user-select:none;
+      white-space:nowrap;
+      height:34px;
+      flex:0 0 auto;
+    }
+    .btn.secondary{
+      background:transparent;
+      color:#111;
+      border:1px solid rgba(0,0,0,.12);
+    }
+    .btn.rec{ background:var(--dangerRed); }
 
-        <label class="octave-control">
-          Octave
-          <div class="stepper">
-            <button id="octaveDown" aria-label="Decrease octave">−</button>
-            <span id="octaveValue">0</span>
-            <button id="octaveUp" aria-label="Increase octave">+</button>
-          </div>
-        </label>
+    .iconCircle{
+      width:34px; height:34px;
+      border-radius:999px;
+      display:flex; align-items:center; justify-content:center;
+      border:1px solid rgba(0,0,0,.12);
+      background:transparent;
+      font-size:16px;
+      flex:0 0 auto;
+      cursor:pointer;
+      user-select:none;
+      line-height:1;
+    }
 
-        <label class="sustain-control">
-          Sustain
-          <button id="sustainBtn" class="toggle-btn sustain-btn" type="button" aria-pressed="false">OFF</button>
-        </label>
+    .iconCircle.scrollCircle{
+      background:#111;
+      border-color:#111;
+      color:#fff;
+      font-weight:1300;
+      font-size:16px;
+    }
+    .iconCircle.scrollCircle.on{
+      background:#16a34a;
+      border-color:#16a34a;
+      color:#fff;
+    }
+    .iconCircle.transportStop{
+      width:30px;
+      height:30px;
+      min-width:30px;
+      font-size:13px;
+      font-weight:1100;
+      padding:0;
+    }
 
-        <div class="capo-shape-mode-row" aria-label="Capo and chord-shape controls">
-          <label id="capoWrap">
-            Capo
-            <select id="capoSelect"></select>
-          </label>
+    .iconCircle.recCircle{
+      background: var(--dangerRed);
+      border-color: var(--dangerRed);
+      position:relative;
+      font-size:0;
+      color:transparent;
+      overflow:hidden;
+      text-indent:-9999px;
+    }
+    .iconCircle.recCircle::before{
+      content:"●";
+      font-size:16px;
+      color:#fff;
+      line-height:1;
+      text-indent:0;
+    }
+    .iconCircle.recCircle.recording::before{
+      content:"■";
+      font-size:15px;
+    }
 
-          <label id="neckWrap">
-            Chord Shape
-            <select id="neckSelect">
-              <option value="open">Open / Easy</option>
-              <option value="triad">Triad</option>
-              <option value="barre">Barre Chord</option>
-              <option value="power">Power Chord</option>
-              <option value="shell">Shell Voicing</option>
-              <option value="inversion">Inversion</option>
-              <option value="color">Color / Extended</option>
-            </select>
-          </label>
+    .tabs{ display:none; }
+    
+.miniIconBtn{
+  width:34px; height:34px;
+  border-radius:999px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(0,0,0,.12);
+  background:transparent;
+  font-size:16px;
+  flex:0 0 auto;
+  cursor:pointer;
+  user-select:none;
+  line-height:1;
+}
+.miniIconBtn:active{ transform:scale(0.98); }
 
-          <label id="transposeWrap">
-            Capo mode
-            <button id="transposeBtn" class="toggle-btn" type="button" aria-pressed="false">Transpose OFF</button>
-          </label>
-        </div>
-      </div>
+    /* ✅ main MUST be flex:1 so it fills below header */
+    main{
+      padding:12px 12px 110px;
+      max-width:1100px;
+      margin:0 auto;
+      width:100%;
+      flex:1;
+      display:flex;
+      min-height:0;
+    }
 
-      <div class="entry-row">
-        <input id="chordInput" type="text" autocomplete="off" autocapitalize="characters"
-          placeholder="Enter chords, e.g. Em A7 Cmaj7 B7" />
-        <button id="buildBtn" class="accent">Build</button>
-      </div>
+    /* ✅ sheet fills remaining viewport height */
+    .sheet{
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      border:1px solid rgba(0,0,0,.06);
+      overflow:hidden;
+       position:relative;
 
-      <div id="status" class="status" aria-live="polite"></div>
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      min-height:calc(100vh - var(--headerH) - 24px);
+    }
+    
+.sheetHeader{
+  /* ✅ stays pinned to the TOP of the LOWER scroll panel (#sheetBody) */
+  position: sticky;
+  top: 0;
+  z-index: 5;
 
-      <div>
-        <div class="section-heading-row">
-          <h2 id="fitHeading">Chords that fit</h2>
-          <div class="fit-key-row">
-            <input id="keyInput" class="key-input" type="text" autocomplete="off" autocapitalize="characters"
-              placeholder="Key" aria-label="Key for chord suggestions" />
-            <span id="keyHint" class="subtle"></span>
-          </div>
-        </div>
-        <div id="compatibleChords" class="chip-row"></div>
-      </div>
+  padding:10px 12px;
+  background: var(--card);
+  border-bottom:1px solid rgba(0,0,0,.06);
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  flex-wrap:nowrap;
+}
+   
+    .sheetHeader h2{ margin:0; font-size:13px; font-weight:1100; letter-spacing:.3px; }
+    .hint{ font-size:11px; color:var(--muted); font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-      </div>
+    /* ✅ We render the Full-page hint INSIDE the title bar now. Hide the external slot. */
+    #sheetHint{ display:none; }
 
-      <div class="play-row">
-        <button id="addLineBtn" type="button">＋ Add blank line</button>
 
-        <label class="bpm-control">
-          <span class="transport-label">BPM</span>
-          <input id="bpmInput" type="number" min="40" max="240" value="92" />
-        </label>
+    /* =========================
+       Song Part title pills (Full breaks + page heading)
+    ========================= */
+    .fullBreakPills{
+      padding:12px 12px 2px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .breakRow{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      position:relative;
+      padding:2px 0;
+    }
 
-        <label class="beats-control">
-          <span class="beats-label"><span>Beats</span><span>chord</span></span>
-          <select id="beatsSelect">
-            <option>1</option>
-            <option>2</option>
-            <option selected>4</option>
-            <option>8</option>
-          </select>
-        </label>
-      </div>
+    .breakActions{
+      position:absolute;
+      left:0;
+      right:0;
+      display:flex;
+      justify-content:center;
+      gap:10px;
+      padding:2px 0;
+      pointer-events:auto;
+    }
+    .breakActBtn{
+      width:34px;
+      height:34px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.18);
+      background:rgba(255,255,255,.92);
+      font-size:18px;
+      font-weight:900;
+      line-height:1;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 6px 14px rgba(0,0,0,.08);
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .breakActBtn:active{ transform: translateY(1px); }
 
-      <div id="partManager" class="part-manager" aria-label="Song parts">
-        <div class="part-manager-top">
-          <div id="partStrip" class="part-strip" aria-label="Parts"></div>
-          <button id="addPartBtn" class="add-part-btn" type="button"><span>Add</span><span>Part</span></button>
-        </div>
-      </div>
+    .breakRow::before,
+    .breakRow::after{
+      content:"";
+      height:2px;
+      background:rgba(0,0,0,.18);
+      flex:1 1 auto;
+      border-radius:999px;
+    }
+    .breakRow::before{ margin-right:10px; }
+    .breakRow::after{ margin-left:10px; }
 
-      <div id="leadPartEditor" class="lead-part-editor" hidden>
-        <div class="lead-editor-head">
-          <div>
-            <h3 id="leadPartTitle">Lead / Bass</h3>
-            <p class="subtle">Tap cells to place notes. Pitch names are real MIDI-style note/octave names.</p>
-          </div>
-          <label class="part-volume-label lead-volume-bridge" hidden aria-hidden="true">Volume <input id="leadVolume" type="range" min="0" max="100" value="80" tabindex="-1" /><span id="leadVolumeValue">80%</span></label>
-        </div>
-        <div class="lead-controls">
-          <div class="segmented compact-segmented" id="leadInstrumentTabs">
-            <button class="seg active" data-lead-instrument="piano" type="button">Piano</button>
-            <button class="seg" data-lead-instrument="guitar" type="button">Guitar</button>
-            <button class="seg" data-lead-instrument="misc" type="button">Misc</button>
-          </div>
-          <label class="lead-sound-control legacy-sound-control" aria-hidden="true">Sound<select id="leadSoundSelect" tabindex="-1"></select></label>
-          <div class="lead-compact-settings-row" aria-label="Lead grid settings">
-            <label class="lead-grid-octave-control">Grid octave<select id="leadGridOctave"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
-            <label class="lead-resolution-control">Resolution<select id="leadResolution"><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
-            <label class="lead-bars-control">Bars<select id="leadBars"><option value="1">1</option><option value="2">2</option><option value="4" selected>4</option><option value="8">8</option><option value="16">16</option><option value="song">Length of Song</option></select></label>
-            <label class="lead-sustain-control"><span>Sustain</span><span class="part-repeat-toggle"><input id="leadSustain" type="checkbox"><span>On</span></span></label>
-            <button id="leadGridViewToggle" class="lead-grid-view-toggle" type="button" aria-pressed="false" title="Collapse the MIDI grid into a scrollable window">Collapse Grid</button>
-          </div>
-        </div>
-        <div class="lead-bar-nav">
-          <button id="leadPrevBar" type="button">‹</button>
-          <strong id="leadBarLabel">Bar 1 / 4</strong>
-          <button id="leadNextBar" type="button">›</button>
-          <div id="leadHarmonyHelper" class="lead-harmony-helper" aria-live="polite">
-            <div class="lead-harmony-row">
-              <span class="lead-harmony-label">Chords Used</span>
-              <div id="leadChordsUsed" class="lead-harmony-chips"><span class="lead-harmony-empty">—</span></div>
-            </div>
-            <div class="lead-harmony-row">
-              <span class="lead-harmony-label">Notes that fit</span>
-              <div id="leadNotesFit" class="lead-harmony-chips lead-note-fit-chips"><span class="lead-harmony-empty">—</span></div>
-            </div>
-          </div>
-          <div class="lead-play-options lead-play-options-lower"><button id="leadPlaybackBtn" class="part-preview-btn" type="button">▶ Play</button><label class="part-repeat-toggle"><input id="leadRepeat" type="checkbox" checked><span>Repeat</span></label><button id="leadAutoScrollBtn" class="lead-auto-scroll-btn" type="button" aria-pressed="false" title="Follow the playing Lead/Bass note">↕ Auto</button></div>
-          <div class="lead-bar-tools"><button id="leadCopyBar" type="button" title="Copy selected bars / octave grids">Copy</button><button id="leadPasteBar" type="button" disabled title="Paste copied bars into a chosen bar / octave grid">Paste</button><button id="leadClearBar" type="button" title="Clear selected bars / octave grids">Clear</button></div>
-        </div>
-        <div id="leadGridWrap" class="lead-grid-wrap"><div id="leadGrid" class="lead-grid"></div></div>
-      </div>
+    /* ✅ Full-page break pills should be shorter (about half the prior length) */
+    input.songPartPill{
+  width:min(220px, 34vw);
+  max-width:340px;
+  height:34px;
+  border-radius:999px;
+  border:1px solid rgba(0,0,0,.22);
+  background:var(--hiYellow);
+  padding:6px 12px;
+  font-weight:900;
+  font-size:15px;
+  outline:none;
+  text-align:center;
+  box-shadow: 0 8px 18px rgba(0,0,0,.08);
+  font-family:var(--sans);
+    }
+    input.songPartPill::placeholder{
+      color:#7a7a7a;
+      font-weight:1000;
+    }
+    /* page header title input uses the same pill, but left-aligned */
+    input.songPartPill.headingPill{
+      text-align:left;
+      box-shadow:none;
+      width:min(520px, 72vw);
+      max-width:620px;
+    }
 
-      <div id="vocalPartEditor" class="vocal-part-editor" hidden>
-        <div class="vocal-editor-card">
-          <div class="vocal-title-row">
-            <div class="vocal-title-main"><div class="vocal-title-copy"><h3 id="vocalPartTitle">Vocals</h3><p class="subtle">Dry WAV master • effects stay non-destructive</p><label class="part-repeat-toggle"><input id="vocalRepeat" type="checkbox" checked><span>Repeat this part</span></label></div><button id="vocalMasterPlayBtn" class="part-preview-btn vocal-master-play-btn" type="button">▶ Play Mix</button></div>
-            <label class="part-volume-label">Part volume <input id="vocalVolume" type="range" min="0" max="100" value="100" /><span id="vocalVolumeValue">100%</span></label>
-          </div>
+    /* ✅ Overlay pills that sit INSIDE the Full textarea */
+    .fullPillHost{ position:relative; }
+    .fullPillOverlay{
+      position:absolute;
+      left:0; right:0;
+      top:0; bottom:0;
+      pointer-events:none;
+      overflow:hidden;
+    }
+    .fullPillOverlay .breakRow{
+      position:absolute;
+      left:12px;
+      right:12px;
+      pointer-events:none;
+      z-index:5;
+    }
+    .fullPillOverlay .breakRow::before,
+    .fullPillOverlay .breakRow::after{ background:rgba(0,0,0,.14); }
+    .fullPillOverlay input.songPartPill{ pointer-events:auto; }
 
-          <div class="vocal-recorder-grid">
-            <section class="vocal-panel">
-              <h4>🎧 Backing while recording</h4>
-              <div id="vocalBackingParts" class="vocal-backing-list"></div>
-              <label class="check-label vocal-drum-check"><input id="vocalBackingDrums" type="checkbox" checked><span>Drums</span></label>
-              <label class="vocal-playback-level">Playback level <input id="vocalBackingVolume" type="range" min="0" max="100" value="80"><strong id="vocalBackingVolumeValue">80%</strong></label>
-              <p class="subtle tiny">Use headphones. Only the microphone is captured.</p>
-            </section>
+    /* ===== Full Page (section blocks) ===== */
+ .fullSectionEditor{
+  display:flex;
+  flex-direction:column;
+  gap:24px;
+  padding:16px 12px 52vh; /* keyboard-safe bottom space for last full-view line */
+  overflow-anchor:none;
+  overscroll-behavior-y:contain;
+}
 
-            <section class="vocal-panel">
-              <h4>🎙 Mic</h4>
-              <div class="mic-meter"><span id="vocalMicMeter"></span></div>
-              <div class="mic-meter-labels"><span>Input</span><strong id="vocalMicDb">— dB</strong></div>
-              <button id="vocalArmMic" type="button" aria-pressed="false">Mic check</button>
-              <p id="vocalMicInfo" class="subtle tiny">Requests the cleanest mic mode your browser allows.</p>
-            </section>
-          </div>
+/* REMOVE card look completely */
+.fullSectionCard{
+  border:none;
+  background:transparent;
+  box-shadow:none;
+  padding:0;
+  border-radius:0;
+}
+   .fullSectionHead{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  margin:10px 0 6px;
+} 
+ .fullSectionHead .fullBreakLine{
+  flex:1;
+  height:2px;
+  background:#d9d9d9;
+  border-radius:99px;
+}
+    .fullSectionHead input.songPartPill{
+      flex:0 1 52%;
+      max-width:520px;
+    }
+   textarea.fullSectionText{
+  width:100%;
+  min-height:160px;
+  height:auto;
+  resize:none;
+  overflow:hidden;
+  border:none;
+  border-radius:0;
+  padding:0 4px 14px;
+  box-sizing:border-box;
+  font-size:18px;
+  font-weight:900;
+  line-height:1.5;
+  background:#fff;
+  border:1px solid rgba(0,0,0,.10);
+  border-radius:14px;
+  outline:none;
+  scroll-margin-bottom:24px;
+  overflow-anchor:none;
+}
+    textarea.fullSectionText:focus{
+      border-color:rgba(0,0,0,.22);
+      box-shadow:0 0 0 3px rgba(255,235,59,.25);
+    }
 
-          <div class="vocal-transport">
-            <button id="vocalRecordBtn" class="vocal-record-btn" type="button"><span class="record-dot"></span> Record</button>
-            <button id="vocalStopBtn" type="button" disabled>■ Stop</button>
-            <button id="vocalLyricsBtn" type="button">Lyrics</button>
-            <strong id="vocalTimer">00:00.0</strong>
-          </div>
+    /* Full Song View: inline syllable number after each lyric line. */
+    .fullSectionTextWrap{
+      position:relative;
+      width:100%;
+    }
+    .fullSectionSyllableOverlay{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      overflow:visible;
+      z-index:3;
+    }
+    .fullBeatDivider{
+      position:absolute;
+      width:1px;
+      height:1.15em;
+      background:#c9c9cc;
+      border-radius:999px;
+      transform:translateX(-50%);
+      opacity:.9;
+      pointer-events:none;
+    }
+    .fullLineSyllable{
+      position:absolute;
+      min-width:0;
+      height:auto;
+      display:inline-block;
+      padding:0;
+      font-size:14px;
+      font-weight:1100;
+      line-height:1;
+      text-shadow:0 1px 0 rgba(255,255,255,.85);
+      transform:translateY(2px);
+      white-space:nowrap;
+    }
+    .fullLineSyllable.sylRed,
+    .fullPerfSyllable.sylRed{
+      color:#dc2626;
+      font-weight:1200;
+      -webkit-text-stroke:.45px rgba(0,0,0,.72);
+      text-shadow:0 1px 1px rgba(0,0,0,.62);
+    }
+    .fullLineSyllable.sylYellow,
+    .fullPerfSyllable.sylYellow{
+      color:var(--hiYellow);
+      font-weight:1200;
+      -webkit-text-stroke:.45px rgba(0,0,0,.72);
+      text-shadow:0 1px 1px rgba(0,0,0,.62);
+    }
+    .fullLineSyllable.sylGreen,
+    .fullPerfSyllable.sylGreen{
+      color:#16a34a;
+      font-weight:1200;
+      -webkit-text-stroke:.45px rgba(0,0,0,.72);
+      text-shadow:0 1px 1px rgba(0,0,0,.62);
+    }
 
-          <section class="vocal-panel vocal-transcript-panel">
-            <div class="vocal-panel-heading"><h4>Lyrics / transcript</h4><span class="subtle tiny">Cloud transcription • works across phones, tablets & computers • always editable</span></div>
-            <div class="vocal-transcribe-row"><button id="vocalTranscribeBtn" type="button">Transcribe active take</button><span id="vocalSpeechStatus" class="subtle tiny">After a take is saved to cloud, tap Transcribe. New saved takes are transcribed automatically.</span></div>
-            <textarea id="vocalTranscript" rows="5" placeholder="Cloud speech-to-text appears here. You can always type or correct lyrics manually."></textarea>
-          </section>
+    .fullPerfSyllable{
+      display:inline-block;
+      margin-left:7px;
+      font-family:var(--sans);
+      font-size:14px;
+      font-weight:1100;
+      line-height:1;
+      flex:0 0 auto;
+    }
+  .fullSectionActions{
+  display:flex;
+  justify-content:center;
+  gap:16px;
+  margin:14px 0 0;
+}
 
-          <section class="vocal-panel vocal-effects">
-            <div class="vocal-panel-heading vocal-effects-heading"><div class="vocal-effects-title"><h4>Vocal Effects</h4><span class="subtle tiny">Editable anytime • dry recording is preserved</span></div><button id="voxBoxBtn" class="vox-box-launch" type="button">Vox Box</button></div>
-            <div class="vocal-effects-grid">
-              <label>EQ<select id="vocalFxEq"><option value="flat">Natural</option><option value="clear" selected>Clear</option><option value="warm">Warm</option><option value="bright">Bright</option></select></label>
-              <label>Compression<select id="vocalFxComp"><option value="off">Off</option><option value="light">Light</option><option value="medium" selected>Medium</option><option value="heavy">Heavy</option></select></label>
-              <label>Reverb<select id="vocalFxReverb"><option value="0">Off</option><option value="0.12" selected>Small</option><option value="0.22">Medium</option><option value="0.34">Large</option></select></label>
-              <label>Delay<select id="vocalFxDelay"><option value="0" selected>Off</option><option value="0.10">Slap</option><option value="0.18">1/8</option><option value="0.28">1/4</option></select></label>
-              <label class="vocal-autotune-control">
-                <span class="vocal-autotune-heading"><span>Auto-Tune</span><small id="vocalAutotuneKey" class="subtle">Song key: —</small></span>
-                <span class="vocal-autotune-slider"><input id="vocalFxAutotune" type="range" min="0" max="100" step="1" value="0" aria-label="Auto-Tune amount"><strong id="vocalFxAutotuneValue">0%</strong></span>
-                <small class="subtle tiny">0% = natural/off • 100% = hard robotic correction to the song key</small>
-              </label>
-            </div>
-          </section>
+    /* Ensure + / × controls sit above textarea text as well */
+    .fullPillOverlay .breakActions{ z-index:6; }
 
-          <section class="vocal-panel">
-            <div class="vocal-panel-heading"><h4>Takes</h4><span id="vocalStorageNote" class="subtle tiny">Dry WAV masters sync to your cloud account when signed in.</span></div>
-            <div id="vocalTakes" class="vocal-takes"></div>
-          </section>
-        </div>
-      </div>
+    .sheetActions{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:nowrap;
+    }
 
-      <div id="chordPartRows">
-      <div class="line-actions transport-line-actions">
-        <button id="playAllBtn" class="accent big">▶ Play</button>
-        <label class="check-label repeat-control">
-          <input id="loopToggle" type="checkbox" checked />
-          <span>Repeat</span>
-        </label>
-        <button id="autoScrollBtn" class="auto-scroll-btn" type="button" aria-pressed="false" title="Keep the playing card in view" aria-label="Auto scroll">↕</button>
-        <button id="midiViewBtn" class="midi-view-toggle" type="button" aria-pressed="false" title="Open the editable horizontal MIDI table">MIDI View</button>
-        <button id="babyChordSetupToggleBtn" class="baby-chord-setup-toggle" type="button" aria-expanded="true" hidden>Hide Setup</button>
-      </div>
+   /* ✅ sheetBody must stretch AND SCROLL */
+#sheetBody{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  min-height:0;
 
-      <p class="drag-tip"><span class="line-help line-help-drag">Tap a card to hear it. Long-press/drag any card within a line or between lines. Empty lines are allowed.</span></p>
+  overflow:auto;                 /* ✅ THIS fixes “frozen cards” */
+  -webkit-overflow-scrolling:touch;
+  overflow-anchor:none;
+  overscroll-behavior-y:contain;
+}
+/* ✅ Full page layout: make the render target a flex child */
+#sheetInner{
+  flex:1;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+}
 
-      <div id="progression" class="progression" aria-label="Chord and note progression"></div>
-      <div id="mobileLineIndicator" class="mobile-line-indicator" hidden aria-live="polite"></div>
-      </div>
-    </section>
+    .cards{
+  padding:0 12px 140px;  /* ✅ more room at bottom */
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
 
-    <section id="projectsPanel" class="panel save-panel collapsible-data-panel">
-      <div class="section-heading-row collapsible-panel-heading">
-        <h2>Projects</h2>
-        <div class="panel-heading-actions">
-          <span id="projectStorageLabel" class="subtle">Saved on this device</span>
-          <button id="projectsPanelToggleBtn" class="panel-collapse-toggle" type="button" aria-expanded="true" aria-controls="projectsPanelBody">Hide</button>
-        </div>
-      </div>
 
-      <div class="save-row project-save-row project-controls-fixed">
-        <input id="projectName" type="text" placeholder="Project name" aria-label="Loaded project name" />
-        <button id="newProjectBtn" type="button">New</button>
-        <button id="saveProjectBtn" class="accent">Save</button>
-        <button id="renameCurrentProjectBtn" type="button" title="Rename the loaded project">Rename</button>
-        <div class="export-wrap">
-          <button id="exportBtn" class="export-btn" type="button" aria-haspopup="true" aria-expanded="false">Export ▾</button>
-          <div id="exportMenu" class="export-menu" hidden>
-            <button id="exportPdfBtn" type="button">PDF chord sheet</button>
-            <button id="exportPngBtn" type="button">PNG image</button>
-            <button id="exportAudioBtn" type="button">Audio mix (WAV)…</button>
-            <button id="exportStudioBtn" type="button">Studio package…</button>
-          </div>
-        </div>
-      </div>
+    .card{
+  position:relative; /* ✅ for top-right X */
+  border:1px solid rgba(0,0,0,.10);
+  border-radius:14px;
+  background:transparent;
+  padding: 10px;
+  scroll-margin-top: 210px;
+    }
+.cardDel,
+.cardAdd{
+  position:static;
+  width:30px;
+  height:30px;
+  border-radius:10px;
+  border:1px solid rgba(0,0,0,.14);
+  background:transparent;
+  font-size:18px;
+  font-weight:1100;
+  line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  user-select:none;
+  padding:0;
+}
+.cardDel:active,
+.cardAdd:active{
+  transform:scale(0.98);
+}
 
-      <div id="projectsPanelBody" class="collapsible-panel-body">
-        <div class="project-browser-tabs" role="tablist" aria-label="Project folders">
-          <button id="projectsTabBtn" class="project-browser-tab active" type="button" role="tab" aria-selected="true">
-            Projects <span id="projectsCount" class="project-tab-count">0</span>
-          </button>
-          <button id="archiveTabBtn" class="project-browser-tab" type="button" role="tab" aria-selected="false">
-            Archive <span id="archiveCount" class="project-tab-count">0</span>
-          </button>
-        </div>
 
-        <div class="project-browser-window">
-          <div id="projectList" class="project-list"></div>
-        </div>
-      </div>
-    </section>
+    .cardTop{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+}
+.cardTopLeft{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex:1 1 auto;
+  min-width:0;
+}
+.cardTopRight{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex:0 0 auto;
+}
 
-    <section id="notesPanel" class="panel notes-panel baby-daw-only collapsible-data-panel">
-      <div class="section-heading-row collapsible-panel-heading">
-        <h2>Notes</h2>
-        <div class="panel-heading-actions">
-          <span class="subtle">Per project</span>
-          <button id="notesPanelToggleBtn" class="panel-collapse-toggle" type="button" aria-expanded="true" aria-controls="notesPanelBody">Hide</button>
-        </div>
-      </div>
-      <div id="notesPanelBody" class="collapsible-panel-body">
-        <div class="notes-toolbar">
-          <button data-cmd="bold"><b>B</b></button>
-          <button data-cmd="italic"><i>I</i></button>
-          <button data-cmd="underline"><u>U</u></button>
-          <button data-cmd="insertUnorderedList">• List</button>
-          <button data-cmd="insertOrderedList">1. List</button>
-          <button id="clearNotesBtn">Clear</button>
-        </div>
-        <div id="notesEditor" class="notes-editor" contenteditable="true"
-          data-placeholder="Song ideas, voicing notes, lyric notes, production reminders…"></div>
-      </div>
-    </section>
+    .cardNum{
+      font-weight:1100;
+      font-size:12px;
+      background:transparent;
+      border:1px solid rgba(0,0,0,.12);
+      border-radius:999px;
+      padding:6px 10px;
+      min-width:40px;
+      text-align:center;
+      cursor:pointer;
+      user-select:none;
+    }
+   .syllPill{
+  font-weight:1100;
+  font-size:12px;
+
+  padding:6px 10px;
+  border-radius:999px;
+
+  /* ✅ WHITE PILL BASE */
+  background:#ffffff;
+  color:#111;
+  border:1px solid rgba(0,0,0,.14);
+  max-width:100%;
+  box-shadow:none;
+}
+
+/* ✅ Glow Bands */
+.syllPill.sylRed{
+  border-color:rgba(220,38,38,.55);
+  box-shadow:0 0 0 2px rgba(220,38,38,.20),
+             0 0 18px rgba(220,38,38,.32);
+}
+
+.syllPill.sylYellow{
+  border-color:rgba(234,179,8,.60);
+  box-shadow:0 0 0 2px rgba(234,179,8,.20),
+             0 0 18px rgba(234,179,8,.30);
+}
+
+.syllPill.sylGreen{
+  border-color:rgba(34,197,94,.55);
+  box-shadow:0 0 0 2px rgba(34,197,94,.18),
+             0 0 18px rgba(34,197,94,.28);
+}
+
+    .notesRow{
+      display:grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap:6px;
+      margin-bottom:8px;
+    }
+    .noteCell{
+      border-radius:10px;
+      border:1px solid rgba(0,0,0,.18);
+      background:var(--noteBlue);
+      padding:8px 6px;
+      font-family:var(--mono);
+      font-size:12px;
+      text-align:center;
+      outline:none;
+      height:34px;
+      -webkit-appearance:none;
+      appearance:none;
+    }
+
+    textarea.lyrics{
+      width:100%;
+      resize:vertical;
+      min-height:46px;
+      max-height:180px;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.18);
+      font-size:14px;
+      font-weight:900 !important;
+      outline:none;
+      background:var(--lyricPink);
+      color:#111;
+      font-weight:900;
+      margin-bottom:10px;
+    }
+
+    /* ✅ Make ALL lower-window editable boxes bold */
+    .cards textarea,
+    .cards input.noteCell{
+      font-weight:900;
+      font-weight:900 !important;
+    }
+
+    .beatsRow{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap:10px;
+    }
+    textarea.beatCell{
+      width:100%;
+      border-radius:14px;
+      border:1px solid rgba(0,0,0,.14);
+      background:transparent;
+      padding:10px 8px;
+      font-weight:900 !important;
+      font-family:var(--mono);
+      font-size:14px;
+      font-weight:900;
+      text-align:center;
+      outline:none;
+      min-height: 78px;
+      line-height:1.15;
+      resize:none;
+      overflow:hidden;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    .beatsRow textarea.beatCell:nth-child(2),
+    .beatsRow textarea.beatCell:nth-child(4){
+      background:var(--backbeatGreen);
+    }
+
+    .tick{
+      box-shadow: 0 0 0 6px rgba(255,213,74,.92) inset, 0 0 0 2px rgba(0,0,0,.10);
+      outline: none;
+      border-radius: 14px;
+    }
+
+    /* ✅ Beat Sheet Pro style: bright yellow flash INSIDE the box on each tick (border stays) */
+    @keyframes tickFillFlash{
+      0%{ background-color: rgba(255,213,74,.95); filter: brightness(1.25); }
+      100%{ background-color: transparent; filter: brightness(1); }
+    }
+
+    /* ✅ 16th-note pulse (4 flashes per beat) */
+    @keyframes tickFillFlash16{
+      0%{ background-color: rgba(255,235,59,0.0); }
+      12%{ background-color: rgba(255,235,59,0.85); }
+      25%{ background-color: rgba(255,235,59,0.0); }
+      37%{ background-color: rgba(255,235,59,0.85); }
+      50%{ background-color: rgba(255,235,59,0.0); }
+      62%{ background-color: rgba(255,235,59,0.85); }
+      75%{ background-color: rgba(255,235,59,0.0); }
+      87%{ background-color: rgba(255,235,59,0.85); }
+      100%{ background-color: rgba(255,235,59,0.0); }
+    }
+
+    .tickFlash{
+      animation: tickFillFlash 140ms ease-out;
+    }
+    .tickFlash16{
+      /* duration is set per-beat via --beatSec */
+      animation: tickFillFlash16 var(--beatSec, 0.63s) linear;
+    }
+
+    /* ===============================
+       Full Song View (BSP-style performance)
+       - Used when AutoScroll is ON in Full
+    =============================== */
+    .fullPerf{
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      /* ✅ let #sheetBody handle scrolling (BSP-style) */
+      height:auto;
+
+      min-height:0;
+    }
+    .fullPerfScroll{
+      flex:1;
+      min-height:0;
+      overflow:visible;
+
+      -webkit-overflow-scrolling: touch;
+      background:transparent;
+      border-radius:16px;
+      border:none;
+      box-shadow:none;
+      padding:0;
+    }
+    .fullPerfSection{ margin-bottom:22px; }
+    .fullPerfHead{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin:6px 0 10px;
+    }
+    .fullPerfLine{
+      height:2px;
+      background: rgba(0,0,0,.18);
+      flex:1;
+      border-radius:999px;
+    }
+    .fullPerfPill{
+      background: var(--hiYellow);
+      border:2px solid #111;
+      color:#111;
+      border-radius:999px;
+      padding:8px 14px;
+      font-family: var(--titleFont);
+      font-weight: 1000;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      text-align:center;
+      white-space:nowrap;
+    }
+    .fullPerfRow{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap:10px;
+      margin:8px 0;
+    }
+    .fullPerfBox{
+      border:none;
+      border-radius:14px;
+      padding:10px 10px;
+      font-family: var(--mono);
+      font-size:16px;
+      font-weight: 1000;
+      line-height:1.15;
+      min-height:54px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      background:transparent;
+      word-break:break-word;
+    }
+
+    @media (orientation: landscape){
+      .fullPerfBox{
+        font-size:14px;
+        padding:8px 8px;
+        min-height:46px;
+      }
+      .fullPerfRow{ gap:8px; }
+    }
+    .fullPerfChordRow{
+      margin:6px 0;
+      font-family: var(--mono);
+      font-size:14px;
+      font-weight: 700;
+      color:#111;
+      opacity:.85;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    .fullPerfActive{ }
+
+    /* ✅ FULL PAGE layout: make Preview eat remaining space */
+    .fullBoxWrap{
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      flex:1;
+      min-height:0;
+    }
+
+    .fullPreviewBlock{
+      margin-top:auto;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      flex:1;
+      min-height:0;
+    }
+
+    textarea.fullBox{
+      width:100%;
+      min-height:18vh;  /* still usable */
+      padding:12px;
+      border-radius:14px;
+      border:1px solid rgba(0,0,0,.12);
+      background:transparent;
+      font-family:var(--mono);
+      font-size:14px;
+      outline:none;
+      line-height:1.35;
+      white-space:pre-wrap;
+      word-break:break-word;
+      overflow-wrap:anywhere;
+    }
+
+    textarea.fullPreview{
+      width:100%;
+      flex:1;          /* ✅ THIS is the “fill the grey space” part */
+      min-height:0;    /* ✅ REQUIRED for flex children */
+      padding:12px;
+      border-radius:14px;
+      border:1px solid rgba(0,0,0,.12);
+      background:#f7f7f8;
+      font-family:var(--mono);
+      font-size:14px;
+      outline:none;
+      line-height:1.35;
+      white-space:pre-wrap;
+      word-break:break-word;
+      overflow-wrap:anywhere;
+    }
+
+    .rBtn{
+      position:fixed;
+      right:14px;
+      bottom:18px;
+      z-index:250;
+      width:52px;height:52px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.12);
+      background:#111;
+      color:#fff;
+      font-weight:1200;
+      font-size:18px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 14px 30px rgba(0,0,0,.25);
+      cursor:pointer;
+      user-select:none;
+    }
+
+    .rhymeDock{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:260;
+  display:none;
+  padding:0 12px calc(10px + env(safe-area-inset-bottom));
+  transform:translateY(0);
+    }
+    .rhymeBox{
+  max-width:1100px;
+  margin:0 auto;
+  background:#ffffff;               /* ✅ solid background */
+  border:1px solid rgba(0,0,0,.10);
+  border-radius:16px;
+  box-shadow:0 12px 28px rgba(0,0,0,.18);
+  overflow:hidden;
+    }
+    .rhymeTop{
+      padding:10px 12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      border-bottom:1px solid rgba(0,0,0,.06);
+      font-weight:1100;
+    }
+.rhymeWords{
+  padding:10px 12px 12px;
+  display:flex;
+  gap:10px;
+  flex-wrap:nowrap;
+
+  overflow-x:auto;                  /* ✅ swipe left/right */
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch; /* ✅ smooth phone scrolling */
+  touch-action:pan-x;               /* ✅ allow horizontal pan */
+  scroll-behavior:smooth;
+}
+    .rWord{
+  border:1px solid rgba(0,0,0,.12);
+  background:#ff7ac8;               /* ✅ visible chip */
+  color:#000;
+  border-radius:999px;
+  padding:7px 10px;
+  font-weight:1100;
+  cursor:pointer;
+  user-select:none;
+  font-size:13px;
+
+  flex:0 0 auto;                    /* ✅ prevents wrapping */
+  white-space:nowrap;
+    }
+/* =========================
+   CAPO / STEP TOGGLE (vertical letters, always visible)
+========================= */
+/* ✅ CAPO/STEP pill created by app.js (single button with id capoStepToggle) */
+#capoStepToggle{
+  width:26px;
+  height:34px;
+  border-radius:999px;
+  border:1px solid rgba(0,0,0,.18);
+  background:transparent;
+  color:#111;
+  font-weight:1100;
+  font-size:11px;
+
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  overflow:hidden;
+}
+#capoStepToggle.on{
+  background:#111;
+  color:#fff;
+}
+/* =========================
+   KEY WINDOW: keep on-screen (CSS safety net)
+   (works if your key window uses #keyWindow)
+========================= */
+#keyWindow{
+  position:fixed !important;
+  left:50% !important;
+  top: max(12px, env(safe-area-inset-top)) !important;
+  transform: translateX(-50%) !important;
+
+  width:min(520px, calc(100vw - 24px)) !important;
+  max-height: calc(100vh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  overflow:auto !important;
+
+  z-index:9999 !important;
+  box-sizing:border-box !important;
+}
+
+@media (min-width: 431px){
+  .tinyCombo{
+    padding:0 8px;
+  }
+  .tinyCombo .tinyLbl{
+    font-size:10px;
+  }
+  #bpmInput{
+    width:42px !important;
+    min-width:42px !important;
+    max-width:42px !important;
+    font-size:14px;
+  }
+}
+
+@media (max-width: 430px){
+  #topControlsRow{ gap:4px !important; }
+  .miniIconBtn{
+    width:32px;
+    height:32px;
+    font-size:14px;
+  }
+  .tinyCombo{
+    gap:4px;
+    padding:0 6px;
+    height:32px;
+  }
+  .tinyCombo .tinyLbl{
+    font-size:9px;
+    letter-spacing:.2px;
+  }
+  #bpmInput{
+    width:34px !important;
+    min-width:34px !important;
+    max-width:34px !important;
+    font-size:12px;
+    height:30px;
+  }
+  #capoInput{
+    width:46px !important;
+    min-width:46px !important;
+    max-width:46px !important;
+    font-size:12px;
+    padding:6px 4px !important;
+  }
+  #keyOutput{
+    width:50px !important;
+    min-width:50px !important;
+    max-width:50px !important;
+    font-size:12px;
+  }
+  #capoStepToggle{
+    width:24px !important;
+    height:32px !important;
+    font-size:10px !important;
+  }
+  #cloudSyncBtn{
+    font-size:13px;
+  }
+  #drumSelect, #mDrumSelect{ flex:1.35 1 0; width:auto; min-width:0; }
+  #instrumentSelect, #mInstrumentSelect{ flex:.95 1 0; width:auto; min-width:0; }
+  #noteLenSelect, #mNoteLenSelect{ flex:.82 1 0; width:auto; min-width:0; }
+  #panelBody .compactSelect, #miniBar .compactSelect{ font-size:11px; padding:0 6px; }
+  #panelBody .controlSelectRow, #miniBar .controlSelectRow{ gap:3px; }
+  #panelBody .controlSelectRow .iconCircle,
+  #panelBody .controlSelectRow .transportStop,
+  #panelBody .controlSelectRow .recCircle,
+  #miniBar .iconCircle, #miniBar .transportStop, #miniBar .recCircle{ width:30px; height:30px; min-width:30px; flex:0 0 30px; }
+  #miniBar #mRecordBtn{ width:30px; height:30px; min-width:30px; flex:0 0 30px; }
+}
   
 
-    <section id="accountPanel" class="panel account-panel">
-      <button id="accountSummaryBtn" class="account-summary-btn" type="button" hidden aria-expanded="false">
-        ☁ Cloud Account
-      </button>
-      <div class="section-heading-row account-heading">
-        <div><h2>Cloud Account</h2><span id="accountStatus" class="subtle">Checking account…</span></div>
-        <button id="logoutBtn" type="button" hidden>Log out</button>
-      </div>
-      <div id="authForms" class="auth-wrap" hidden>
-        <div class="auth-box">
-          <h3>Log in</h3>
-          <input id="loginEmail" type="email" autocomplete="email" placeholder="Email" />
-          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password" />
-          <button id="loginBtn" class="accent" type="button">Log in</button>
-        </div>
-        <div class="auth-box">
-          <h3>Create account</h3>
-          <input id="registerName" type="text" autocomplete="name" placeholder="Name (optional)" />
-          <input id="registerEmail" type="email" autocomplete="email" placeholder="Email" />
-          <input id="registerPassword" type="password" autocomplete="new-password" placeholder="Password (8+ characters)" />
-          <input id="inviteCode" type="password" autocomplete="off" placeholder="Private invite code" />
-          <button id="registerBtn" class="accent" type="button">Create account</button>
-        </div>
-      </div>
-      <div id="accountTools" class="account-tools" hidden>
-        <button id="syncNowBtn" class="accent" type="button">↻ Sync Now</button>
-        <button id="changePasswordBtn" type="button">Change password</button>
-        <span class="subtle">Projects sync to your private cloud account. This device also keeps a local backup.</span>
-      </div>
-      <div id="authMessage" class="status" aria-live="polite"></div>
-    </section>
-  </main>
+    /* ===== Audio playback progress / seek ===== */
+    .audioProgressWrap{
+      width:100%;
+      display:none;
+      align-items:center;
+      gap:8px;
+      min-width:0;
+    }
+    .audioProgressTime{
+      flex:0 0 auto;
+      min-width:34px;
+      font-size:11px;
+      font-weight:1000;
+      color:#666;
+      font-variant-numeric:tabular-nums;
+      text-align:center;
+    }
+    #audioProgress{
+      position:relative;
+      z-index:20;
+      flex:1 1 auto;
+      min-width:0;
+      width:100%;
+      height:44px;
+      cursor:pointer;
+      touch-action:none !important;
+      pointer-events:auto !important;
+      user-select:none;
+      -webkit-user-select:none;
+      -webkit-touch-callout:none;
+      -webkit-tap-highlight-color:transparent;
+      outline:none;
+      display:flex;
+      align-items:center;
+    }
+    #audioProgress::before{
+      content:"";
+      position:absolute;
+      left:0;
+      right:0;
+      top:50%;
+      height:4px;
+      transform:translateY(-50%);
+      border-radius:999px;
+      background:#d7d7d9;
+    }
+    .audioSeekFill{
+      position:absolute;
+      left:0;
+      top:50%;
+      height:4px;
+      width:0%;
+      transform:translateY(-50%);
+      border-radius:999px;
+      background:#111;
+      pointer-events:none !important;
+    }
+    .audioSeekThumb{
+      position:absolute;
+      top:50%;
+      left:0%;
+      width:18px;
+      height:18px;
+      border-radius:999px;
+      background:#111;
+      border:2px solid #fff;
+      box-shadow:0 1px 4px rgba(0,0,0,.30);
+      transform:translate(-50%,-50%);
+      pointer-events:none !important;
+    }
+    #audioProgress[data-enabled="0"]{
+      opacity:.45;
+      cursor:default;
+    }
 
-  <footer>
-    <span>Chord Rider Pro</span>
-    <span>Rider &amp; Bones</span>
-  </footer>
+    /* ===== Native audio seek player ===== */
+    .audioNativeHost{
+      width:100%;
+      min-width:0;
+      position:relative;
+      height:54px;
+      overflow:hidden;
+    }
+
+    /*
+      Android/Chrome makes almost the whole light-gray native control strip
+      seek-sensitive. Keep seeking limited to a narrow band directly over
+      the real progress bar so taps in the surrounding gray area do nothing.
+      20px shields on top and bottom leave only a 14px center seek band.
+    */
+    .audioNativeHost::before,
+    .audioNativeHost::after{
+      content:"";
+      position:absolute;
+      left:0;
+      right:0;
+      height:20px;
+      z-index:10;
+      pointer-events:auto;
+      touch-action:pan-y;
+      background:transparent;
+    }
+    .audioNativeHost::before{ top:0; }
+    .audioNativeHost::after{ bottom:0; }
+
+    .srpNativeAudioPlayer{
+      display:block;
+      width:100%;
+      max-width:100%;
+      height:54px;
+      margin:0;
+    }
+    .audioNativeHost audio{
+      width:100% !important;
+      max-width:100% !important;
+    }
+    .recordingAudioSlot:empty{ display:none; }
+    .recordingAudioSlot .audioNativeHost{ margin:0; }
+
+    /* ===== Project Notes ===== */
+    .notesModal{
+      position:fixed;
+      inset:0;
+      z-index:220;
+      display:none;
+      background:#f5f5f6;
+      color:#151515;
+      flex-direction:column;
+      padding-top:calc(env(safe-area-inset-top) + 6px);
+      padding-bottom:calc(env(safe-area-inset-bottom) + 18px);
+    }
+    .notesModal.show{ display:flex; }
+
+    .notesToolbar{
+      position:sticky;
+      top:0;
+      z-index:2;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      padding:10px 12px;
+      background:linear-gradient(#efeff1,#e7e7e9);
+      border-bottom:1px solid rgba(0,0,0,.08);
+      box-shadow:0 2px 10px rgba(0,0,0,.05);
+    }
+    .notesToolBtn,
+    .notesSelect,
+    .notesColor{
+      height:38px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.14);
+      background:#fff;
+      font-weight:900;
+      color:#111;
+    }
+    .notesToolBtn{
+      min-width:38px;
+      padding:0 11px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-size:18px;
+      line-height:1;
+      cursor:pointer;
+      user-select:none;
+    }
+    .notesToolBtn:active{ transform:scale(.98); }
+    .notesToolBtn[data-cmd="bold"]{ font-weight:1100; }
+    .notesToolBtn[data-cmd="italic"]{ font-style:italic; }
+    .notesToolBtn[data-cmd="underline"]{ text-decoration:underline; }
+    .notesToolBtn[data-cmd="strikeThrough"]{ text-decoration:line-through; }
+    .notesSelect{ padding:0 10px; min-width:72px; }
+    .notesColor{ width:44px; padding:3px; }
+    .notesCloseInline{
+      margin-left:auto;
+      min-width:40px;
+      font-size:24px;
+      line-height:1;
+      font-weight:1000;
+    }
+
+    .notesEditorWrap{
+      flex:1;
+      min-height:0;
+      overflow:auto;
+      -webkit-overflow-scrolling:touch;
+      padding:12px 12px 96px;
+    }
+    .notesEditor{
+      min-height:100%;
+      outline:none;
+      border:none;
+      background:transparent;
+      padding:6px 4px 32px;
+      font-size:18px;
+      line-height:1.55;
+      font-weight:500;
+      color:#151515;
+      white-space:pre-wrap;
+      word-break:break-word;
+      caret-color:#f07b57;
+    }
+    .notesEditor:empty::before{
+      content:attr(data-placeholder);
+      color:#8c8c8c;
+      font-weight:700;
+    }
+    .notesCloseFab{ display:none !important; }
+
+    .notesTodoLine{
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+      min-height:1.55em;
+    }
+    .notesTodoBox{
+      flex:0 0 22px;
+      width:22px;
+      height:22px;
+      margin-top:.18em;
+      border:2px solid #444;
+      border-radius:6px;
+      background:#fff;
+      position:relative;
+      cursor:pointer;
+      user-select:none;
+      -webkit-user-select:none;
+    }
+    .notesTodoLine.is-checked .notesTodoBox::after{
+      content:"✓";
+      position:absolute;
+      inset:-1px 0 0 0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:16px;
+      font-weight:1000;
+      color:#111;
+    }
+    .notesTodoText{
+      flex:1 1 auto;
+      min-width:0;
+      display:block;
+    }
+    .notesTodoLine.is-checked .notesTodoText,
+    .notesTodoLine.is-checked .notesTodoText *{
+      text-decoration:line-through;
+    }
+
+    .notesImageBlock{
+      position:relative;
+      display:block;
+      width:min(100%, 420px);
+      max-width:100%;
+      min-width:140px;
+      margin:12px 0;
+      border:1px solid rgba(0,0,0,.12);
+      border-radius:16px;
+      overflow:hidden;
+      background:#fff;
+      box-shadow:0 6px 16px rgba(0,0,0,.08);
+      touch-action:none;
+      line-height:0;
+    }
+    .notesImageBlock.is-selected{
+      box-shadow:0 0 0 3px rgba(37,99,235,.22), 0 10px 22px rgba(37,99,235,.12);
+      border-color:rgba(37,99,235,.45);
+    }
+    .notesImageBlock.is-loading::before{
+      content:"Loading photo…";
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:14px;
+      font-weight:1000;
+      color:#555;
+      background:linear-gradient(#fafafa,#f2f2f2);
+      z-index:0;
+    }
+    .notesImageBlock img{
+      display:block;
+      width:100%;
+      height:auto;
+      max-height:62vh;
+      object-fit:contain;
+      background:transparent;
+      -webkit-user-drag:none;
+      user-select:none;
+      pointer-events:none;
+      position:relative;
+      z-index:1;
+      vertical-align:top;
+    }
+    .notesImageBlock img:not([src]),
+    .notesImageBlock img[src=""]{
+      visibility:hidden;
+      min-height:160px;
+    }
+    .notesImageDeleteBtn,
+    .notesImageCropBtn,
+    .notesImageResizeHandle{
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .16s ease;
+    }
+    .notesImageBlock.is-selected .notesImageDeleteBtn,
+    .notesImageBlock.is-selected .notesImageCropBtn,
+    .notesImageBlock.is-selected .notesImageResizeHandle{
+      opacity:1;
+      pointer-events:auto;
+    }
+    .notesImageDeleteBtn,
+    .notesImageCropBtn{
+      position:absolute;
+      top:8px;
+      width:26px;
+      height:26px;
+      border:none;
+      border-radius:999px;
+      background:rgba(17,17,17,.78);
+      color:transparent;
+      font-size:0;
+      font-weight:1000;
+      line-height:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:3;
+      box-shadow:0 2px 8px rgba(0,0,0,.22);
+      text-shadow:none;
+    }
+    .notesImageDeleteBtn{
+      right:10px;
+    }
+    .notesImageDeleteBtn::before{
+      content:"×";
+      color:#fff;
+      font-size:15px;
+      font-weight:1000;
+      line-height:1;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .notesImageCropBtn{
+      right:42px;
+    }
+    .notesImageCropBtn::before{
+      content:"✂";
+      color:#fff;
+      font-size:13px;
+      font-weight:1000;
+      line-height:1;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .notesImageResizeHandle{
+      position:absolute;
+      right:10px;
+      bottom:10px;
+      width:22px;
+      height:22px;
+      border-radius:999px;
+      background:rgba(17,17,17,.76);
+      box-shadow:0 2px 8px rgba(0,0,0,.22);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:3;
+      touch-action:none;
+      cursor:ew-resize;
+    }
+    .notesImageResizeHandle::before{
+      content:"↔";
+      color:#fff;
+      font-size:13px;
+      font-weight:1000;
+      line-height:1;
+    }
+    .notesImageBlock::after{
+      content:none;
+      position:absolute;
+      right:38px;
+      bottom:10px;
+      padding:4px 8px;
+      border-radius:999px;
+      background:rgba(17,17,17,.72);
+      color:#fff;
+      font-size:11px;
+      font-weight:1000;
+      letter-spacing:.2px;
+      z-index:2;
+    }
 
 
-  <div id="addPartModal" class="part-modal" hidden>
-    <div class="part-modal-backdrop" data-close-part-modal></div>
-    <div class="part-modal-card" role="dialog" aria-modal="true" aria-labelledby="addPartTitle">
-      <div class="part-modal-heading"><h2 id="addPartTitle">Add Part</h2><button id="closePartModal" type="button" aria-label="Close">×</button></div>
-      <button class="part-choice" data-part-type="chord" type="button"><strong>Chord / Note</strong><span>Another full Chord Rider line editor. No extra drums.</span></button>
-      <button class="part-choice" data-part-type="lead" type="button"><strong>Lead / Bass</strong><span>Piano-roll style note grid with 1/8 through 1/64 resolution.</span></button>
-      <button class="part-choice" data-part-type="vocal" type="button"><strong>Vocals</strong><span>Record clean dry WAV takes while selected parts play in headphones.</span></button>
+    .projectPickerBtn{
+      flex:1 1 auto;
+      min-width:0;
+      height:34px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.12);
+      background:#fff;
+      color:#111;
+      font-weight:1000;
+      font-size:13px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:0 12px;
+      cursor:pointer;
+    }
+    .projectPickerBtn .projectPickerLabel{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      text-align:left;
+      flex:1 1 auto;
+    }
+    .projectPickerBtn .projectPickerCaret{
+      flex:0 0 auto;
+      color:#444;
+      font-size:12px;
+    }
+    .projectModal{
+      position:fixed;
+      inset:0;
+      z-index:309;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      background:rgba(0,0,0,.36);
+    }
+    .projectModal.show{ display:flex; }
+
+    .archiveModal{
+      position:fixed;
+      inset:0;
+      z-index:310;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      background:rgba(0,0,0,.36);
+    }
+    .archiveModal.show{ display:flex; }
+    .archiveCard{
+      width:min(520px, calc(100vw - 24px));
+      max-height:min(78vh, 720px);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      background:#fff;
+      border-radius:18px;
+      box-shadow:0 22px 48px rgba(0,0,0,.24);
+      border:1px solid rgba(0,0,0,.10);
+      overscroll-behavior:contain;
+      touch-action:pan-y;
+      position:relative;
+    }
+    .archiveHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:14px 16px;
+      border-bottom:1px solid rgba(0,0,0,.08);
+    }
+    .archiveTitle{ font-size:18px; font-weight:1100; }
+    .archiveControls{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      padding:12px 16px;
+      border-bottom:1px solid rgba(0,0,0,.06);
+    }
+    .archiveList,
+    .archiveAddList{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      padding:14px 16px 16px;
+      overflow:auto;
+      -webkit-overflow-scrolling:touch;
+      overscroll-behavior:contain;
+      touch-action:pan-y;
+      min-height:0;
+      flex:1 1 auto;
+    }
+    .archiveAddPanel{
+      display:none;
+      flex-direction:column;
+      position:absolute;
+      left:0;
+      right:0;
+      bottom:0;
+      top:108px;
+      border-top:1px solid rgba(0,0,0,.06);
+      background:#fafafa;
+      border-top-left-radius:18px;
+      border-top-right-radius:18px;
+      box-shadow:0 -10px 26px rgba(0,0,0,.12);
+      overflow:hidden;
+      overscroll-behavior:contain;
+      touch-action:pan-y;
+      z-index:3;
+    }
+    .archiveAddPanel.show{ display:flex; }
+    .archiveAddHead{
+      padding:12px 16px 0;
+      font-size:12px;
+      font-weight:1000;
+      color:#666;
+    }
+    .archiveRow{
+      width:100%;
+      border:1px solid rgba(0,0,0,.12);
+      background:#fff;
+      border-radius:14px;
+      padding:12px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      text-align:left;
+      cursor:pointer;
+      font-weight:1000;
+    }
+    .archiveRowName{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .archiveRowMeta,
+    .archiveRowAction{ color:#666; font-size:12px; font-weight:1000; flex:0 0 auto; }
+    .archiveEmpty{
+      padding:18px 12px;
+      border:1px dashed rgba(0,0,0,.15);
+      border-radius:14px;
+      text-align:center;
+      font-weight:900;
+      color:#666;
+      background:#fafafa;
+    }
+    .archiveMoveBox{
+      width:min(360px, calc(100vw - 24px));
+      background:#fff;
+      border-radius:18px;
+      box-shadow:0 22px 48px rgba(0,0,0,.24);
+      border:1px solid rgba(0,0,0,.10);
+      padding:18px;
+    }
+    .archiveMoveText{ font-size:16px; font-weight:1000; margin-bottom:14px; }
+    .archiveMoveBtns{ display:flex; gap:10px; }
+
+    .authModal{
+      position:fixed;
+      inset:0;
+      z-index:320;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      background:rgba(0,0,0,.36);
+    }
+    .authModal.show{ display:flex; }
+    .authCard{
+      width:min(420px, calc(100vw - 24px));
+      background:#fff;
+      border-radius:18px;
+      box-shadow:0 22px 48px rgba(0,0,0,.24);
+      border:1px solid rgba(0,0,0,.10);
+      padding:16px;
+    }
+    .authHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      font-weight:1100;
+      font-size:18px;
+      margin-bottom:10px;
+    }
+    .authClose{
+      width:36px;
+      height:36px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.12);
+      background:#fff;
+      font-size:24px;
+      line-height:1;
+      cursor:pointer;
+    }
+    .authStatus{
+      font-size:13px;
+      font-weight:900;
+      color:#555;
+      margin-bottom:12px;
+    }
+    .authField{
+      width:100%;
+      height:42px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.14);
+      padding:0 12px;
+      font-size:15px;
+      font-weight:900;
+      margin-bottom:10px;
+      background:#fff;
+      color:#111;
+    }
+    .authBtns{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:4px;
+    }
+    .authBtn{
+      flex:1 1 160px;
+      height:40px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.14);
+      background:#111;
+      color:#fff;
+      font-weight:1100;
+      cursor:pointer;
+    }
+    .authBtn.secondary{
+      background:#fff;
+      color:#111;
+    }
+    .authSignedIn,
+    .authSignedOut{ display:none; }
+    .authModal.signed-in .authSignedIn{ display:block; }
+    .authModal.signed-out .authSignedOut{ display:block; }
+    .authUserEmail{
+      font-weight:1100;
+      margin-bottom:12px;
+      word-break:break-word;
+    }
+    .authHelp{
+      margin-top:12px;
+      font-size:12px;
+      font-weight:900;
+      color:#666;
+    }
+
+
+    .authResetWrap{ display:none; }
+    .authModal.resetting .authSignedOut,
+    .authModal.resetting .authSignedIn{ display:none !important; }
+    .authModal.resetting .authResetWrap{ display:block; }
+    .authForgotRow{
+      display:flex;
+      justify-content:flex-end;
+      margin:-2px 0 10px;
+    }
+    .authLinkBtn{
+      border:none;
+      background:transparent;
+      padding:0;
+      font:inherit;
+      font-size:12px;
+      font-weight:1000;
+      color:#2563eb;
+      cursor:pointer;
+      text-decoration:underline;
+    }
+    .authLinkBtn.secondary{
+      color:#555;
+    }
+
+
+/* v2.9.3 — preserve approved SRP tri-color metallic wordmark */
+html.crp-integrated .panelTop .left .srp-pink{
+ background:linear-gradient(180deg,#fff 0%,#ffd9ef 12%,#ff4fa7 28%,#ff9fd0 43%,#fff 51%,#d71d79 62%,#ff70b7 80%,#7a1748 100%)!important;
+ -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;
+}
+html.crp-integrated .panelTop .left .srp-blue{
+ background:linear-gradient(180deg,#fff 0%,#d9f6ff 12%,#2ec7ff 28%,#86e7ff 43%,#fff 51%,#1188d7 62%,#65d8ff 80%,#0f4f80 100%)!important;
+ -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;
+}
+html.crp-integrated .panelTop .left .srp-green{
+ background:linear-gradient(180deg,#fff 0%,#ddffe9 12%,#28d77d 28%,#83efad 43%,#fff 51%,#15934f 62%,#5ee99b 80%,#176238 100%)!important;
+ -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;
+}
+</style>
+
+<style id="srpEmbeddedOverrides">
+html.srp-embedded,html.srp-embedded body{height:auto!important;min-height:0!important;overflow:visible!important;}
+html.srp-embedded body{display:block!important;min-height:0!important;}
+html.srp-embedded header{position:relative!important;top:auto!important;}
+html.srp-embedded .horseWrap{display:none!important;}
+html.srp-embedded main{display:block!important;flex:none!important;min-height:0!important;height:auto!important;padding-bottom:20px!important;}
+html.srp-embedded .sheet{display:block!important;flex:none!important;min-height:0!important;height:auto!important;overflow:visible!important;}
+html.srp-embedded .sheetHeader{position:relative!important;top:auto!important;}
+html.srp-embedded #sheetBody{display:block!important;flex:none!important;min-height:0!important;height:auto!important;overflow:visible!important;overscroll-behavior:auto!important;}
+html.srp-embedded #sheetInner{display:block!important;flex:none!important;min-height:0!important;height:auto!important;}
+html.srp-embedded .cards{padding-bottom:32px!important;}
+html.srp-embedded .fullPerf,html.srp-embedded .fullPerfScroll{display:block!important;flex:none!important;min-height:0!important;height:auto!important;overflow:visible!important;}
+html.srp-embedded #drumSelect,html.srp-embedded #mDrumSelect,html.srp-embedded #instrumentSelect,html.srp-embedded #mInstrumentSelect{display:none!important;}
+html.srp-embedded [title="Drums"],html.srp-embedded [title="Instrument"]{display:none!important;}
+html.srp-embedded .fullBoxWrap,html.srp-embedded .fullPreviewBlock{display:block!important;flex:none!important;min-height:0!important;height:auto!important;}
+html.srp-embedded textarea.fullBox,html.srp-embedded textarea.fullPreview{display:block!important;flex:none!important;min-height:140px!important;height:140px!important;}
+html.srp-embedded #editorRoot{display:block!important;flex:none!important;min-height:0!important;height:auto!important;}
+html.srp-embedded .fullSectionEditor{padding:16px 12px 24px!important;overscroll-behavior:auto!important;}
+html.srp-embedded .fullSectionCard:last-child{margin-bottom:0!important;}
+html.srp-embedded #rBtn{position:absolute!important;bottom:8px!important;}
+</style>
+<script>
+(function(){
+  const q=new URLSearchParams(location.search);
+  if(q.get('embedded')==='1') document.documentElement.classList.add('srp-embedded');
+  if(q.get('crpMode')==='1') document.documentElement.classList.add('crp-integrated');
+})();
+</script>
+
+
+<style id="crpIntegratedSrpStyles">
+html.crp-integrated,html.crp-integrated body{height:auto!important;min-height:100%!important;overflow-x:hidden!important;overflow-y:visible!important;background:#101318!important;}
+html.crp-integrated body{display:block!important;padding:0!important;}
+html.crp-integrated .horseWrap{display:none!important;}
+html.crp-integrated header{position:relative!important;top:auto!important;z-index:auto!important;background:#e9e9ea!important;}
+html.crp-integrated main{display:block!important;flex:none!important;min-height:0!important;height:auto!important;padding-bottom:18px!important;background:#e9e9ea!important;}
+html.crp-integrated .sheet{display:block!important;flex:none!important;min-height:0!important;height:auto!important;overflow:visible!important;}
+html.crp-integrated .sheetHeader{position:relative!important;top:auto!important;}
+html.crp-integrated #sheetBody{display:block!important;flex:none!important;min-height:0!important;height:auto!important;max-height:none!important;overflow:visible!important;overscroll-behavior:auto!important;-webkit-overflow-scrolling:auto!important;}
+html.crp-integrated #sheetInner{display:block!important;flex:none!important;min-height:0!important;height:auto!important;}
+html.crp-integrated .cards{padding-bottom:28px!important;}
+html.crp-integrated .fullPerf,html.crp-integrated .fullPerfScroll{display:block!important;flex:none!important;min-height:0!important;height:auto!important;max-height:none!important;overflow:visible!important;}
+html.crp-integrated .fullBoxWrap,html.crp-integrated .fullPreviewBlock,html.crp-integrated #editorRoot{display:block!important;flex:none!important;min-height:0!important;height:auto!important;}
+html.crp-integrated textarea.fullBox,html.crp-integrated textarea.fullPreview{min-height:140px!important;height:140px!important;}
+html.crp-integrated .fullSectionEditor{padding-bottom:24px!important;overscroll-behavior:auto!important;}
+html.crp-integrated #drumSelect,html.crp-integrated #mDrumSelect,html.crp-integrated #instrumentSelect,html.crp-integrated #mInstrumentSelect{display:none!important;}
+html.crp-integrated [title="Drums"],html.crp-integrated [title="Instrument"]{display:none!important;}
+html.crp-integrated #panelBody{max-height:none!important;overflow:visible!important;}
+html.crp-integrated #rBtn{position:fixed!important;right:14px!important;bottom:14px!important;z-index:80!important;}
+.crp-srp-shell{display:none;background:#101318;color:#f5f5f5;border-bottom:1px solid #2b313a;padding:10px 10px 12px;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+html.crp-integrated .crp-srp-shell{display:block;}
+.crp-srp-brand{display:flex;align-items:center;justify-content:center;gap:10px;padding:2px 0 10px;}
+.crp-srp-brand img{width:58px;height:42px;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(0,0,0,.5));}
+.crp-srp-brand strong{font-size:clamp(1.35rem,6vw,2rem);line-height:1;background:linear-gradient(180deg,#fff2b6 0%,#ffd55e 24%,#e5a329 50%,#925309 74%,#ffd86a 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:1px rgba(109,63,4,.65);filter:drop-shadow(0 2px 0 #4e2b00);}
+.crp-srp-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;}
+.crp-srp-mode{min-width:0;min-height:76px;border:1px solid #3d4652;border-radius:14px;background:#151a21;color:#e8ebef;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 5px;text-decoration:none;}
+.crp-srp-mode.active{border-color:#e4b84d;box-shadow:0 0 0 1px rgba(228,184,77,.38),0 0 15px rgba(228,184,77,.28);background:linear-gradient(145deg,#2a2412,#15191f);}
+.crp-srp-mode img{width:48px;height:48px;object-fit:contain;flex:0 0 48px;}
+.crp-srp-mode .copy{min-width:0;display:flex;flex-direction:column;text-align:left;line-height:1.05;}
+.crp-srp-mode strong{font-size:.9rem;}.crp-srp-mode small{font-size:.63rem;color:#9ea6b1;margin-top:3px;}
+.crp-srp-linkbar{margin:10px 0 0;border:1px solid rgba(228,184,77,.42);border-radius:12px;padding:9px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#15191f;}
+.crp-srp-linkbar .status{flex:1 1 180px;min-width:0;display:flex;flex-direction:column;gap:2px}.crp-srp-linkbar .status strong{font-size:.92rem}.crp-srp-linkbar .status span{font-size:.72rem;color:#aab2bd;white-space:normal;}
+.crp-srp-linkbar button{border:1px solid #d8ae52;border-radius:9px;background:#20242b;color:#f4d47d;padding:8px 10px;font-weight:800;font-size:.78rem;}
+@media(max-width:390px){.crp-srp-mode{gap:3px;padding:6px 3px}.crp-srp-mode img{width:42px;height:42px;flex-basis:42px}.crp-srp-mode strong{font-size:.82rem}.crp-srp-mode small{font-size:.58rem}.crp-srp-brand img{width:48px;height:36px}}
+</style>
+
+<style id="crpSrpUiOverhaulV220">
+/* v2.2.0 — SRP visual overhaul for the integrated Chord Rider experience */
+html.crp-integrated{
+  --srp-bg:#0d0f12;
+  --srp-panel:#171a1f;
+  --srp-panel2:#11151a;
+  --srp-line:#353d47;
+  --srp-text:#f2f4f7;
+  --srp-muted:#9aa3ad;
+  --srp-gold:#e9c46a;
+  --srp-gold2:#d7b654;
+  --srp-red:#e76f51;
+}
+html.crp-integrated,
+html.crp-integrated body{
+  background:radial-gradient(circle at top,#171b22 0,#0d0f12 46%,#090b0e 100%)!important;
+  color:var(--srp-text)!important;
+}
+html.crp-integrated main{background:transparent!important;padding:10px 10px 28px!important;max-width:1180px!important;}
+html.crp-integrated header{background:transparent!important;padding:10px!important;border:0!important;}
+html.crp-integrated .panel,
+html.crp-integrated .sheet{
+  background:linear-gradient(180deg,rgba(32,36,43,.97),rgba(23,26,31,.99))!important;
+  color:var(--srp-text)!important;
+  border:1px solid var(--srp-line)!important;
+  border-radius:18px!important;
+  box-shadow:0 10px 30px rgba(0,0,0,.28)!important;
+}
+html.crp-integrated .panelTop,
+html.crp-integrated .miniBar,
+html.crp-integrated .sheetHeader{
+  background:linear-gradient(180deg,#1d2229,#171b21)!important;
+  border-color:#343c46!important;
+  color:var(--srp-text)!important;
+}
+html.crp-integrated .row{color:var(--srp-text)!important;}
+html.crp-integrated .hint,
+html.crp-integrated .archiveLoadedName,
+html.crp-integrated #nowPlaying,
+html.crp-integrated .fullPerfChordRow{color:var(--srp-muted)!important;}
+
+/* Colored-chrome SONG RIDER PRO wordmark */
+html.crp-integrated .panelTop .left{
+  font-family:Impact,Haettenschweiler,"Arial Black",sans-serif!important;
+  font-size:clamp(1.65rem,7vw,2.4rem)!important;
+  letter-spacing:.045em!important;
+  gap:.18em!important;
+  filter:drop-shadow(0 4px 5px rgba(0,0,0,.5));
+}
+html.crp-integrated .panelTop .left span{
+  color:transparent!important;
+  background:
+    linear-gradient(180deg,
+      #ffffff 0%,
+      #f7fbff 10%,
+      #67e8f9 23%,
+      #ffffff 35%,
+      #ff77c8 49%,
+      #ffd86b 61%,
+      #ffffff 72%,
+      #78e6a3 84%,
+      #f5f7ff 100%)!important;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  -webkit-text-stroke:1px rgba(14,16,20,.88)!important;
+  text-shadow:
+    0 1px 0 rgba(255,255,255,.65),
+    0 2px 0 rgba(76,83,93,.75),
+    0 4px 7px rgba(0,0,0,.55)!important;
+}
+html.crp-integrated .panelTop .left .srp-pink{background-position:0 0!important;}
+html.crp-integrated .panelTop .left .srp-blue{background-position:45% 0!important;}
+html.crp-integrated .panelTop .left .srp-green{background-position:90% 0!important;}
+html.crp-integrated #horseParked{filter:drop-shadow(0 6px 10px rgba(0,0,0,.55))!important;}
+
+/* CRP-style buttons */
+html.crp-integrated .btn,
+html.crp-integrated .tinyBtn,
+html.crp-integrated .miniIconBtn,
+html.crp-integrated .iconCircle,
+html.crp-integrated .exportBtn,
+html.crp-integrated .breakActBtn,
+html.crp-integrated .cardDel,
+html.crp-integrated .cardAdd,
+html.crp-integrated .notesToolBtn,
+html.crp-integrated .projectPickerBtn,
+html.crp-integrated .authBtn{
+  border:1px solid #3d444f!important;
+  background:#252b33!important;
+  color:var(--srp-text)!important;
+  border-radius:10px!important;
+  box-shadow:none!important;
+}
+html.crp-integrated .btn:hover,
+html.crp-integrated .tinyBtn:hover,
+html.crp-integrated .miniIconBtn:hover,
+html.crp-integrated .iconCircle:hover,
+html.crp-integrated .exportBtn:hover{filter:brightness(1.08);}
+html.crp-integrated .btn.secondary{background:#171c23!important;color:var(--srp-text)!important;border-color:#3d444f!important;}
+html.crp-integrated .iconCircle.scrollCircle,
+html.crp-integrated .tinyBtn.active,
+html.crp-integrated .pill.active{
+  background:var(--srp-gold)!important;
+  border-color:var(--srp-gold2)!important;
+  color:#17130a!important;
+  font-weight:900!important;
+}
+html.crp-integrated .iconCircle.scrollCircle.on{background:#72c98a!important;border-color:#72c98a!important;color:#10140f!important;}
+html.crp-integrated .iconCircle.recCircle,
+html.crp-integrated .btn.rec{background:var(--srp-red)!important;border-color:var(--srp-red)!important;color:#fff!important;}
+html.crp-integrated .pill{background:#11151a!important;color:var(--srp-text)!important;border-color:#3d4652!important;}
+
+/* Fields and selects */
+html.crp-integrated select,
+html.crp-integrated input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+html.crp-integrated textarea{
+  background:#0e1115!important;
+  color:var(--srp-text)!important;
+  border-color:#39414b!important;
+  caret-color:#fff!important;
+}
+html.crp-integrated select:focus,
+html.crp-integrated input:focus,
+html.crp-integrated textarea:focus{
+  border-color:var(--srp-gold)!important;
+  box-shadow:0 0 0 3px rgba(233,196,106,.13)!important;
+}
+html.crp-integrated input[readonly]{background:#12161b!important;color:#c8ced6!important;}
+html.crp-integrated input::placeholder,
+html.crp-integrated textarea::placeholder{color:#69737f!important;}
+
+/* Project/song controls */
+html.crp-integrated .projectPickerBtn,
+html.crp-integrated .compactSelect{height:38px!important;}
+html.crp-integrated .compactSelect{border-radius:10px!important;font-weight:700!important;}
+html.crp-integrated .audioProgressWrap{background:#11151a!important;border-color:#39414b!important;}
+
+/* Full Song View */
+html.crp-integrated .sheetHeader h2{color:var(--srp-text)!important;font-size:.92rem!important;}
+html.crp-integrated .fullSectionEditor{gap:18px!important;padding:14px 12px 28px!important;}
+html.crp-integrated .fullSectionCard{
+  background:#11151a!important;
+  border:1px solid #343c46!important;
+  border-radius:16px!important;
+  padding:12px!important;
+}
+html.crp-integrated .fullSectionHead{margin:0 0 10px!important;gap:10px!important;}
+html.crp-integrated .fullSectionHead .fullBreakLine,
+html.crp-integrated .breakRow::before,
+html.crp-integrated .breakRow::after{background:#414a55!important;}
+html.crp-integrated input.songPartPill,
+html.crp-integrated .fullPerfPill{
+  background:linear-gradient(180deg,#f1cf76,#e5b947)!important;
+  color:#17130a!important;
+  border:1px solid #d7b654!important;
+  border-radius:999px!important;
+  box-shadow:0 5px 14px rgba(0,0,0,.22)!important;
+  font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif!important;
+  font-weight:900!important;
+}
+html.crp-integrated textarea.fullSectionText{
+  background:#0e1115!important;
+  color:#f4f6f8!important;
+  border:1px solid #39414b!important;
+  border-radius:12px!important;
+  padding:12px 12px 16px!important;
+  font-weight:750!important;
+  line-height:1.5!important;
+}
+html.crp-integrated textarea.fullSectionText:focus{border-color:var(--srp-gold)!important;box-shadow:0 0 0 3px rgba(233,196,106,.13)!important;}
+html.crp-integrated .fullBeatDivider{background:#56616e!important;}
+html.crp-integrated .fullLineSyllable{text-shadow:0 1px 2px #000!important;}
+html.crp-integrated .fullPerfBox{color:var(--srp-text)!important;}
+html.crp-integrated .fullPerfChordRow{color:#c8ced6!important;opacity:1!important;}
+
+/* Cards / supporting panels */
+html.crp-integrated .card,
+html.crp-integrated .rhymeBox,
+html.crp-integrated .notesModalCard,
+html.crp-integrated .projectModalCard,
+html.crp-integrated .archiveModalCard,
+html.crp-integrated .authCard{
+  background:#171a1f!important;
+  color:var(--srp-text)!important;
+  border-color:#343c46!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.38)!important;
+}
+html.crp-integrated .rhymeTop,
+html.crp-integrated .notesModalTop,
+html.crp-integrated .projectModalTop,
+html.crp-integrated .archiveModalTop{border-color:#343c46!important;}
+html.crp-integrated .rWord{background:#252b33!important;color:#f4d47d!important;border-color:#4a5563!important;}
+html.crp-integrated .rBtn{background:var(--srp-gold)!important;color:#17130a!important;border-color:#d7b654!important;box-shadow:0 12px 28px rgba(0,0,0,.4)!important;}
+
+/* Integrated shell polish to match CRP proper */
+html.crp-integrated .crp-srp-shell{background:#0d0f12!important;border-color:#2b313a!important;}
+html.crp-integrated .crp-srp-mode{background:#151a21!important;border-color:#3d4652!important;border-radius:16px!important;}
+html.crp-integrated .crp-srp-mode.active{border-color:var(--srp-gold)!important;box-shadow:0 0 0 1px rgba(233,196,106,.35),0 0 18px rgba(233,196,106,.24)!important;background:linear-gradient(145deg,#2a2412,#15191f)!important;}
+html.crp-integrated .crp-srp-linkbar{background:#15191f!important;border-color:rgba(233,196,106,.42)!important;}
+html.crp-integrated .crp-srp-linkbar button{background:#252b33!important;border-color:#d7b654!important;color:#f4d47d!important;border-radius:10px!important;}
+
+@media(max-width:520px){
+  html.crp-integrated .panelTop{padding:11px 10px!important;}
+  html.crp-integrated .panelTop .left{font-size:clamp(1.45rem,7.8vw,2rem)!important;}
+  html.crp-integrated #horseParked{right:72px!important;height:96px!important;top:-9px!important;}
+  html.crp-integrated .fullSectionCard{padding:10px!important;border-radius:14px!important;}
+  html.crp-integrated textarea.fullSectionText{font-size:17px!important;}
+}
+</style>
+
+
+<style id="srpUiPolish221">
+/* v2.2.1 visual polish: stronger SRP chrome, CRP gold section pills, pro icon system */
+html.crp-integrated{
+  --ico-undo:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M9%207%204%2012l5%205M4%2012h9a6%206%200%200%201%206%206%27%2F%3E%3C%2Fsvg%3E");
+  --ico-redo:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27m15%207%205%205-5%205M20%2012h-9a6%206%200%200%200-6%206%27%2F%3E%3C%2Fsvg%3E");
+  --ico-save:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M3%203h15l3%203v15H3zM7%203v7h10V3M7%2021v-8h10v8%27%2F%3E%3C%2Fsvg%3E");
+  --ico-cloud:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M17.5%2019H7a5%205%200%200%201-.8-9.94A7%207%200%200%201%2019.6%2011%204%204%200%200%201%2017.5%2019Z%27%2F%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27m9%2014%202%202%204-4%27%2F%3E%3C%2Fsvg%3E");
+  --ico-notes:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M4%203h11l5%205v13H4zM15%203v5h5M8%2012h8M8%2016h8%27%2F%3E%3C%2Fsvg%3E");
+  --ico-upload:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M12%2016V4m0%200-4%204m4-4%204%204M5%2020h14%27%2F%3E%3C%2Fsvg%3E");
+  --ico-download:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M12%204v12m0%200%204-4m-4%204-4-4M5%2020h14%27%2F%3E%3C%2Fsvg%3E");
+  --ico-archive:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M4%207h16v13H4zM3%204h18v4H3zM9%2011h6%27%2F%3E%3C%2Fsvg%3E");
+  --ico-plus:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272.4%27%20stroke-linecap%3D%27round%27%20d%3D%27M12%205v14M5%2012h14%27%2F%3E%3C%2Fsvg%3E");
+  --ico-edit:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27m4%2020%204.5-1%2010-10-3.5-3.5-10%2010zM13.8%206.7l3.5%203.5%27%2F%3E%3C%2Fsvg%3E");
+  --ico-delete:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M5%207h14M9%207V4h6v3M8%2010v8M12%2010v8M16%2010v8M7%207l1%2014h8l1-14%27%2F%3E%3C%2Fsvg%3E");
+  --ico-close:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272.4%27%20stroke-linecap%3D%27round%27%20d%3D%27m6%206%2012%2012M18%206%206%2018%27%2F%3E%3C%2Fsvg%3E");
+}
+/* True tri-color metallic wordmark: each word keeps its original identity */
+html.crp-integrated .panelTop .left .srp-pink{
+  background:linear-gradient(180deg,#fff 0%,#ffd9ef 12%,#ff4fa7 28%,#ff9fd0 43%,#fff 51%,#d71d79 62%,#ff70b7 80%,#7a1748 100%)!important;
+}
+html.crp-integrated .panelTop .left .srp-blue{
+  background:linear-gradient(180deg,#fff 0%,#d9f6ff 12%,#2ec7ff 28%,#86e7ff 43%,#fff 51%,#1188d7 62%,#65d8ff 80%,#0f4f80 100%)!important;
+}
+html.crp-integrated .panelTop .left .srp-green{
+  background:linear-gradient(180deg,#fff 0%,#ddffe9 12%,#28d77d 28%,#83efad 43%,#fff 51%,#15934f 62%,#5ee99b 80%,#145c38 100%)!important;
+}
+html.crp-integrated .panelTop .left span{
+  -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;
+  -webkit-text-stroke:1px rgba(10,12,16,.95)!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.85),0 2px 0 #747c87,0 4px 0 #252a31,0 7px 10px rgba(0,0,0,.58)!important;
+}
+/* CAPO/STEP: readable black type, including active state */
+html.crp-integrated #capoStepToggle,html.crp-integrated #capoStepToggle.on{
+  background:#f5f6f8!important;color:#090a0c!important;-webkit-text-fill-color:#090a0c!important;
+  border-color:#c5cad0!important;text-shadow:none!important;
+}
+/* Section title pills must match CRP's gold controls, no dark input override */
+html.crp-integrated input.songPartPill,html.crp-integrated input.headingPill,html.crp-integrated .fullPerfPill{
+  background:linear-gradient(180deg,#f4d47c 0%,#e9c25d 52%,#d9ab37 100%)!important;
+  color:#151109!important;-webkit-text-fill-color:#151109!important;
+  border:1px solid #d4aa3f!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.22)!important;
+  font-weight:950!important;letter-spacing:.02em!important;
+}
+html.crp-integrated input.songPartPill:focus,html.crp-integrated input.headingPill:focus{
+  border-color:#f7dc8d!important;box-shadow:0 0 0 3px rgba(233,196,106,.18),inset 0 1px 0 rgba(255,255,255,.45)!important;
+}
+/* Unified professional action buttons */
+html.crp-integrated #undoBtn,html.crp-integrated #redoBtn,html.crp-integrated #saveBtn,html.crp-integrated #cloudSyncBtn,
+html.crp-integrated #notesBtn,html.crp-integrated #uploadAudioBtn,html.crp-integrated #exportBtn,html.crp-integrated #archiveBtn,
+html.crp-integrated #newProjectBtn,html.crp-integrated #renameProjectBtn,html.crp-integrated #deleteProjectBtn,
+html.crp-integrated .sheetAddBtn,html.crp-integrated .sheetDeleteBtn,
+html.crp-integrated .fullAddBtn,html.crp-integrated .fullDeleteBtn{
+  position:relative!important;width:44px!important;height:44px!important;min-width:44px!important;padding:0!important;
+  border-radius:12px!important;border:1px solid #3d4652!important;background:linear-gradient(180deg,#272e37,#1e242c)!important;
+  color:#eef1f5!important;font-size:0!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 3px 8px rgba(0,0,0,.2)!important;
+}
+html.crp-integrated #undoBtn:disabled,html.crp-integrated #redoBtn:disabled{opacity:.35!important;}
+html.crp-integrated #undoBtn::before,html.crp-integrated #redoBtn::before,html.crp-integrated #saveBtn::before,html.crp-integrated #cloudSyncBtn::before,
+html.crp-integrated #notesBtn::before,html.crp-integrated #uploadAudioBtn::before,html.crp-integrated #exportBtn::before,html.crp-integrated #archiveBtn::before,
+html.crp-integrated #newProjectBtn::before,html.crp-integrated #renameProjectBtn::before,html.crp-integrated #deleteProjectBtn::before,
+html.crp-integrated .sheetAddBtn::before,html.crp-integrated .sheetDeleteBtn::before,html.crp-integrated .fullAddBtn::before,html.crp-integrated .fullDeleteBtn::before{
+  content:"";width:21px;height:21px;background:currentColor;display:block;
+  -webkit-mask:var(--ico-plus) center/contain no-repeat;mask:var(--ico-plus) center/contain no-repeat;
+}
+html.crp-integrated #undoBtn::before{-webkit-mask-image:var(--ico-undo);mask-image:var(--ico-undo)}
+html.crp-integrated #redoBtn::before{-webkit-mask-image:var(--ico-redo);mask-image:var(--ico-redo)}
+html.crp-integrated #saveBtn::before{-webkit-mask-image:var(--ico-save);mask-image:var(--ico-save)}
+html.crp-integrated #cloudSyncBtn::before{-webkit-mask-image:var(--ico-cloud);mask-image:var(--ico-cloud)}
+html.crp-integrated #notesBtn::before{-webkit-mask-image:var(--ico-notes);mask-image:var(--ico-notes)}
+html.crp-integrated #saveBtn::before{width:22px!important;height:22px!important;min-width:22px!important;aspect-ratio:1/1!important;transform:none!important;}
+html.crp-integrated #notesBtn::before{width:24px!important;height:21px!important;min-width:24px!important;transform:none!important;}
+html.crp-integrated #uploadAudioBtn::before{-webkit-mask-image:var(--ico-upload);mask-image:var(--ico-upload)}
+html.crp-integrated #exportBtn::before{-webkit-mask-image:var(--ico-download);mask-image:var(--ico-download)}
+html.crp-integrated #archiveBtn::before{-webkit-mask-image:var(--ico-archive);mask-image:var(--ico-archive)}
+html.crp-integrated #newProjectBtn::before,html.crp-integrated .sheetAddBtn::before,html.crp-integrated .fullAddBtn::before{-webkit-mask-image:var(--ico-plus);mask-image:var(--ico-plus)}
+html.crp-integrated #renameProjectBtn::before{-webkit-mask-image:var(--ico-edit);mask-image:var(--ico-edit)}
+html.crp-integrated #deleteProjectBtn::before,html.crp-integrated .sheetDeleteBtn::before,html.crp-integrated .fullDeleteBtn::before{-webkit-mask-image:var(--ico-delete);mask-image:var(--ico-delete)}
+/* Make destructive actions obvious but still CRP-like */
+html.crp-integrated #deleteProjectBtn,html.crp-integrated .sheetDeleteBtn,html.crp-integrated .fullDeleteBtn{color:#ff8e7d!important;}
+html.crp-integrated #saveBtn,html.crp-integrated #exportBtn{color:#f2cd72!important;}
+@media (hover:hover){
+  html.crp-integrated #undoBtn:hover,html.crp-integrated #redoBtn:hover,html.crp-integrated #saveBtn:hover,html.crp-integrated #cloudSyncBtn:hover,
+  html.crp-integrated #notesBtn:hover,html.crp-integrated #uploadAudioBtn:hover,html.crp-integrated #exportBtn:hover,html.crp-integrated #archiveBtn:hover,
+  html.crp-integrated #newProjectBtn:hover,html.crp-integrated #renameProjectBtn:hover,html.crp-integrated #deleteProjectBtn:hover{
+    border-color:#d8b85e!important;transform:translateY(-1px);
+  }
+}
+</style>
+
+
+<style id="srpHeaderMatch295">
+html.crp-integrated #togglePanelBtn{min-width:56px!important;min-height:38px!important;padding:0 9px!important;border-radius:12px!important;font-size:.78rem!important;}
+html.crp-integrated .srp-exact-wordmark{max-height:72px!important;width:auto!important;max-width:calc(100vw - 105px)!important;object-fit:contain!important;object-position:left center!important;}
+</style>
+
+<style id="srpUiPolish222">
+/* v2.2.2 — CRP-matched SRP header, mobile toolbar fit, gold section labels */
+html.crp-integrated .crp-srp-shell{padding:0 0 12px!important;}
+html.crp-integrated .crp-srp-app-header{
+  min-height:86px;display:grid;grid-template-columns:92px minmax(0,1fr) 92px;align-items:center;gap:4px;
+  padding:6px 8px 8px;border-bottom:1px solid #313844;background:#090b0e;overflow:hidden;
+}
+html.crp-integrated .crp-srp-brand-mark{
+  width:92px;height:72px;object-fit:contain;filter:drop-shadow(0 3px 3px rgba(0,0,0,.6));
+}
+html.crp-integrated .crp-srp-brand-copy{text-align:center;min-width:0;}
+html.crp-integrated .crp-srp-title{
+  font-family:Impact,Haettenschweiler,"Arial Black",sans-serif;font-size:clamp(1.75rem,7.5vw,2.65rem);line-height:.95;
+  letter-spacing:.025em;white-space:nowrap;color:transparent;
+  background:linear-gradient(180deg,#fff4bd 0%,#ffd862 20%,#f1b62f 45%,#b4650a 66%,#ffd96d 82%,#8c4a06 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-stroke:1px rgba(93,52,3,.8);
+  text-shadow:0 1px 0 rgba(255,255,255,.4),0 3px 0 #6b3905,0 6px 10px rgba(0,0,0,.55);
+}
+html.crp-integrated .crp-srp-tagline{
+  margin-top:5px;color:#f3f4f6;font-family:"Brush Script MT","Segoe Script",cursive;font-size:clamp(.72rem,3.5vw,1rem);
+  white-space:nowrap;text-shadow:0 1px 2px #000;
+}
+html.crp-integrated .crp-srp-modes{margin:10px 10px 0;}
+html.crp-integrated .crp-srp-linkbar{margin:10px 10px 0;}
+/* The Song Rider wordmark gets breathing room; no mascot inside this title bar. */
+html.crp-integrated #horseParked{display:none!important;}
+html.crp-integrated .panelTop>div:first-child{min-width:0!important;}
+html.crp-integrated .panelTop .left{padding-right:0!important;}
+/* Mobile top controls: key must always remain visible. */
+html.crp-integrated #topControlsRow{display:grid!important;grid-template-columns:44px 44px minmax(72px,1fr) 50px 58px!important;gap:6px!important;overflow:visible!important;}
+html.crp-integrated #topControlsRow #saveBtn,html.crp-integrated #topControlsRow #cloudSyncBtn{width:44px!important;min-width:44px!important;}
+html.crp-integrated #topControlsRow .tinyCombo{width:100%!important;min-width:72px!important;justify-content:center!important;box-sizing:border-box!important;}
+html.crp-integrated #topControlsRow .tinyField{width:50px!important;min-width:50px!important;}
+html.crp-integrated #topControlsRow .tinyField.key{width:58px!important;min-width:58px!important;}
+html.crp-integrated #topControlsRow .tinyField input,html.crp-integrated #topControlsRow .tinyField.key input{width:100%!important;max-width:100%!important;box-sizing:border-box!important;}
+/* Utility action row: archive cluster left, undo/redo anchored right. */
+html.crp-integrated .srp-action-spacer{flex:1 1 auto!important;min-width:8px!important;}
+/* Section title pill = same yellow family as the rhyme button, with bold black text. */
+html.crp-integrated input.songPartPill,html.crp-integrated input.headingPill,html.crp-integrated .fullPerfPill{
+  background:#efc85d!important;background-image:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;
+  color:#111!important;-webkit-text-fill-color:#111!important;border:1px solid #d6aa3f!important;
+  font-weight:1000!important;text-shadow:none!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.25)!important;
+}
+@media(max-width:430px){
+  html.crp-integrated .crp-srp-app-header{grid-template-columns:78px minmax(0,1fr) 78px;min-height:78px;padding:5px 4px 7px;}
+  html.crp-integrated .crp-srp-brand-mark{width:78px;height:64px;}
+  html.crp-integrated .crp-srp-title{font-size:clamp(1.55rem,7.4vw,2rem);}
+  html.crp-integrated .crp-srp-tagline{font-size:clamp(.66rem,3vw,.82rem);}
+  html.crp-integrated #topControlsRow{grid-template-columns:42px 42px minmax(68px,1fr) 48px 54px!important;gap:5px!important;padding-left:10px!important;padding-right:10px!important;}
+  html.crp-integrated #topControlsRow #saveBtn,html.crp-integrated #topControlsRow #cloudSyncBtn{width:42px!important;min-width:42px!important;height:42px!important;}
+  html.crp-integrated #topControlsRow .tinyField{width:48px!important;min-width:48px!important;}
+  html.crp-integrated #topControlsRow .tinyField.key{width:54px!important;min-width:54px!important;}
+}
+</style>
+
+<style id="srpUiPolish223">
+/* v2.2.3 — header parity, compact transport metadata row, reliable gold section pills */
+html.crp-integrated .crp-srp-app-header{
+  position:relative!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:14px!important;
+  min-height:86px!important;padding:10px max(16px,env(safe-area-inset-left))!important;
+  background:rgba(13,15,18,.96)!important;border-bottom:1px solid #343a43!important;overflow:visible!important;
+}
+html.crp-integrated .crp-srp-brand-copy{min-width:0!important;flex:1 1 auto!important;text-align:center!important;overflow:visible!important;}
+html.crp-integrated .crp-srp-brand-copy h1{
+  display:inline-block!important;margin:0!important;padding:0 2px 2px!important;max-width:100%!important;
+  font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif!important;font-style:italic!important;font-weight:900!important;
+  font-size:clamp(1.55rem,4.6vw,2.5rem)!important;line-height:.95!important;letter-spacing:.025em!important;text-transform:uppercase!important;white-space:nowrap!important;
+  background:linear-gradient(180deg,#fff3bf 0%,#ffd968 20%,#e9a92f 47%,#9b5b08 72%,#ffd86a 100%)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;-webkit-text-fill-color:transparent!important;
+  -webkit-text-stroke:1px rgba(109,63,4,.7)!important;
+  filter:drop-shadow(0 2px 0 #4e2b00) drop-shadow(0 0 7px rgba(242,183,54,.38))!important;
+}
+html.crp-integrated .crp-srp-brand-copy .tagline{
+  position:relative!important;display:block!important;width:max-content!important;max-width:100%!important;margin:4px auto 0!important;
+  color:#fff!important;font-family:"Brush Script MT","Segoe Script","Snell Roundhand",cursive!important;
+  font-size:clamp(.72rem,3.15vw,.98rem)!important;font-weight:700!important;font-style:italic!important;line-height:1.05!important;white-space:nowrap!important;
+  text-shadow:0 1px 0 rgba(218,223,230,.95),0 2px 1px rgba(105,113,124,.72),0 3px 4px rgba(0,0,0,.62)!important;
+}
+html.crp-integrated .crp-srp-brand-mark{width:76px!important;height:58px!important;flex:0 0 76px!important;object-fit:contain!important;position:relative!important;align-self:flex-end!important;transform:scale(1.27)!important;transform-origin:center bottom!important;bottom:-10px!important;z-index:2!important;}
+html.crp-integrated .srp-link-status-only{display:none!important;}
+
+/* One compact metadata/control row: Save, Cloud, BPM, Capo/Step, Key, Link */
+html.crp-integrated #topControlsRow{
+  display:grid!important;grid-template-columns:38px 38px 58px 70px 48px minmax(72px,1fr)!important;
+  align-items:center!important;gap:5px!important;overflow:visible!important;padding:10px!important;
+}
+html.crp-integrated #topControlsRow #saveBtn,html.crp-integrated #topControlsRow #cloudSyncBtn{width:38px!important;min-width:38px!important;height:40px!important;}
+html.crp-integrated #topControlsRow .tinyCombo{width:58px!important;min-width:58px!important;height:40px!important;padding:0 3px!important;gap:2px!important;}
+html.crp-integrated #topControlsRow #bpmInput{width:31px!important;min-width:31px!important;max-width:31px!important;padding:4px 1px!important;}
+html.crp-integrated #capoStepWrap{display:grid!important;grid-template-columns:42px 23px!important;align-items:center!important;gap:4px!important;width:70px!important;min-width:70px!important;position:relative!important;}
+html.crp-integrated #capoInput{width:42px!important;min-width:42px!important;max-width:42px!important;height:40px!important;padding:5px 3px!important;}
+html.crp-integrated #capoStepToggle,html.crp-integrated #capoStepToggle.on{
+  position:static!important;width:23px!important;min-width:23px!important;height:40px!important;margin:0!important;padding:0!important;
+  background:#f5f6f8!important;color:#090a0c!important;-webkit-text-fill-color:#090a0c!important;border:1px solid #c5cad0!important;
+  border-radius:999px!important;writing-mode:vertical-rl!important;transform:rotate(180deg)!important;overflow:hidden!important;z-index:auto!important;
+}
+html.crp-integrated #topControlsRow .tinyField.key{width:48px!important;min-width:48px!important;height:40px!important;}
+html.crp-integrated #topControlsRow #keyOutput{width:48px!important;min-width:48px!important;max-width:48px!important;height:40px!important;padding:5px 2px!important;font-size:12px!important;}
+html.crp-integrated .srp-inline-link-btn{
+  min-width:0!important;width:100%!important;height:40px!important;padding:2px 6px!important;border:1px solid #d8ae52!important;border-radius:10px!important;
+  background:#252b33!important;color:#f4d47d!important;font-size:11px!important;font-weight:900!important;line-height:1!important;
+  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;overflow:hidden!important;
+}
+html.crp-integrated .srp-inline-link-btn .srp-link-main,
+html.crp-integrated .srp-inline-link-btn .srp-link-project-name{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+html.crp-integrated .srp-inline-link-btn .srp-link-main{font-size:10.5px;font-weight:950;line-height:1;}
+html.crp-integrated .srp-inline-link-btn .srp-link-project-name{font-size:7.8px;font-weight:750;line-height:1;color:#fff3c7;opacity:.92;}
+html.crp-integrated .srp-inline-link-btn:hover{border-color:#efc85d!important;}
+
+/* Force every editable section heading to CRP gold, even while focused/editing. */
+html.crp-integrated input.fullPerfPill,html.crp-integrated .fullPerfPill,
+html.crp-integrated input.songPartPill,html.crp-integrated input.headingPill,
+html.crp-integrated input.fullPerfPill:focus,html.crp-integrated input.songPartPill:focus,html.crp-integrated input.headingPill:focus{
+  appearance:none!important;-webkit-appearance:none!important;
+  background:#efc85d!important;background-color:#efc85d!important;background-image:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;
+  color:#111!important;-webkit-text-fill-color:#111!important;border:1px solid #d6aa3f!important;border-radius:999px!important;
+  font-weight:1000!important;text-shadow:none!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.25)!important;caret-color:#111!important;
+}
+@media(max-width:430px){
+  html.crp-integrated .crp-srp-app-header{gap:7px!important;padding:8px 8px 9px!important;min-height:76px!important;}
+  html.crp-integrated .crp-srp-brand-mark{width:53px!important;height:50px!important;flex-basis:53px!important;transform:scale(1.38)!important;bottom:-9px!important;}
+  html.crp-integrated .crp-srp-brand-copy h1{font-size:clamp(1.35rem,6.3vw,1.85rem)!important;letter-spacing:.018em!important;}
+  html.crp-integrated .crp-srp-brand-copy .tagline{font-size:clamp(.68rem,3vw,.86rem)!important;}
+  html.crp-integrated #topControlsRow{grid-template-columns:36px 36px 55px 66px 44px minmax(66px,1fr)!important;gap:4px!important;padding:9px 8px!important;}
+  html.crp-integrated #topControlsRow #saveBtn,html.crp-integrated #topControlsRow #cloudSyncBtn{width:36px!important;min-width:36px!important;height:38px!important;}
+  html.crp-integrated #topControlsRow .tinyCombo{width:55px!important;min-width:55px!important;height:38px!important;}
+  html.crp-integrated #capoStepWrap{grid-template-columns:39px 22px!important;width:66px!important;min-width:66px!important;gap:3px!important;}
+  html.crp-integrated #capoInput{width:39px!important;min-width:39px!important;max-width:39px!important;height:38px!important;}
+  html.crp-integrated #capoStepToggle,html.crp-integrated #capoStepToggle.on{width:22px!important;min-width:22px!important;height:38px!important;font-size:9px!important;}
+  html.crp-integrated #topControlsRow .tinyField.key,html.crp-integrated #topControlsRow #keyOutput{width:44px!important;min-width:44px!important;max-width:44px!important;height:38px!important;}
+  html.crp-integrated .srp-inline-link-btn{height:38px!important;font-size:10px!important;padding:2px 4px!important;gap:1px!important;} html.crp-integrated .srp-inline-link-btn .srp-link-project-name{font-size:7.2px!important;}
+}
+</style>
+
+<style id="srp226DefinitiveFixes">
+/* v2.2.6 — use the exact CRP header treatment in Song Rider. */
+html.crp-integrated .crp-srp-app-header{
+  position:relative!important;top:auto!important;z-index:10!important;
+  display:flex!important;grid-template-columns:none!important;align-items:center!important;gap:14px!important;
+  min-height:0!important;padding:10px max(16px, env(safe-area-inset-left))!important;
+  background:rgba(13,15,18,.92)!important;backdrop-filter:blur(12px)!important;
+  border-bottom:1px solid #343a43!important;
+}
+html.crp-integrated .crp-srp-brand-copy{
+  min-width:0!important;flex:1 1 auto!important;text-align:center!important;overflow:visible!important;
+}
+html.crp-integrated .crp-srp-brand-copy h1{
+  display:inline-block!important;margin:0!important;padding:0 2px 2px!important;max-width:100%!important;
+  font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif!important;
+  font-style:italic!important;font-weight:900!important;text-transform:uppercase!important;
+  font-size:clamp(1.55rem,4.6vw,2.5rem)!important;line-height:.95!important;letter-spacing:.025em!important;white-space:nowrap!important;
+  background:linear-gradient(180deg,#fff3bf 0%,#ffd968 20%,#e9a92f 47%,#9b5b08 72%,#ffd86a 100%)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;-webkit-text-fill-color:transparent!important;
+  -webkit-text-stroke:1px rgba(109,63,4,.7)!important;
+  filter:drop-shadow(0 2px 0 #4e2b00) drop-shadow(0 0 7px rgba(242,183,54,.38))!important;
+  text-shadow:none!important;
+}
+html.crp-integrated .crp-srp-brand-copy .tagline{
+  position:relative!important;z-index:1!important;display:block!important;width:max-content!important;max-width:100%!important;
+  margin:5px auto 0!important;color:#fff!important;-webkit-text-fill-color:#fff!important;
+  font-family:"Brush Script MT","Segoe Script","Snell Roundhand","URW Chancery L",cursive!important;
+  font-size:clamp(.92rem,2.65vw,1.28rem)!important;font-weight:700!important;font-style:italic!important;line-height:1.05!important;
+  letter-spacing:.015em!important;white-space:nowrap!important;transform:rotate(-1deg)!important;
+  text-shadow:0 1px 0 rgba(218,223,230,.95),0 2px 1px rgba(105,113,124,.72),0 3px 4px rgba(0,0,0,.62)!important;
+}
+html.crp-integrated .crp-srp-brand-copy .tagline::after{
+  content:""!important;position:absolute!important;left:7%!important;right:5%!important;bottom:-5px!important;height:6px!important;
+  border-bottom:2px solid rgba(255,255,255,.58)!important;border-radius:50%!important;transform:rotate(.6deg)!important;opacity:.65!important;pointer-events:none!important;
+}
+html.crp-integrated .crp-srp-brand-mark{
+  width:76px!important;height:58px!important;flex:0 0 76px!important;object-fit:contain!important;position:relative!important;align-self:flex-end!important;
+  transform:scale(1.27)!important;transform-origin:center bottom!important;bottom:-10px!important;z-index:2!important;
+}
+/* Rebuilt section-title control: a true gold button, not a themeable text input. */
+html.crp-integrated .crpSectionTitlePill{
+  appearance:none!important;-webkit-appearance:none!important;border:1px solid #d6aa3f!important;border-radius:999px!important;
+  min-width:0!important;width:min(340px,62vw)!important;max-width:100%!important;height:48px!important;padding:0 20px!important;
+  background:#efc85d!important;background-image:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;
+  color:#111!important;-webkit-text-fill-color:#111!important;font:900 1rem/1 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif!important;
+  letter-spacing:.02em!important;text-transform:uppercase!important;text-align:center!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+  text-shadow:none!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 4px 12px rgba(0,0,0,.28)!important;cursor:pointer!important;
+}
+@media(max-width:700px){
+  html.crp-integrated .crp-srp-app-header{gap:7px!important;padding-top:8px!important;padding-bottom:9px!important;}
+  html.crp-integrated .crp-srp-brand-mark{width:53px!important;height:50px!important;flex-basis:53px!important;transform:scale(1.38)!important;bottom:-9px!important;}
+  html.crp-integrated .crp-srp-brand-copy h1{font-size:clamp(1.35rem,6.3vw,1.85rem)!important;letter-spacing:.018em!important;}
+  html.crp-integrated .crp-srp-brand-copy .tagline{margin-top:4px!important;font-size:clamp(.72rem,3.15vw,.98rem)!important;letter-spacing:0!important;}
+}
+@media(max-width:390px){
+  html.crp-integrated .crp-srp-app-header{gap:4px!important;}
+  html.crp-integrated .crp-srp-brand-mark{width:45px!important;height:45px!important;flex-basis:45px!important;transform:scale(1.42)!important;bottom:-9px!important;}
+  html.crp-integrated .crp-srp-brand-copy h1{font-size:clamp(1.22rem,6vw,1.55rem)!important;}
+  html.crp-integrated .crp-srp-brand-copy .tagline{font-size:clamp(.66rem,3vw,.84rem)!important;}
+  html.crp-integrated .crpSectionTitlePill{width:min(300px,58vw)!important;height:46px!important;font-size:.94rem!important;}
+}
+</style>
+
+
+<style id="srp227ExactHeaderAndPillSize">
+/* v2.2.7 — match CRP mobile title sizing exactly and trim section-title pill. */
+html.crp-integrated .crpSectionTitlePill{
+  width:min(220px,54vw)!important;
+  height:42px!important;
+  padding:0 16px!important;
+  font-size:.92rem!important;
+}
+@media(max-width:520px){
+  html.crp-integrated .crp-srp-brand-copy h1{
+    font-size:clamp(1.55rem,7vw,2rem)!important;
+    letter-spacing:.015em!important;
+  }
+}
+@media(max-width:390px){
+  html.crp-integrated .crpSectionTitlePill{
+    width:min(205px,53vw)!important;
+    height:40px!important;
+    font-size:.88rem!important;
+  }
+}
+</style>
+
+<style id="songRiderSuiteExactV285">
+/* IDENTICAL gold suite shell inside SRP */
+html.crp-integrated .crp-srp-app-header{
+  display:grid!important;
+  grid-template-columns:82px minmax(0,1fr) 82px!important;
+  align-items:center!important;gap:4px!important;
+  min-height:92px!important;padding:7px 8px 8px!important;
+  background:
+    radial-gradient(ellipse at 50% 0%,rgba(91,57,5,.22),transparent 58%),
+    linear-gradient(180deg,#090a0c,#0c0f13)!important;
+  border-top:2px solid #d8a62a!important;
+  border-bottom:2px solid #c99724!important;
+  box-shadow:inset 0 1px 0 rgba(255,242,174,.36),inset 0 -1px 0 rgba(255,215,87,.22),0 4px 12px rgba(0,0,0,.45)!important;
+  overflow:hidden!important;
+}
+html.crp-integrated .crp-srp-brand-mark{
+  width:82px!important;height:72px!important;object-fit:contain!important;
+  filter:drop-shadow(0 4px 4px rgba(0,0,0,.72))!important;
+}
+html.crp-integrated .crp-srp-brand-copy{
+  min-width:0!important;text-align:center!important;
+  display:flex!important;flex-direction:column!important;align-items:center!important;
+}
+html.crp-integrated .crp-srp-brand-copy h1{
+  margin:0!important;white-space:nowrap!important;
+  font-family:Impact,Haettenschweiler,"Arial Black",sans-serif!important;
+  font-size:clamp(1.45rem,7.3vw,2.25rem)!important;
+  line-height:.96!important;letter-spacing:.012em!important;
+  transform:scaleX(.88)!important;transform-origin:center!important;
+  color:transparent!important;
+  background:linear-gradient(180deg,#fffbd2 0%,#ffe17a 9%,#ffbe20 25%,#fff0a3 39%,#d88a00 53%,#ffcf3d 66%,#9a5300 83%,#f0ae17 100%)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;
+  -webkit-text-stroke:1px #5d3100!important;
+  text-shadow:0 1px 0 #fff6c7,0 2px 0 #c47a05,0 4px 0 #663600,0 6px 10px rgba(0,0,0,.78),0 0 14px rgba(255,188,29,.52)!important;
+}
+html.crp-integrated .crp-srp-tagline{
+  margin:5px 0 0!important;color:#f2f2f0!important;
+  font-family:"Brush Script MT","Segoe Script",cursive!important;
+  font-size:clamp(.66rem,2.85vw,.9rem)!important;line-height:1!important;
+  white-space:nowrap!important;text-shadow:0 2px 3px #000!important;
+}
+
+/* identical mode cards + exact gold selected state */
+html.crp-integrated .crp-srp-mode{
+  border:1px solid #46505d!important;background:#11161d!important;color:#c8ced6!important;
+}
+html.crp-integrated .crp-srp-mode.active{
+  border-color:#f2c44d!important;color:#fff5cf!important;
+  background:radial-gradient(circle at 50% 35%,rgba(111,76,13,.30),transparent 66%),linear-gradient(145deg,#2b2413,#14181e)!important;
+  box-shadow:0 0 0 1px rgba(255,217,104,.55),0 0 18px rgba(238,183,48,.55),inset 0 0 22px rgba(231,178,43,.10)!important;
+}
+html.crp-integrated .crp-srp-mode.active small{color:#e6d29a!important;}
+html.crp-integrated .crp-srp-mode img{object-fit:contain!important;}
+html.crp-integrated .crp-srp-mode:nth-child(2) img{
+  width:58px!important;height:58px!important;
+  background:none!important;border:0!important;border-radius:0!important;
+  filter:drop-shadow(0 4px 5px rgba(0,0,0,.75))!important;
+}
+
+/* EXACT approved Song Rider Pro treatment: colored LETTERS, not colored blocks */
+html.crp-integrated .panelTop .left{
+  display:flex!important;align-items:center!important;gap:.20em!important;
+  font-family:Impact,Haettenschweiler,"Arial Black",sans-serif!important;
+  font-size:clamp(1.8rem,8vw,2.65rem)!important;
+  line-height:1!important;letter-spacing:.005em!important;
+  text-transform:uppercase!important;
+  filter:drop-shadow(0 5px 6px rgba(0,0,0,.58))!important;
+}
+html.crp-integrated .panelTop .left span{
+  color:transparent!important;
+  -webkit-background-clip:text!important;background-clip:text!important;
+  -webkit-text-stroke:1px rgba(12,14,18,.92)!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.74),0 2px 0 rgba(70,76,84,.82),0 5px 8px rgba(0,0,0,.62)!important;
+  box-shadow:none!important;border:0!important;border-radius:0!important;padding:0!important;
+}
+html.crp-integrated .panelTop .left .srp-pink{
+  background:linear-gradient(180deg,#fff 0%,#ffd7ed 10%,#ff3f9a 27%,#ff8ec7 42%,#fff 51%,#cf176d 63%,#ff64ad 79%,#721540 100%)!important;
+}
+html.crp-integrated .panelTop .left .srp-blue{
+  background:linear-gradient(180deg,#fff 0%,#d7f5ff 10%,#22bfff 27%,#77dfff 42%,#fff 51%,#0e80cb 63%,#55ceff 79%,#0d4774 100%)!important;
+}
+html.crp-integrated .panelTop .left .srp-green{
+  background:linear-gradient(180deg,#fff 0%,#d9ffe6 10%,#20d573 27%,#76eba3 42%,#fff 51%,#128a48 63%,#52e490 79%,#145d34 100%)!important;
+}
+
+@media(max-width:520px){
+ html.crp-integrated .crp-srp-app-header{grid-template-columns:72px minmax(0,1fr) 72px!important;min-height:86px!important;padding:6px 6px 7px!important;}
+ html.crp-integrated .crp-srp-brand-mark{width:72px!important;height:66px!important;}
+ html.crp-integrated .crp-srp-brand-copy h1{font-size:clamp(1.36rem,7.35vw,1.95rem)!important;letter-spacing:.004em!important;transform:scaleX(.87)!important;}
+ html.crp-integrated .crp-srp-tagline{font-size:clamp(.60rem,2.7vw,.78rem)!important;margin-top:4px!important;}
+ html.crp-integrated .crp-srp-mode:nth-child(2) img{width:52px!important;height:52px!important;}
+ html.crp-integrated .panelTop .left{font-size:clamp(1.62rem,7.6vw,2.15rem)!important;gap:.14em!important;}
+}
+</style>
+
+
+<style id="exactBrandAssetsV286">
+html.crp-integrated .crp-srp-brand-copy{
+ display:flex!important;align-items:center!important;justify-content:center!important;min-width:0!important;
+}
+html.crp-integrated .crp-srp-brand-copy .suite-wordmark{
+ display:block!important;width:min(100%,520px)!important;height:auto!important;max-height:62px!important;
+ object-fit:contain!important;margin:0 auto!important;transform:none!important;filter:none!important;
+}
+html.crp-integrated .crp-srp-mode:nth-child(2) img{
+ display:block!important;width:58px!important;height:58px!important;object-fit:contain!important;
+ background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;
+ filter:drop-shadow(0 3px 4px rgba(0,0,0,.72))!important;
+}
+html.crp-integrated .panelTop .left .srp-exact-wordmark{
+ display:block!important;width:min(100%,590px)!important;height:auto!important;max-height:74px!important;
+ object-fit:contain!important;margin:0!important;filter:none!important;
+}
+@media(max-width:520px){
+ html.crp-integrated .crp-srp-brand-copy .suite-wordmark{width:min(100%,360px)!important;max-height:50px!important;}
+ html.crp-integrated .crp-srp-mode:nth-child(2) img{width:52px!important;height:52px!important;}
+ html.crp-integrated .panelTop .left .srp-exact-wordmark{width:min(100%,470px)!important;max-height:64px!important;}
+}
+</style>
+
+
+<style id="headerBabyFixV287">
+html.crp-integrated .crp-srp-app-header{
+  position:relative!important;
+  display:block!important;
+  min-height:92px!important;
+  padding:7px 0 8px!important;
+  overflow:hidden!important;
+}
+html.crp-integrated .crp-srp-brand-mark{
+  position:absolute!important;
+  top:9px!important;
+  width:82px!important;
+  height:72px!important;
+  object-fit:contain!important;
+  z-index:2!important;
+}
+html.crp-integrated #srpBrandLeft{left:7px!important;}
+html.crp-integrated #srpBrandRight{right:7px!important;}
+html.crp-integrated .crp-srp-brand-copy{
+  position:relative!important;
+  left:auto!important;
+  transform:none!important;
+  width:calc(100% - 168px)!important;
+  margin:0 auto!important;
+  min-width:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  z-index:1!important;
+}
+html.crp-integrated .crp-srp-brand-copy h1{
+  display:block!important;
+  margin:5px 0 0!important;
+  width:100%!important;
+  white-space:nowrap!important;
+  text-align:center!important;
+  font-family:Impact,Haettenschweiler,"Arial Black",sans-serif!important;
+  font-size:clamp(1.35rem,6.9vw,2.05rem)!important;
+  line-height:.96!important;
+  letter-spacing:.008em!important;
+  transform:scaleX(.88)!important;
+  transform-origin:center!important;
+  color:transparent!important;
+  background:linear-gradient(180deg,#fffbd2 0%,#ffe17a 9%,#ffbe20 25%,#fff0a3 39%,#d88a00 53%,#ffcf3d 66%,#9a5300 83%,#f0ae17 100%)!important;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  -webkit-text-stroke:1px #5d3100!important;
+  text-shadow:0 1px 0 #fff6c7,0 2px 0 #c47a05,0 4px 0 #663600,0 6px 10px rgba(0,0,0,.78),0 0 14px rgba(255,188,29,.52)!important;
+}
+html.crp-integrated .crp-srp-tagline{
+  display:block!important;
+  width:100%!important;
+  margin:7px 0 0!important;
+  text-align:center!important;
+  color:#f2f2f0!important;
+  font-family:"Brush Script MT","Segoe Script",cursive!important;
+  font-size:clamp(.61rem,2.72vw,.80rem)!important;
+  line-height:1!important;
+  letter-spacing:0!important;
+  white-space:nowrap!important;
+  text-shadow:0 2px 3px #000!important;
+}
+html.crp-integrated .crp-srp-mode:nth-child(2) img{
+  width:66px!important;
+  height:66px!important;
+  object-fit:contain!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  filter:drop-shadow(0 4px 5px rgba(0,0,0,.72))!important;
+}
+@media(max-width:520px){
+ html.crp-integrated .crp-srp-app-header{min-height:86px!important;}
+ html.crp-integrated .crp-srp-brand-mark{width:72px!important;height:66px!important;top:8px!important;}
+ html.crp-integrated .crp-srp-brand-copy{width:calc(100% - 150px)!important;}
+ html.crp-integrated .crp-srp-brand-copy h1{font-size:clamp(1.22rem,6.65vw,1.82rem)!important;transform:scaleX(.87)!important;}
+ html.crp-integrated .crp-srp-tagline{font-size:clamp(.58rem,2.62vw,.74rem)!important;margin-top:6px!important;}
+ html.crp-integrated .crp-srp-mode{min-height:91px!important;}
+ html.crp-integrated .crp-srp-mode:nth-child(2) img{width:62px!important;height:62px!important;}
+}
+</style>
+
+  <link rel="stylesheet" href="./suite-header.css?v=2.9.3" />
+
+<style id="babyStickerOnlyV288">
+html.crp-integrated .crp-srp-mode:nth-child(2) img{
+  width:68px!important;height:68px!important;object-fit:contain!important;
+  background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;
+  filter:drop-shadow(0 4px 5px rgba(0,0,0,.72))!important;
+}
+@media(max-width:520px){
+ html.crp-integrated .crp-srp-mode:nth-child(2) img{width:64px!important;height:64px!important;}
+}
+</style>
+
+<link rel="stylesheet" href="../suite-header.css?v=2.9.5">
+<link rel="stylesheet" href="../branding-shell.css?v=3.3.12">
+<link rel="stylesheet" href="../suite-shell-lock.css?v=3.3.16">
+
+<style id="srpShellParityV290">
+html.crp-integrated .crp-srp-shell{
+  padding:0!important;
+  margin:0!important;
+  border:0!important;
+  background:#10141a!important;
+}
+html.crp-integrated .crp-srp-shell>.app-header.suite-master-header{
+  margin:0!important;
+}
+html.crp-integrated .crp-srp-shell>.workspace-mode-switch{
+  margin:0 auto!important;
+}
+</style>
+
+
+<style id="srpDesktopTitleFillV3310">
+/* v3.3.10 — desktop/tablet SRP title uses the entire title cell, matching CRP.
+   Mobile stays on the already-approved sizing. */
+@media (min-width:701px){
+  html.crp-integrated header .panel .panelTop{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 56px!important;
+    align-items:center!important;
+    column-gap:10px!important;
+    width:100%!important;
+  }
+  html.crp-integrated header .panel .panelTop>div:first-child{
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+  }
+  html.crp-integrated header .panel .panelTop .left{
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    padding:0!important;
+    margin:0!important;
+  }
+  html.crp-integrated header .panel .panelTop .left .srp-exact-wordmark{
+    display:block!important;
+    width:100%!important;
+    max-width:none!important;
+    height:auto!important;
+    max-height:none!important;
+    object-fit:contain!important;
+    object-position:left center!important;
+    margin:0!important;
+    padding:0!important;
+    filter:none!important;
+  }
+  html.crp-integrated header .panel .panelTop #togglePanelBtn{
+    grid-column:2!important;
+    justify-self:end!important;
+    width:56px!important;
+    min-width:56px!important;
+    max-width:56px!important;
+    height:38px!important;
+    min-height:38px!important;
+    margin:0!important;
+  }
+}
+</style>
+
+
+<style id="v3313DesktopBpmFix">
+@media (min-width:701px){
+  html.crp-integrated #topControlsRow{grid-template-columns:38px 38px 76px 70px 48px minmax(72px,1fr)!important;}
+  html.crp-integrated #topControlsRow .tinyCombo{width:76px!important;min-width:76px!important;padding:0 5px!important;gap:4px!important;box-sizing:border-box!important;}
+  html.crp-integrated #topControlsRow #bpmInput{width:44px!important;min-width:44px!important;max-width:44px!important;padding:4px 3px!important;font-size:13px!important;box-sizing:border-box!important;}
+}
+</style>
+
+<style id="srp3320InlineFullTitle">
+/* v3.3.20 — Full Song section title is edited directly in the gold pill. */
+html.crp-integrated body .fullSectionHead input[type="text"].crpSectionTitlePill.crpSectionTitleInput{
+  appearance:none!important;-webkit-appearance:none!important;
+  cursor:text!important;
+  caret-color:#111!important;
+  outline:none!important;
+  box-sizing:border-box!important;
+  background:#efc85d!important;
+  background-color:#efc85d!important;
+  background-image:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;
+  color:#111!important;-webkit-text-fill-color:#111!important;
+  border:1px solid #d6aa3f!important;border-radius:999px!important;
+  font-weight:1000!important;text-shadow:none!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 4px 12px rgba(0,0,0,.28)!important;
+}
+html.crp-integrated body .fullSectionHead input[type="text"].crpSectionTitlePill.crpSectionTitleInput:focus{
+  border-color:#ffe39a!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.58),0 0 0 3px rgba(239,200,93,.24),0 4px 12px rgba(0,0,0,.28)!important;
+}
+</style>
+
+<style id="trackMasterV3327">
+html.crp-integrated .track-master-nav-row{display:flex;justify-content:center;align-items:center;width:100%;max-width:none;margin:6px 0 10px;padding:0 2.65vw;box-sizing:border-box;}
+html.crp-integrated .track-master-gold-btn{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:40px;width:100%;max-width:none;padding:8px 22px;border:1px solid #ffe999;border-radius:13px;background:linear-gradient(120deg,#7a5000 0%,#c98700 11%,#f3bd24 24%,#fff3a1 35%,#e8a914 48%,#9f6500 61%,#f8ce45 76%,#fff0a0 86%,#a66c00 100%);color:#171005!important;font-weight:950;letter-spacing:.075em;text-transform:uppercase;text-decoration:none!important;font-size:.9rem;text-shadow:0 1px 0 rgba(255,255,255,.58);box-shadow:inset 0 1px 0 rgba(255,255,255,.82),inset 0 -2px 4px rgba(91,48,0,.4),0 0 0 1px rgba(125,77,0,.38),0 5px 15px rgba(227,166,22,.2);transition:transform .12s ease,filter .12s ease,box-shadow .12s ease;}
+html.crp-integrated .track-master-gold-btn::after{content:"";position:absolute;z-index:-1;inset:-70% -20%;transform:translateX(-65%) rotate(18deg);background:linear-gradient(90deg,transparent 38%,rgba(255,255,255,.7) 50%,transparent 62%);opacity:.48;pointer-events:none;}
+html.crp-integrated .track-master-gold-btn:hover{filter:brightness(1.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -2px 4px rgba(91,48,0,.38),0 0 0 1px rgba(125,77,0,.4),0 6px 19px rgba(240,184,40,.33)}
+html.crp-integrated .track-master-gold-btn:active{transform:translateY(1px) scale(.988);filter:brightness(.98)}
+html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0a0;outline-offset:3px}
+@media(max-width:700px){html.crp-integrated .track-master-nav-row{margin:5px 0 8px;padding:0 10px}html.crp-integrated .track-master-gold-btn{width:100%;max-width:none;min-height:38px;padding:7px 18px;border-radius:12px;font-size:.78rem}}
+</style>
+  <link rel="stylesheet" href="../skins.css?v=3.3.111-LIGHT-FINE-TEXT-READABILITY">
+</head>
+
+<body>
+
+  <section id="crpSrpShell" class="crp-srp-shell" aria-label="Chord Rider Pro workspace navigation">
+    <div class="app-header suite-master-header">
+      <img src="../assets/suite-header-new.png?v=3.3.12" alt="Song Rider Suite — Ride the progression. See it. Hear it. Build it.">
     </div>
+    <nav class="workspace-mode-switch" aria-label="Workspace mode">
+      <a class="workspace-mode-btn" href="/index.html?workspace=chord-rider">
+        <span class="mode-art rider-mode-art"><img src="../assets/crp-rider-bones-sticker.png?v=3.0.1" alt=""></span>
+        <span class="mode-copy"><strong>Chord Rider</strong><small>Chords + Beat</small></span>
+      </a>
+      <a class="workspace-mode-btn" href="/index.html?workspace=baby-daw">
+        <span class="baby-exact-art" aria-hidden="true"><img src="../assets/baby-daw-button-hq.png?v=3.3.12" alt=""></span>
+      </a>
+      <a class="workspace-mode-btn active" href="/song-rider/index.html?crpMode=1" aria-current="page">
+        <span class="mode-art song-mode-art"><img src="../assets/srp-rider-bones-sticker.png?v=3.0.1" alt=""></span>
+        <span class="mode-copy"><strong>Song Rider</strong><small>Lyrics + Flow</small></span>
+      </a>
+    </nav>
+    <div class="track-master-nav-row" aria-label="Track editor shortcut">
+      <a id="srpTrackMasterBtn" class="track-master-gold-btn" href="../index.html?workspace=baby-daw&amp;trackMaster=1&amp;return=song-rider" title="Open Track Master">Track Master</a>
+    </div>
+    <div class="crp-srp-linkbar srp-link-status-only">
+      <div class="status"><strong>Song Rider Pro</strong><span id="crpSrpLinkStatus">Not linked to this CRP project</span></div>
+    </div>
+  </section>
+
+  <!-- ✅ Horse GIFs -->
+  <div class="horseWrap" id="horseWrap" aria-hidden="true">
+    <img id="horseRight" src="./Horserunsright.gif?v=64" alt="Horse runs right"/>
+    <img id="horseLeft"  src="./Horserunsleft.gif?v=64"  alt="Horse runs left"/>
   </div>
 
-
-  <div id="voxBoxPage" class="vox-box-page" hidden aria-hidden="true">
-    <div class="vox-box-shell">
-      <header class="vox-box-header">
-        <div class="vox-box-brand"><strong>TRACK MASTER</strong><span>Vocal Event Editor</span></div>
-        <div class="vox-box-header-actions">
-          <label class="vox-bpm-edit" title="Song tempo"><span>BPM</span><input id="voxBpmInput" type="number" min="40" max="240" step="1" inputmode="numeric" aria-label="Vox Box BPM"></label>
-          <label class="vox-snap-toggle"><input id="voxSnapToBeat" type="checkbox" checked><span>Snap to Beat</span></label>
-          <label class="vox-snap-resolution"><span>Grid</span><select id="voxSnapResolution"><option value="4">1/4</option><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
-          <button id="voxBoxCloseBtn" type="button">Done</button>
-        </div>
-      </header>
-
-      <div class="vox-box-tools">
-        <div class="vox-edit-button-row" role="toolbar" aria-label="Track Master edit tools">
-          <button id="voxCropBtn" type="button" aria-pressed="false" title="Range Select — choose a time section on a vocal track">Select</button>
-          <button id="voxSplitBtn" type="button">Split</button>
-          <button id="voxCopyBtn" type="button">Copy</button>
-          <button id="voxCutBtn" type="button">Cut</button>
-          <button id="voxPasteBtn" type="button" disabled>Paste</button>
-          <button id="voxDeleteBtn" type="button">Delete</button>
-          <button id="voxUndoBtn" type="button" disabled title="Undo Track Master edit">Undo</button>
-          <button id="voxRedoBtn" type="button" disabled title="Redo Track Master edit">Redo</button>
-        </div>
-        <div id="voxHarmonyGuide" class="vox-harmony-guide" aria-live="polite">
-          <div><strong>Chords Used</strong><span id="voxChordsUsed">—</span></div>
-          <div><strong>Notes that fit</strong><span id="voxNotesFit">—</span></div>
-        </div>
-        <span id="voxBoxStatus" class="subtle tiny">Select chooses a time range on any track for Copy/Cut/Delete. Multi Select selects whole events; All selects every event on the highlighted track. On touch, long-press an event to grab and move it.</span>
-      </div>
-
-      <div id="voxTimelineScroller" class="vox-timeline-scroller">
-        <div class="vox-tool-mode-cluster"><button id="voxToolModeBtn" class="vox-tool-mode-btn" type="button" aria-pressed="false" title="Toggle Multi Select">Multi Select</button><label id="voxSelectAllTrackWrap" class="vox-select-all-track" hidden><input id="voxSelectAllTrack" type="checkbox"><span>All</span></label></div>
-        <div id="voxTimelineInner" class="vox-timeline-inner">
-          <div id="voxLocatorLayer" class="vox-locator-layer" aria-label="Song range locators">
-            <div id="voxSongRangeFill" class="vox-song-range-fill" aria-hidden="true"></div>
-            <button id="voxSongStartLocator" class="vox-song-locator start" type="button" aria-label="Song start locator" title="Drag to set song start"><span>START</span></button>
-            <button id="voxSongEndLocator" class="vox-song-locator end" type="button" aria-label="Song end locator" title="Drag to set song finish"><span>FINISH</span></button>
+  <header>
+    <div class="panel">
+      <div class="panelTop">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="left" aria-label="Song Rider Pro">
+            <img class="srp-exact-wordmark" src="./song-rider-pro-wordmark-hq.png?v=3.3.12" alt="Song Rider Pro">
           </div>
-          <div id="voxRuler" class="vox-ruler" aria-label="Track Master timeline ruler"></div>
-          <div id="voxTracks" class="vox-tracks"></div>
-          <div id="voxPlayhead" class="vox-playhead" aria-hidden="true"><span></span></div>
+
+          <!-- ✅ Parked horse (size controlled by #horseParked CSS) -->
+          <img id="horseParked" src="./horse-parked.png" alt="Horse"/>
+        </div>
+
+        <button class="btn secondary" id="togglePanelBtn">Hide</button>
+      </div>
+
+      <div class="miniBar" id="miniBar">
+        <div class="row nowrap controlSelectRow" style="padding:0;">
+          <select id="mDrumSelect" class="compactSelect miniSelect" title="Drums">
+            <option value="off">Drums</option>
+            <option value="rock">1 Rustbelt Charge</option>
+            <option value="hardrock">2 Granite Drive</option>
+            <option value="arena">3 Stadium Riot</option>
+            <option value="southernrock">4 Diesel Anthem</option>
+            <option value="pop">5 Neon Heartbeat</option>
+            <option value="popbounce">6 Glitter Runway</option>
+            <option value="electropop">7 Sunset Circuit</option>
+            <option value="powerpop">8 Sugar Satellite</option>
+            <option value="rnbsmooth">9 Velvet Tide</option>
+            <option value="rnblate">10 Midnight Silk</option>
+            <option value="rap">11 Westside Hitter</option>
+            <option value="trapphantom">12 Phantom Flex</option>
+            <option value="trapnight">13 Night Snare</option>
+            <option value="trapglide">14 Ghost Drip</option>
+            <option value="trapriot">15 Hit Squad</option>
+            <option value="trapstorm">16 Blackout Cartel</option>
+          </select>
+          <select id="mInstrumentSelect" class="compactSelect miniSelect" title="Instrument">
+            <option value="off">Inst</option>
+            <option value="acoustic">1 Studio Grand</option>
+            <option value="upright">2 Warm Upright</option>
+            <option value="electric">3 Velvet EP</option>
+            <option value="fmbell">4 Crystal Bell</option>
+            <option value="analog">5 Analog Poly</option>
+            <option value="piano">6 Air Synth</option>
+            <option value="oakgrand">7 Oak Grand</option>
+            <option value="skyline">8 Skyline Keys</option>
+            <option value="tapeglow">9 Tape Glow</option>
+            <option value="prismkeys">10 Prism Keys</option>
+            <option value="reedgarden">11 Reed Garden</option>
+            <option value="dreamstate">12 Dreamstate Pad</option>
+            <option value="novasweep">13 Nova Sweep</option>
+            <option value="midglass">14 Midnight Glass</option>
+            <option value="suitcase">15 Suitcase Spark</option>
+            <option value="sunsetdyno">16 Sunset Dyno</option>
+            <option value="tinebloom">17 Tine Bloom</option>
+          </select>
+          <select id="mNoteLenSelect" class="compactSelect miniSelect" title="Note length">
+            <option value="half">Default</option>
+            <option value="eighth">Staccato</option>
+            <option value="bar">Hold</option>
+          </select>
+          <button class="iconCircle scrollCircle" id="mScrollBtn" title="Start AutoScroll">▶</button>
+          <button class="iconCircle transportStop" id="mAutoStopBtn" title="Stop AutoScroll" style="display:none;">■</button>
+          <button class="iconCircle recCircle" id="mRecordBtn" title="Record"></button>
         </div>
       </div>
 
-      <div id="voxFloatingTransport" class="vox-floating-transport" role="toolbar" aria-label="Vox Box transport">
-        <button id="voxTransportDrag" class="vox-transport-drag" type="button" title="Drag transport">⠿</button>
-        <button id="voxToStartBtn" type="button" title="Go to beginning" aria-label="Go to beginning">|◀</button>
-        <button id="voxRewindBtn" type="button" title="Rewind 4 beats" aria-label="Rewind">◀◀</button>
-        <button id="voxFastForwardBtn" type="button" title="Fast forward 4 beats" aria-label="Fast forward">▶▶</button>
-        <button id="voxToEndBtn" type="button" title="Go to end" aria-label="Go to end">▶|</button>
-        <button id="voxStopTransportBtn" type="button" title="Stop" aria-label="Stop">■</button>
-        <button id="voxPlayTransportBtn" class="accent" type="button" title="Play" aria-label="Play">▶</button>
-        <button id="voxPauseTransportBtn" type="button" title="Pause" aria-label="Pause">Ⅱ</button>
-        <button id="voxRecordTransportBtn" class="vox-record-transport" type="button" title="Record into selected vocal track" aria-label="Record">●</button>
-        <button id="voxAutoScrollBtn" type="button" aria-pressed="true" title="AutoScroll — follow playhead" aria-label="AutoScroll">→</button>
-        <button id="voxLyricsTransportBtn" type="button" title="Open Song Rider Pro lyrics">Lyrics</button>
-      </div>
+      <div id="panelBody">
+        <div class="row nowrap" id="topControlsRow">
 
-      <section class="vox-inspector" aria-label="Vocal event effects">
-        <div class="vox-inspector-heading">
-          <div><strong id="voxInspectorTitle">Track Effects</strong><span id="voxInspectorMeta" class="subtle tiny">Select a vocal track or event.</span></div>
-          <div class="vox-inspector-heading-actions">
-            <label>Apply to<select id="voxFxTarget"><option value="track">Track</option><option value="event">Selected Event</option></select></label>
-            <button id="voxInspectorToggleBtn" class="vox-inspector-toggle" type="button" aria-expanded="true" title="Hide Track Effects">Hide</button>
+          <button id="saveBtn" class="miniIconBtn" type="button" title="Save">💾</button>
+<button id="cloudSyncBtn" class="miniIconBtn" type="button" title="Cloud sync">☁︎</button>
+          <div class="tinyCombo">
+  <span class="tinyLbl">BPM</span>
+  <input id="bpmInput" type="number" min="40" max="240" step="1" value="95"/>
+</div>
+<div class="tinyField">
+  <input id="capoInput" type="number" min="0" max="12" step="1" value="0"/>
+</div>
+          <div class="tinyField key"><input id="keyOutput" type="text" value="—" aria-label="Song key"/></div>
+          <button id="crpSrpLinkBtn" class="srp-inline-link-btn" type="button" title="Link this project to Song Rider Pro">Link SRP</button>
+        </div>
+
+        <div class="row nowrap controlSelectRow" style="border-top:1px solid rgba(0,0,0,.06);">
+          <select id="drumSelect" class="compactSelect" title="Drums">
+            <option value="off">Drums Off</option>
+            <option value="rock">1 Rustbelt Charge</option>
+            <option value="hardrock">2 Granite Drive</option>
+            <option value="arena">3 Stadium Riot</option>
+            <option value="southernrock">4 Diesel Anthem</option>
+            <option value="pop">5 Neon Heartbeat</option>
+            <option value="popbounce">6 Glitter Runway</option>
+            <option value="electropop">7 Sunset Circuit</option>
+            <option value="powerpop">8 Sugar Satellite</option>
+            <option value="rnbsmooth">9 Velvet Tide</option>
+            <option value="rnblate">10 Midnight Silk</option>
+            <option value="rap">11 Westside Hitter</option>
+            <option value="trapphantom">12 Phantom Flex</option>
+            <option value="trapnight">13 Night Snare</option>
+            <option value="trapglide">14 Ghost Drip</option>
+            <option value="trapriot">15 Hit Squad</option>
+            <option value="trapstorm">16 Blackout Cartel</option>
+          </select>
+          <select id="instrumentSelect" class="compactSelect" title="Instrument">
+            <option value="off">Instrument Off</option>
+            <option value="acoustic">1 Studio Grand</option>
+            <option value="upright">2 Warm Upright</option>
+            <option value="electric">3 Velvet EP</option>
+            <option value="fmbell">4 Crystal Bell</option>
+            <option value="analog">5 Analog Poly</option>
+            <option value="piano">6 Air Synth</option>
+            <option value="oakgrand">7 Oak Grand</option>
+            <option value="skyline">8 Skyline Keys</option>
+            <option value="tapeglow">9 Tape Glow</option>
+            <option value="prismkeys">10 Prism Keys</option>
+            <option value="reedgarden">11 Reed Garden</option>
+            <option value="dreamstate">12 Dreamstate Pad</option>
+            <option value="novasweep">13 Nova Sweep</option>
+            <option value="midglass">14 Midnight Glass</option>
+            <option value="suitcase">15 Suitcase Spark</option>
+            <option value="sunsetdyno">16 Sunset Dyno</option>
+            <option value="tinebloom">17 Tine Bloom</option>
+          </select>
+          <select id="noteLenSelect" class="compactSelect" title="Note length">
+            <option value="half">Default</option>
+            <option value="eighth">Staccato</option>
+            <option value="bar">Hold</option>
+          </select>
+          <button class="iconCircle scrollCircle" id="autoPlayBtn" title="Start AutoScroll">▶</button>
+          <button class="iconCircle transportStop" id="autoStopBtn" title="Stop AutoScroll" style="display:none;">■</button>
+          <button class="iconCircle recCircle" id="recordBtn" title="Record"></button>
+        </div>
+
+        <div class="row nowrap" style="border-top:1px solid rgba(0,0,0,.06);">
+          <button class="tinyBtn" id="notesBtn" title="Project Notes">📝</button>
+          <button class="iconCircle" id="uploadAudioBtn" title="Upload audio or PDF">⬆️</button>
+          <button class="exportBtn" id="exportBtn" title="Export (.txt + printable colored .html)">⬇️</button>
+          <button class="iconCircle" id="archiveBtn" title="Completed Projects Archive">📁</button>
+          <span id="archiveLoadedName" class="archiveLoadedName" style="display:none;"></span>
+          <button class="iconCircle" id="beat1Btn" title="Mark Beat 1 now (while MP3 plays)" style="display:none;">1</button>
+          <span class="srp-action-spacer" aria-hidden="true"></span>
+          <button id="undoBtn" class="miniIconBtn" type="button" title="Undo (Ctrl/Cmd+Z)">↶</button>
+          <button id="redoBtn" class="miniIconBtn" type="button" title="Redo (Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z)">↷</button>
+        </div>
+
+        <div class="row" style="display:flex;align-items:center;gap:10px;flex-wrap:nowrap;border-top:1px solid rgba(0,0,0,.06);">
+          <button id="projectPickerBtn" class="projectPickerBtn" type="button" title="Open Projects">
+            <span id="projectPickerLabel" class="projectPickerLabel">Projects</span>
+            <span class="projectPickerCaret">▾</span>
+          </button>
+          <select id="projectSelect" style="display:none;"></select>
+          <select id="sortSelect" style="display:none;">
+            <option value="az">A–Z</option>
+            <option value="recent">Recent</option>
+          </select>
+          <button class="iconCircle" id="newProjectBtn" title="New Project">＋</button>
+          <button class="iconCircle" id="renameProjectBtn" title="Rename Project">✏️</button>
+          <button class="iconCircle" id="deleteProjectBtn" title="Delete Project">Ⓧ</button>
+        </div>
+
+        <div class="row" style="align-items:flex-start;border-top:1px solid rgba(0,0,0,.06);flex-direction:column;gap:8px;">
+          <div id="nowPlaying" style="width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#666;font-weight:900;">
+            —
           </div>
+          <div id="audioNativeHost" class="audioNativeHost" style="display:none;" aria-label="Audio player"></div>
+          <div id="audioProgressWrap" class="audioProgressWrap" style="display:none;" aria-hidden="true">
+            <span id="audioCurrentTime" class="audioProgressTime">0:00</span>
+            <div id="audioProgress"></div>
+            <span id="audioDuration" class="audioProgressTime">0:00</span>
+          </div>
+          <div id="recordingsList" style="flex:1 1 auto;display:flex;flex-direction:column;gap:8px;width:100%;"></div>
         </div>
-        <div class="vox-fx-grid">
-          <label>Volume<input id="voxFxVolume" type="range" min="0" max="150" step="1" value="100"><strong id="voxFxVolumeValue">100%</strong></label>
-          <label>EQ<select id="voxFxEq"><option value="flat">Natural</option><option value="clear">Clear</option><option value="warm">Warm</option><option value="bright">Bright</option></select></label>
-          <label>Compression<select id="voxFxComp"><option value="off">Off</option><option value="light">Light</option><option value="medium">Medium</option><option value="heavy">Heavy</option></select></label>
-          <label>Reverb<select id="voxFxReverb"><option value="0">Off</option><option value="0.12">Small</option><option value="0.22">Medium</option><option value="0.34">Large</option></select></label>
-          <label>Delay<select id="voxFxDelay"><option value="0">Off</option><option value="0.10">Slap</option><option value="0.18">1/8</option><option value="0.28">1/4</option></select></label>
-          <label>Auto-Tune<input id="voxFxAutotune" type="range" min="0" max="100" step="1" value="0"><strong id="voxFxAutotuneValue">0%</strong></label>
-        </div>
-        <div class="vox-inspector-actions"><button id="voxResetEventFxBtn" type="button">Reset Event FX to Track</button><span class="subtle tiny">Track FX edit the whole vocal part. Event FX can override just one clip.</span></div>
-      </section>
+      </div>
+    </div>
+
+    <div class="tabs hidden" id="tabs"></div>
+  </header>
+
+<main>
+  <div class="sheet" id="editorRoot">
+    <!-- ✅  is the LOWER panel scroller; header must be INSIDE it so sticky works -->
+    <div id="sheetBody">
+      <div class="sheetHeader">
+        <h2 id="sheetTitle">Full Song View</h2>
+        <div class="sheetActions" id="sheetActions"></div>
+        <div class="hint" id="sheetHint"></div>
+      </div>
+
+      <!-- ✅ app.js renders into this, so the sticky header never gets wiped -->
+      <div id="sheetInner"></div>
+    </div>
+  </div>
+</main>
+
+  <div class="rBtn" id="rBtn">R</div>
+  <div class="rhymeDock" id="rhymeDock">
+    <div class="rhymeBox">
+      <div class="rhymeTop">
+        <div id="rhymeTitle">Rhymes</div>
+        <button class="btn secondary" id="hideRhymeBtn">Hide</button>
+      </div>
+      <div class="rhymeWords" id="rhymeWords"></div>
     </div>
   </div>
 
-  <div id="srpLyricsOverlay" class="srp-lyrics-overlay" hidden>
-    <div class="srp-lyrics-overlay-head">
-      <strong>Song Rider Pro — Full Song View</strong>
+
+
+  <div class="notesModal" id="notesModal" aria-hidden="true">
+    <div class="notesToolbar" id="notesToolbar">
+      <button class="notesToolBtn" id="notesUndoBtn" type="button" title="Undo">↶</button>
+      <button class="notesToolBtn" id="notesRedoBtn" type="button" title="Redo">↷</button>
+      <select class="notesSelect" id="notesFontSize" title="Text size">
+        <option value="14">14</option>
+        <option value="16">16</option>
+        <option value="18" selected>18</option>
+        <option value="20">20</option>
+        <option value="24">24</option>
+        <option value="28">28</option>
+      </select>
+      <input class="notesColor" id="notesTextColor" type="color" value="#151515" title="Text color"/>
+      <button class="notesToolBtn" data-cmd="bold" type="button" title="Bold">B</button>
+      <button class="notesToolBtn" data-cmd="italic" type="button" title="Italic">I</button>
+      <button class="notesToolBtn" data-cmd="underline" type="button" title="Underline">U</button>
+      <button class="notesToolBtn" data-cmd="strikeThrough" type="button" title="Strikethrough">S</button>
+      <button class="notesToolBtn" data-cmd="insertOrderedList" type="button" title="Numbered list">1.</button>
+      <button class="notesToolBtn" data-cmd="insertUnorderedList" type="button" title="Bullet list">•</button>
+      <button class="notesToolBtn" data-cmd="indent" type="button" title="Indent">⇥</button>
+      <button class="notesToolBtn" data-cmd="outdent" type="button" title="Outdent">⇤</button>
+      <button class="notesToolBtn" id="notesAttachBtn" type="button" title="Add photo">📎</button>
+      <button class="notesToolBtn" id="notesChecklistBtn" type="button" title="Checklist">☑</button>
+      <button class="notesToolBtn notesCloseInline" id="notesCloseBtn" type="button" title="Close notes">×</button>
     </div>
-    <iframe id="srpLyricsFrame" title="Song Rider Pro lyrics" src="about:blank"></iframe>
-    <div class="srp-record-float" aria-label="Vocal recording controls">
-      <button id="srpFloatRecord" type="button" title="Record">●</button>
-      <button id="srpFloatPause" type="button" title="Pause recording" disabled>Ⅱ</button>
-      <button id="srpFloatStop" type="button" title="Stop recording" disabled>■</button>
-      <button id="srpLyricsCloseBtn" type="button" title="Close lyrics" aria-label="Close lyrics">×</button>
+    <div class="notesEditorWrap">
+      <div
+        class="notesEditor"
+        id="notesEditor"
+        contenteditable="true"
+        spellcheck="true"
+        autocapitalize="sentences"
+        data-placeholder="Project notes... ideas, capo thoughts, lyric concepts, arrangement notes, reminders."></div>
+    </div>
+    <input id="notesImageInput" type="file" accept="image/*" multiple hidden />
+  </div>
+
+
+  <!-- ✅ tiny helper: measure sticky header height into CSS var -->
+
+
+  <div id="projectModal" class="projectModal" aria-hidden="true">
+    <div class="archiveCard">
+      <div class="archiveHead">
+        <div class="archiveTitle">Projects</div>
+        <button id="projectCloseBtn" class="authClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="archiveControls">
+        <select id="projectSortSelect" style="padding:8px 10px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;height:34px;">
+          <option value="recent">Recent</option>
+          <option value="az">A–Z</option>
+        </select>
+      </div>
+      <div id="projectList" class="archiveList"></div>
     </div>
   </div>
 
-  <div id="exportStage" class="export-stage" aria-hidden="true"></div>
+  <div id="archiveModal" class="archiveModal" aria-hidden="true">
+    <div class="archiveCard">
+      <div class="archiveHead">
+        <div class="archiveTitle">Completed Projects</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button id="archiveAddBtn" class="iconCircle" type="button" title="Add to archive">＋</button>
+          <button id="archiveCloseBtn" class="authClose" type="button" aria-label="Close">×</button>
+        </div>
+      </div>
+      <div class="archiveControls">
+        <select id="archiveSortSelect" style="padding:8px 10px;border-radius:12px;border:1px solid rgba(0,0,0,.12);font-weight:900;height:34px;">
+          <option value="recent">Recent</option>
+          <option value="az">A–Z</option>
+        </select>
+      </div>
+      <div id="archiveList" class="archiveList"></div>
+      <div id="archiveAddPanel" class="archiveAddPanel">
+        <div class="archiveAddHead">Add from Projects</div>
+        <div id="archiveAddList" class="archiveAddList"></div>
+      </div>
+    </div>
+  </div>
 
-  <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="app.js?v=3.3.72-PROJECT-NOTES-COLLAPSE"></script>
-  <script src="parts.js?v=3.3.67-TIMING-AUDIT-FIX"></script>
-  <script src="beat-maker.js?v=3.3.56-BATCH-UNDO-SYNC"></script>
-  <script src="skins.js?v=3.3.114-BLACK-LABEL-PLAIN-CLOUD"></script>
+  <div id="archiveMoveModal" class="archiveModal" aria-hidden="true">
+    <div class="archiveMoveBox">
+      <div id="archiveMoveText" class="archiveMoveText">Move to Projects?</div>
+      <div class="archiveMoveBtns">
+        <button id="archiveMoveConfirmBtn" class="authBtn" type="button">Move</button>
+        <button id="archiveMoveCancelBtn" class="authBtn secondary" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="authModal" class="authModal signed-out" aria-hidden="true">
+    <div class="authCard">
+      <div class="authHead">
+        <div>Cloud Account</div>
+        <button id="authCloseBtn" class="authClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="authStatus" class="authStatus">Sign in with your Song Rider Suite / Chord Rider Pro cloud account.</div>
+
+      <div class="authSignedOut">
+        <input id="authEmailInput" class="authField" type="email" placeholder="Email" autocomplete="email" />
+        <input id="authPasswordInput" class="authField" type="password" placeholder="Password" autocomplete="current-password" />
+        <div class="authBtns">
+          <button id="authSignInBtn" class="authBtn" type="button">Sign In</button>
+          <button id="authSignUpBtn" class="authBtn secondary" type="button">Create Account</button>
+        </div>
+      </div>
+
+      <div id="authResetWrap" class="authResetWrap">
+        <input id="authResetEmailInput" class="authField" type="email" placeholder="Email" autocomplete="email" />
+        <input id="authNewPasswordInput" class="authField" type="password" placeholder="New Password" autocomplete="new-password" style="display:none;" />
+        <div id="authForgotRow" class="authForgotRow">
+          <button id="authBackToSignInBtn" class="authLinkBtn secondary" type="button">Back to Sign In</button>
+        </div>
+        <div class="authBtns">
+          <button id="authSendResetBtn" class="authBtn" type="button">Send Reset Link</button>
+          <button id="authUpdatePasswordBtn" class="authBtn secondary" type="button" style="display:none;">Update Password</button>
+        </div>
+      </div>
+
+      <div class="authSignedIn">
+        <div id="authUserEmail" class="authUserEmail"></div>
+        <div class="authBtns">
+          <button id="authSyncNowBtn" class="authBtn" type="button">Sync Now</button>
+          <button id="authSignOutBtn" class="authBtn secondary" type="button">Sign Out</button>
+        </div>
+      </div>
+
+      <div class="authHelp">Uses your Song Rider Suite / Chord Rider Pro cloud account. Your SRP projects and media now sync through Cloudflare.</div>
+      <div class="authForgotRow"><button id="authForgotPasswordBtn" class="authLinkBtn" type="button">Forgot Password?</button></div>
+    </div>
+  </div>
+
+<script src="./lame.min.js?v=63"></script>
+<script type="module">
+  import * as pdfjsLib from "./pdf.mjs?v=20";
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf.worker.mjs?v=20";
+  window.pdfjsLib = pdfjsLib; // <-- makes your existing app.js code work unchanged
+</script>
+<!-- cache-buster -->
+<script src="./app.js?v=3.3.60-SRP-GDOCS-PRINT-LAYOUT"></script>
+<script src="../skins.js?v=3.3.114-BLACK-LABEL-PLAIN-CLOUD"></script>
+
+
+<script>
+(() => {
+  const root = document.documentElement;
+  const header = document.querySelector("header");
+  if(!header) return;
+
+  let raf = 0;
+  const syncHeaderH = () => {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      const h = Math.ceil(header.getBoundingClientRect().height || 0);
+      root.style.setProperty("--headerH", h + "px");
+    });
+  };
+
+  // initial
+  syncHeaderH();
+
+  // keep updated
+  window.addEventListener("resize", syncHeaderH, { passive:true });
+
+  // updates after Show/Hide toggles
+  const toggleBtn = document.getElementById("togglePanelBtn");
+  if(toggleBtn){
+    toggleBtn.addEventListener("click", () => {
+      // wait for DOM/layout to settle, then measure
+      setTimeout(syncHeaderH, 0);
+      setTimeout(syncHeaderH, 60);
+    });
+  }
+
+  // observe header size changes (covers dynamic rows showing/hiding)
+  if("ResizeObserver" in window){
+    const ro = new ResizeObserver(syncHeaderH);
+    ro.observe(header);
+  }else{
+    const mo = new MutationObserver(syncHeaderH);
+    mo.observe(header, { attributes:true, childList:true, subtree:true });
+  }
+})();
+</script>
+
+<style id="srp241WorkflowPolish">
+html.crp-integrated #srpTransposeLinkBtn{display:none!important;}
+html.crp-integrated #topControlsRow{align-items:center!important;}
+html.crp-integrated #topControlsRow #crpSrpLinkBtn{margin:0!important;}
+html.crp-integrated .sheetHeader input.headingPill{
+  display:block!important;min-height:40px!important;height:40px!important;padding:0 16px!important;
+  background:#efc85d!important;background-image:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;
+  color:#111!important;-webkit-text-fill-color:#111!important;border:1px solid #d6aa3f!important;border-radius:999px!important;
+  font-weight:1000!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.25)!important;
+}
+html.crp-integrated .sheetHeader input.headingPill::placeholder{color:#55420f!important;-webkit-text-fill-color:#55420f!important;opacity:.78!important;}
+html.crp-integrated #srpHeaderAutoScroll,html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedPlayBtn,html.crp-integrated #srpLinkedStopBtn{
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;width:44px!important;height:40px!important;min-width:44px!important;padding:0!important;border-radius:12px!important;font-weight:1000!important;font-size:18px!important;
+}
+html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedStopBtn{background:#252b33!important;color:#f3f5f7!important;border:1px solid #414b57!important;}
+html.crp-integrated #srpLinkedPlayBtn{background:linear-gradient(180deg,#f7d774,#dda93a)!important;color:#111!important;border:1px solid #d6aa3f!important;}
+html.crp-integrated #srpHeaderAutoScroll.on{background:linear-gradient(180deg,#f7d774,#dda93a)!important;color:#111!important;}
+@media(max-width:430px){
+ html.crp-integrated .sheetHeader{padding-left:10px!important;padding-right:10px!important;}
+ html.crp-integrated .sheetHeader>div:last-child{gap:6px!important;}
+ html.crp-integrated #srpHeaderAutoScroll,html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedPlayBtn,html.crp-integrated #srpLinkedStopBtn{width:40px!important;min-width:40px!important;height:38px!important;}
+}
+</style>
 </body>
-</html>
+
+<style id="srpLightSkinWindowParityV3383">
+/* Keep Full Song View + Card View lyric windows aligned with each light skin. */
+html.crp-integrated[data-skin="studio-pastel"],
+html.crp-integrated[data-skin="black-label-light"],
+html.crp-integrated[data-skin="royal-wave"],
+html.crp-integrated[data-skin="candy-pop"],
+html.crp-integrated[data-skin="rider-light"],
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]){
+  --srp-light-text:#2b3035;
+  --srp-light-muted:#68717a;
+  --srp-light-line:#d7d3cb;
+  --srp-light-panel:#fffdf8;
+  --srp-light-panel2:#f5f1ea;
+  --srp-light-input:#fffdfa;
+}
+html.crp-integrated[data-skin="studio-pastel"]{--srp-light-panel:#fff8ef;--srp-light-panel2:#f2e8dc;--srp-light-input:#fffdf8;--srp-light-line:#d8cbbb;}
+html.crp-integrated[data-skin="black-label-light"]{--srp-light-panel:#ffffff;--srp-light-panel2:#efefec;--srp-light-input:#ffffff;--srp-light-line:#d0cec7;}
+html.crp-integrated[data-skin="royal-wave"]{--srp-light-panel:#EEE8C6;--srp-light-panel2:#98D6FF;--srp-light-input:#fff9df;--srp-light-line:#005CF7;--srp-light-text:#12244e;--srp-light-muted:#47617d;}
+html.crp-integrated[data-skin="candy-pop"]{--srp-light-panel:#FFB2F6;--srp-light-panel2:#EFEAD7;--srp-light-input:#fffdf2;--srp-light-line:#87FFF5;--srp-light-text:#263337;--srp-light-muted:#665866;}
+html.crp-integrated[data-skin="rider-light"]{--srp-light-panel:#f5f5f1;--srp-light-panel2:#ebede9;--srp-light-input:#ffffff;--srp-light-line:#d2d6d0;}
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]){--srp-light-panel:#efe8cf;--srp-light-panel2:#fffdf7;--srp-light-input:#fffdf7;--srp-light-line:#d7a63c;--srp-light-text:#261b16;--srp-light-muted:#72665a;}
+
+html.crp-integrated[data-skin="studio-pastel"] .sheet,
+html.crp-integrated[data-skin="black-label-light"] .sheet,
+html.crp-integrated[data-skin="royal-wave"] .sheet,
+html.crp-integrated[data-skin="candy-pop"] .sheet,
+html.crp-integrated[data-skin="rider-light"] .sheet,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheet,
+html.crp-integrated[data-skin="studio-pastel"] .fullSectionCard,
+html.crp-integrated[data-skin="black-label-light"] .fullSectionCard,
+html.crp-integrated[data-skin="royal-wave"] .fullSectionCard,
+html.crp-integrated[data-skin="candy-pop"] .fullSectionCard,
+html.crp-integrated[data-skin="rider-light"] .fullSectionCard,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullSectionCard,
+html.crp-integrated[data-skin="studio-pastel"] .card,
+html.crp-integrated[data-skin="black-label-light"] .card,
+html.crp-integrated[data-skin="royal-wave"] .card,
+html.crp-integrated[data-skin="candy-pop"] .card,
+html.crp-integrated[data-skin="rider-light"] .card,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .card{
+  background:var(--srp-light-panel)!important;
+  color:var(--srp-light-text)!important;
+  border-color:var(--srp-light-line)!important;
+  box-shadow:0 10px 28px rgba(58,49,35,.10)!important;
+}
+html.crp-integrated[data-skin="studio-pastel"] .sheetHeader,
+html.crp-integrated[data-skin="black-label-light"] .sheetHeader,
+html.crp-integrated[data-skin="royal-wave"] .sheetHeader,
+html.crp-integrated[data-skin="candy-pop"] .sheetHeader,
+html.crp-integrated[data-skin="rider-light"] .sheetHeader,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader{
+  background:var(--srp-light-panel2)!important;
+  color:var(--srp-light-text)!important;
+  border-color:var(--srp-light-line)!important;
+}
+html.crp-integrated[data-skin="studio-pastel"] textarea.fullSectionText,
+html.crp-integrated[data-skin="black-label-light"] textarea.fullSectionText,
+html.crp-integrated[data-skin="royal-wave"] textarea.fullSectionText,
+html.crp-integrated[data-skin="candy-pop"] textarea.fullSectionText,
+html.crp-integrated[data-skin="rider-light"] textarea.fullSectionText,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) textarea.fullSectionText,
+html.crp-integrated[data-skin="studio-pastel"] textarea.lyrics,
+html.crp-integrated[data-skin="black-label-light"] textarea.lyrics,
+html.crp-integrated[data-skin="royal-wave"] textarea.lyrics,
+html.crp-integrated[data-skin="candy-pop"] textarea.lyrics,
+html.crp-integrated[data-skin="rider-light"] textarea.lyrics,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) textarea.lyrics,
+html.crp-integrated[data-skin="studio-pastel"] textarea.fullBox,
+html.crp-integrated[data-skin="black-label-light"] textarea.fullBox,
+html.crp-integrated[data-skin="royal-wave"] textarea.fullBox,
+html.crp-integrated[data-skin="candy-pop"] textarea.fullBox,
+html.crp-integrated[data-skin="rider-light"] textarea.fullBox,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) textarea.fullBox,
+html.crp-integrated[data-skin="studio-pastel"] textarea.fullPreview,
+html.crp-integrated[data-skin="black-label-light"] textarea.fullPreview,
+html.crp-integrated[data-skin="royal-wave"] textarea.fullPreview,
+html.crp-integrated[data-skin="candy-pop"] textarea.fullPreview,
+html.crp-integrated[data-skin="rider-light"] textarea.fullPreview,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) textarea.fullPreview{
+  background:var(--srp-light-input)!important;
+  color:var(--srp-light-text)!important;
+  border-color:var(--srp-light-line)!important;
+}
+html.crp-integrated[data-skin="studio-pastel"] .fullPerf,
+html.crp-integrated[data-skin="studio-pastel"] .fullPerfScroll,
+html.crp-integrated[data-skin="black-label-light"] .fullPerf,
+html.crp-integrated[data-skin="black-label-light"] .fullPerfScroll,
+html.crp-integrated[data-skin="royal-wave"] .fullPerf,
+html.crp-integrated[data-skin="royal-wave"] .fullPerfScroll,
+html.crp-integrated[data-skin="candy-pop"] .fullPerf,
+html.crp-integrated[data-skin="candy-pop"] .fullPerfScroll,
+html.crp-integrated[data-skin="rider-light"] .fullPerf,
+html.crp-integrated[data-skin="rider-light"] .fullPerfScroll,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerf,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerfScroll{
+  background:var(--srp-light-panel)!important;
+  color:var(--srp-light-text)!important;
+}
+html.crp-integrated[data-skin="studio-pastel"] .fullPerfChordRow,
+html.crp-integrated[data-skin="black-label-light"] .fullPerfChordRow,
+html.crp-integrated[data-skin="royal-wave"] .fullPerfChordRow,
+html.crp-integrated[data-skin="candy-pop"] .fullPerfChordRow,
+html.crp-integrated[data-skin="rider-light"] .fullPerfChordRow,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerfChordRow{color:var(--srp-light-muted)!important;}
+
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheet,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullSectionCard,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .card{
+  background-color:#fffdf7!important;
+  background-image:url('../assets/rider-blood-light-pattern.png')!important;
+  background-size:220px auto!important;
+  background-repeat:repeat!important;
+}
+</style>
+</html><style id="srp230RemoveLegacyNoteLength">
+html.crp-integrated #noteLenSelect,
+html.crp-integrated #mNoteLenSelect{display:none!important;}
+</style>
+
+<style id="srp240LinkedWorkflow">
+html.crp-integrated #recordBtn,html.crp-integrated #mRecordBtn{display:none!important;}
+html.crp-integrated #panelBody > .controlSelectRow{display:none!important;}
+html.crp-integrated .sheetHeader #srpHeaderAutoScroll{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:38px!important;flex:0 0 42px!important;border-radius:11px!important;border:1px solid #d8ae52!important;background:#252b33!important;color:#f4d47d!important;font-weight:1000!important;font-size:19px!important;}
+html.crp-integrated .sheetHeader #srpHeaderAutoScroll.on{background:linear-gradient(180deg,#f7d774,#dda93a)!important;color:#111!important;}
+html.crp-integrated #autoPlayBtn,html.crp-integrated #autoStopBtn,html.crp-integrated #mScrollBtn,html.crp-integrated #mAutoStopBtn{display:none!important;}
+html.crp-integrated input.headingPill{background:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;color:#111!important;-webkit-text-fill-color:#111!important;border:1px solid #d6aa3f!important;border-radius:999px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.24)!important;}
+html.crp-integrated #srpTransposeLinkBtn{width:23px!important;min-width:23px!important;height:38px!important;padding:0!important;border-radius:999px!important;font-size:11px!important;font-weight:1000!important;}
+html.crp-integrated #srpTransposeLinkBtn.on{background:#efc85d!important;color:#111!important;}
+html.srp-lyrics-overlay-mode .crp-srp-app-header,html.srp-lyrics-overlay-mode header{display:none!important;}
+html.srp-lyrics-overlay-mode main{padding:0 0 86px!important;}
+html.srp-lyrics-overlay-mode .sheet{border:0!important;border-radius:0!important;margin:0!important;}
+html.srp-lyrics-overlay-mode .sheetHeader{position:sticky!important;top:0!important;z-index:20!important;background:#151a21!important;}
+</style>
+
+
+<style id="srp282CardPageTransport">
+/* v2.9.3 — keep SRP card-page title + AutoScroll + Play/Pause + Stop on one mobile row. */
+html.crp-integrated .sheetHeader > div:first-child{
+  min-width:0!important;
+  flex:1 1 auto!important;
+}
+html.crp-integrated .sheetHeader input.headingPill{
+  flex:0 1 210px!important;
+  width:min(210px,100%)!important;
+  max-width:210px!important;
+  min-width:105px!important;
+}
+@media(max-width:430px){
+  html.crp-integrated .sheetHeader input.headingPill{
+    flex:0 1 145px!important;
+    width:145px!important;
+    max-width:145px!important;
+    min-width:105px!important;
+    padding-left:12px!important;
+    padding-right:12px!important;
+  }
+  html.crp-integrated .sheetHeader > div:last-child{
+    gap:5px!important;
+  }
+  html.crp-integrated #srpHeaderAutoScroll,
+  html.crp-integrated #srpHeaderAutoStop,
+  html.crp-integrated #srpLinkedPlayBtn,
+  html.crp-integrated #srpLinkedStopBtn{
+    width:38px!important;
+    min-width:38px!important;
+    height:38px!important;
+    flex:0 0 38px!important;
+  }
+  html.crp-integrated .sheetHeader .sheetAddBtn,
+  html.crp-integrated .sheetHeader .sheetDeleteBtn{
+    width:36px!important;
+    min-width:36px!important;
+    height:38px!important;
+    flex:0 0 36px!important;
+  }
+}
+</style>
+
+
+<style id="srp3385RiderBloodLightFullWindowPattern">
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheet,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullSectionCard,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .card,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerf,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerfScroll{
+  background-color:#FFFDF7!important;
+  background-image:linear-gradient(rgba(255,253,247,.10),rgba(255,253,247,.10)),url('../assets/rider-blood-light-pattern.png')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#201B16!important;
+  border-color:#D8CAA8!important;
+}
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader a.workspace-mode-btn.active,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader button[aria-pressed="true"],
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #srpHeaderAutoScroll.on,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #srpTransposeLinkBtn.on{
+  background:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
+  color:#FFF!important;
+  border-color:#9F0000!important;
+}
+</style>
+
+<style id="srp3386RiderBloodLightPatternAuditFix">
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .panel,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheet,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullSectionCard,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .card,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .archiveAddPanel,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .archiveCard,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .archiveModal,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .projectModal,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerf,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerfScroll{
+  background-color:#FFFDF7!important;
+  background-image:url('../assets/rider-blood-light-pattern.png')!important;
+  background-repeat:repeat!important;
+  background-size:270px auto!important;
+  background-position:center top!important;
+  color:#201B16!important;
+  border-color:#D8CAA8!important;
+}
+</style>
+
+
+<style id="srp33109RiderBloodLightOgRepair">
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .panel,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .sheet,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .sheetHeader,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .fullSectionCard,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .card,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .archiveAddPanel,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .archiveCard,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .archiveModal,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .projectModal,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .fullPerf,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .fullPerfScroll{
+  background-color:#fffdf7!important;
+  background-image:linear-gradient(rgba(255,253,247,.08),rgba(255,253,247,.08)),url('../assets/rider-blood-light-og-pattern.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#201b16!important;
+  border-color:#d8caa8!important;
+}
+</style>
