@@ -2734,3 +2734,38 @@ html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] b
   background-position:0 0,center top!important;
   color:#102b4f!important;
 }
+
+/* =========================================================
+   v3.3.119 — Rider Blood Light Add Line readability +
+   Sapphire Paisley Light active segmented control contrast
+   Presentation-only skin polish. No playback/project logic touched.
+   ========================================================= */
+
+/* Rider Blood Light / OG: the shared Add blank line button keeps its dark shell,
+   but the label must stay white in CRP + Baby DAW so it reads against the dark fill. */
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #addLineBtn,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #addLineBtn::after,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #addLineBtn,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #addLineBtn::after{
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+}
+
+/* Sapphire Paisley Light: engaged segmented controls (Piano / Guitar / Misc,
+   Chord / Note, etc.) should always render white text on the sapphire-blue active fill. */
+html[data-skin-choice="sapphire-paisley-light"] :is(#instrumentTabs .seg.active,#leadInstrumentTabs .seg.active,#modeTabs .seg.active,.segmented .seg.active),
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#instrumentTabs .seg.active,#leadInstrumentTabs .seg.active,#modeTabs .seg.active,.segmented .seg.active){
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] :is(#instrumentTabs .seg.active,#leadInstrumentTabs .seg.active,#modeTabs .seg.active,.segmented .seg.active) *,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#instrumentTabs .seg.active,#leadInstrumentTabs .seg.active,#modeTabs .seg.active,.segmented .seg.active) *{
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] :is(#instrumentTabs .seg.active::after,#leadInstrumentTabs .seg.active::after,#modeTabs .seg.active::after,.segmented .seg.active::after),
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#instrumentTabs .seg.active::after,#leadInstrumentTabs .seg.active::after,#modeTabs .seg.active::after,.segmented .seg.active::after){
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+  opacity:.82!important;
+}
