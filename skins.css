@@ -2875,3 +2875,14 @@ html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #
     font-size:.72rem!important;
   }
 }
+
+/* =========================================================
+   v3.3.123 — Sapphire Paisley Light Notes-that-fit root contrast
+   Presentation-only. Dark sapphire/root note chips use white text.
+   ========================================================= */
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-chip.note.root-tone,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-chip.note.root-tone{
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+  font-weight:900!important;
+}
