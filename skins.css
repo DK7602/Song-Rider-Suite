@@ -2903,3 +2903,25 @@ html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #
   border-color:#69AEE3!important;
   box-shadow:none!important;
 }
+
+
+/* =========================================================
+   v3.3.125 — Sapphire Paisley Light project browser active row contrast
+   Make the active/open project title readable and ensure the highlighted
+   Open button uses white text on the dark sapphire state.
+   ========================================================= */
+html[data-skin-choice="sapphire-paisley-light"] .project-item.current .name,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .project-item.current .name{
+  color:#102b4f!important;
+  -webkit-text-fill-color:#102b4f!important;
+  font-weight:900!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] .project-item.current .open,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .project-item.current .open{
+  background:#0D00FF!important;
+  background-image:none!important;
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+  border-color:#D6BC67!important;
+  font-weight:900!important;
+}
