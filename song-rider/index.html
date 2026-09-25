@@ -3711,3 +3711,24 @@ html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-pa
   border-color:#9FC4E8!important;
 }
 </style>
+
+<style id="srpStudioPastelPatternParityV3384">
+/* SRP Studio Pastel: preserve the same supplied cream pattern used by CRP/BD.
+   This intentionally comes after SRP light-window parity, whose background
+   shorthand otherwise clears the Studio Pastel background-image. */
+html.crp-integrated[data-skin="studio-pastel"] .sheet,
+html.crp-integrated[data-skin="studio-pastel"] .fullSectionCard,
+html.crp-integrated[data-skin="studio-pastel"] .card,
+html.crp-integrated[data-skin="studio-pastel"] .sheetHeader,
+html.crp-integrated[data-skin="studio-pastel"] .fullPerf,
+html.crp-integrated[data-skin="studio-pastel"] .fullPerfScroll{
+  background-color:#fffaf4!important;
+  background-image:linear-gradient(rgba(255,250,244,.18),rgba(255,250,244,.18)),url('../assets/studio-pastel-pattern.jpg')!important;
+  background-size:auto,700px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+}
+html.crp-integrated[data-skin="studio-pastel"] .sheetHeader{
+  background-color:#f4e9df!important;
+}
+</style>
