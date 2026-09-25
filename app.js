@@ -1338,7 +1338,7 @@
         const merged=incoming.map(remote=>{
           const id=String(remote?.id||''),local=localById.get(id);
           if(local&&cloudPending(id))return local;
-          if(local){const changed=Number(local.updatedAt||0)!==Number(remote.updatedAt||0)||JSON.stringify({...local,updatedAt:0})!==JSON.stringify({...remote,updatedAt:0});if(changed){pulled++;if(sameProjectId(id,state.currentProjectId))activeShouldReload=true;}}
+          if(local){const changed=Number(local.updatedAt||0)!==Number(remote.updatedAt||0);if(changed){pulled++;if(sameProjectId(id,state.currentProjectId))activeShouldReload=true;}}
           return remote;
         });
         const remoteIds=new Set(incoming.map(p=>String(p?.id||'')));
@@ -1349,7 +1349,7 @@
         cloudProjects=merged;for(const p of incoming){if(!cloudPending(p.id))upsertLocal(p);}renderProjects();
         let pushed=0;if(pushPending)pushed=await pushPendingCloudProjects();
         cloudSyncState='ready';updateAccountSummary();renderProjects();
-        if(rehydrateActive&&activeShouldReload&&state.currentProjectId&&!cloudPending(state.currentProjectId)&&!autoSaveRunning&&!autoSaveTimer){performLoadProject(state.currentProjectId);}
+        if(rehydrateActive&&activeShouldReload&&state.currentProjectId&&!cloudPending(state.currentProjectId)&&!autoSaveRunning&&!autoSaveTimer&&!window.CRPParts?.isPlaying?.()){performLoadProject(state.currentProjectId);}
         return {pulled,pushed};
       }catch(e){cloudSyncState='error';updateAccountSummary();if(!quiet)$('status').textContent=`Cloud sync unavailable — using local backup: ${e.message}`;renderProjects();throw e;}
       finally{cloudRefreshPromise=null;}
@@ -1914,7 +1914,7 @@
     // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
     // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.
     if(!IS_PLAYBACK_BRIDGE){checkAccount();window.addEventListener('focus',scheduleFocusCloudRefresh);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')scheduleFocusCloudRefresh();});}
-    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.115-BLACK-LABEL-PLAIN-REPAIR').catch(()=>{});
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.120-CLOUD-LIVE-PLAYBACK-FIX').catch(()=>{});
   }
 
   const WORKSPACE_MODE_KEY='crp-workspace-mode-v1';
