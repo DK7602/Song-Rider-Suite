@@ -5174,3 +5174,19 @@ body.workspace-chord-rider .primary-toolbar > .sustain-control{
   .project-save-row{gap:5px!important}
   .project-save-row #newProjectBtn,.project-save-row #saveProjectBtn,.project-save-row #renameCurrentProjectBtn,.project-save-row .export-btn{padding:8px 5px!important;font-size:.68rem!important}
 }
+
+/* v3.3.118 — Light-skin Lead/Bass Sustain control
+   Keep the Sustain field visually consistent with the white/light controls beside it. */
+html[data-skin="black-label-light"] .lead-sustain-control .part-repeat-toggle,
+html[data-skin="rider-light"] .lead-sustain-control .part-repeat-toggle,
+html[data-skin="studio-pastel"] .lead-sustain-control .part-repeat-toggle,
+html[data-skin="candy-pop"] .lead-sustain-control .part-repeat-toggle,
+html[data-skin-choice="sapphire-paisley-light"] .lead-sustain-control .part-repeat-toggle,
+html[data-skin-choice="rider-blood-light"] .lead-sustain-control .part-repeat-toggle,
+html[data-skin-choice="rider-blood-light-og"] .lead-sustain-control .part-repeat-toggle,
+html[data-skin-choice="rider-light-og"] .lead-sustain-control .part-repeat-toggle{
+  background:var(--srs-skin-input,#fff)!important;
+  border-color:var(--srs-skin-line,var(--line,#d3d1ca))!important;
+  color:var(--srs-skin-text,var(--text,#202226))!important;
+  box-shadow:0 1px 2px rgba(20,28,36,.05)!important;
+}
