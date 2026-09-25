@@ -2797,3 +2797,22 @@ html[data-skin-choice="sapphire-paisley-light"] #saveProjectBtn{
   border-color:#69aee3!important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.45)!important;
 }
+
+/* =========================================================
+   v3.3.121 — Sapphire Paisley Light cloud-account actions
+   Presentation-only. Keep account primary actions readable and consistent.
+   ========================================================= */
+html[data-skin-choice="sapphire-paisley-light"] :is(#loginBtn,#registerBtn,#syncNowBtn,#changePasswordBtn),
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#loginBtn,#registerBtn,#syncNowBtn,#changePasswordBtn){
+  background:#0D00FF!important;
+  background-image:none!important;
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+  border-color:#D6BC67!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 0 0 1px rgba(214,188,103,.25)!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] :is(#loginBtn,#registerBtn,#syncNowBtn,#changePasswordBtn) *,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#loginBtn,#registerBtn,#syncNowBtn,#changePasswordBtn) *{
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+}
