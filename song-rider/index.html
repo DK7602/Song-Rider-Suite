@@ -3712,40 +3712,23 @@ html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-pa
 }
 </style>
 
-<style id="srp33118StudioPastelFullWindowPatternFix">
-/* v3.3.118 — Studio Pastel SRP background parity.
-   Restore the supplied cream swirl pattern to every SRP window surface while
-   keeping lyric/edit text boxes clean and readable. This intentionally comes
-   after the light-skin parity block so its background-image cannot be reset by
-   the later background shorthand. */
-html.crp-integrated[data-skin="studio-pastel"] .panel,
+<style id="srpStudioPastelPatternParityV3384">
+/* SRP Studio Pastel: preserve the same supplied cream pattern used by CRP/BD.
+   This intentionally comes after SRP light-window parity, whose background
+   shorthand otherwise clears the Studio Pastel background-image. */
 html.crp-integrated[data-skin="studio-pastel"] .sheet,
-html.crp-integrated[data-skin="studio-pastel"] .sheetHeader,
 html.crp-integrated[data-skin="studio-pastel"] .fullSectionCard,
 html.crp-integrated[data-skin="studio-pastel"] .card,
-html.crp-integrated[data-skin="studio-pastel"] .archiveAddPanel,
-html.crp-integrated[data-skin="studio-pastel"] .archiveCard,
-html.crp-integrated[data-skin="studio-pastel"] .archiveModal,
-html.crp-integrated[data-skin="studio-pastel"] .projectModal,
+html.crp-integrated[data-skin="studio-pastel"] .sheetHeader,
 html.crp-integrated[data-skin="studio-pastel"] .fullPerf,
-html.crp-integrated[data-skin="studio-pastel"] .fullPerfScroll,
-html.crp-integrated[data-skin-choice="studio-pastel"] .panel,
-html.crp-integrated[data-skin-choice="studio-pastel"] .sheet,
-html.crp-integrated[data-skin-choice="studio-pastel"] .sheetHeader,
-html.crp-integrated[data-skin-choice="studio-pastel"] .fullSectionCard,
-html.crp-integrated[data-skin-choice="studio-pastel"] .card,
-html.crp-integrated[data-skin-choice="studio-pastel"] .archiveAddPanel,
-html.crp-integrated[data-skin-choice="studio-pastel"] .archiveCard,
-html.crp-integrated[data-skin-choice="studio-pastel"] .archiveModal,
-html.crp-integrated[data-skin-choice="studio-pastel"] .projectModal,
-html.crp-integrated[data-skin-choice="studio-pastel"] .fullPerf,
-html.crp-integrated[data-skin-choice="studio-pastel"] .fullPerfScroll{
-  background-color:#fff8ef!important;
+html.crp-integrated[data-skin="studio-pastel"] .fullPerfScroll{
+  background-color:#fffaf4!important;
   background-image:linear-gradient(rgba(255,250,244,.18),rgba(255,250,244,.18)),url('../assets/studio-pastel-pattern.jpg')!important;
   background-size:auto,700px auto!important;
   background-repeat:repeat,repeat!important;
   background-position:0 0,center top!important;
-  color:var(--srp-light-text,#2b3035)!important;
-  border-color:var(--srp-light-line,#d8cbbb)!important;
+}
+html.crp-integrated[data-skin="studio-pastel"] .sheetHeader{
+  background-color:#f4e9df!important;
 }
 </style>
