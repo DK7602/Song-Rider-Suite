@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.119-production-cache-recovery-srp';
+const CACHE = 'song-rider-suite-v3.3.124-production-cache-recovery-srp';
 const ASSETS = [
   '../skins.css',
   '../skins.js',

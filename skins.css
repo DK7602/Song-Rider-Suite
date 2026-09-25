@@ -2734,3 +2734,172 @@ html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] b
   background-position:0 0,center top!important;
   color:#102b4f!important;
 }
+
+/* =========================================================
+   v3.3.119 — Rider Blood Light Add Line readability +
+   Sapphire Paisley Light active segmented control contrast
+   Presentation-only skin polish. No playback/project logic touched.
+   ========================================================= */
+
+/* Rider Blood Light / OG: the shared Add blank line button keeps its dark shell,
+   but the label must stay white in CRP + Baby DAW so it reads against the dark fill. */
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #addLineBtn,
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #addLineBtn::after,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #addLineBtn,
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #addLineBtn::after{
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+}
+
+/* Sapphire Paisley Light: engaged segmented controls (Piano / Guitar / Misc,
+   Chord / Note, etc.) should always render white text on the sapphire-blue active fill. */
+html[data-skin-choice="sapphire-paisley-light"] :is(#instrumentTabs .seg.active,#leadInstrumentTabs .seg.active,#modeTabs .seg.active,.segmented .seg.active),
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#instrumentTabs .seg.active,#leadInstrumentTabs .seg.active,#modeTabs .seg.active,.segmented .seg.active){
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] :is(#instrumentTabs .seg.active,#leadInstrumentTabs .seg.active,#modeTabs .seg.active,.segmented .seg.active) *,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#instrumentTabs .seg.active,#leadInstrumentTabs .seg.active,#modeTabs .seg.active,.segmented .seg.active) *{
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] :is(#instrumentTabs .seg.active::after,#leadInstrumentTabs .seg.active::after,#modeTabs .seg.active::after,.segmented .seg.active::after),
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#instrumentTabs .seg.active::after,#leadInstrumentTabs .seg.active::after,#modeTabs .seg.active::after,.segmented .seg.active::after){
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+  opacity:.82!important;
+}
+
+/* =========================================================
+   v3.3.120 — Sapphire Paisley Light primary-action contrast
+   Presentation-only. Keep dark sapphire primary actions readable and return
+   Save to the same baby-blue treatment as New / Rename / Export.
+   ========================================================= */
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#buildBtn,#playAllBtn,#leadPlaybackBtn),
+html[data-skin-choice="sapphire-paisley-light"] :is(#buildBtn,#playAllBtn,#leadPlaybackBtn){
+  background:#0D00FF!important;
+  background-image:none!important;
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+  border-color:#D6BC67!important;
+}
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#buildBtn,#playAllBtn,#leadPlaybackBtn) *,
+html[data-skin-choice="sapphire-paisley-light"] :is(#buildBtn,#playAllBtn,#leadPlaybackBtn) *{
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+}
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #saveProjectBtn,
+html[data-skin-choice="sapphire-paisley-light"] #saveProjectBtn{
+  background:#A4DCFF!important;
+  background-image:none!important;
+  color:#102b4f!important;
+  -webkit-text-fill-color:#102b4f!important;
+  border-color:#69aee3!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45)!important;
+}
+
+/* =========================================================
+   v3.3.121 — Sapphire Paisley Light cloud-account actions
+   Presentation-only. Keep account primary actions readable and consistent.
+   ========================================================= */
+html[data-skin-choice="sapphire-paisley-light"] :is(#loginBtn,#registerBtn,#syncNowBtn,#changePasswordBtn),
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#loginBtn,#registerBtn,#syncNowBtn,#changePasswordBtn){
+  background:#0D00FF!important;
+  background-image:none!important;
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+  border-color:#D6BC67!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 0 0 1px rgba(214,188,103,.25)!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] :is(#loginBtn,#registerBtn,#syncNowBtn,#changePasswordBtn) *,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#loginBtn,#registerBtn,#syncNowBtn,#changePasswordBtn) *{
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+}
+
+/* =========================================================
+   v3.3.122 — Sapphire Paisley Light Lead/Bass label readability
+   Presentation-only. Strengthen the small Lead/Bass control labels and
+   harmony helper without changing editor/playback behavior.
+   ========================================================= */
+
+/* Grid octave / Resolution / Bars: black + bold labels, while keeping the
+   dropdown values themselves at their normal weight. */
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-compact-settings-row > :is(.lead-grid-octave-control,.lead-resolution-control,.lead-bars-control),
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-compact-settings-row > :is(.lead-grid-octave-control,.lead-resolution-control,.lead-bars-control){
+  color:#111!important;
+  font-weight:900!important;
+  opacity:1!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-compact-settings-row > :is(.lead-grid-octave-control,.lead-resolution-control,.lead-bars-control) > select,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-compact-settings-row > :is(.lead-grid-octave-control,.lead-resolution-control,.lead-bars-control) > select{
+  font-weight:500!important;
+}
+
+/* Sustain heading + lower Repeat label: black and bold for clear contrast. */
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-sustain-control > span:first-child,
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-play-options-lower .part-repeat-toggle > span:last-child,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-sustain-control > span:first-child,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-play-options-lower .part-repeat-toggle > span:last-child{
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+  font-weight:900!important;
+  opacity:1!important;
+}
+
+/* Chords Used / Notes that fit: make the helper headings unmistakable over the
+   paisley art, and make the used-chord chip easier to read. */
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-label,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-label{
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+  font-weight:900!important;
+  opacity:1!important;
+  font-size:.76rem!important;
+  letter-spacing:.005em!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.9)!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-chip.chord,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-chip.chord{
+  background:rgba(255,255,255,.94)!important;
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+  border-color:#D6BC67!important;
+  font-weight:900!important;
+  opacity:1!important;
+  box-shadow:0 1px 4px rgba(28,60,100,.10)!important;
+}
+@media(max-width:520px){
+  html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-label,
+  html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-label{
+    font-size:.72rem!important;
+  }
+}
+
+/* =========================================================
+   v3.3.123 — Sapphire Paisley Light Notes-that-fit root contrast
+   Presentation-only. Dark sapphire/root note chips use white text.
+   ========================================================= */
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-chip.note.root-tone,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-chip.note.root-tone{
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+  font-weight:900!important;
+}
+
+/* =========================================================
+   v3.3.124 — Sapphire Paisley Light Track Master transport parity
+   Keep the floating Play button visually consistent with the neighboring
+   light-blue transport buttons instead of using the dark sapphire accent.
+   ========================================================= */
+html[data-skin-choice="sapphire-paisley-light"] #voxPlayTransportBtn,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #voxPlayTransportBtn,
+html[data-skin-choice="sapphire-paisley-light"] #voxPlayTransportBtn.is-active,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #voxPlayTransportBtn.is-active{
+  background:#A4DCFF!important;
+  background-image:none!important;
+  color:#102b4f!important;
+  -webkit-text-fill-color:#102b4f!important;
+  border-color:#69AEE3!important;
+  box-shadow:none!important;
+}

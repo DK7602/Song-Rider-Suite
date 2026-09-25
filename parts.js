@@ -90,7 +90,7 @@
   let liveEditTimer=null,bpmRestartTimer=null,mediaPositionTimer=null,mediaKeepAlive=null,mediaKeepAliveUrl='',mediaPausedBeat=0,mediaActionsInstalled=false;
   let liveVocalFxNodes=new Map();
   let audioCtx=null, masterLimiter=null, cycleTimer=null;
-  let playerCache=new Map(), resolvedPlayerCache=new Map(), lastReadyPlayer=new Map(), playerSound=new WeakMap(), partBuses=new Map(), partInstrumentFx=new Map(), highlightTimers=[], activeVoices=new Set(), vocalBufferCache=new Map(), activeVocalSources=new Set();
+  let playerCache=new Map(), resolvedPlayerCache=new Map(), lastReadyPlayer=new Map(), playerSound=new WeakMap(), partBuses=new Map(), partHandoffGates=new Map(), partInstrumentFx=new Map(), highlightTimers=[], activeVoices=new Set(), vocalBufferCache=new Map(), activeVocalSources=new Set();
   // v3.3.54 — cached waveform envelopes keep Track Master navigation from rescanning
   // millions of audio samples on the UI thread while WebAudio playback is running.
   const voxWaveformPeakCache=new Map();
@@ -196,6 +196,18 @@
     const ev=normalizeVoxEvent({id:uid(),takeId:p.activeTakeId,sourcePartId:p.id,startBeat,trimStartSec:0,trimEndSec:null,volume:1,fx:null},p);
     p.voxEvents.push(ev);return ev;
   }
+  function normalTransportRepeatEnabled(){
+    // v3.3.120 — the visible Lead/Bass Repeat control mirrors the hidden/master
+    // CRP loop checkbox, but mobile live editing can briefly leave those two DOM
+    // controls one paint apart. Treat either checked control as repeat-on for the
+    // normal (unscoped) transport so a live instrument/sound edit cannot turn an
+    // already-looping song into an end-of-song stop.
+    if(playbackScope)return false;
+    if(!!core.loop)return true;
+    const a=active(),leadRepeat=$('leadRepeat');
+    return a?.type==='lead'&&!!leadRepeat?.checked;
+  }
+
   function updatePartPlaybackButtons(){
     const a=active(), busy=!!(playing||starting);
     const leadBtn=$('leadPlaybackBtn');
@@ -1191,8 +1203,13 @@
     ensureAudio();let bus=partBuses.get(p.id),fresh=false;
     if(!bus){
       bus=audioCtx.createGain();
+      // v3.3.118 — keep a dedicated unity-gain handoff gate between the part
+      // volume bus and its FX chain.  The normal scheduler is free to smooth
+      // bus.gain for live volume/mute changes without cancelling the tiny
+      // anti-click envelope used when a newly decoded SoundFont becomes ready.
+      const gate=audioCtx.createGain();gate.gain.value=1;bus.connect(gate);partHandoffGates.set(p.id,gate);
       const fx=core.createInstrumentFxChain?.(audioCtx,masterLimiter);
-      if(fx){bus.connect(fx.input);partInstrumentFx.set(p.id,fx);}else bus.connect(masterLimiter);
+      if(fx){gate.connect(fx.input);partInstrumentFx.set(p.id,fx);}else gate.connect(masterLimiter);
       partBuses.set(p.id,bus);fresh=true;
     }
     return {bus,fresh};
@@ -1229,7 +1246,27 @@
       ).then(player=>{
         resolvedPlayerCache.set(key,player);
         try{playerSound.set(player,sound);}catch{}
-        if(requestedPartSound(p)===sound||!lastReadyPlayer.has(p.id))lastReadyPlayer.set(p.id,{sound,player});
+        const previous=lastReadyPlayer.get(p.id);
+        if(requestedPartSound(p)===sound||!previous){
+          // v3.3.118 — A decoded live sound may have a very different sample level/
+          // waveform than the currently queued player.  Switching it into the same
+          // part bus at full level can make a short click/static burst, especially on
+          // mobile.  Schedule a tiny WebAudio cross-duck around the handoff.  This is
+          // audio-thread automation (not a transport restart), so playback and the
+          // rolling scheduler stay continuous while the new player becomes current.
+          if((playing||starting)&&previous?.player&&previous.sound!==sound){
+            ensurePartBus(p);const gate=partHandoffGates.get(p.id),now=audioCtx.currentTime;
+            try{
+              if(gate){
+                if(typeof gate.gain.cancelAndHoldAtTime==='function')gate.gain.cancelAndHoldAtTime(now);
+                else{gate.gain.cancelScheduledValues(now);gate.gain.setValueAtTime(Math.max(.0001,gate.gain.value||1),now);}
+                gate.gain.linearRampToValueAtTime(.0001,now+.018);
+                gate.gain.linearRampToValueAtTime(1,now+.072);
+              }
+            }catch{}
+          }
+          lastReadyPlayer.set(p.id,{sound,player});
+        }
         return player;
       }).catch(err=>{
         playerCache.delete(key);resolvedPlayerCache.delete(key);
@@ -1448,8 +1485,9 @@
     for(const src of activeVocalSources){try{src.stop(0);}catch{}try{src.disconnect();}catch{}}
     activeVocalSources.clear();liveVocalFxNodes.clear();
     for(const bus of partBuses.values()){try{bus.gain.cancelScheduledValues(audioCtx?.currentTime||0);bus.gain.value=0;bus.disconnect();}catch{}}
+    for(const gate of partHandoffGates.values()){try{gate.gain.cancelScheduledValues(audioCtx?.currentTime||0);gate.gain.value=0;gate.disconnect();}catch{}}
     for(const fx of partInstrumentFx.values())try{fx?.disconnect?.();}catch{}
-    partInstrumentFx.clear();partBuses.clear();
+    partInstrumentFx.clear();partHandoffGates.clear();partBuses.clear();
     playerCache.clear();resolvedPlayerCache.clear();lastReadyPlayer.clear();playerSound=new WeakMap();
     if(masterLimiter){try{masterLimiter.disconnect();}catch{}masterLimiter=null;}
   }
@@ -1573,11 +1611,23 @@
 
             nextAudioStart=end;cursorBeat=toBeat;
             if(cursorBeat>=total-1e-7){
-              const loopSong=playbackScope?false:!!core.loop;
+              const loopSong=normalTransportRepeatEnabled();
               if(loopSong){cursorBeat=playbackLoopStartBeat;vocalsScheduledForCycle=false;}
               else{
                 endStopScheduled=true;
-                cycleTimer=setTimeout(()=>{if(generation===playbackGeneration)stopPlayback();},Math.max(10,(end-audioCtx.currentTime)*1000+35));
+                cycleTimer=setTimeout(()=>{
+                  if(generation!==playbackGeneration||!playing)return;
+                  // Repeat may have been re-synchronized while this final audio
+                  // slice was already queued. Re-check at the actual boundary;
+                  // if Repeat is visibly on, continue the same transport session
+                  // rather than firing a stale end timer and changing Stop -> Play.
+                  if(normalTransportRepeatEnabled()){
+                    endStopScheduled=false;cursorBeat=playbackLoopStartBeat;vocalsScheduledForCycle=false;
+                    nextAudioStart=Math.max(audioCtx.currentTime+.02,end);
+                    scheduleNext();return;
+                  }
+                  stopPlayback();
+                },Math.max(10,(end-audioCtx.currentTime)*1000+35));
                 break;
               }
             }
