@@ -998,6 +998,19 @@
     };w.appendChild(b);});
   }
   function renderSound(){const s=$('soundSelect');s.innerHTML='';SOUNDS[state.instrument].forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;s.appendChild(o);});if(!SOUNDS[state.instrument].some(x=>x[0]===state.sound))state.sound=SOUNDS[state.instrument][0][0];s.value=state.sound;}
+  let instrumentSoundTapGuardUntil=0;
+  function armInstrumentSoundTapGuard(ms=700){
+    instrumentSoundTapGuardUntil=Math.max(instrumentSoundTapGuardUntil,performance.now()+Math.max(0,Number(ms)||0));
+  }
+  // v3.3.120 — Android can emit one delayed compatibility click after a touch
+  // sound choice even after the popup itself has been hidden. Capture that one
+  // trailing click at document level so it cannot land on Play/Stop, Build,
+  // Repeat, or any other control underneath the former popup.
+  document.addEventListener('click',e=>{
+    if(performance.now()>=instrumentSoundTapGuardUntil)return;
+    if(e.target?.closest?.('#crpInstrumentSoundPickerLayer'))return;
+    e.preventDefault?.();e.stopPropagation?.();e.stopImmediatePropagation?.();
+  },true);
   function closeInstrumentSoundPicker(){
     document.getElementById('crpInstrumentSoundPickerLayer')?.remove();
     document.getElementById('crpInstrumentSoundPicker')?.remove();
@@ -1014,7 +1027,7 @@
     const pop=document.createElement('div');pop.id='crpInstrumentSoundPicker';pop.className='instrument-sound-picker';pop.setAttribute('role','menu');pop.setAttribute('aria-label',`${instrument} sounds`);
     const title=document.createElement('strong');title.textContent=`${instrument.charAt(0).toUpperCase()+instrument.slice(1)} Sounds`;pop.appendChild(title);
     let guardTimer=0;
-    const guardedClose=()=>{clearTimeout(guardTimer);pop.style.visibility='hidden';layer.classList.add('is-consuming-tap');guardTimer=setTimeout(closeInstrumentSoundPicker,420);};
+    const guardedClose=()=>{clearTimeout(guardTimer);armInstrumentSoundTapGuard(700);pop.style.visibility='hidden';layer.classList.add('is-consuming-tap');guardTimer=setTimeout(closeInstrumentSoundPicker,700);};
     for(const [value,label] of options){
       const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.sound=value;b.classList.toggle('is-current',String(value)===String(current));b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(String(value)===String(current)));
       let down=null,chosen=false;

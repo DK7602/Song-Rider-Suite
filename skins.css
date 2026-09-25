@@ -2769,3 +2769,31 @@ html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :
   -webkit-text-fill-color:#FFF!important;
   opacity:.82!important;
 }
+
+/* =========================================================
+   v3.3.120 — Sapphire Paisley Light primary-action contrast
+   Presentation-only. Keep dark sapphire primary actions readable and return
+   Save to the same baby-blue treatment as New / Rename / Export.
+   ========================================================= */
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#buildBtn,#playAllBtn,#leadPlaybackBtn),
+html[data-skin-choice="sapphire-paisley-light"] :is(#buildBtn,#playAllBtn,#leadPlaybackBtn){
+  background:#0D00FF!important;
+  background-image:none!important;
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+  border-color:#D6BC67!important;
+}
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#buildBtn,#playAllBtn,#leadPlaybackBtn) *,
+html[data-skin-choice="sapphire-paisley-light"] :is(#buildBtn,#playAllBtn,#leadPlaybackBtn) *{
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+}
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #saveProjectBtn,
+html[data-skin-choice="sapphire-paisley-light"] #saveProjectBtn{
+  background:#A4DCFF!important;
+  background-image:none!important;
+  color:#102b4f!important;
+  -webkit-text-fill-color:#102b4f!important;
+  border-color:#69aee3!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45)!important;
+}

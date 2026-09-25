@@ -196,6 +196,18 @@
     const ev=normalizeVoxEvent({id:uid(),takeId:p.activeTakeId,sourcePartId:p.id,startBeat,trimStartSec:0,trimEndSec:null,volume:1,fx:null},p);
     p.voxEvents.push(ev);return ev;
   }
+  function normalTransportRepeatEnabled(){
+    // v3.3.120 — the visible Lead/Bass Repeat control mirrors the hidden/master
+    // CRP loop checkbox, but mobile live editing can briefly leave those two DOM
+    // controls one paint apart. Treat either checked control as repeat-on for the
+    // normal (unscoped) transport so a live instrument/sound edit cannot turn an
+    // already-looping song into an end-of-song stop.
+    if(playbackScope)return false;
+    if(!!core.loop)return true;
+    const a=active(),leadRepeat=$('leadRepeat');
+    return a?.type==='lead'&&!!leadRepeat?.checked;
+  }
+
   function updatePartPlaybackButtons(){
     const a=active(), busy=!!(playing||starting);
     const leadBtn=$('leadPlaybackBtn');
@@ -1599,11 +1611,23 @@
 
             nextAudioStart=end;cursorBeat=toBeat;
             if(cursorBeat>=total-1e-7){
-              const loopSong=playbackScope?false:!!core.loop;
+              const loopSong=normalTransportRepeatEnabled();
               if(loopSong){cursorBeat=playbackLoopStartBeat;vocalsScheduledForCycle=false;}
               else{
                 endStopScheduled=true;
-                cycleTimer=setTimeout(()=>{if(generation===playbackGeneration)stopPlayback();},Math.max(10,(end-audioCtx.currentTime)*1000+35));
+                cycleTimer=setTimeout(()=>{
+                  if(generation!==playbackGeneration||!playing)return;
+                  // Repeat may have been re-synchronized while this final audio
+                  // slice was already queued. Re-check at the actual boundary;
+                  // if Repeat is visibly on, continue the same transport session
+                  // rather than firing a stale end timer and changing Stop -> Play.
+                  if(normalTransportRepeatEnabled()){
+                    endStopScheduled=false;cursorBeat=playbackLoopStartBeat;vocalsScheduledForCycle=false;
+                    nextAudioStart=Math.max(audioCtx.currentTime+.02,end);
+                    scheduleNext();return;
+                  }
+                  stopPlayback();
+                },Math.max(10,(end-audioCtx.currentTime)*1000+35));
                 break;
               }
             }
