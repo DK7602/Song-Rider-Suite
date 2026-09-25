@@ -2816,3 +2816,62 @@ html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :
   color:#FFF!important;
   -webkit-text-fill-color:#FFF!important;
 }
+
+/* =========================================================
+   v3.3.122 — Sapphire Paisley Light Lead/Bass label readability
+   Presentation-only. Strengthen the small Lead/Bass control labels and
+   harmony helper without changing editor/playback behavior.
+   ========================================================= */
+
+/* Grid octave / Resolution / Bars: black + bold labels, while keeping the
+   dropdown values themselves at their normal weight. */
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-compact-settings-row > :is(.lead-grid-octave-control,.lead-resolution-control,.lead-bars-control),
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-compact-settings-row > :is(.lead-grid-octave-control,.lead-resolution-control,.lead-bars-control){
+  color:#111!important;
+  font-weight:900!important;
+  opacity:1!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-compact-settings-row > :is(.lead-grid-octave-control,.lead-resolution-control,.lead-bars-control) > select,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-compact-settings-row > :is(.lead-grid-octave-control,.lead-resolution-control,.lead-bars-control) > select{
+  font-weight:500!important;
+}
+
+/* Sustain heading + lower Repeat label: black and bold for clear contrast. */
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-sustain-control > span:first-child,
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-play-options-lower .part-repeat-toggle > span:last-child,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-sustain-control > span:first-child,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-play-options-lower .part-repeat-toggle > span:last-child{
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+  font-weight:900!important;
+  opacity:1!important;
+}
+
+/* Chords Used / Notes that fit: make the helper headings unmistakable over the
+   paisley art, and make the used-chord chip easier to read. */
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-label,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-label{
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+  font-weight:900!important;
+  opacity:1!important;
+  font-size:.76rem!important;
+  letter-spacing:.005em!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.9)!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-chip.chord,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-chip.chord{
+  background:rgba(255,255,255,.94)!important;
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+  border-color:#D6BC67!important;
+  font-weight:900!important;
+  opacity:1!important;
+  box-shadow:0 1px 4px rgba(28,60,100,.10)!important;
+}
+@media(max-width:520px){
+  html[data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-label,
+  html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #leadPartEditor .lead-harmony-label{
+    font-size:.72rem!important;
+  }
+}
