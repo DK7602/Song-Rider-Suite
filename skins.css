@@ -2886,3 +2886,20 @@ html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #
   -webkit-text-fill-color:#FFF!important;
   font-weight:900!important;
 }
+
+/* =========================================================
+   v3.3.124 — Sapphire Paisley Light Track Master transport parity
+   Keep the floating Play button visually consistent with the neighboring
+   light-blue transport buttons instead of using the dark sapphire accent.
+   ========================================================= */
+html[data-skin-choice="sapphire-paisley-light"] #voxPlayTransportBtn,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #voxPlayTransportBtn,
+html[data-skin-choice="sapphire-paisley-light"] #voxPlayTransportBtn.is-active,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #voxPlayTransportBtn.is-active{
+  background:#A4DCFF!important;
+  background-image:none!important;
+  color:#102b4f!important;
+  -webkit-text-fill-color:#102b4f!important;
+  border-color:#69AEE3!important;
+  box-shadow:none!important;
+}
