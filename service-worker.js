@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.3.118-studio-pastel-srp-bg-fix';
+const CACHE = 'song-rider-suite-v3.3.119-production-cache-recovery';
 const ASSETS = [
   './','./index.html','./styles.css','./app.js','./parts.js','./beat-maker.js',
   './crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css','./skins.css','./skins.js',
