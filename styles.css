@@ -5174,11 +5174,3 @@ body.workspace-chord-rider .primary-toolbar > .sustain-control{
   .project-save-row{gap:5px!important}
   .project-save-row #newProjectBtn,.project-save-row #saveProjectBtn,.project-save-row #renameCurrentProjectBtn,.project-save-row .export-btn{padding:8px 5px!important;font-size:.68rem!important}
 }
-
-/* v3.3.116 — Lead/Bass sustain control must stay readable on every skin. */
-.lead-compact-settings-row .lead-sustain-control .part-repeat-toggle{
-  background:#fff!important;
-  color:#111!important;
-  border-color:#d8d8d8!important;
-}
-.lead-compact-settings-row .lead-sustain-control .part-repeat-toggle span{color:#111!important;}
