@@ -36,7 +36,7 @@
     if(!p||!p.type)return null;
     const base={id:p.id||uid(),name:p.name||`${p.type==='chord'?'Chords':p.type==='lead'?'Lead':'Vocals'} ${i+1}`,enabled:p.enabled!==false,volume:Number.isFinite(+p.volume)?Math.max(0,Math.min(1,+p.volume)):.85};
     if(p.type==='chord')return {...base,type:'chord',data:clone(p.data||core.snapshot())};
-    if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,sustain:p.sustain===true,instrument:p.instrument==='guitar'?'guitar':'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(16,+p.bars||4)),events:Array.isArray(p.events)?p.events.map(e=>({step:+e.step,midi:+e.midi})).filter(e=>Number.isFinite(e.step)&&Number.isFinite(e.midi)):[]};
+    if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,sustain:p.sustain===true,instrument:['piano','guitar','misc'].includes(p.instrument)?p.instrument:'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(16,+p.bars||4)),events:Array.isArray(p.events)?p.events.map(e=>({step:+e.step,midi:+e.midi})).filter(e=>Number.isFinite(e.step)&&Number.isFinite(e.midi)):[]};
     return {...base,type:'vocal',repeat:p.repeat!==false,transcript:String(p.transcript||''),transcriptWords:Array.isArray(p.transcriptWords)?p.transcriptWords:[],recordings:Array.isArray(p.recordings)?p.recordings.map(r=>({...r,blob:null})):[],activeTakeId:p.activeTakeId||null,backingPartIds:Array.isArray(p.backingPartIds)?p.backingPartIds:[],backingDrums:p.backingDrums!==false,backingVolume:Number.isFinite(+p.backingVolume)?Math.max(0,Math.min(1,+p.backingVolume)):.8,fx:{eq:p.fx?.eq||'clear',comp:p.fx?.comp||'medium',reverb:Number(p.fx?.reverb??.12),delay:Number(p.fx?.delay||0)}};
   }
   function ensureInitial(){
@@ -327,7 +327,15 @@
     },Math.max(0,delayMs));highlightTimers.push(t);
   }
   function scheduleLeadHighlight(delayMs,p,step){
-    if(p.id!==activePartId||p.type!=='lead')return;const t=setTimeout(()=>{document.querySelectorAll('.lead-cell.playing').forEach(c=>c.classList.remove('playing'));document.querySelectorAll(`.lead-cell[data-step="${step}"]`).forEach(c=>c.classList.add('playing'));},Math.max(0,delayMs));highlightTimers.push(t);
+    if(p.id!==activePartId||p.type!=='lead')return;const t=setTimeout(()=>{
+      if(p.id!==activePartId||p.type!=='lead')return;
+      const auto=$('leadAutoScrollBtn')?.getAttribute('aria-pressed')==='true';
+      const stepsPerBar=p.resolution;
+      const targetBar=Math.max(0,Math.min(p.bars-1,Math.floor(step/stepsPerBar)));
+      if(auto&&targetBar!==leadBarPage){leadBarPage=targetBar;renderLeadEditor(p);}
+      document.querySelectorAll('.lead-cell.playing').forEach(c=>c.classList.remove('playing'));
+      document.querySelectorAll(`.lead-cell[data-step="${step}"]`).forEach(c=>{c.classList.add('playing');if(auto)c.scrollIntoView?.({block:'nearest',inline:'nearest',behavior:'smooth'});});
+    },Math.max(0,delayMs));highlightTimers.push(t);
   }
   function trackVoice(voice,releaseMs=2500){
     if(!voice||typeof voice.stop!=='function')return voice;
@@ -399,7 +407,7 @@
       await window.CRPBeatMaker?.startMainNow?.(leadIn,initialBeat);
       if(generation!==playbackGeneration)return;
 
-      starting=false;playing=true;core.setPlaying(true);core.status('');
+      starting=false;playing=true;core.setPlaying(true);if($('leadPlaybackBtn'))$('leadPlaybackBtn').textContent='■ Stop';core.status('');
       if(generation!==playbackGeneration||!playing){window.CRPBeatMaker?.stopMainNow?.();return;}
 
       let nextAudioStart=audioCtx.currentTime+leadIn;
@@ -471,7 +479,7 @@
     document.querySelectorAll('.lead-cell.playing').forEach(c=>c.classList.remove('playing'));
     document.querySelectorAll('.chord-card').forEach(c=>c.style.outline='');
     silenceScheduledAudio();
-    core.setPlaying(false);window.CRPBeatMaker?.stopMainNow?.();
+    core.setPlaying(false);if($('leadPlaybackBtn'))$('leadPlaybackBtn').textContent='▶ Play';window.CRPBeatMaker?.stopMainNow?.();
   }
   function togglePlayback(){if(playing||starting)stopPlayback();else startPlayback();}
 
@@ -512,7 +520,9 @@
   function wire(){
     ensureInitial();renderParts();
     $('addPartBtn')?.addEventListener('click',openModal);$('closePartModal')?.addEventListener('click',closeModal);document.querySelector('[data-close-part-modal]')?.addEventListener('click',closeModal);document.querySelectorAll('.part-choice').forEach(b=>b.addEventListener('click',()=>addPart(b.dataset.partType)));
-    document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;p.instrument=b.dataset.leadInstrument;p.sound=(core.sounds[p.instrument]||[])[0]?.[0]||p.sound;invalidatePartPlayers(p);renderLeadEditor(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();});
+    document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;const instrument=b.dataset.leadInstrument;const options=core.sounds[instrument]||core.sounds.piano;const choose=(sound)=>{p.instrument=instrument;p.sound=sound||options[0]?.[0]||p.sound;invalidatePartPlayers(p);renderLeadEditor(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();};if(typeof window.CRPShowSoundPicker==='function')window.CRPShowSoundPicker(b,instrument,p.instrument===instrument?p.sound:options[0]?.[0],choose);else choose(options[0]?.[0]);});
+    $('leadPlaybackBtn')?.addEventListener('click',togglePlayback);
+    $('leadAutoScrollBtn')?.addEventListener('click',()=>{const b=$('leadAutoScrollBtn');const on=b?.getAttribute('aria-pressed')!=='true';if(core.setAutoScroll)core.setAutoScroll(on);else if(b){b.setAttribute('aria-pressed',String(on));b.classList.toggle('on',on);b.textContent=on?'↕ Auto On':'↕ Auto';}});
     $('leadRepeat').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.repeat=e.target.checked;core.scheduleAutoSave();};
     $('leadSustain').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sustain=e.target.checked;core.scheduleAutoSave();};
     $('leadSoundSelect').onchange=e=>{const p=active();if(p?.type!=='lead')return;p.sound=e.target.value;invalidatePartPlayers(p);warmLivePlayer(p);busFor(p);core.scheduleAutoSave();};
