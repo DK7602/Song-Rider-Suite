@@ -44,4 +44,40 @@ button.scale-rider-note{cursor:pointer;min-width:40px}
   .fit-key-row #keyHint{font-size:.58rem!important;padding-inline:1px!important}
   .scale-rider-launch{padding:5px 4px!important;font-size:.68rem!important}
 }
+
+/* v1.4 — Baby DAW Lead/Bass Scale Rider launch.
+   Uses the same skin accent and opens the same song-key-backed Scale Rider. */
+.lead-scale-rider-btn{
+  flex:1 1 88px;
+  min-width:82px;
+  max-width:150px;
+  min-height:44px;
+  margin-left:auto!important;
+  padding:5px 10px!important;
+  display:flex!important;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  line-height:.88;
+  font-weight:950!important;
+  text-transform:uppercase;
+  white-space:normal!important;
+  border-radius:11px!important;
+  background:var(--srs-skin-accent,var(--accent,#e9c46a))!important;
+  color:#17130a!important;
+  border-color:color-mix(in srgb,var(--srs-skin-accent,var(--accent,#e9c46a)) 80%,#775f20)!important;
+}
+.lead-scale-rider-btn span{display:block;pointer-events:none}
+@media(max-width:600px){
+  .lead-play-options-lower{gap:6px!important}
+  .lead-scale-rider-btn{
+    flex:1 1 76px;
+    min-width:72px;
+    max-width:112px;
+    min-height:38px;
+    padding:4px 6px!important;
+    font-size:.72rem!important;
+  }
+}
+
 .sr-layer{position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,.68);display:flex;align-items:center;justify-content:center;padding:14px}.sr-panel{width:min(920px,100%);max-height:90vh;overflow:auto;border:2px solid currentColor;border-radius:16px;padding:14px;background:var(--panel,#17191d);color:inherit;box-shadow:0 20px 70px rgba(0,0,0,.45)}.sr-head{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:-14px;z-index:2;padding:10px 0;background:inherit}.sr-head h2{margin:0}.sr-head-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto}.sr-close,.sr-back{display:grid;place-items:center;min-width:42px;height:42px;padding:0;font-size:1.25rem;font-weight:900}.sr-back{font-size:1.35rem}.sr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px}.sr-choice,.sr-action{min-height:46px;font-weight:850}.sr-toolbar{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 12px}.sr-toolbar button.on{outline:3px solid currentColor}.sr-prog-list{display:grid;gap:9px}.sr-key-group-title,.sr-scale-key-title,.sr-genre-title{margin:12px 0 1px;padding:6px 9px;border-bottom:1px solid rgba(127,127,127,.45);font-size:1rem}.sr-prog-list>.sr-key-group-title:first-child,.sr-scale-list>.sr-scale-key-title:first-child{margin-top:0}.sr-prog{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;align-items:center;border:1px solid rgba(127,127,127,.45);border-radius:12px;padding:9px;background:rgba(127,127,127,.08)}.sr-prog-main{min-width:0}.sr-prog-chords{font-size:1.02rem;font-weight:950;white-space:nowrap;overflow-x:auto}.sr-prog-meta{font-size:.76rem;opacity:.78;margin-top:3px}.sr-icon{min-width:42px;font-size:1.15rem}.sr-star.is-fav{font-variation-settings:'FILL' 1}.sr-scale-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}.sr-scale-key-title{grid-column:1/-1}.sr-scale-card{text-align:left;padding:10px}.sr-scale-card strong,.sr-scale-card span{display:block}.sr-scale-card span{font-size:.78rem;opacity:.8;margin-top:3px}.sr-keybox{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:8px 0 12px}.sr-keybox input{max-width:100px}@media(max-width:600px){.sr-panel{max-height:94vh;padding:10px}.sr-head{top:-10px}.sr-prog{grid-template-columns:minmax(0,1fr) 40px 40px}.sr-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sr-close,.sr-back{min-width:40px;height:40px}}

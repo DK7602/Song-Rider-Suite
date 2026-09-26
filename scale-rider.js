@@ -114,5 +114,5 @@ function auditCatalog(){
 }
 try{activeScale=JSON.parse(localStorage.getItem('scale-rider-active-v1')||'null')}catch{};
 window.ScaleRider={get active(){return activeScale},pitchClasses(){return activeScale?activeScale.intervals.map(i=>(NI[activeScale.root]+i)%12):null},open:genrePicker,renderActive,audit:auditCatalog};
-function boot(){document.getElementById('scaleRiderBtn')?.addEventListener('click',genrePicker);renderActive();setTimeout(()=>{const a=auditCatalog();if(!a.ok)console.warn('Scale Rider catalog audit failed',a);else console.info(`Scale Rider audit OK: ${a.total.progressions} resolved progressions, ${a.total.scales} scales.`)},0)} document.readyState==='loading'?document.addEventListener('DOMContentLoaded',boot):boot();
+function boot(){document.querySelectorAll('#scaleRiderBtn,#leadScaleRiderBtn').forEach(btn=>btn.addEventListener('click',genrePicker));renderActive();setTimeout(()=>{const a=auditCatalog();if(!a.ok)console.warn('Scale Rider catalog audit failed',a);else console.info(`Scale Rider audit OK: ${a.total.progressions} resolved progressions, ${a.total.scales} scales.`)},0)} document.readyState==='loading'?document.addEventListener('DOMContentLoaded',boot):boot();
 })();
