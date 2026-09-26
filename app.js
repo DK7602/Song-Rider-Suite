@@ -2488,7 +2488,18 @@
     addProgressionLine(chords,{root=null,minor=false}={}){
       const checked=normalizeChordSequence(chords);if(!checked.valid){$('status').textContent=checked.invalid.length?`Scale Rider chord not supported: ${checked.invalid.join(', ')}`:'No progression chords to add.';return false;}
       const vals=checked.values;
-      lockAutoSongKey();state.rows.push(vals.map(value=>({type:'chord',value})));state.selectedRow=state.rows.length-1;state.mode='chord';localStorage.setItem('crp-last-mode','chord');
+      lockAutoSongKey();
+      // Reuse a genuinely empty selected line instead of always appending a new one.
+      // This keeps a brand-new project on Line 1 when Scale Rider supplies the
+      // first progression, while preserving the normal append behavior once the
+      // selected line already contains chords or notes.
+      const rowIsEmpty=row=>!Array.isArray(row)||!row.some(card=>card&&String(card.value??'').trim());
+      let targetRow=0;
+      if(!rowIsEmpty(state.rows[0])){
+        targetRow=Math.max(0,Math.min(state.rows.length-1,state.selectedRow));
+        if(!rowIsEmpty(state.rows[targetRow])){state.rows.push([]);targetRow=state.rows.length-1;}
+      }
+      state.rows[targetRow]=vals.map(value=>({type:'chord',value}));state.selectedRow=targetRow;state.mode='chord';localStorage.setItem('crp-last-mode','chord');
       if(root)this.setSongKey(root,minor);renderAll();syncBuildInput();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();return true;
     },
     auditionProgression(chords){
