@@ -1,14 +1,22 @@
 (() => {
   const $ = id => document.getElementById(id);
   const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-  const NOTE_INDEX = {C:0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A:9,'A#':10,Bb:10,B:11};
+  const NOTE_INDEX = {C:0,'C#':1,Db:1,Cb:11,'B#':0,D:2,'D#':3,Eb:3,E:4,'E#':5,Fb:4,F:5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A:9,'A#':10,Bb:10,B:11};
 
+  // Chord vocabulary shared by typed CRP chords, Scale Rider insertion,
+  // audition playback, diagrams and Baby DAW harmony. Keep this table as the
+  // single source of pitch truth so a chord cannot be accepted by one feature
+  // and rejected by another.
   const QUALITY = {
-    '':[0,4,7], m:[0,3,7], '7':[0,4,7,10], maj7:[0,4,7,11], m7:[0,3,7,10],
+    '':[0,4,7], m:[0,3,7], '5':[0,7],
+    '6':[0,4,7,9], m6:[0,3,7,9],
+    '7':[0,4,7,10], maj7:[0,4,7,11], m7:[0,3,7,10], mMaj7:[0,3,7,11],
     '9':[0,4,7,10,14], maj9:[0,4,7,11,14], m9:[0,3,7,10,14],
-    add9:[0,4,7,14], madd9:[0,3,7,14], '6':[0,4,7,9], m6:[0,3,7,9],
-    sus2:[0,2,7], sus4:[0,5,7], dim:[0,3,6], dim7:[0,3,6,9],
-    m7b5:[0,3,6,10], aug:[0,4,8]
+    add9:[0,4,7,14], madd9:[0,3,7,14], add11:[0,4,7,17], madd11:[0,3,7,17],
+    sus2:[0,2,7], sus4:[0,5,7], '7sus2':[0,2,7,10], '7sus4':[0,5,7,10],
+    dim:[0,3,6], dim7:[0,3,6,9], m7b5:[0,3,6,10], aug:[0,4,8],
+    '7b5':[0,4,6,10], '7#5':[0,4,8,10], '7b9':[0,4,7,10,13], '7#9':[0,4,7,10,15],
+    'maj7#11':[0,4,7,11,18]
   };
 
   // v3.3.23 — expanded pro instrument palette + smooth live switching. All standard entries use the same
@@ -138,14 +146,32 @@
     const m=String(raw).trim().replace(/♭/g,'b').replace(/♯/g,'#').match(/^([A-Ga-g])([#b]?)/);
     return m ? m[1].toUpperCase()+m[2] : null;
   }
+  function normalizeChordQuality(raw=''){
+    let q=String(raw).trim().replace(/\s+/g,'');
+    const exact={
+      major:'',maj:'',minor:'m',min:'m','-':'m',
+      major6:'6',maj6:'6',minor6:'m6',min6:'m6',
+      major7:'maj7',M7:'maj7',minor7:'m7',min7:'m7',
+      major9:'maj9',M9:'maj9',minor9:'m9',min9:'m9',
+      minorMajor7:'mMaj7',minMaj7:'mMaj7',mM7:'mMaj7',
+      halfdim7:'m7b5','ø7':'m7b5',o:'dim','°':'dim','o7':'dim7','°7':'dim7','+':'aug'
+    };
+    if(Object.prototype.hasOwnProperty.call(exact,q))q=exact[q];
+    else q=q.replace(/^minor/i,'m').replace(/^min/i,'m').replace(/^major/i,'maj');
+    return q;
+  }
   function parseChord(raw) {
     raw=String(raw).trim().replace(/♭/g,'b').replace(/♯/g,'#');
     const m=raw.match(/^([A-Ga-g])([#b]?)(.*)$/); if(!m)return null;
     const root=m[1].toUpperCase()+m[2]; if(!(root in NOTE_INDEX))return null;
-    let q=m[3].trim().replace(/^minor7$/i,'m7').replace(/^minor$/i,'m').replace(/^min/i,'m')
-      .replace(/^major9$/i,'maj9').replace(/^major7$/i,'maj7').replace(/^M7$/,'maj7').replace(/^ø7$/,'m7b5');
+    const q=normalizeChordQuality(m[3]);
     if(!(q in QUALITY))return null;
     return {root,quality:q,display:root+q};
+  }
+  function normalizeChordSequence(chords){
+    const raw=Array.isArray(chords)?chords:[],values=[],invalid=[];
+    raw.forEach(v=>{const c=parseChord(v);if(c)values.push(c.display);else invalid.push(String(v??''));});
+    return {values,invalid,valid:raw.length>0&&values.length===raw.length};
   }
   function parseNote(raw){const r=parseRoot(raw);return r&&r in NOTE_INDEX?r:null;}
   function tokens(text){return text.split(/[\s,|]+/).map(x=>x.trim()).filter(Boolean);}
@@ -446,20 +472,26 @@
 
   function chordCoreIntervals(c){
     const q=c.quality;
+    if(q==='5')return[0,7,7];
     if(q==='dim'||q==='dim7'||q==='m7b5')return[0,3,6];
-    if(q==='aug')return[0,4,8];
-    if(q==='sus2')return[0,2,7];
-    if(q==='sus4')return[0,5,7];
+    if(q==='aug'||q==='7#5')return[0,4,8];
+    if(q==='7b5')return[0,4,6];
+    if(q==='sus2'||q==='7sus2')return[0,2,7];
+    if(q==='sus4'||q==='7sus4')return[0,5,7];
     return q.startsWith('m')&&!q.startsWith('maj')?[0,3,7]:[0,4,7];
   }
   function seventhInterval(c){
-    if(['7','9','m7','m9','m7b5'].includes(c.quality))return 10;
-    if(['maj7','maj9'].includes(c.quality))return 11;
+    if(['7','9','m7','m9','m7b5','7sus2','7sus4','7b5','7#5','7b9','7#9'].includes(c.quality))return 10;
+    if(['maj7','maj9','mMaj7','maj7#11'].includes(c.quality))return 11;
     if(c.quality==='dim7')return 9;
     return null;
   }
   function extensionInterval(c){
     if(['9','maj9','m9','add9','madd9'].includes(c.quality))return 2;
+    if(c.quality==='7b9')return 1;
+    if(c.quality==='7#9')return 3;
+    if(['add11','madd11'].includes(c.quality))return 5;
+    if(c.quality==='maj7#11')return 6;
     if(['6','m6'].includes(c.quality))return 9;
     return null;
   }
@@ -984,18 +1016,26 @@
     setupMobileCarousel(wrap);applyProgressionEditLock();
   }
 
+  function appendFitValue(v,type=state.mode){
+    const targetType=type==='note'?'note':'chord';
+    const parsed=targetType==='note'?parseNote(v):parseChord(v)?.display;
+    if(!parsed)return false;
+    // Treat whatever is currently typed in the Build field as the source of truth
+    // before appending a chip. This preserves manually typed chords/notes and
+    // prevents stale row state from wiping or duplicating the entry.
+    const bad=commitBuildInput();
+    selectedRow().push({type:targetType,value:parsed});
+    $('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';
+    syncBuildInput();autoPopulateKeyFromEntry();renderAll();scheduleAutoSave();
+    return true;
+  }
   function renderFits(){
-    $('fitHeading').textContent=state.mode==='chord'?'Chords that fit':'Notes that fit';const k=activeKey(),manual=enteredKey();
+    $('fitHeading').textContent=state.mode==='chord'?'Chords that fit':'Notes that fit';const k=activeKey();
     $('keyHint').innerHTML=`<span>Based on the</span><span>${k.root}${k.minor?' minor':' major'}</span><span>chord family</span>`;
-    const w=$('compatibleChords');w.innerHTML='';fitItems().forEach(v=>{const b=document.createElement('button');b.className='chip';b.textContent=v;b.onclick=()=>{
-      // Treat whatever is currently typed in the Build field as the source of truth
-      // before appending a chip. This preserves manually typed chords/notes and
-      // prevents stale row state from wiping or duplicating the entry.
-      const bad=commitBuildInput();
-      selectedRow().push({type:state.mode,value:v});
-      $('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';
-      syncBuildInput();autoPopulateKeyFromEntry();renderAll();scheduleAutoSave();
-    };w.appendChild(b);});
+    const w=$('compatibleChords');w.innerHTML='';fitItems().forEach(v=>{const b=document.createElement('button');b.className='chip';b.textContent=v;b.onclick=()=>appendFitValue(v,state.mode);w.appendChild(b);});
+    // Scale Rider loads after app.js, so this optional hook keeps its active
+    // scale row in sync when Chord/Note mode changes without coupling startup.
+    window.ScaleRider?.renderActive?.();
   }
   function renderSound(){const s=$('soundSelect');s.innerHTML='';SOUNDS[state.instrument].forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;s.appendChild(o);});if(!SOUNDS[state.instrument].some(x=>x[0]===state.sound))state.sound=SOUNDS[state.instrument][0][0];s.value=state.sound;}
   let instrumentSoundTapGuardUntil=0;
@@ -2441,13 +2481,19 @@
     get songKey(){return activeKey();},
     get enteredSongKey(){return enteredKey();},
     setSongKey(root,minor=false){const el=$('keyInput');if(!el)return;el.value=String(root||'C')+(minor?'m':'');el.dataset.autoKey='0';renderFits();scheduleAutoSave();},
+    get mode(){return state.mode;},
+    addScaleNote(note){return state.mode==='note'?appendFitValue(note,'note'):false;},
+    validateChordSequence(chords){return normalizeChordSequence(chords);},
+    validateNote(note){return !!parseNote(note);},
     addProgressionLine(chords,{root=null,minor=false}={}){
-      const vals=(Array.isArray(chords)?chords:[]).map(v=>parseChord(v)?.display).filter(Boolean);if(!vals.length)return false;
+      const checked=normalizeChordSequence(chords);if(!checked.valid){$('status').textContent=checked.invalid.length?`Scale Rider chord not supported: ${checked.invalid.join(', ')}`:'No progression chords to add.';return false;}
+      const vals=checked.values;
       lockAutoSongKey();state.rows.push(vals.map(value=>({type:'chord',value})));state.selectedRow=state.rows.length-1;state.mode='chord';localStorage.setItem('crp-last-mode','chord');
       if(root)this.setSongKey(root,minor);renderAll();syncBuildInput();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();return true;
     },
     auditionProgression(chords){
-      const vals=(Array.isArray(chords)?chords:[]).map(v=>parseChord(v)?.display).filter(Boolean);if(!vals.length)return;
+      const checked=normalizeChordSequence(chords);if(!checked.valid){$('status').textContent=checked.invalid.length?`Scale Rider chord not supported: ${checked.invalid.join(', ')}`:'No progression chords to audition.';return;}
+      const vals=checked.values;
       // Schedule the entire audition in one unlocked AudioContext pass. This avoids
       // mobile browsers only sounding the first chord when later timer callbacks
       // fall outside the original user gesture.
