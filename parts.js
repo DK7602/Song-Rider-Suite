@@ -474,7 +474,20 @@
   }
   window.addEventListener('scale-rider-change',()=>{try{renderLeadHarmony()}catch{}});
   function renderLeadHarmony(){
-    const chordsBox=$('leadChordsUsed'),notesBox=$('leadNotesFit');if(!chordsBox||!notesBox)return;
+    const chordsBox=$('leadChordsUsed'),notesBox=$('leadNotesFit'),scaleName=$('leadScaleName');if(!chordsBox||!notesBox)return;
+    const activeScale=window.ScaleRider?.active||null;
+    if(scaleName){
+      if(activeScale?.root&&activeScale?.name){
+        const label=`${activeScale.root} ${activeScale.name}`;
+        scaleName.textContent=`• ${label}`;
+        scaleName.title=label;
+        scaleName.hidden=false;
+      }else{
+        scaleName.textContent='';
+        scaleName.removeAttribute('title');
+        scaleName.hidden=true;
+      }
+    }
     const ctx=harmonyContextForLeadBar();chordsBox.innerHTML='';notesBox.innerHTML='';
     if(!ctx.chordLabels.length){const e=document.createElement('span');e.className='lead-harmony-empty';e.textContent='—';chordsBox.appendChild(e);}else{
       for(const name of ctx.chordLabels){const chip=document.createElement('span');chip.className='lead-harmony-chip chord';chip.textContent=name;chip.title=`${ctx.chordName} • Bar ${leadBarPage+1}`;chordsBox.appendChild(chip);}
