@@ -2887,6 +2887,17 @@ html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] #
   font-weight:900!important;
 }
 
+html[data-skin-choice="sapphire-paisley-light"] :is(#scaleRiderBtn,#leadScaleRiderBtn),
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#scaleRiderBtn,#leadScaleRiderBtn){
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+}
+html[data-skin-choice="sapphire-paisley-light"] :is(#scaleRiderBtn,#leadScaleRiderBtn) *,
+html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] :is(#scaleRiderBtn,#leadScaleRiderBtn) *{
+  color:#FFF!important;
+  -webkit-text-fill-color:#FFF!important;
+}
+
 /* =========================================================
    v3.3.124 — Sapphire Paisley Light Track Master transport parity
    Keep the floating Play button visually consistent with the neighboring
