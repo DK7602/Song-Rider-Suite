@@ -2834,6 +2834,33 @@ body.workspace-song-rider .app-shell,body.workspace-song-rider footer{display:no
   .lead-bar-tools{order:10;}
 }
 
+/* Scale Rider v1.5 — show the active Lead/Bass scale beside “Notes that fit”. */
+.lead-notes-fit-label{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  min-width:0;
+  overflow:hidden;
+}
+.lead-scale-name{
+  min-width:0;
+  max-width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:none;
+  white-space:nowrap;
+  color:var(--srs-skin-accent,var(--accent,#e9c46a));
+  font-size:.92em;
+  font-weight:900;
+}
+.lead-scale-name::-webkit-scrollbar{display:none}
+.lead-scale-name[hidden]{display:none!important}
+@media(max-width:520px){
+  .lead-notes-fit-label{font-size:.64rem;}
+  .lead-scale-name{font-size:.96em;}
+}
+
+
 /* v3.2.3 — Baby DAW setup toggle lives beside Auto Scroll.
    CRP and Baby DAW still keep independent setup visibility, but the Parts strip
    now gets the space back for more part tabs. */
