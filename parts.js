@@ -458,7 +458,11 @@
     }
     const key=harmonyKey(data,cards);
     let notePcs=[];
-    if(key){
+    const riderPcs=window.ScaleRider?.pitchClasses?.();
+    if(Array.isArray(riderPcs)&&riderPcs.length){
+      notePcs=[...riderPcs];
+      for(const pc of chordTonePcs)if(!notePcs.includes(pc))notePcs.push(pc);
+    }else if(key){
       const ints=key.minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
       notePcs=ints.map(i=>(key.rootIndex+i)%12);
       for(const pc of chordTonePcs)if(!notePcs.includes(pc))notePcs.push(pc);
@@ -468,6 +472,7 @@
     }
     return {chordName:chord?.name||'Chords',chordLabels,notePcs:uniquePitchClasses(notePcs),chordTonePcs:uniquePitchClasses(chordTonePcs),rootPcs:uniquePitchClasses(rootPcs)};
   }
+  window.addEventListener('scale-rider-change',()=>{try{renderLeadHarmony()}catch{}});
   function renderLeadHarmony(){
     const chordsBox=$('leadChordsUsed'),notesBox=$('leadNotesFit');if(!chordsBox||!notesBox)return;
     const ctx=harmonyContextForLeadBar();chordsBox.innerHTML='';notesBox.innerHTML='';

@@ -11,6 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
   <script>(()=>{try{const s=localStorage.getItem('srs-skin-v1')||'black-label-plain',b=(s==='sapphire-paisley'?'black-label':(s==='sapphire-paisley-light'?'black-label-light':((s==='rider-blood'||s==='rider-og')?'rider-original':(s==='black-label-plain'?'black-label':(((s==='rider-blood-light'||s==='rider-blood-light-og')||s==='rider-light-og')?'rider-light':s)))));document.documentElement.dataset.skin=b;document.documentElement.dataset.skinChoice=s;if(s==='rider-blood'||s==='rider-blood-light'||s==='rider-blood-light-og')document.documentElement.dataset.skinVariant='blood'}catch{document.documentElement.dataset.skin='black-label';document.documentElement.dataset.skinChoice='black-label-plain'}})()</script>
   <link rel="stylesheet" href="styles.css?v=3.3.118-LIGHT-SUSTAIN-LIVE-AUDIO" />
+  <link rel="stylesheet" href="scale-rider.css?v=1.0.0" />
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
   <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
@@ -136,9 +137,11 @@
             <input id="keyInput" class="key-input" type="text" autocomplete="off" autocapitalize="characters"
               placeholder="Key" aria-label="Key for chord suggestions" />
             <span id="keyHint" class="subtle"></span>
+            <button id="scaleRiderBtn" class="scale-rider-launch" type="button"><span>Scale</span><span>Rider</span></button>
           </div>
         </div>
         <div id="compatibleChords" class="chip-row"></div>
+        <div id="scaleRiderActive" class="scale-rider-active" hidden><strong id="scaleRiderActiveTitle"></strong><div id="scaleRiderActiveNotes" class="scale-rider-note-strip"></div></div>
       </div>
 
       </div>
@@ -504,6 +507,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="app.js?v=3.3.120-LIVE-CONTINUITY"></script>
   <script src="parts.js?v=3.3.120-LIVE-CONTINUITY"></script>
+  <script src="scale-rider.js?v=1.0.0"></script>
   <script src="beat-maker.js?v=3.3.56-BATCH-UNDO-SYNC"></script>
   <script src="skins.js?v=3.3.116-SAPPHIRE-PAISLEY"></script>
 </body>

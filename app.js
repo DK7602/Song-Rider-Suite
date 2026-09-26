@@ -2437,7 +2437,18 @@
     setBabyDawSetupHidden(hidden){setWorkspaceSetupHidden('baby-daw',!!hidden);},
     refreshSetupVisibility(){applySetupVisibility();},
     get workspaceMode(){return currentSetupWorkspace();},
-    noteAtMidi
+    noteAtMidi,
+    get songKey(){return activeKey();},
+    setSongKey(root,minor=false){const el=$('keyInput');if(!el)return;el.value=String(root||'C')+(minor?'m':'');el.dataset.autoKey='0';renderFits();scheduleAutoSave();},
+    addProgressionLine(chords,{root=null,minor=false}={}){
+      const vals=(Array.isArray(chords)?chords:[]).map(v=>parseChord(v)?.display).filter(Boolean);if(!vals.length)return false;
+      lockAutoSongKey();state.rows.push(vals.map(value=>({type:'chord',value})));state.selectedRow=state.rows.length-1;state.mode='chord';localStorage.setItem('crp-last-mode','chord');
+      if(root)this.setSongKey(root,minor);renderAll();syncBuildInput();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();return true;
+    },
+    auditionProgression(chords){
+      const vals=(Array.isArray(chords)?chords:[]).map(v=>parseChord(v)?.display).filter(Boolean);if(!vals.length)return;
+      (async()=>{const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),seconds=60/bpm*Math.max(1,+$('beatsSelect').value||4);for(const value of vals){playCard({type:'chord',value},Math.max(.35,seconds*.88));await new Promise(r=>setTimeout(r,seconds*1000));}})();
+    }
   };
 
   init();
