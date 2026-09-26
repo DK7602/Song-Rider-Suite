@@ -986,7 +986,7 @@
 
   function renderFits(){
     $('fitHeading').textContent=state.mode==='chord'?'Chords that fit':'Notes that fit';const k=activeKey(),manual=enteredKey();
-    $('keyHint').textContent=`Based on the ${k.root}${k.minor?' minor':' major'} family`;
+    $('keyHint').innerHTML=`<span>Based on the</span><span>${k.root}${k.minor?' minor':' major'}</span><span>chord family</span>`;
     const w=$('compatibleChords');w.innerHTML='';fitItems().forEach(v=>{const b=document.createElement('button');b.className='chip';b.textContent=v;b.onclick=()=>{
       // Treat whatever is currently typed in the Build field as the source of truth
       // before appending a chip. This preserves manually typed chords/notes and
@@ -2439,6 +2439,7 @@
     get workspaceMode(){return currentSetupWorkspace();},
     noteAtMidi,
     get songKey(){return activeKey();},
+    get enteredSongKey(){return enteredKey();},
     setSongKey(root,minor=false){const el=$('keyInput');if(!el)return;el.value=String(root||'C')+(minor?'m':'');el.dataset.autoKey='0';renderFits();scheduleAutoSave();},
     addProgressionLine(chords,{root=null,minor=false}={}){
       const vals=(Array.isArray(chords)?chords:[]).map(v=>parseChord(v)?.display).filter(Boolean);if(!vals.length)return false;
@@ -2447,7 +2448,20 @@
     },
     auditionProgression(chords){
       const vals=(Array.isArray(chords)?chords:[]).map(v=>parseChord(v)?.display).filter(Boolean);if(!vals.length)return;
-      (async()=>{const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),seconds=60/bpm*Math.max(1,+$('beatsSelect').value||4);for(const value of vals){playCard({type:'chord',value},Math.max(.35,seconds*.88));await new Promise(r=>setTimeout(r,seconds*1000));}})();
+      // Schedule the entire audition in one unlocked AudioContext pass. This avoids
+      // mobile browsers only sounding the first chord when later timer callbacks
+      // fall outside the original user gesture.
+      (async()=>{
+        try{
+          const p=await ensureAudio(),bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),seconds=60/bpm*Math.max(1,+$('beatsSelect').value||4),start=state.audioCtx.currentTime+.045,duration=Math.max(.35,seconds*.88);
+          vals.forEach((value,index)=>{
+            const card={type:'chord',value},notes=midiNotesForCard(card).map(noteAtMidi),when=start+index*seconds;
+            notes.forEach((n,i)=>p.play(n,when+(state.instrument==='guitar'?i*.035:0),{duration,gain:.95}));
+          });
+          $('status').textContent=`Auditioning ${vals.length}-chord progression…`;
+          setTimeout(()=>{if($('status').textContent.startsWith('Auditioning '))$('status').textContent='';},Math.ceil((vals.length*seconds+.2)*1000));
+        }catch(_){$('status').textContent='Could not audition that progression.';}
+      })();
     }
   };
 
