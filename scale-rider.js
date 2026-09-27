@@ -82,7 +82,7 @@ function scaleNotes(root,ints,name=''){
  if(Array.isArray(degrees)&&degrees.length===pcs.length)return pcs.map((pc,i)=>spelledPitch(root,degrees[i],pc));
  return pcs.map(pc=>N[pc]);
 }
-function applyScale(name,k){activeScale={name,root:k.root,intervals:SCALES[name]};localStorage.setItem('scale-rider-active-v1',JSON.stringify(activeScale));renderActive();window.dispatchEvent(new CustomEvent('scale-rider-change',{detail:activeScale}));document.querySelector('.sr-layer')?.remove();window.CRPCore?.status?.(`${k.root} ${name} is active for Scale Rider notes.`)}
+function applyScale(name,k){activeScale={name,root:k.root,intervals:[...SCALES[name]]};renderActive();window.dispatchEvent(new CustomEvent('scale-rider-change',{detail:activeScale}));window.CRPCore?.scheduleAutoSave?.();document.querySelector('.sr-layer')?.remove();window.CRPCore?.status?.(`${k.root} ${name} is active for Scale Rider notes.`)}
 function scalesPage(onBack=()=>genrePicker()){const selected=key(),initial=selected?`${selected.root}${selected.minor?'m':''}`:'';const l=layer('Scale Rider — Scales',`<div class="sr-toolbar"><button id="srGenres">Progressions</button><button id="srFav">★ Favorites</button></div><div class="sr-keybox"><label>Scale key <input id="srScaleKey" value="${initial}" placeholder="All keys" aria-label="Scale key"></label><span class="subtle">${selected?'Showing the selected song key. Clear the field to browse every key.':'No Key selected — showing every key. Enter a key here to narrow the scale list.'}</span></div><div class="sr-scale-list"></div>`,onBack),box=l.querySelector('.sr-scale-list'),input=l.querySelector('#srScaleKey');const draw=()=>{const raw=input.value.trim(),manual=parseKey(raw);box.innerHTML='';if(raw&&!manual){box.innerHTML='<p class="subtle">Enter a valid key such as C, F#, Bb, Am, or F#m.</p>';return;}const roots=manual?[manual.root]:ALL_ROOTS;roots.forEach(root=>{const h=document.createElement('h3');h.className='sr-scale-key-title';h.textContent=root;box.appendChild(h);Object.entries(SCALES).forEach(([name,ints])=>{const b=document.createElement('button');b.className='sr-scale-card';b.innerHTML=`<strong>${root} ${name}</strong><span>${scaleNotes(root,ints,name).join(' • ')}</span>`;b.onclick=()=>applyScale(name,{root,minor:false});box.appendChild(b)})})};input.oninput=draw;draw();l.querySelector('#srGenres').onclick=genrePicker;l.querySelector('#srFav').onclick=()=>favoritesPage(()=>scalesPage(onBack))}
 function renderActive(){
  const wrap=document.getElementById('scaleRiderActive'),title=document.getElementById('scaleRiderActiveTitle'),box=document.getElementById('scaleRiderActiveNotes');if(!wrap||!title||!box)return;
@@ -112,7 +112,15 @@ function auditCatalog(){
  });
  return {ok:problems.length===0,problems,total};
 }
-try{activeScale=JSON.parse(localStorage.getItem('scale-rider-active-v1')||'null')}catch{};
-window.ScaleRider={get active(){return activeScale},pitchClasses(){return activeScale?activeScale.intervals.map(i=>(NI[activeScale.root]+i)%12):null},open:genrePicker,renderActive,audit:auditCatalog};
+// Scale selection belongs to the project, never to the browser/session. Older
+// projects without scaleRider data intentionally load OFF.
+try{localStorage.removeItem('scale-rider-active-v1')}catch{}
+function normalizeProjectScale(saved){
+ if(!saved?.name||!saved?.root||!SCALES[saved.name]||!(saved.root in NI))return null;
+ return {name:saved.name,root:saved.root,intervals:[...SCALES[saved.name]]};
+}
+function loadProjectScale(project){activeScale=normalizeProjectScale(project?.scaleRider);renderActive();window.dispatchEvent(new CustomEvent('scale-rider-change',{detail:activeScale}));}
+function clearProjectScale(){activeScale=null;renderActive();window.dispatchEvent(new CustomEvent('scale-rider-change',{detail:null}));}
+window.ScaleRider={get active(){return activeScale},pitchClasses(){return activeScale?activeScale.intervals.map(i=>(NI[activeScale.root]+i)%12):null},open:genrePicker,renderActive,audit:auditCatalog,capture(){return activeScale?{name:activeScale.name,root:activeScale.root}:null},loadProject:loadProjectScale,newProject:clearProjectScale};
 function boot(){document.querySelectorAll('#scaleRiderBtn,#leadScaleRiderBtn').forEach(btn=>btn.addEventListener('click',genrePicker));renderActive();setTimeout(()=>{const a=auditCatalog();if(!a.ok)console.warn('Scale Rider catalog audit failed',a);else console.info(`Scale Rider audit OK: ${a.total.progressions} resolved progressions, ${a.total.scales} scales.`)},0)} document.readyState==='loading'?document.addEventListener('DOMContentLoaded',boot):boot();
 })();
