@@ -2958,3 +2958,40 @@ html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice=
 html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #recordingsList button{
   color:#fff!important;-webkit-text-fill-color:#fff!important;
 }
+
+/* v3.3.129 — Song Rider Pro light-skin audio titles + AutoScroll lyric contrast. */
+/* Only light skins; leave dark skins, transport buttons, timing and highlights intact. */
+html.crp-integrated:is(
+  [data-skin-choice="studio-pastel"],
+  [data-skin-choice="black-label-light"],
+  [data-skin-choice="sapphire-paisley-light"],
+  [data-skin-choice="royal-wave"],
+  [data-skin-choice="candy-pop"],
+  [data-skin-choice="rider-light"],
+  [data-skin-choice="rider-light-og"],
+  [data-skin-choice="rider-blood-light"],
+  [data-skin-choice="rider-blood-light-og"]
+) :is(
+  #recordingsList > [data-recording-rec-id] > div:nth-child(2) > div:first-child,
+  #nowPlaying,
+  .fullPerfBox
+){
+  color:#000!important;
+  -webkit-text-fill-color:#000!important;
+  text-shadow:none!important;
+  opacity:1!important;
+}
+/* Preserve the separate red/yellow/green syllable-count indicators in lyrics. */
+html.crp-integrated:is(
+  [data-skin-choice="studio-pastel"],
+  [data-skin-choice="black-label-light"],
+  [data-skin-choice="sapphire-paisley-light"],
+  [data-skin-choice="royal-wave"],
+  [data-skin-choice="candy-pop"],
+  [data-skin-choice="rider-light"],
+  [data-skin-choice="rider-light-og"],
+  [data-skin-choice="rider-blood-light"],
+  [data-skin-choice="rider-blood-light-og"]
+) .fullPerfBox .fullPerfSyllable{
+  -webkit-text-fill-color:currentColor!important;
+}
