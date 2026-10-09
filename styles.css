@@ -4606,20 +4606,20 @@ body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
 .vox-instrument-group-lane{display:flex;align-items:center;padding-left:12px;color:#8f9aa6;font-size:.68rem;font-weight:750;cursor:pointer!important}
 @media(max-width:600px){.vox-instrument-group-row,.vox-instrument-group-row>.vox-track-label{height:44px!important;min-height:44px!important}.vox-instrument-group-row>.vox-track-label{grid-template-columns:26px minmax(0,1fr)!important;padding:5px 6px!important;gap:5px!important}.vox-instrument-group-toggle{width:25px!important;min-width:25px!important;height:25px!important;min-height:25px!important}.vox-instrument-group-label strong{font-size:.66rem!important}}
 
-/* Track title controls: reserve real cells for the ellipsis and M/S controls
-   instead of floating them over the title. This is authoritative on mobile. */
+/* Track Master: place track actions beside Mute/Solo, never over the title.
+   Free the full title width on both desktop and mobile. */
 .vox-track-label{padding-right:8px!important}
-.vox-track-enable{padding-right:30px!important}
-.vox-track-name{width:calc(100% - 30px)!important;padding-right:4px!important}
+.vox-track-enable{padding-right:0!important}
+.vox-track-name{width:100%!important;max-width:100%!important;box-sizing:border-box!important;padding-right:4px!important}
 .vox-track-label>.vox-track-meta,.vox-track-label>span{padding-right:0!important;max-width:calc(100% - 2px)!important}
-.vox-track-menu-btn{right:6px!important;top:7px!important;width:24px!important;min-width:24px!important;height:24px!important;min-height:24px!important}
+.vox-track-menu-btn{right:6px!important;top:auto!important;bottom:7px!important;width:24px!important;min-width:24px!important;height:23px!important;min-height:23px!important}
 .vox-track-ms{left:8px!important;bottom:7px!important;gap:5px!important}
 @media(max-width:600px){
   .vox-track-label{padding-left:6px!important;padding-right:5px!important}
-  .vox-track-enable{padding-right:27px!important;gap:4px!important}
+  .vox-track-enable{padding-right:0!important;gap:4px!important}
   .vox-track-enable input{width:15px!important;height:15px!important;flex-basis:15px!important}
-  .vox-track-name{width:calc(100% - 27px)!important;font-size:.69rem!important;padding-left:2px!important}
-  .vox-track-menu-btn{right:4px!important;top:5px!important;width:22px!important;min-width:22px!important;height:22px!important;min-height:22px!important;font-size:.75rem!important}
+  .vox-track-name{width:100%!important;max-width:100%!important;font-size:.69rem!important;padding-left:2px!important}
+  .vox-track-menu-btn{right:4px!important;top:auto!important;bottom:5px!important;width:22px!important;min-width:22px!important;height:20px!important;min-height:20px!important;font-size:.75rem!important}
   .vox-track-ms{left:6px!important;bottom:5px!important;gap:4px!important}
   .vox-track-ms button{width:22px!important;min-width:22px!important;height:20px!important;min-height:20px!important;font-size:.59rem!important}
 }
