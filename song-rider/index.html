@@ -3334,7 +3334,7 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
   window.pdfjsLib = pdfjsLib; // <-- makes your existing app.js code work unchanged
 </script>
 <!-- cache-buster -->
-<script src="./app.js?v=3.3.126-SRP-AUDIO-DICTATION"></script>
+<script src="./app.js?v=3.3.127-SRP-BAR-SPACING"></script>
 <script src="../skins.js?v=3.3.116-SAPPHIRE-PAISLEY"></script>
 
 
@@ -3736,3 +3736,29 @@ html.crp-integrated[data-skin="studio-pastel"] .sheetHeader{
 }
 </style>
 
+
+<script>
+// Keep the settings window's surface identical to the Full Song window for
+// every skin, including skin changes received from the parent suite.
+(() => {
+  const matchSongSurface = () => {
+    const sheet = document.querySelector('.sheet');
+    const panelBody = document.getElementById('panelBody');
+    const panel = panelBody?.closest('.panel');
+    if(!sheet || !panelBody || !panel) return;
+    const surface = getComputedStyle(sheet);
+    for(const target of [panel, panelBody]){
+      for(const property of ['background-color','background-image','background-size','background-repeat','background-position','background-attachment']){
+        target.style.setProperty(property, surface.getPropertyValue(property), 'important');
+      }
+    }
+  };
+  const schedule = () => requestAnimationFrame(matchSongSurface);
+  new MutationObserver(schedule).observe(document.documentElement, {
+    attributes:true, attributeFilter:['data-skin','data-skin-choice','class']
+  });
+  window.addEventListener('load', schedule);
+  document.addEventListener('DOMContentLoaded', schedule);
+  schedule();
+})();
+</script>

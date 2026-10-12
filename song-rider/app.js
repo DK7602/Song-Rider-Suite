@@ -9484,9 +9484,7 @@ function syncFullTextFromSections(){
         wroteAny = true;
         if(String(chordLine || "").trim()) out.push(chordLine);
         out.push(String(lyricLine || "").trimRight());
-        // Chord rows need a separator for card pairing. Lyric-only bars are
-        // consecutive lines, including those created by spoken bar commands.
-        if(String(chordLine || "").trim()) out.push("");
+        out.push(""); // A full blank line separates bars in Full Song view.
       }
 
       if(!wroteAny) out.push("");
@@ -9840,7 +9838,7 @@ function stopFullLyricsDictation(){
   if(fullLyricsDictation) fullLyricsDictation.cancel();
 }
 function spokenLyricsToText(text){
-  return String(text || "").replace(/\b(?:new|next)[\s,.-]+bar\b[.,!?;:]?/gi, "\n")
+  return String(text || "").replace(/\b(?:new|next)[\s,.-]+bar\b[.,!?;:]?/gi, "\n\n")
     .replace(/[^\S\n]*\n[^\S\n]*/g, "\n").replace(/^[^\S\n]+|[^\S\n]+$/g, "");
 }
 function lyricsPcmWav(parts, rate){
@@ -9867,7 +9865,7 @@ function attachFullLyricsMic(ta, card, actions){
   mic.textContent='🎤';mic.title='Speak lyrics into this section';mic.setAttribute('aria-label',mic.title);mic.setAttribute('aria-pressed','false');
   const info=document.createElement('div');info.className='fullLyricsVoiceInfo';info.setAttribute('role','status');info.setAttribute('aria-live','polite');info.hidden=true;
   card.appendChild(info);actions.appendChild(mic);
-  const tip='Say “new bar” (or “next bar”) to start a new line. Tap the mic to stop. Text appears after a pause.';
+  const tip='Say “new bar” (or “next bar”) to leave a blank line between bars. Tap the mic to stop. Text appears after a pause.';
   mic.addEventListener('click',async e=>{
     e.preventDefault();e.stopPropagation();
     if(fullLyricsDictation?.mic===mic){fullLyricsDictation.stop();return;}
