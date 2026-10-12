@@ -757,6 +757,9 @@
   gap:16px;
   margin:14px 0 0;
 }
+  .fullLyricsMic{min-width:44px;min-height:44px;touch-action:manipulation;}
+  .fullLyricsMic[aria-pressed="true"]{background:#b91c1c!important;color:white!important;box-shadow:0 0 0 2px white;}
+  .fullLyricsVoiceInfo{margin:10px 0;padding:10px 12px;background:#fff;color:#111;border:1px solid #777;border-radius:10px;font-size:14px;font-weight:700;line-height:1.4;}
 
     /* Ensure + / × controls sit above textarea text as well */
     .fullPillOverlay .breakActions{ z-index:6; }
@@ -3331,7 +3334,7 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
   window.pdfjsLib = pdfjsLib; // <-- makes your existing app.js code work unchanged
 </script>
 <!-- cache-buster -->
-<script src="./app.js?v=3.3.60-SRP-GDOCS-PRINT-LAYOUT"></script>
+<script src="./app.js?v=3.3.125-SRP-VOICE-LYRICS"></script>
 <script src="../skins.js?v=3.3.116-SAPPHIRE-PAISLEY"></script>
 
 
@@ -3732,3 +3735,4 @@ html.crp-integrated[data-skin="studio-pastel"] .sheetHeader{
   background-color:#f4e9df!important;
 }
 </style>
+

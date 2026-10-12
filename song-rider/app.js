@@ -9828,7 +9828,118 @@ function renderSheetTitleBar(){
 }
 
 
+// One dictation session at a time; never write into a replaced editor/project.
+let fullLyricsDictation = null;
+function stopFullLyricsDictation(){
+  if(fullLyricsDictation) fullLyricsDictation.cancel();
+}
+function spokenLyricsToText(text){
+  return String(text || "").replace(/\bnew[\s-]+bar\b[.,!?;:]?/gi, "\n")
+    .replace(/[^\S\n]*\n[^\S\n]*/g, "\n").replace(/^[^\S\n]+|[^\S\n]+$/g, "");
+}
+function attachFullLyricsMic(ta, card, actions){
+  const mic = document.createElement("button");
+  mic.type = "button";
+  mic.className = "pillBtn fullLyricsMic";
+  mic.textContent = "🎤";
+  mic.title = "Speak lyrics into this section";
+  mic.setAttribute("aria-label", mic.title);
+  mic.setAttribute("aria-pressed", "false");
+  const info = document.createElement("div");
+  info.className = "fullLyricsVoiceInfo";
+  info.setAttribute("role", "status");
+  info.setAttribute("aria-live", "polite");
+  info.hidden = true;
+  card.appendChild(info);
+  actions.appendChild(mic);
+  const tip = 'Say “new bar” to start a new line. Speak naturally. Tap the mic again to stop.';
+  mic.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if(fullLyricsDictation?.mic === mic){ fullLyricsDictation.stop(); return; }
+    stopFullLyricsDictation();
+    info.hidden = false;
+    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!Speech){ info.textContent = "Voice to text is unavailable in this browser. Try Chrome or your keyboard’s microphone."; return; }
+    const recognition = new Speech();
+    recognition.lang = "en-US";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    const project = state.project;
+    let cursor = ta.selectionStart ?? ta.value.length;
+    let end = ta.selectionEnd ?? cursor;
+    let done = false;
+    const valid = () => !done && ta.isConnected && state.project === project;
+    const reset = () => {
+      done = true;
+      mic.textContent = "🎤";
+      mic.setAttribute("aria-pressed", "false");
+      if(fullLyricsDictation?.mic === mic) fullLyricsDictation = null;
+      ta.removeEventListener("input", manualEdit);
+      ta.removeEventListener("pointerdown", manualEdit);
+    };
+    const cancel = () => { reset(); try{ recognition.abort(); }catch{} };
+    const manualEdit = (event) => { if(event.isTrusted) cancel(); };
+    ta.addEventListener("input", manualEdit);
+    ta.addEventListener("pointerdown", manualEdit);
+    fullLyricsDictation = {mic, cancel, stop: () => {
+      info.textContent = "Finishing… " + tip;
+      try{ recognition.stop(); }catch{ reset(); }
+    }};
+    recognition.onstart = () => {
+      if(!valid()){ cancel(); return; }
+      mic.textContent = "⏹";
+      mic.setAttribute("aria-pressed", "true");
+      info.textContent = "Listening… " + tip;
+    };
+    recognition.onresult = (event) => {
+      if(!valid()){ cancel(); return; }
+      let preview = "";
+      for(let i = event.resultIndex; i < event.results.length; i++){
+        const result = event.results[i];
+        if(!result.isFinal){ preview += result[0].transcript; continue; }
+        let words = spokenLyricsToText(result[0].transcript);
+        if(!words) continue;
+        const before = ta.value.slice(0, cursor);
+        const after = ta.value.slice(end);
+        if(before && !/\s$/.test(before) && !/^\s/.test(words)) words = " " + words;
+        const suffix = after && !/^\s/.test(after) && !/\s$/.test(words) ? " " : "";
+        ta.value = before + words + suffix + after;
+        cursor = before.length + words.length;
+        end = cursor;
+        ta.setSelectionRange(cursor, cursor);
+        lastLyricsTextarea = ta;
+        ta.dispatchEvent(new Event("input", {bubbles:true}));
+      }
+      info.textContent = "Listening… " + tip + (preview ? " Heard: " + preview : "");
+    };
+    recognition.onerror = (event) => {
+      const messages = {
+        'not-allowed': 'Microphone access was blocked. Allow it in browser settings and try again.',
+        'service-not-allowed': 'Speech recognition is blocked by this browser.',
+        'audio-capture': 'No microphone is available. Check your microphone connection.',
+        'network': 'Speech recognition could not connect. Check your connection and try again.',
+        'no-speech': 'No speech heard. Tap the mic to try again.'
+      };
+      info.textContent = messages[event.error] || 'Voice to text stopped. Tap the mic to try again.';
+      cancel();
+    };
+    recognition.onend = () => {
+      if(!done) info.textContent = "Voice to text stopped. " + tip;
+      reset();
+    };
+    info.textContent = "Starting microphone… " + tip + " Your browser may process speech online.";
+    try{ recognition.start(); }catch{
+      info.textContent = "Could not start voice to text. Tap the mic to try again.";
+      cancel();
+    }
+  });
+}
+window.addEventListener("pagehide", stopFullLyricsDictation);
+document.addEventListener("visibilitychange", () => {
+  if(document.hidden) stopFullLyricsDictation();
+});
 function renderSheet(){
+  stopFullLyricsDictation();
   cancelChordDragCopy();
   renderSheetTitleBar();
   renderSheetActions();
@@ -10255,6 +10366,7 @@ if(state.currentSection === "Full"){
     });
     actions.appendChild(addBtn);
     actions.appendChild(delBtn);
+    attachFullLyricsMic(ta, card, actions);
 
     card.appendChild(head);
     card.appendChild(textWrap);
@@ -17569,5 +17681,6 @@ KEEP RHYME UI ABOVE KEYBOARD
 
 // v3.0.0: end Song Rider Pro main application IIFE. Transport sync is owned by the bridge above.
 })();
+
 
 
