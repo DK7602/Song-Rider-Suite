@@ -209,7 +209,10 @@ async function api(request,env,url){
       let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
       const result=await env.AI.run('@cf/openai/whisper-large-v3-turbo',{
         audio:btoa(binary),language:'en',task:'transcribe',vad_filter:true,condition_on_previous_text:false,
-        initial_prompt:"Rap lyrics dictated in conversational American English, including African American English and slang. Preserve the speaker's exact words and dialect. Do not correct grammar, expand slang, censor, or paraphrase. The speaker may say new bar or next bar. Transcribe those words verbatim."
+        // Whisper's prompt is transcription context, rather than a chat instruction.
+        // Dialect spelling examples bias recognition without post-editing lyrics.
+        beam_size:8,
+        initial_prompt:"Conversational hip-hop and rap lyrics in American English and African American English. Slang vocabulary and spellings: ain't, gon', gonna, finna, tryna, wanna, gotta, y'all, 'em, cuz, bruh, homie, lil', doin', goin', ridin', trippin'. Spoken line commands: new bar, next bar. Verbatim lyrics with the speaker's dialect and contractions."
       });
       return json({ok:true,text:String(result?.text||result?.transcription_info?.text||'').trim()});
     }catch(e){console.error('Lyric dictation failed',e);return json({ok:false,error:'Speech transcription failed. Please retry.'},502);}

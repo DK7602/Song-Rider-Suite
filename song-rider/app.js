@@ -1301,6 +1301,10 @@ function parseFullTextToSectionCards(fullText){
   let pendingChordLine = null;
 
   function maybeConsumeTitleLine(i){
+    // Editor-generated breaks have a blank spacer beneath the title pill.
+    // An empty inline title stays empty; the next lyric is never a title.
+    // Retain legacy titles placed directly on the line after a break.
+    if(i < lines.length && String(lines[i] || "").trim() === "") return { nextIndex:i, title:"" };
     // After a break line, the very next non-empty line can be treated as the page title
     let k = i;
     while(k < lines.length && String(lines[k] || "").trim() === "") k++;
@@ -9480,7 +9484,9 @@ function syncFullTextFromSections(){
         wroteAny = true;
         if(String(chordLine || "").trim()) out.push(chordLine);
         out.push(String(lyricLine || "").trimRight());
-        out.push(""); // blank line = next card
+        // Chord rows need a separator for card pairing. Lyric-only bars are
+        // consecutive lines, including those created by spoken bar commands.
+        if(String(chordLine || "").trim()) out.push("");
       }
 
       if(!wroteAny) out.push("");
