@@ -9867,6 +9867,9 @@ function attachFullLyricsMic(ta, card, actions){
     const project = state.project;
     let cursor = ta.selectionStart ?? ta.value.length;
     let end = ta.selectionEnd ?? cursor;
+    const beforeDictation = ta.value.slice(0, cursor);
+    const afterDictation = ta.value.slice(end);
+    let lastCommittedText = "";
     let done = false;
     const valid = () => !done && ta.isConnected && state.project === project;
     const reset = () => {
@@ -9894,18 +9897,22 @@ function attachFullLyricsMic(ta, card, actions){
     recognition.onresult = (event) => {
       if(!valid()){ cancel(); return; }
       let preview = "";
-      for(let i = event.resultIndex; i < event.results.length; i++){
+      // Android can revise already-final results and resend a growing transcript.
+      // Rebuild this session's insertion from the complete results list rather
+      // than appending each callback, which duplicated every partial phrase.
+      const finalParts = [];
+      for(let i = 0; i < event.results.length; i++){
         const result = event.results[i];
         if(!result.isFinal){ preview += result[0].transcript; continue; }
-        let words = spokenLyricsToText(result[0].transcript);
-        if(!words) continue;
-        const before = ta.value.slice(0, cursor);
-        const after = ta.value.slice(end);
-        if(before && !/\s$/.test(before) && !/^\s/.test(words)) words = " " + words;
-        const suffix = after && !/^\s/.test(after) && !/\s$/.test(words) ? " " : "";
-        ta.value = before + words + suffix + after;
-        cursor = before.length + words.length;
-        end = cursor;
+        finalParts.push(result[0].transcript);
+      }
+      let words = spokenLyricsToText(finalParts.join(" "));
+      if(words && words !== lastCommittedText){
+        lastCommittedText = words;
+        if(beforeDictation && !/\s$/.test(beforeDictation) && !/^\s/.test(words)) words = " " + words;
+        const suffix = afterDictation && !/^\s/.test(afterDictation) && !/\s$/.test(words) ? " " : "";
+        ta.value = beforeDictation + words + suffix + afterDictation;
+        cursor = beforeDictation.length + words.length;
         ta.setSelectionRange(cursor, cursor);
         lastLyricsTextarea = ta;
         ta.dispatchEvent(new Event("input", {bubbles:true}));
