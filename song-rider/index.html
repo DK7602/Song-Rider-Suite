@@ -3737,28 +3737,13 @@ html.crp-integrated[data-skin="studio-pastel"] .sheetHeader{
 </style>
 
 
-<script>
-// Keep the settings window's surface identical to the Full Song window for
-// every skin, including skin changes received from the parent suite.
-(() => {
-  const matchSongSurface = () => {
-    const sheet = document.querySelector('.sheet');
-    const panelBody = document.getElementById('panelBody');
-    const panel = panelBody?.closest('.panel');
-    if(!sheet || !panelBody || !panel) return;
-    const surface = getComputedStyle(sheet);
-    for(const target of [panel, panelBody]){
-      for(const property of ['background-color','background-image','background-size','background-repeat','background-position','background-attachment']){
-        target.style.setProperty(property, surface.getPropertyValue(property), 'important');
-      }
-    }
-  };
-  const schedule = () => requestAnimationFrame(matchSongSurface);
-  new MutationObserver(schedule).observe(document.documentElement, {
-    attributes:true, attributeFilter:['data-skin','data-skin-choice','class']
-  });
-  window.addEventListener('load', schedule);
-  document.addEventListener('DOMContentLoaded', schedule);
-  schedule();
-})();
-</script>
+<style id="srpRiderLightOgMintPaisley">
+/* Rider Light OG: use the supplied mint paisley on both SRP windows. */
+html.crp-integrated[data-skin-choice="rider-light-og"] :is(.panel,#panelBody,.sheet,.sheetHeader,.fullSectionCard,.card,.fullPerf,.fullPerfScroll){
+  background-color:#f4f4f2!important;
+  background-image:linear-gradient(rgba(255,255,255,.12),rgba(255,255,255,.12)),url('../assets/rider-light-og-pattern.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+}
+</style>
