@@ -9883,7 +9883,7 @@ function attachFullLyricsMic(ta, card, actions){
       if(context)context.close().catch(()=>{});
       ta.removeEventListener('input',manual);
     };
-    const reset=()=>{mic.textContent='🎤';mic.setAttribute('aria-pressed','false');if(fullLyricsDictation?.mic===mic)fullLyricsDictation=null;};
+    const reset=()=>{mic.textContent='🎤';mic.setAttribute('aria-pressed','false');if(fullLyricsDictation?.mic===mic)fullLyricsDictation=null;if(!hadError){info.hidden=true;info.textContent='';}};
     const cancel=()=>{cancelled=true;stopped=true;cleanup();reset();};
     // A touch beginning on lyrics may be a scroll gesture, not a stop request.
     // Manual edits move the insertion point without ending microphone capture.
@@ -9933,7 +9933,7 @@ function attachFullLyricsMic(ta, card, actions){
       if(stopped)return;stopped=true;flush();cleanup();mic.textContent='…';
       chain.then(()=>{
         if(valid()&&pendingCommand){const word=pendingCommand;pendingCommand='';insert(word,true);}
-        reset();if(valid()&&!hadError)info.textContent='Voice to text stopped. '+tip;
+        reset();
       });
     };
     fullLyricsDictation={mic,cancel,stop};ta.addEventListener('input',manual);
@@ -9962,7 +9962,7 @@ function attachFullLyricsMic(ta, card, actions){
       };
       stream.getTracks().forEach(t=>t.addEventListener('ended',()=>{if(!stopped){info.textContent='Microphone disconnected. Finishing captured audio…';stop();}}));
       mic.textContent='⏹';mic.setAttribute('aria-pressed','true');info.textContent='Listening… '+tip;
-    }catch(err){info.textContent='Could not start voice to text: '+err.message;cancel();}
+    }catch(err){hadError=true;info.textContent='Could not start voice to text: '+err.message;cancel();}
   });
 }
 window.addEventListener("pagehide", stopFullLyricsDictation);
