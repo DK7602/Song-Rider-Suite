@@ -9881,11 +9881,15 @@ function attachFullLyricsMic(ta, card, actions){
       if(processor){processor.onaudioprocess=null;processor.disconnect();}
       source?.disconnect();gain?.disconnect();stream?.getTracks().forEach(t=>t.stop());
       if(context)context.close().catch(()=>{});
-      ta.removeEventListener('input',manual);ta.removeEventListener('pointerdown',manual);
+      ta.removeEventListener('input',manual);
     };
     const reset=()=>{mic.textContent='🎤';mic.setAttribute('aria-pressed','false');if(fullLyricsDictation?.mic===mic)fullLyricsDictation=null;};
     const cancel=()=>{cancelled=true;stopped=true;cleanup();reset();};
-    const manual=e=>{if(e.isTrusted)cancel();};
+    // A touch beginning on lyrics may be a scroll gesture, not a stop request.
+    // Manual edits move the insertion point without ending microphone capture.
+    const manual=e=>{
+      if(e.isTrusted){cursor=ta.selectionStart??ta.value.length;end=ta.selectionEnd??cursor;}
+    };
     const insert=(text,final=false)=>{
       if(!valid())return;
       // Keep a trailing command word until the next segment, so a chunk boundary
@@ -9932,7 +9936,7 @@ function attachFullLyricsMic(ta, card, actions){
         reset();if(valid()&&!hadError)info.textContent='Voice to text stopped. '+tip;
       });
     };
-    fullLyricsDictation={mic,cancel,stop};ta.addEventListener('input',manual);ta.addEventListener('pointerdown',manual);
+    fullLyricsDictation={mic,cancel,stop};ta.addEventListener('input',manual);
     info.textContent='Starting microphone… '+tip+' Audio is transcribed by Cloudflare.';
     try{
       // Authenticate and verify AI availability before requesting microphone access.
