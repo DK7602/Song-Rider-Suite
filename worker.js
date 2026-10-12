@@ -195,6 +195,26 @@ async function api(request,env,url){
     if(method==='DELETE'){await env.AUDIO.delete(key);return json({ok:true});}
   }
 
+  // Authenticated, transient lyric dictation; audio is never stored in R2.
+  if(path==='/api/lyrics-dictation'){
+    if(!env.AI)return json({ok:false,error:'Speech transcription is not connected to this Worker.'},503);
+    if(method==='GET')return json({ok:true,model:'@cf/openai/whisper-large-v3-turbo'});
+    if(method!=='POST')return json({ok:false,error:'Method not allowed.'},405);
+    if(Number(request.headers.get('Content-Length')||0)>700000)return json({ok:false,error:'Audio segment too large.'},413);
+    const bytes=new Uint8Array(await request.arrayBuffer());
+    if(bytes.length<44||bytes.length>700000)return json({ok:false,error:'Invalid audio segment size.'},413);
+    const v=new DataView(bytes.buffer);
+    if(new TextDecoder().decode(bytes.slice(0,4))!=='RIFF'||new TextDecoder().decode(bytes.slice(8,12))!=='WAVE'||v.getUint16(20,true)!==1||v.getUint16(22,true)!==1||v.getUint32(24,true)!==16000||v.getUint16(34,true)!==16||v.getUint32(40,true)!==bytes.length-44)return json({ok:false,error:'Expected mono 16 kHz PCM WAV.'},400);
+    try{
+      let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+      const result=await env.AI.run('@cf/openai/whisper-large-v3-turbo',{
+        audio:btoa(binary),language:'en',task:'transcribe',vad_filter:true,condition_on_previous_text:false,
+        initial_prompt:"Rap lyrics dictated in conversational American English, including African American English and slang. Preserve the speaker's exact words and dialect. Do not correct grammar, expand slang, censor, or paraphrase. The speaker may say new bar or next bar. Transcribe those words verbatim."
+      });
+      return json({ok:true,text:String(result?.text||result?.transcription_info?.text||'').trim()});
+    }catch(e){console.error('Lyric dictation failed',e);return json({ok:false,error:'Speech transcription failed. Please retry.'},502);}
+  }
+
   // Cross-device vocal transcription. The browser only records WAV; Cloudflare Workers AI transcribes the R2 master.
   const transcribeMatch=path.match(/^\/api\/transcribe\/([^/]+)$/);
   if(transcribeMatch&&method==='POST'){
@@ -251,3 +271,4 @@ async function api(request,env,url){
 }
 
 export default {async fetch(request,env){const url=new URL(request.url);if(url.pathname.startsWith('/api/'))return api(request,env,url);return env.ASSETS.fetch(request);}};
+
