@@ -757,6 +757,9 @@
   gap:16px;
   margin:14px 0 0;
 }
+  .fullLyricsMic{min-width:44px;min-height:44px;touch-action:manipulation;}
+  .fullLyricsMic[aria-pressed="true"]{background:#b91c1c!important;color:white!important;box-shadow:0 0 0 2px white;}
+  .fullLyricsVoiceInfo{margin:10px 0;padding:10px 12px;background:#fff;color:#111;border:1px solid #777;border-radius:10px;font-size:14px;font-weight:700;line-height:1.4;}
 
     /* Ensure + / × controls sit above textarea text as well */
     .fullPillOverlay .breakActions{ z-index:6; }
@@ -3331,7 +3334,7 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
   window.pdfjsLib = pdfjsLib; // <-- makes your existing app.js code work unchanged
 </script>
 <!-- cache-buster -->
-<script src="./app.js?v=3.3.60-SRP-GDOCS-PRINT-LAYOUT"></script>
+<script src="./app.js?v=3.3.127-SRP-BAR-SPACING"></script>
 <script src="../skins.js?v=3.3.116-SAPPHIRE-PAISLEY"></script>
 
 
@@ -3731,4 +3734,37 @@ html.crp-integrated[data-skin="studio-pastel"] .fullPerfScroll{
 html.crp-integrated[data-skin="studio-pastel"] .sheetHeader{
   background-color:#f4e9df!important;
 }
+</style>
+
+
+<style id="srpRiderLightOgMintPaisley">
+/* Rider Light OG: use the supplied mint paisley on both SRP windows. */
+html.crp-integrated[data-skin-choice="rider-light-og"] :is(.panel,#panelBody,.sheet,.sheetHeader,.fullSectionCard,.card,.fullPerf,.fullPerfScroll){
+  background-color:#f4f4f2!important;
+  background-image:linear-gradient(rgba(255,255,255,.12),rgba(255,255,255,.12)),url('../assets/rider-light-og-pattern.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+}
+</style>
+
+<style id="srpOutlineMicButton">
+/* White outline microphone on black, consistent across skins. */
+html .fullSectionActions button.fullLyricsMic{
+  width:44px!important;height:44px!important;min-width:44px!important;
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  padding:8px!important;border:1px solid #555!important;border-radius:12px!important;
+  background:#050505!important;background-image:none!important;color:#eee!important;
+  font-size:0!important;box-shadow:0 3px 8px rgba(0,0,0,.22)!important;
+}
+html .fullSectionActions button.fullLyricsMic::before{
+  content:""!important;display:block!important;width:26px!important;height:26px!important;
+  background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23eeeeee' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='2' width='6' height='12' rx='3'/%3E%3Cpath d='M5 10v1a7 7 0 0 0 14 0v-1M7 22h10'/%3E%3C/svg%3E") center/contain no-repeat!important;
+}
+html .fullSectionActions button.fullLyricsMic::after{display:none!important;}
+html .fullSectionActions button.fullLyricsMic[aria-pressed="true"]{
+  background:#050505!important;border-color:#e53935!important;
+  box-shadow:0 0 0 2px #e53935,0 3px 8px rgba(0,0,0,.22)!important;
+}
+html .fullSectionActions button.fullLyricsMic:focus-visible{outline:2px solid #efc85d!important;outline-offset:3px!important;}
 </style>

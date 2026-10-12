@@ -1301,6 +1301,10 @@ function parseFullTextToSectionCards(fullText){
   let pendingChordLine = null;
 
   function maybeConsumeTitleLine(i){
+    // Editor-generated breaks have a blank spacer beneath the title pill.
+    // An empty inline title stays empty; the next lyric is never a title.
+    // Retain legacy titles placed directly on the line after a break.
+    if(i < lines.length && String(lines[i] || "").trim() === "") return { nextIndex:i, title:"" };
     // After a break line, the very next non-empty line can be treated as the page title
     let k = i;
     while(k < lines.length && String(lines[k] || "").trim() === "") k++;
@@ -9480,7 +9484,7 @@ function syncFullTextFromSections(){
         wroteAny = true;
         if(String(chordLine || "").trim()) out.push(chordLine);
         out.push(String(lyricLine || "").trimRight());
-        out.push(""); // blank line = next card
+        out.push(""); // A full blank line separates bars in Full Song view.
       }
 
       if(!wroteAny) out.push("");
@@ -9828,7 +9832,145 @@ function renderSheetTitleBar(){
 }
 
 
+// One dictation session at a time; never write into a replaced editor/project.
+let fullLyricsDictation = null;
+function stopFullLyricsDictation(){
+  if(fullLyricsDictation) fullLyricsDictation.cancel();
+}
+function spokenLyricsToText(text){
+  return String(text || "").replace(/\b(?:new|next)[\s,.-]+bar\b[.,!?;:]?/gi, "\n\n")
+    .replace(/[^\S\n]*\n[^\S\n]*/g, "\n").replace(/^[^\S\n]+|[^\S\n]+$/g, "");
+}
+function lyricsPcmWav(parts, rate){
+  const count = parts.reduce((n,p)=>n+p.length,0);
+  const pcm = new Float32Array(count); let pos=0;
+  parts.forEach(p=>{pcm.set(p,pos);pos+=p.length;});
+  const size=Math.floor(count*16000/rate);
+  const buffer=new ArrayBuffer(44+size*2), v=new DataView(buffer);
+  const tag=(at,text)=>{for(let i=0;i<text.length;i++)v.setUint8(at+i,text.charCodeAt(i));};
+  tag(0,'RIFF');v.setUint32(4,36+size*2,true);tag(8,'WAVE');tag(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,16000,true);v.setUint32(28,32000,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+  tag(36,'data');v.setUint32(40,size*2,true);
+  for(let i=0;i<size;i++){
+    const first=Math.floor(i*rate/16000), last=Math.min(count,Math.floor((i+1)*rate/16000));
+    let sum=0;for(let j=first;j<last;j++)sum+=pcm[j];
+    const sample=Math.max(-1,Math.min(1,sum/Math.max(1,last-first)));
+    v.setInt16(44+i*2,sample<0?sample*32768:sample*32767,true);
+  }
+  return new Blob([buffer],{type:'audio/wav'});
+}
+function attachFullLyricsMic(ta, card, actions){
+  const mic=document.createElement('button');mic.type='button';mic.className='pillBtn fullLyricsMic';
+  mic.textContent='🎤';mic.title='Speak lyrics into this section';mic.setAttribute('aria-label',mic.title);mic.setAttribute('aria-pressed','false');
+  const info=document.createElement('div');info.className='fullLyricsVoiceInfo';info.setAttribute('role','status');info.setAttribute('aria-live','polite');info.hidden=true;
+  card.appendChild(info);actions.appendChild(mic);
+  const tip='Say “new bar” (or “next bar”) to leave a blank line between bars. Tap the mic to stop. Text appears after a pause.';
+  mic.addEventListener('click',async e=>{
+    e.preventDefault();e.stopPropagation();
+    if(fullLyricsDictation?.mic===mic){fullLyricsDictation.stop();return;}
+    stopFullLyricsDictation();info.hidden=false;
+    if(!navigator.mediaDevices?.getUserMedia){info.textContent='Microphone recording is unavailable in this browser.';return;}
+    const project=state.project;
+    let cancelled=false,stopped=false,stream=null,context=null,source=null,processor=null,gain=null;
+    let parts=[],samples=0,hasSpeech=false,quiet=0,chain=Promise.resolve(),pending=0;
+    let cursor=ta.selectionStart??ta.value.length,end=ta.selectionEnd??cursor;
+    let pendingCommand='',hadError=false;
+    const valid=()=>!cancelled&&ta.isConnected&&state.project===project;
+    const cleanup=()=>{
+      if(processor){processor.onaudioprocess=null;processor.disconnect();}
+      source?.disconnect();gain?.disconnect();stream?.getTracks().forEach(t=>t.stop());
+      if(context)context.close().catch(()=>{});
+      ta.removeEventListener('input',manual);
+    };
+    const reset=()=>{mic.textContent='🎤';mic.setAttribute('aria-pressed','false');if(fullLyricsDictation?.mic===mic)fullLyricsDictation=null;};
+    const cancel=()=>{cancelled=true;stopped=true;cleanup();reset();};
+    // A touch beginning on lyrics may be a scroll gesture, not a stop request.
+    // Manual edits move the insertion point without ending microphone capture.
+    const manual=e=>{
+      if(e.isTrusted){cursor=ta.selectionStart??ta.value.length;end=ta.selectionEnd??cursor;}
+    };
+    const insert=(text,final=false)=>{
+      if(!valid())return;
+      // Keep a trailing command word until the next segment, so a chunk boundary
+      // between “new” and “bar” cannot turn the command into lyric text.
+      text=pendingCommand+text;pendingCommand='';
+      if(!final&&/\b(?:new|next)\s*[.,!?]?$/i.test(text)){
+        const m=text.match(/\b(?:new|next)\s*[.,!?]?$/i);pendingCommand=m[0].replace(/[.,!?]/g,'').trim()+' ';text=text.slice(0,m.index);
+      }
+      let words=spokenLyricsToText(text);if(!words)return;
+      const before=ta.value.slice(0,cursor),after=ta.value.slice(end);
+      if(before&&!/\s$/.test(before)&&!/^\s/.test(words))words=' '+words;
+      const suffix=after&&!/^\s/.test(after)&&!/\s$/.test(words)?' ':'';
+      ta.value=before+words+suffix+after;cursor=before.length+words.length;end=cursor;
+      ta.setSelectionRange(cursor,cursor);lastLyricsTextarea=ta;ta.dispatchEvent(new Event('input',{bubbles:true}));
+    };
+    const flush=()=>{
+      const audioParts=parts,rate=context?.sampleRate;
+      const speech=hasSpeech;parts=[];samples=0;hasSpeech=false;quiet=0;
+      if(!speech||!audioParts.length||!valid())return;
+      const blob=lyricsPcmWav(audioParts,rate);pending++;
+      chain=chain.then(async()=>{
+        if(!valid())return;
+        info.textContent=(stopped?'Finishing transcription… ':'Listening / transcribing… ')+tip;
+        try{
+          const result=await suiteCloudApi('/api/lyrics-dictation',{method:'POST',body:blob,headers:{'Content-Type':'audio/wav'}});
+          if(valid())insert(String(result.text||''));
+        }catch(err){
+          if(!valid())return;
+          hadError=true;stopped=true;cleanup();
+          info.textContent='Transcription failed: '+err.message+' Your audio is available below.';
+          const url=URL.createObjectURL(blob),link=document.createElement('a');
+          link.href=url;link.download='lyrics-dictation.wav';link.textContent=' Download recording';info.appendChild(link);
+          const retry=document.createElement('button');retry.type='button';retry.textContent='Retry transcription';
+          retry.onclick=async()=>{retry.disabled=true;try{const r=await suiteCloudApi('/api/lyrics-dictation',{method:'POST',body:blob,headers:{'Content-Type':'audio/wav'}});if(valid())insert(String(r.text||''));retry.textContent='Transcribed';URL.revokeObjectURL(url);}catch(e){retry.textContent='Retry: '+e.message;retry.disabled=false;}};
+          info.appendChild(retry);reset();throw err;
+        }finally{pending--;}
+        if(valid()&&!hadError)info.textContent=(stopped?'Voice to text stopped. ':'Listening… ')+tip;
+      }).catch(()=>{});
+    };
+    const stop=()=>{
+      if(stopped)return;stopped=true;flush();cleanup();mic.textContent='…';
+      chain.then(()=>{
+        if(valid()&&pendingCommand){const word=pendingCommand;pendingCommand='';insert(word,true);}
+        reset();if(valid()&&!hadError)info.textContent='Voice to text stopped. '+tip;
+      });
+    };
+    fullLyricsDictation={mic,cancel,stop};ta.addEventListener('input',manual);
+    info.textContent='Starting microphone… '+tip+' Audio is transcribed by Cloudflare.';
+    try{
+      // Authenticate and verify AI availability before requesting microphone access.
+      await suiteCloudApi('/api/lyrics-dictation',{method:'GET'});
+      if(!valid()||stopped)return;
+      stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
+      if(!valid()||stopped){stream.getTracks().forEach(t=>t.stop());return;}
+      const Audio=window.AudioContext||window.webkitAudioContext;context=new Audio();await context.resume();
+      if(!valid()||stopped){cleanup();return;}
+      source=context.createMediaStreamSource(stream);processor=context.createScriptProcessor(4096,1,1);gain=context.createGain();gain.gain.value=0;
+      source.connect(processor);processor.connect(gain);gain.connect(context.destination);
+      processor.onaudioprocess=e=>{
+        if(!valid()||stopped)return;
+        const data=new Float32Array(e.inputBuffer.getChannelData(0));
+        let power=0;for(const x of data)power+=x*x;
+        const speech=Math.sqrt(power/data.length)>0.008;
+        // Retain a short pre-roll, then submit only nonoverlapping utterances.
+        parts.push(data);samples+=data.length;
+        if(speech){hasSpeech=true;quiet=0;}else quiet+=data.length;
+        if(hasSpeech&&((quiet/context.sampleRate>1.2&&samples/context.sampleRate>2)||samples/context.sampleRate>20))flush();
+        else if(!hasSpeech&&samples/context.sampleRate>0.4){parts=parts.slice(-2);samples=parts.reduce((n,p)=>n+p.length,0);}
+        if(pending>8){info.textContent='Transcription is falling behind. Finishing captured audio…';stop();}
+      };
+      stream.getTracks().forEach(t=>t.addEventListener('ended',()=>{if(!stopped){info.textContent='Microphone disconnected. Finishing captured audio…';stop();}}));
+      mic.textContent='⏹';mic.setAttribute('aria-pressed','true');info.textContent='Listening… '+tip;
+    }catch(err){info.textContent='Could not start voice to text: '+err.message;cancel();}
+  });
+}
+window.addEventListener("pagehide", stopFullLyricsDictation);
+document.addEventListener("visibilitychange", () => {
+  if(document.hidden) stopFullLyricsDictation();
+});
 function renderSheet(){
+  stopFullLyricsDictation();
   cancelChordDragCopy();
   renderSheetTitleBar();
   renderSheetActions();
@@ -10255,6 +10397,7 @@ if(state.currentSection === "Full"){
     });
     actions.appendChild(addBtn);
     actions.appendChild(delBtn);
+    attachFullLyricsMic(ta, card, actions);
 
     card.appendChild(head);
     card.appendChild(textWrap);
@@ -17569,5 +17712,6 @@ KEEP RHYME UI ABOVE KEYBOARD
 
 // v3.0.0: end Song Rider Pro main application IIFE. Transport sync is owned by the bridge above.
 })();
+
 
 
