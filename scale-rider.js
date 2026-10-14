@@ -9,6 +9,21 @@ const GENRES={
  Metal:{Heavy:['i-bVI-bVII-i','i-bVII-bVI-V','i-bII-bVII-i','i-iv-bVI-V','i-bIII-bVII-i'],Thrash:['i-bII-i-bIII','i-bVII-bII-i','i-iv-bII-i','i-bVI-bVII-i','i-bIII-bII-i'],Doom:['i-bVI-bII-i','i-bVII-bVI-i','i-iv-bII-i','i-bIII-bII-i','i-bVI-bVII-V'],Metalcore:['i-bVI-bIII-bVII','i-bVII-bVI-bIII','i-iv-bVI-bVII','i-bIII-bVII-bVI','i-bVI-bVII-i'],Progressive:['i-bIII-IV-bVI','i-iv-bVII-bIII','i-bII-bVI-V','i-bVI-iv-V','i-bIII-bVII-IV']},
  Pop:{Contemporary:['I-V-vi-IV','vi-IV-I-V','I-vi-IV-V','IV-I-V-vi','I-iii-IV-V'],Ballad:['I-iii-IV-iv','I-V7-vi-IV','I-vi-ii-V','vi-IV-I-V','I-IV-iv-I'],Dance:['vi-IV-I-V','I-V-vi-IV','I-vi-IV-V','IV-V-iii-vi','i-bVI-bIII-bVII']},
  Rap:{'Hip Hop':['i-iv-v-i','i-bVI-bIII-bVII','i-bVII-bVI-bVII','i-bIII-iv-bVII','i-bVI-iv-V'],'Boom Bap':['i7-iv7-bVII7-bIIImaj7','i7-bVImaj7-iv7-V7','i7-bIIImaj7-iv7-bVII7','i7-iv7-i7-V7','i7-bVII7-bVImaj7-V7'],'G-Funk':['i7-IV7-i7-V7','i7-bVII7-IV7-i7','i9-IV9-bVII9-i9','i7-bIIImaj7-IV7-i7','i9-bVII9-iv9-V9'],Trap:['i-bVI-bIII-bVII','i-bVII-bVI-i','i-bII-bVI-V','i-iv-bVI-V','i-bIII-bVII-bVI'],Drill:['i-bII-bVI-V','i-bVII-bVI-V','i-bIII-bII-i','i-bVI-bVII-i','i-iv-bII-V'],'Lo-Fi':['i7-iv7-bVII7-bIIImaj7','Imaj7-iii7-vi7-ii7','ii7-V7-Imaj7-vi7','i9-bVImaj7-iv9-V7','Imaj7-vi7-ii7-V7'],Memphis:['i-bII-i-bVII','i-bVI-bVII-i','i-bIII-bII-i','i-iv-bII-i','i-bVII-bVI-V']},
+
+ Worship:{
+  Gospel:['I-IV-I-V-I','I-vi-ii-V-I','I-IV-iv-I','I-III7-vi-II7-V7-I','I-IV-V7-I'],
+  'Contemporary Worship':['I-V-vi-IV','vi-IV-I-V','I-IV-vi-V','IV-I-V-vi','I-V-IV-I'],
+  'Black Gospel':['Imaj7-iii7-vi7-ii7-V7-Imaj7','I-III7-vi-II7-V7-I','I-IVmaj7-iv-I','I-vi7-ii7-V7','I-IV-V-IV'],
+  'Southern Gospel':['I-IV-V-I','I-IV-I-V','I-vi-IV-V','I-IV-ii-V-I','I-V7-IV-I'],
+  'Urban Gospel':['Imaj7-vi7-ii7-V7','Imaj7-iii7-IVmaj7-iv7','IVmaj7-iii7-ii7-V7','Imaj7-IVmaj7-ii7-V7','I-III7-vi7-II7-V7'],
+  'Praise & Worship':['I-IV-V-IV','I-V-vi-IV','IV-I-V-vi','I-IV-I-V','vi-IV-I-V'],
+  'Traditional Hymns':['I-IV-I-V-I','I-vi-ii-V-I','I-V-I-IV-V-I','I-IV-ii-V-I','I-ii-V7-I'],
+  'Modern Hymns':['I-IV-V-vi','I-vi-IV-V','I-iii-IV-V','I-V-vi-IV','IV-I-V-I'],
+  'Worship Ballads':['I-V-vi-IV','IV-I-V-vi','vi-IV-I-V','I-iii-IV-iv','I-vi-IV-V'],
+  'Acoustic Worship':['I-IV-I-V','I-V-vi-IV','vi-IV-I-V','I-ii-IV-V','IV-I-V-I'],
+  'Gospel Choir':['I-IV-I-V','I-vi-ii-V-I','I-IV-iv-I','I-III7-vi-II7-V7-I','I-IV-V7-I'],
+  'Contemporary Christian (CCM)':['I-V-vi-IV','vi-IV-I-V','I-iii-IV-V','IV-I-V-vi','I-vi-IV-V']
+ },
  Rock:{Classic:['I-bVII-IV-I','I-IV-V-I','I-V-vi-IV','I-bIII-IV-I','i-bVII-bVI-bVII'],Alternative:['I-iii-IV-iv','i-bIII-bVII-IV','I-V-IV-iv','i-bVI-bIII-bVII','I-bVII-IV-I'],Punk:['I-IV-V-IV','I-V-IV-I','I-bVII-IV-I','vi-IV-I-V','I-IV-I-V'],Grunge:['i-bVI-bIII-bVII','I-bIII-bVII-IV','i-bVII-bVI-i','I-bVII-IV-I','i-bII-bVII-i'],'Hard Rock':['i-bVII-IV-i','I-bVII-IV-I','i-bVI-bVII-i','I-IV-bVII-I','i-bIII-IV-bVII'],Progressive:['i-bIII-IV-bVI','I-iii-IV-bVI','i-iv-bVII-bIII','I-bVII-ii-IV','i-bII-bVI-V']}
 };
 const SCALES={
