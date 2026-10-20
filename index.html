@@ -15,20 +15,25 @@
   <link rel="stylesheet" href="suite-header.css?v=2.9.5" />
 <link rel="stylesheet" href="branding-shell.css?v=3.3.12">
   <link rel="stylesheet" href="suite-shell-lock.css?v=3.3.16">
-  <link rel="stylesheet" href="crp-layout-lock.css?v=3.3.19-STABILITY">
-  <!-- v3.3.19 critical CRP layout fallback. Duplicates only the tiny setup grid
+  <link rel="stylesheet" href="crp-layout-lock.css?v=3.3.129-MOBILE-STARTUP">
+  <!-- v3.3.129 critical CRP layout fallback. Duplicates only the tiny setup grid
        so a stale/missed external stylesheet cannot restore the stretched layout. -->
-  <style id="crp-critical-layout-v3-3-19">
+  <style id="crp-critical-layout-v3-3-129">
     #chordPartControls>.primary-toolbar{display:grid!important;grid-template-columns:minmax(0,1fr) 104px 72px!important;grid-auto-flow:row!important;grid-auto-rows:max-content!important;gap:12px!important;align-items:end!important;align-content:start!important;width:100%!important;min-width:0!important}
     #chordPartControls>.primary-toolbar[hidden],#chordPartControls>.primary-toolbar.crp-controls-hidden{display:none!important}
-    #chordPartControls>.primary-toolbar>#instrumentTabs{grid-column:1/-1!important;width:100%!important;min-width:0!important}
-    #chordPartControls>.primary-toolbar>#modeTabs{grid-column:1!important;width:100%!important;min-width:0!important}
+    #chordPartControls>.primary-toolbar>#instrumentTabs{grid-column:1/-1!important;grid-row:1!important;width:100%!important;min-width:0!important}
+    #chordPartControls>.primary-toolbar>#modeTabs{grid-column:1!important;grid-row:2!important;width:100%!important;min-width:0!important}
     #chordPartControls>.primary-toolbar>.sound-control{grid-column:1!important;width:100%!important;min-width:0!important}
     #chordPartControls>.primary-toolbar>.sound-control #soundSelect{width:100%!important;min-width:0!important}
-    #chordPartControls>.primary-toolbar>.octave-control{grid-column:2!important;width:104px!important;min-width:104px!important;justify-self:end!important}
-    #chordPartControls>.primary-toolbar>.sustain-control{grid-column:3!important;width:72px!important;min-width:72px!important;justify-self:end!important}
+    #chordPartControls>.primary-toolbar>.octave-control{grid-column:2!important;grid-row:2!important;width:104px!important;min-width:104px!important;justify-self:end!important}
+    #chordPartControls>.primary-toolbar>.sustain-control{grid-column:3!important;grid-row:2!important;width:72px!important;min-width:72px!important;justify-self:end!important}
     #chordPartControls>.primary-toolbar>.capo-shape-mode-row{grid-column:1/-1!important;width:100%!important}
     @media(max-width:390px){#chordPartControls>.primary-toolbar{grid-template-columns:minmax(0,1fr) 88px 58px!important;gap:7px!important}#chordPartControls>.primary-toolbar>.octave-control{width:88px!important;min-width:88px!important}#chordPartControls>.primary-toolbar>.sustain-control{width:58px!important;min-width:58px!important}#chordPartControls>.primary-toolbar>#modeTabs .seg{padding-left:7px!important;padding-right:7px!important}}
+    @media(max-width:700px){
+      #chordPartControls>.entry-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:7px!important;width:100%!important;min-width:0!important}
+      #chordPartControls>.entry-row>#chordInput{width:100%!important;min-width:0!important;max-width:100%!important}
+      #chordPartControls>.entry-row>#buildBtn{grid-column:2!important;min-width:0!important;width:auto!important;white-space:nowrap!important}
+    }
   </style>
   <link rel="stylesheet" href="skins.css?v=3.3.128-BLOOD-LIGHT-STATE" />
 </head>
