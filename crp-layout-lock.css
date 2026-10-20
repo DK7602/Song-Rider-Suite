@@ -1,4 +1,4 @@
-/* v3.3.19 — authoritative CRP setup geometry. Keep this file tiny and deterministic. */
+/* v3.3.129 — reliable CRP startup geometry. Keep this file tiny and deterministic. */
 #chordPartControls > .primary-toolbar{
   display:grid!important;grid-template-columns:minmax(0,1fr) 104px 72px!important;
   grid-auto-flow:row!important;grid-auto-rows:max-content!important;
@@ -6,14 +6,24 @@
   width:100%!important;min-width:0!important;
 }
 #chordPartControls > .primary-toolbar[hidden],#chordPartControls > .primary-toolbar.crp-controls-hidden{display:none!important;}
-#chordPartControls > .primary-toolbar > #instrumentTabs,#chordPartControls > .primary-toolbar > #modeTabs{grid-column:1/-1!important;width:100%!important;min-width:0!important;}
+/* Piano/Guitar/Misc owns row one; Chord/Note MUST stay in column one of row two. */
+#chordPartControls > .primary-toolbar > #instrumentTabs{grid-column:1/-1!important;grid-row:1!important;width:100%!important;min-width:0!important;}
+#chordPartControls > .primary-toolbar > #modeTabs{grid-column:1!important;grid-row:2!important;width:100%!important;min-width:0!important;}
 #chordPartControls > .primary-toolbar > .sound-control{grid-column:1!important;width:100%!important;min-width:0!important;}
 #chordPartControls > .primary-toolbar > .sound-control #soundSelect{width:100%!important;min-width:0!important;}
-#chordPartControls > .primary-toolbar > .octave-control{grid-column:2!important;width:104px!important;min-width:104px!important;justify-self:end!important;}
-#chordPartControls > .primary-toolbar > .sustain-control{grid-column:3!important;width:72px!important;min-width:72px!important;justify-self:end!important;}
+#chordPartControls > .primary-toolbar > .octave-control{grid-column:2!important;grid-row:2!important;width:104px!important;min-width:104px!important;justify-self:end!important;}
+#chordPartControls > .primary-toolbar > .sustain-control{grid-column:3!important;grid-row:2!important;width:72px!important;min-width:72px!important;justify-self:end!important;}
 #chordPartControls > .primary-toolbar > .capo-shape-mode-row{grid-column:1/-1!important;width:100%!important;}
 @media(max-width:390px){
   #chordPartControls > .primary-toolbar{grid-template-columns:minmax(0,1fr) 96px 62px!important;gap:8px!important;}
   #chordPartControls > .primary-toolbar > .octave-control{width:96px!important;min-width:96px!important;}
   #chordPartControls > .primary-toolbar > .sustain-control{width:62px!important;min-width:62px!important;}
+}
+
+/* Keep the input and Build on ONE compact mobile row, even if older rules
+   or an offline shell are briefly in control of the rest of the page. */
+@media(max-width:700px){
+  #chordPartControls > .entry-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:7px!important;width:100%!important;min-width:0!important;}
+  #chordPartControls > .entry-row > #chordInput{width:100%!important;min-width:0!important;max-width:100%!important;}
+  #chordPartControls > .entry-row > #buildBtn{width:auto!important;min-width:0!important;white-space:nowrap!important;grid-column:2!important;}
 }
