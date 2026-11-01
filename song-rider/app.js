@@ -10937,6 +10937,7 @@ card.appendChild(top);
         inp.dataset.raw = rawNow;
         editProject("note", () => {
           line.notes[i] = rawNow;
+          syncFullTextFromSections();
         });
         updateKeyFromAllNotes();
 
@@ -13333,6 +13334,17 @@ async function removeNoteImageFromCloud(entry){
   }
 }
 
+// Record where a just-uploaded note photo lives. Bookkeeping on the photo's own song (which may
+// no longer be the open one after the upload): no undo step, no "last changed" bump.
+function setNoteImageManifestEntry(projectId, entry){
+  const live = libraryProject(projectId);
+  if(!live || !entry) return;
+  const manifest = getProjectNotesImages(live).filter((item) => String(item.id || '') !== String(entry.id || ''));
+  manifest.unshift(entry);
+  setProjectNotesImages(live, manifest);
+  upsertProject(live, { bump:false, select:false });
+}
+
 // Same contract as saveProjectAudioManifest: change the song in place, never swap it out.
 function saveProjectNotesImageManifest(projectId, beforeManifest, nextManifest){
   const live = libraryProject(projectId);
@@ -14643,11 +14655,7 @@ async function applyNotesCrop(){
       try{
         const uploaded = await uploadNoteImageToCloud(updatedRec);
         if(uploaded){
-          editProject('notesImageCropCloud', () => {
-            const manifest = getProjectNotesImages(state.project).filter((item) => String(item.id || '') !== String(updatedRec.id || ''));
-            manifest.unshift(uploaded);
-            setProjectNotesImages(state.project, manifest);
-          });
+          setNoteImageManifestEntry(updatedRec.projectId, uploaded);
           const oldPath = String(oldEntry?.path || '').trim();
           const newPath = String(uploaded?.path || '').trim();
           if(oldPath && newPath && oldPath !== newPath){
@@ -14720,11 +14728,7 @@ async function insertNotesImageFromFile(file){
     try{
       const uploaded = await uploadNoteImageToCloud(rec);
       if(uploaded){
-        editProject('notesImageCloudPath', () => {
-          const manifest = getProjectNotesImages(state.project).filter((item) => String(item.id || '') !== imageId);
-          manifest.unshift(uploaded);
-          setProjectNotesImages(state.project, manifest);
-        });
+        setNoteImageManifestEntry(rec.projectId, uploaded);
       }
     }catch(err){
       console.warn('Immediate notes image upload failed', err);
