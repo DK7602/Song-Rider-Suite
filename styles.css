@@ -28,7 +28,7 @@ h1 { margin:0; font-size: clamp(1.4rem, 4vw, 2.1rem); letter-spacing:.02em; }
 .app-shell { width:min(1180px, 100%); margin:0 auto; padding:16px; display:grid; gap:16px; }
 .panel { background:linear-gradient(180deg, rgba(32,36,43,.96), rgba(23,26,31,.98)); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); padding:16px; }
 .toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:end; }
-label { display:grid; gap:6px; color:var(--muted); font-size:.82rem; }
+label, .control-group { display:grid; gap:6px; color:var(--muted); font-size:.82rem; }
 select, input {
   color:var(--text); background:#0e1115; border:1px solid #39414b;
   border-radius:10px; padding:10px 12px; outline:none;
@@ -66,7 +66,9 @@ h2 { margin:0; font-size:1rem; }
 .chord-card.dragging { opacity:.55; outline:2px dashed var(--accent); }
 .chord-card .card-top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
 .chord-card .chord-name { font-size:1.2rem; font-weight:900; color:var(--accent); }
-.chord-card .remove { padding:3px 7px; border-radius:8px; color:#f0a291; background:#271718; border-color:#593334; }
+.chord-card .remove { position:relative; padding:3px 7px; border-radius:8px; color:#f0a291; background:#271718; border-color:#593334; }
+/* Small visible buttons keep a 44px touch target. */
+.chord-card .remove::after, .delete-line::after, .duplicate-line::after { content:""; position:absolute; inset:50% auto auto 50%; width:44px; height:44px; transform:translate(-50%,-50%); }
 .diagram { width:100%; overflow:hidden; }
 .diagram svg { width:100%; height:auto; display:block; }
 .chord-card .hint { color:var(--muted); font-size:.72rem; margin-top:7px; text-align:center; }
@@ -90,7 +92,7 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
   .brand-mark { width:64px; }
   .app-shell { padding:10px; }
   .panel { border-radius:14px; padding:12px; }
-  .toolbar > label { flex:1 1 44%; }
+  .toolbar > label, .toolbar > .control-group { flex:1 1 44%; }
   .toolbar .segmented { width:100%; }
   .toolbar .seg { flex:1; }
   .chord-card { width:100%; min-width:0; }
@@ -662,13 +664,17 @@ footer { display:flex; justify-content:space-between; color:#68727f; font-size:.
 }
 
 
-/* v2.7 — line delete control + ink-saving PDF export */
-.delete-line {
-  position:absolute; top:-11px; right:12px; width:22px; height:22px; padding:0;
+/* Line Duplicate / Delete: 34px circles with 44px touch targets, 12px apart so a
+   tap on one can never land on the other. */
+.delete-line, .duplicate-line {
+  position:absolute; top:-17px; width:34px; height:34px; padding:0;
   display:grid; place-items:center; border-radius:50%; border:1px solid #4b5561;
-  background:var(--panel); color:#aab2bc; font-size:15px; font-weight:900; line-height:1; z-index:2;
+  background:var(--panel); color:#aab2bc; font-size:17px; font-weight:900; line-height:1; z-index:2;
 }
+.delete-line { right:8px; }
+.duplicate-line { right:64px; font-size:16px; }
 .delete-line:hover, .delete-line:focus-visible { color:#fff; border-color:#e76f51; background:#3a2020; }
+.duplicate-line:hover, .duplicate-line:focus-visible { color:#fff; border-color:var(--accent); background:#34301f; }
 .export-sheet.pdf-print { background:#fff; }
 .export-sheet.pdf-print .export-card { background:#fff; color:#111; border:0; border-radius:0; }
 .export-sheet.pdf-print .export-card-name { color:#111; font-weight:900; }
@@ -1480,47 +1486,10 @@ body.moving-line { user-select:none; -webkit-user-select:none; }
     z-index:6;
   }
 
-  .progression.mobile-carousel .delete-line{
-    top:6px !important;
-    right:8px !important;
-    z-index:6;
-  }
+  .progression.mobile-carousel :is(.delete-line,.duplicate-line){ top:4px; z-index:6; }
 }
 
 
-/* v1.6.3 — duplicate whole progression line */
-.duplicate-line{
-  position:absolute;
-  top:-11px;
-  right:40px;
-  width:22px;
-  height:22px;
-  padding:0;
-  display:grid;
-  place-items:center;
-  border-radius:50%;
-  border:1px solid #4b5561;
-  background:var(--panel);
-  color:#aab2bc;
-  font-size:14px;
-  font-weight:900;
-  line-height:1;
-  z-index:2;
-}
-.duplicate-line:hover,
-.duplicate-line:focus-visible{
-  color:#fff;
-  border-color:var(--accent);
-  background:#34301f;
-}
-
-@media(max-width:700px){
-  .progression.mobile-carousel .duplicate-line{
-    top:6px !important;
-    right:42px !important;
-    z-index:6;
-  }
-}
 
 
 /* v1.6.5 — compact Projects / Archive browser */
@@ -3134,21 +3103,21 @@ body.workspace-chord-rider #chordPartControls.setup-collapsed > .entry-row{
   gap:12px;
   align-items:end;
 }
-.capo-shape-mode-row > label{min-width:0;width:100%;}
+.capo-shape-mode-row > :is(label,.control-group){min-width:0;width:100%;}
 .capo-shape-mode-row select,
 .capo-shape-mode-row #transposeBtn{width:100%;min-width:0;}
 .capo-shape-mode-row #transposeBtn{white-space:nowrap;}
 .crp-midi-roll-wrap{overflow-anchor:none;}
 @media(max-width:700px){
   .capo-shape-mode-row{grid-template-columns:minmax(0,.9fr) minmax(0,1.15fr) minmax(0,1.15fr);gap:8px;}
-  .capo-shape-mode-row > label{font-size:.74rem;}
+  .capo-shape-mode-row > :is(label,.control-group){font-size:.74rem;}
   .capo-shape-mode-row select,
   .capo-shape-mode-row #transposeBtn{padding-left:8px;padding-right:8px;font-size:.82rem;}
   .capo-shape-mode-row #transposeBtn{min-width:0!important;}
 }
 @media(max-width:390px){
   .capo-shape-mode-row{gap:6px;grid-template-columns:minmax(0,.86fr) minmax(0,1.16fr) minmax(0,1.18fr);}
-  .capo-shape-mode-row > label{font-size:.68rem;gap:5px;}
+  .capo-shape-mode-row > :is(label,.control-group){font-size:.68rem;gap:5px;}
   .capo-shape-mode-row select,
   .capo-shape-mode-row #transposeBtn{padding-left:6px;padding-right:6px;font-size:.75rem;}
 }
@@ -5234,3 +5203,4 @@ html[data-skin-choice="rider-light-og"] .lead-sustain-control .part-repeat-toggl
 .edit-history-row .history-btn{min-height:44px;min-width:64px;padding:8px 12px;font-weight:800}
 .edit-history-row .history-btn:disabled{opacity:.45;cursor:default}
 .edit-history-row .drag-tip{flex:1 1 220px;margin:0}
+.chord-card:focus-visible{outline:3px solid var(--accent);outline-offset:3px}

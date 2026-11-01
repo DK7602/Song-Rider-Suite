@@ -763,53 +763,55 @@
       wrap.prepend(lead);wrap.append(tail);
     }
 
-    let settleTimer=null,carouselTeleporting=false;
-    const instantCarouselJump=target=>{
-      if(!target)return;
-      carouselTeleporting=true;
-      const oldBehavior=wrap.style.scrollBehavior,oldSnap=wrap.style.scrollSnapType;
-      // The edge clone and its real line look identical. Temporarily disabling
-      // smooth scrolling + snapping makes the wrap-around jump invisible.
-      wrap.style.scrollBehavior='auto';
-      wrap.style.scrollSnapType='none';
-      wrap.scrollLeft=lineScrollLeft(wrap,target);
-      void wrap.offsetWidth;
-      requestAnimationFrame(()=>{
-        wrap.style.scrollBehavior=oldBehavior;
-        wrap.style.scrollSnapType=oldSnap;
-        requestAnimationFrame(()=>{carouselTeleporting=false;});
-      });
-    };
-    const settle=()=>{
-      if(carouselTeleporting)return;
-      const items=[...wrap.querySelectorAll(':scope > .progression-line')];if(!items.length)return;
-      const wr=wrap.getBoundingClientRect(),cx=wr.left+wr.width/2;
-      let nearest=items[0],dist=Infinity;
-      items.forEach(el=>{const r=el.getBoundingClientRect(),d=Math.abs((r.left+r.width/2)-cx);if(d<dist){dist=d;nearest=el;}});
-      if(nearest.classList.contains('carousel-clone')){
-        const ri=+nearest.dataset.cloneTarget||0;
-        const target=wrap.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"]`);
-        instantCarouselJump(target);
-        setCarouselSelectedRow(ri);
-      }else setCarouselSelectedRow(+nearest.dataset.row||0);
-    };
+    requestAnimationFrame(()=>scrollMobileLineTo(state.selectedRow,false));
+    updateMobileLineIndicator(state.selectedRow);
+  }
+  // The carousel's scroll/touch listeners live on the #progression container, which
+  // survives re-renders, so they are attached once (renderRows only rebuilds lines).
+  let carouselSettleTimer=null,carouselTeleporting=false;
+  function instantCarouselJump(wrap,target){
+    if(!target)return;
+    carouselTeleporting=true;
+    const oldBehavior=wrap.style.scrollBehavior,oldSnap=wrap.style.scrollSnapType;
+    // The edge clone and its real line look identical. Temporarily disabling
+    // smooth scrolling + snapping makes the wrap-around jump invisible.
+    wrap.style.scrollBehavior='auto';
+    wrap.style.scrollSnapType='none';
+    wrap.scrollLeft=lineScrollLeft(wrap,target);
+    void wrap.offsetWidth;
+    requestAnimationFrame(()=>{
+      wrap.style.scrollBehavior=oldBehavior;
+      wrap.style.scrollSnapType=oldSnap;
+      requestAnimationFrame(()=>{carouselTeleporting=false;});
+    });
+  }
+  function settleCarousel(wrap){
+    if(carouselTeleporting||!wrap.classList.contains('mobile-carousel'))return;
+    const items=[...wrap.querySelectorAll(':scope > .progression-line')];if(!items.length)return;
+    const wr=wrap.getBoundingClientRect(),cx=wr.left+wr.width/2;
+    let nearest=items[0],dist=Infinity;
+    items.forEach(el=>{const r=el.getBoundingClientRect(),d=Math.abs((r.left+r.width/2)-cx);if(d<dist){dist=d;nearest=el;}});
+    if(nearest.classList.contains('carousel-clone')){
+      const ri=+nearest.dataset.cloneTarget||0;
+      instantCarouselJump(wrap,wrap.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"]`));
+      setCarouselSelectedRow(ri);
+    }else setCarouselSelectedRow(+nearest.dataset.row||0);
+  }
+  function initCarouselListeners(){
+    const wrap=$('progression');if(!wrap)return;
     wrap.addEventListener('scroll',()=>{
-      if(carouselTeleporting)return;
-      clearTimeout(settleTimer);settleTimer=setTimeout(settle,90);
+      if(carouselTeleporting||!wrap.classList.contains('mobile-carousel'))return;
+      clearTimeout(carouselSettleTimer);carouselSettleTimer=setTimeout(()=>settleCarousel(wrap),90);
     },{passive:true});
-
     // A deliberate horizontal swipe takes control away from playback-follow mode.
     let tx=null,ty=null;
-    wrap.addEventListener('touchstart',e=>{if(!e.touches?.length)return;tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+    wrap.addEventListener('touchstart',e=>{if(!e.touches?.length||!wrap.classList.contains('mobile-carousel'))return;tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
     wrap.addEventListener('touchmove',e=>{
       if(tx==null||!e.touches?.length)return;
       const dx=e.touches[0].clientX-tx,dy=e.touches[0].clientY-ty;
       if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)){tx=ty=null;if(state.autoScroll)disableAutoScrollForManualScroll();}
     },{passive:true});
     wrap.addEventListener('touchend',()=>{tx=ty=null;},{passive:true});
-
-    requestAnimationFrame(()=>scrollMobileLineTo(state.selectedRow,false));
-    updateMobileLineIndicator(state.selectedRow);
   }
 
   function moveDragged(toRow,toIndex){
@@ -1103,11 +1105,22 @@
       row.forEach((card,ci)=>{
         const el=document.createElement('div');el.className='chord-card'+(card.type==='note'?' note-card':'');el.draggable=!state.autoScroll;
         const shown=displayedValue(card),sub=subtitle(card),hint=state.autoScroll?'Tap to play • Auto Scroll locks reordering':'Tap to play • hold & drag to move';
-        const visual=`<div class="diagram">${state.instrument==='guitar'?guitarSvg(card):pianoSvg(card)}</div>`;
+        const visual=`<div class="diagram" aria-hidden="true">${state.instrument==='guitar'?guitarSvg(card):pianoSvg(card)}</div>`;
         const explicitDur=Number.isFinite(+card.durationBeats)&&+card.durationBeats>0?cardDurationBeats(card):null,durBadge=explicitDur?`<div class="card-duration">${formatBeatDuration(explicitDur)} beat${explicitDur===1?'':'s'}</div>`:'';
-        el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}${durBadge}${visual}<div class="hint">${hint}</div>`;
-        el.querySelector('.remove').onclick=e=>{e.stopPropagation();recordUndo();row.splice(ci,1);renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
-        el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove')){const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),stepSeconds=60/bpm*cardDurationBeats(card);playCard(card,state.sustain?sustainedNoteSeconds(stepSeconds,state.sound):Math.max(.35,stepSeconds*.92));}};
+        el.innerHTML=`<div class="card-top"><span class="chord-name">${esc(shown)}</span><button class="remove" type="button" aria-label="Remove ${esc(shown)}">×</button></div>${sub?`<div class="card-subtitle">${esc(sub)}</div>`:''}${durBadge}${visual}<div class="hint" aria-hidden="true">${hint}</div>`;
+        // Keyboard: Tab to a card, Enter/Space plays it, Delete removes it, arrows move between cards.
+        el.tabIndex=0;el.setAttribute('role','group');
+        el.setAttribute('aria-label',`${card.type==='note'?'Note':'Chord'} ${shown}, line ${ri+1}, card ${ci+1} of ${row.length}. Enter to play, Delete to remove.`);
+        const removeCard=()=>{recordUndo();row.splice(ci,1);renderRows();syncBuildInput();renderFits();scheduleAutoSave();focusCard(ri,Math.min(ci,row.length-1));};
+        const playThis=()=>{state.selectedRow=ri;const stepSeconds=60/clampBpm($('bpmInput').value)*cardDurationBeats(card);playCard(card,state.sustain?sustainedNoteSeconds(stepSeconds,state.sound):Math.max(.35,stepSeconds*.92));};
+        el.querySelector('.remove').onclick=e=>{e.stopPropagation();removeCard();};
+        el.onclick=e=>{e.stopPropagation();if(!e.target.closest('.remove'))playThis();};
+        el.addEventListener('keydown',e=>{
+          if(e.target!==el)return;
+          if(e.key==='Enter'||e.key===' '){e.preventDefault();playThis();}
+          else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();removeCard();}
+          else if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();focusCard(ri,ci+(e.key==='ArrowRight'?1:-1));}
+        });
         el.addEventListener('dragstart',e=>{if(state.autoScroll){e.preventDefault();$('status').textContent='Turn Auto Scroll off to reorder cards.';return;}state.drag={row:ri,index:ci};e.dataTransfer.effectAllowed='move';el.classList.add('dragging');});
         el.addEventListener('dragend',()=>{el.classList.remove('dragging');state.drag=null;});
         el.addEventListener('dragover',e=>{if(!state.autoScroll)e.preventDefault();});
@@ -1123,6 +1136,10 @@
     setupMobileCarousel(wrap);applyProgressionEditLock();
   }
 
+  function focusCard(ri,ci){
+    const cards=document.querySelectorAll(`#progression .progression-line:not(.carousel-clone)[data-row="${ri}"] .chord-card`);
+    cards[Math.max(0,Math.min(cards.length-1,ci))]?.focus();
+  }
   function appendFitValue(v,type=state.mode){
     const targetType=type==='note'?'note':'chord';
     const parsed=targetType==='note'?parseNote(v):parseChord(v)?.display;
@@ -1544,7 +1561,11 @@
   function readDraft(){const d=readStored(DRAFT_KEY,null);return d?.project&&typeof d.project==='object'?d:null;}
   function clearDraft(){try{localStorage.removeItem(DRAFT_KEY)}catch{}state.draftId=null;}
   function persistDraft(){
-    if(!editorHasContent()){if(readDraft())clearDraft();return;}
+    if(!editorHasContent()){
+      // The user emptied their draft: drop it. Never drop a draft this tab did not open.
+      const d=readDraft();if(d&&state.draftId&&sameProjectId(d.project.id,state.draftId))clearDraft();
+      return;
+    }
     if(!state.draftId)state.draftId=newProjectId();
     const p=capture(state.draftId,($('projectName').value||'').trim().slice(0,160));
     const prior=readDraft();
@@ -2269,8 +2290,21 @@
     const imgs=[...root.querySelectorAll('img')];
     await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=img.onerror=resolve;})));
   }
+  // PDF/PNG export libraries are only fetched the first time someone exports.
+  const exportScripts={};
+  function loadExportScript(src,ready){
+    if(ready())return Promise.resolve();
+    return exportScripts[src]||(exportScripts[src]=new Promise((resolve,reject)=>{
+      const el=document.createElement('script');el.src=src;el.async=true;
+      el.onload=()=>ready()?resolve():reject(new Error('Export tools did not load.'));
+      el.onerror=()=>{delete exportScripts[src];el.remove();reject(new Error('Export tools did not load. Check your connection and try again.'));};
+      document.head.appendChild(el);
+    }));
+  }
+  const loadHtml2canvas=()=>loadExportScript('vendor/html2canvas.min.js?v=1.4.1',()=>typeof window.html2canvas==='function');
+  const loadJsPdf=()=>loadExportScript('vendor/jspdf.umd.min.js?v=2.5.1',()=>!!window.jspdf?.jsPDF);
   async function captureExportSheet(forPdf=false,selection={}){
-    if(typeof html2canvas!=='function')throw new Error('Export tools did not load. Check your connection and try again.');
+    await loadHtml2canvas();
     const sheet=buildExportSheet(selection);sheet.classList.toggle('pdf-print',forPdf);await waitForExportImages(sheet);
     await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
     const bounds=sheet.getBoundingClientRect();
@@ -2302,7 +2336,7 @@
   async function exportPdf(selection={}){
     $('status').textContent='Creating PDF song blueprint…';
     try{
-      if(!window.jspdf?.jsPDF)throw new Error('PDF tools did not load. Check your connection and try again.');
+      await loadJsPdf();
       const {canvas,breaks}=await captureExportSheet(true,selection),{jsPDF}=window.jspdf;
       const pdf=new jsPDF({orientation:'portrait',unit:'pt',format:'letter',compress:true});
       const pageW=pdf.internal.pageSize.getWidth(),pageH=pdf.internal.pageSize.getHeight(),margin=18,drawW=pageW-margin*2,drawH=pageH-margin*2;
@@ -2317,6 +2351,7 @@
 
   function init(){
     for(let i=0;i<=12;i++){const o=document.createElement('option');o.value=i;o.textContent=i?'Capo '+i:'None';$('capoSelect').appendChild(o);}
+    initCarouselListeners();
     $('buildBtn').onclick=()=>{recordUndo();const bad=commitBuildInput();$('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';syncBuildInput();autoPopulateKeyFromEntry();renderAll();scheduleAutoSave();};
     $('chordInput').oninput=()=>autoPopulateKeyFromEntry();
     $('chordInput').onkeydown=e=>{if(e.key==='Enter')$('buildBtn').click();};
@@ -2383,6 +2418,10 @@
       node.value=String(bpm);
       publishLiveSrpMeta('crp');writeHardSync('crp');publishSrpHandoff();scheduleAutoSave();
     };
+    // A tempo above 240 can never become valid by typing more digits, so cap it at once
+    // (both BPM fields); values below 40 may still be on their way to "120" and are
+    // clamped when the edit is committed.
+    document.addEventListener('input',e=>{if(e.target?.matches?.('#bpmInput,#voxBpmInput')&&Number(e.target.value)>240)e.target.value='240';},true);
     $('bpmInput')?.addEventListener('change',commitCrpBpm);
     $('bpmInput')?.addEventListener('blur',commitCrpBpm);
     $('bpmInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitCrpBpm();e.currentTarget.blur();}});
@@ -2874,7 +2913,7 @@
     scheduleAutoSave,flushAutoSaveNow,renderAll,syncBuildInput,publishSrpHandoff,loadProjectById:loadProject,
     recordUndo,undo:undoEdit,redo:redoEdit,get canUndo(){return undoHistory.undo.length>0;},
     keyTonicName,spellInKey,
-    get beats(){return +$('beatsSelect').value||4},get bpm(){return +$('bpmInput').value||92},get loop(){return $('loopToggle').checked},
+    get beats(){return +$('beatsSelect').value||4},get bpm(){return clampBpm($('bpmInput').value)},get loop(){return $('loopToggle').checked},
     get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
     startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).flat().reduce((n,c)=>n+storedCardDurationBeats(c),0);},
     get autoScroll(){return !!state.autoScroll;},get sustain(){return !!state.sustain;},

@@ -89,19 +89,19 @@
           <select id="soundSelect" tabindex="-1"></select>
         </label>
 
-        <label class="octave-control">
-          Octave
+        <div class="octave-control control-group" role="group" aria-labelledby="octaveLabel">
+          <span id="octaveLabel">Octave</span>
           <div class="stepper">
-            <button id="octaveDown" aria-label="Decrease octave">−</button>
-            <span id="octaveValue">0</span>
-            <button id="octaveUp" aria-label="Increase octave">+</button>
+            <button id="octaveDown" type="button" aria-label="Decrease octave">−</button>
+            <span id="octaveValue" aria-live="polite">0</span>
+            <button id="octaveUp" type="button" aria-label="Increase octave">+</button>
           </div>
-        </label>
+        </div>
 
-        <label class="sustain-control">
-          Sustain
-          <button id="sustainBtn" class="toggle-btn sustain-btn" type="button" aria-pressed="false">OFF</button>
-        </label>
+        <div class="sustain-control control-group">
+          <span id="sustainLabel">Sustain</span>
+          <button id="sustainBtn" class="toggle-btn sustain-btn" type="button" aria-pressed="false" aria-labelledby="sustainLabel">OFF</button>
+        </div>
 
         <div class="capo-shape-mode-row" aria-label="Capo and chord-shape controls">
           <label id="capoWrap">
@@ -122,10 +122,10 @@
             </select>
           </label>
 
-          <label id="transposeWrap">
-            Capo mode
-            <button id="transposeBtn" class="toggle-btn" type="button" aria-pressed="false">Transpose OFF</button>
-          </label>
+          <div id="transposeWrap" class="control-group">
+            <span id="transposeLabel">Capo mode</span>
+            <button id="transposeBtn" class="toggle-btn" type="button" aria-pressed="false" aria-describedby="transposeLabel">Transpose OFF</button>
+          </div>
         </div>
       </div>
 
@@ -514,8 +514,7 @@
   <div id="exportStage" class="export-stage" aria-hidden="true"></div>
 
   <script src="vendor/soundfont-player.js?v=0.12.0"></script>
-  <script src="vendor/html2canvas.min.js?v=1.4.1"></script>
-  <script src="vendor/jspdf.umd.min.js?v=2.5.1"></script>
+  <!-- html2canvas and jsPDF are loaded on demand by the PDF/PNG export (app.js). -->
   <script src="app.js?v=3.3.128-PROJECT-SCALE-RIDER"></script>
   <script src="parts.js?v=3.3.121-LEAD-SCALE-NAME"></script>
   <script src="scale-rider.js?v=1.4.1-PROJECT-STATE"></script>
