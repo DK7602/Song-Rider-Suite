@@ -1988,29 +1988,6 @@
     }
 
 
-    .authResetWrap{ display:none; }
-    .authModal.resetting .authSignedOut,
-    .authModal.resetting .authSignedIn{ display:none !important; }
-    .authModal.resetting .authResetWrap{ display:block; }
-    .authForgotRow{
-      display:flex;
-      justify-content:flex-end;
-      margin:-2px 0 10px;
-    }
-    .authLinkBtn{
-      border:none;
-      background:transparent;
-      padding:0;
-      font:inherit;
-      font-size:12px;
-      font-weight:1000;
-      color:#2563eb;
-      cursor:pointer;
-      text-decoration:underline;
-    }
-    .authLinkBtn.secondary{
-      color:#555;
-    }
 
 
 /* v2.9.3 — preserve approved SRP tri-color metallic wordmark */
@@ -3302,18 +3279,6 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
         </div>
       </div>
 
-      <div id="authResetWrap" class="authResetWrap">
-        <input id="authResetEmailInput" class="authField" type="email" placeholder="Email" autocomplete="email" />
-        <input id="authNewPasswordInput" class="authField" type="password" placeholder="New Password" autocomplete="new-password" style="display:none;" />
-        <div id="authForgotRow" class="authForgotRow">
-          <button id="authBackToSignInBtn" class="authLinkBtn secondary" type="button">Back to Sign In</button>
-        </div>
-        <div class="authBtns">
-          <button id="authSendResetBtn" class="authBtn" type="button">Send Reset Link</button>
-          <button id="authUpdatePasswordBtn" class="authBtn secondary" type="button" style="display:none;">Update Password</button>
-        </div>
-      </div>
-
       <div class="authSignedIn">
         <div id="authUserEmail" class="authUserEmail"></div>
         <div class="authBtns">
@@ -3323,7 +3288,6 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
       </div>
 
       <div class="authHelp">Uses your Song Rider Suite / Chord Rider Pro cloud account. Your SRP projects and media now sync through Cloudflare.</div>
-      <div class="authForgotRow"><button id="authForgotPasswordBtn" class="authLinkBtn" type="button">Forgot Password?</button></div>
     </div>
   </div>
 

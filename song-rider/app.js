@@ -28,8 +28,6 @@
 
 "use strict";
 
-// ✅ prevents heavy full-text auto-apply from running on every render
-let didInitialFullApply = false;
 let sheetHeaderBtnLock = false;
 let pendingFullBlockScroll = null;
 
@@ -46,12 +44,6 @@ const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
 const nextTick = () => new Promise(r => setTimeout(r, 0));
 
 
-// BOOT-SAFE STUB: some deployed builds have hit a startup ReferenceError on
-// updateFullIfVisible during init. Define a harmless stub early; the real
-// implementation later in the file will override this function.
-function updateFullIfVisible(){
-  return;
-}
 
 /***********************
 Textarea autosize (Full page blocks)
@@ -1851,8 +1843,6 @@ const cloud = {
   authInitialized: false,
   authChangeSeq: 0,
   appMounted: false,
-  authMode: "signin",
-  recoveryMode: false,
   pendingSyncReasons: [],
   deferInitialMerge: false
 };
@@ -2184,70 +2174,25 @@ async function syncAllProjectsToCloud(reason=""){
 }
 
 
-function setAuthMode(mode="signin"){
-  cloud.authMode = mode || "signin";
-  cloud.recoveryMode = (cloud.authMode === "recovery");
-
-  const modal = document.getElementById("authModal");
-  if(modal) modal.classList.toggle("resetting", cloud.authMode === "forgot" || cloud.authMode === "recovery");
-
-  const resetEmail = document.getElementById("authResetEmailInput");
-  const newPass = document.getElementById("authNewPasswordInput");
-  const sendBtn = document.getElementById("authSendResetBtn");
-  const updateBtn = document.getElementById("authUpdatePasswordBtn");
-  const backBtn = document.getElementById("authBackToSignInBtn");
-  const forgotRow = document.getElementById("authForgotRow");
-  const emailInput = document.getElementById("authEmailInput");
-
-  if(resetEmail){
-    resetEmail.style.display = (cloud.authMode === "forgot") ? "block" : "none";
-    if(emailInput && !resetEmail.value) resetEmail.value = String(emailInput.value || "").trim();
-  }
-  if(newPass) newPass.style.display = (cloud.authMode === "recovery") ? "block" : "none";
-  if(sendBtn) sendBtn.style.display = (cloud.authMode === "forgot") ? "inline-flex" : "none";
-  if(updateBtn) updateBtn.style.display = (cloud.authMode === "recovery") ? "inline-flex" : "none";
-  if(backBtn) backBtn.textContent = (cloud.authMode === "recovery") ? "Back to Sign In" : "Back to Sign In";
-  if(forgotRow) forgotRow.style.display = (cloud.authMode === "signin") ? "flex" : "none";
-}
-
 function updateAuthModalUI(message=""){
   const modal = document.getElementById("authModal");
   if(!modal) return;
   const signedIn = !!cloud.user;
-  modal.classList.toggle("signed-in", signedIn && cloud.authMode !== "forgot" && cloud.authMode !== "recovery");
-  modal.classList.toggle("signed-out", !signedIn && cloud.authMode !== "forgot" && cloud.authMode !== "recovery");
+  modal.classList.toggle("signed-in", signedIn);
+  modal.classList.toggle("signed-out", !signedIn);
 
   const status = document.getElementById("authStatus");
   const userEmail = document.getElementById("authUserEmail");
-  const syncBtn = document.getElementById("authSyncNowBtn");
-  const signOutBtn = document.getElementById("authSignOutBtn");
-  const signInBtn = document.getElementById("authSignInBtn");
-  const signUpBtn = document.getElementById("authSignUpBtn");
-  const emailInput = document.getElementById("authEmailInput");
-  const passInput = document.getElementById("authPasswordInput");
-  const forgotBtn = document.getElementById("authForgotPasswordBtn");
-  const resetEmailInput = document.getElementById("authResetEmailInput");
-  const newPasswordInput = document.getElementById("authNewPasswordInput");
-  const sendResetBtn = document.getElementById("authSendResetBtn");
-  const updatePasswordBtn = document.getElementById("authUpdatePasswordBtn");
-  const backBtn = document.getElementById("authBackToSignInBtn");
-
-  setAuthMode(cloud.authMode || "signin");
-
   if(status){
     if(message) status.textContent = message;
-    else if(cloud.authMode === "forgot") status.textContent = "Enter your email and we’ll send you a password reset link.";
-    else if(cloud.authMode === "recovery") status.textContent = "Enter your new password below.";
     else if(cloud.user) status.textContent = "Projects sync privately to your signed-in account.";
     else status.textContent = "Sign in so your projects follow you across devices.";
   }
   if(userEmail) userEmail.textContent = cloud.user ? (cloud.user.email || cloud.user.id || "Signed in") : "";
 
-  [syncBtn, signOutBtn, signInBtn, signUpBtn, forgotBtn, sendResetBtn, updatePasswordBtn, backBtn].forEach(btn => {
-    if(btn) btn.disabled = !!cloud.authBusy;
-  });
-  [emailInput, passInput, resetEmailInput, newPasswordInput].forEach(inp => {
-    if(inp) inp.disabled = !!cloud.authBusy;
+  ["authSyncNowBtn", "authSignOutBtn", "authSignInBtn", "authSignUpBtn", "authEmailInput", "authPasswordInput"].forEach(id => {
+    const node = document.getElementById(id);
+    if(node) node.disabled = !!cloud.authBusy;
   });
 }
 
@@ -2255,7 +2200,6 @@ function updateAuthModalUI(message=""){
 function openAuthModal(message=""){
   const modal = document.getElementById("authModal");
   if(!modal) return;
-  if(cloud.authMode !== "recovery") setAuthMode(cloud.user ? "signin" : "signin");
   updateAuthModalUI(message);
   modal.classList.add("show");
 }
@@ -2464,17 +2408,6 @@ async function submitAuthSignUp(){
   }
 }
 
-async function submitAuthSendReset(){
-  // Song Rider Suite account recovery is handled from the main Cloud Account panel.
-  setAuthMode("signin");
-  updateAuthModalUI("Password recovery is handled from the main Song Rider Suite Cloud Account panel.");
-}
-
-async function submitAuthUpdatePassword(){
-  setAuthMode("signin");
-  updateAuthModalUI("Change your password from the main Song Rider Suite Cloud Account panel.");
-}
-
 async function submitAuthSignOut(){
   if(!cloud.client) return;
   try{
@@ -2500,16 +2433,6 @@ function wireAuthModal(){
   });
   document.getElementById("authSignInBtn")?.addEventListener("click", submitAuthSignIn);
   document.getElementById("authSignUpBtn")?.addEventListener("click", submitAuthSignUp);
-  const forgotBtn = document.getElementById("authForgotPasswordBtn");
-  if(forgotBtn) forgotBtn.style.display = "none";
-  const resetWrap = document.getElementById("authResetWrap");
-  if(resetWrap) resetWrap.style.display = "none";
-  document.getElementById("authBackToSignInBtn")?.addEventListener("click", () => {
-    setAuthMode("signin");
-    updateAuthModalUI();
-  });
-  document.getElementById("authSendResetBtn")?.addEventListener("click", submitAuthSendReset);
-  document.getElementById("authUpdatePasswordBtn")?.addEventListener("click", submitAuthUpdatePassword);
   document.getElementById("authSignOutBtn")?.addEventListener("click", submitAuthSignOut);
   document.getElementById("authSyncNowBtn")?.addEventListener("click", async () => {
     try{
@@ -2526,13 +2449,6 @@ function wireAuthModal(){
     document.getElementById(id)?.addEventListener("keydown", (e) => {
       if(e.key === "Enter") submitAuthSignIn();
     });
-  });
-
-  document.getElementById("authResetEmailInput")?.addEventListener("keydown", (e) => {
-    if(e.key === "Enter") submitAuthSendReset();
-  });
-  document.getElementById("authNewPasswordInput")?.addEventListener("keydown", (e) => {
-    if(e.key === "Enter") submitAuthUpdatePassword();
   });
 
   updateAuthModalUI();
@@ -3764,23 +3680,6 @@ function shouldTickRun(){
   return !!(state.drumsOn || state.instrumentOn || state.autoScrollOn);
 }
 
-
-function getVisibleCards(){
-  const cards = getCards();
-  if(cards.length === 0) return [];
-
-  const topLine = getHeaderBottomY() - 18;
-  const bottomLine = window.innerHeight + 18;
-
-  const vis = [];
-  for(const c of cards){
-    const r = c.getBoundingClientRect();
-    if(r.bottom < topLine) continue;
-    if(r.top > bottomLine) continue;
-    vis.push(c);
-  }
-  return vis.length ? vis : [cards[0]];
-}
 
 function uiTick8(){
   if(state.autoScrollPaused){
@@ -7894,7 +7793,6 @@ function ensureCapoStepToggle(){
       repaint();
       refreshDisplayedNoteCells();
       updateKeyFromAllNotes();
-      updateFullIfVisible?.();
       if(state.project) upsertProject(state.project);
       window.CRP_SRP_syncMetaToCrp?.();
       window.CRP_SRP_writeHardSyncFromSrp?.();
@@ -8618,7 +8516,6 @@ function applyChordRowUiRefresh(card, line, noteInputs){
     }
   }catch{}
   updateKeyFromAllNotes();
-  updateFullIfVisible();
   refreshDisplayedNoteCells();
 }
 
@@ -9217,10 +9114,6 @@ ${bodyHtml}
 </html>`;
 }
 
-function updateFullIfVisible(){
-  return;
-}
-
 /***********************
 EXPORT
 ***********************/
@@ -9607,7 +9500,6 @@ function renderSheetTitleBar(){
           else { try{ delete state.project.sectionTitles[state.currentSection]; }catch{} }
           syncFullTextFromSections();
         });
-        updateFullIfVisible();
       }, 220);
     });
 
@@ -10426,416 +10318,6 @@ if(state.currentSection === "Full"){
     pendingFullBlockScroll = null;
   });
   return;
-
-  const wrap = document.createElement("div");
-  wrap.className = "fullBoxWrap";
-
-  // ✅ Break title pills now live INSIDE the Full textarea at every break line.
-  //    We render an overlay that aligns pills to the break-line rows in the textarea.
-  const pillPages = getAllSectionOrder().filter(s => s !== "Full");
-
-
-  const host = document.createElement("div");
-  host.className = "fullPillHost";
-
-  const ta = document.createElement("textarea");
-  ta.className = "fullBox";
-  _attachCaretRemember(ta);
-  ta.addEventListener("focus", () => {
-  lastLyricsTextarea = ta;     // ✅ so rhyme taps insert into Full view
-  refreshRhymesFromActive();
-});
-ta.addEventListener("click", () => {
-  lastLyricsTextarea = ta;     // ✅ cursor moves, seed word changes
-  refreshRhymesFromActive();
-});
-  ta.readOnly = false;
-  ta.placeholder = `__________Page name
-Line 1
-Line 2
-
-(blank line = new card)
-
-__________
-...`;
-
-  // ✅ STOP AUTO-POPULATING FULL TEXT
-// (No template gets inserted anymore)
-
-// ✅ OPTIONAL CLEANUP:
-// If a project already has the old template text, wipe it once automatically.
-const _tpl = buildFullTemplate();
-if(String(state.project.fullText || "") === _tpl){
-  state.project.fullText = "";
-  // keep flag true so it never tries to seed again (even if other code remains)
-  state.project.fullSeeded = true;
-  upsertProject(state.project);
-}
-
-// ✅ Seed headings scaffold if empty
-if(!String(state.project.fullText || "").trim()){
-  const scaffold = buildFullScaffold();
-  state.project.fullText = scaffold;
-  upsertProject(state.project);
-}
-ta.value = state.project.fullText || "";
-
-  const overlay = document.createElement("div");
-  overlay.className = "fullPillOverlay";
-  host.appendChild(ta);
-  host.appendChild(overlay);
-
-
-  // Fill the available space better (no index.html edits required)
-  ta.style.width = "100%";
-  ta.style.minHeight = "calc(100vh - 220px)";
-  ta.style.resize = "none";
-
-  // ---------- Break-pill overlay helpers ----------
-  function parseBreakLinesFromText(text){
-    const lines = String(text || "").replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n");
-    const breaks = [];
-    for(let i=0;i<lines.length;i++){
-      const raw = String(lines[i] ?? "");
-      const t = raw.trim();
-      if(!t) continue;
-      if(t === BREAK_LINE || t === "_"){
-        breaks.push({ lineIndex:i, title:"" });
-        continue;
-      }
-      if(t[0] === "_"){
-        const m = t.match(/^_{1,}\s*(.+)?$/);
-        const title = (m && m[1]) ? String(m[1] || "").trim() : "";
-        breaks.push({ lineIndex:i, title });
-      }
-    }
-    return { lines, breaks };
-  }
-
-  function setBreakLineTitleByOccurrence(occIdx, title){
-    const parsed = parseBreakLinesFromText(ta.value);
-    const b = parsed.breaks[occIdx];
-    if(!b) return;
-
-    const lines = parsed.lines.slice();
-    const t = String(title || "").trim();
-    // Force canonical inline title form: ________Title
-    lines[b.lineIndex] = BREAK_LINE + (t ? t : "");
-    const newText = lines.join("\n");
-
-    if(newText === ta.value) return;
-
-    // Preserve cursor as best we can (keep it close)
-    const selStart = ta.selectionStart;
-    const selEnd = ta.selectionEnd;
-    ta.value = newText;
-    try{
-      ta.selectionStart = clamp(selStart, 0, ta.value.length);
-      ta.selectionEnd = clamp(selEnd, 0, ta.value.length);
-    }catch{}
-
-    // Commit via the same pipeline used by typing in Full
-    onFullTextareaInput();
-  }
-  function insertSectionAfterOccurrence(occIdx){
-    const parsed = parseBreakLinesFromText(ta.value);
-    const lines = parsed.lines.slice();
-    const breaks = parsed.breaks;
-
-    if(!breaks.length) return;
-
-    // insertion point is right BEFORE the next break, or end of text
-    let insertAt = (occIdx + 1 < breaks.length) ? breaks[occIdx + 1].lineIndex : lines.length;
-
-    // Ensure at least one blank line before the new break (so + / × feels "under" the section)
-    if(insertAt > 0 && String(lines[insertAt - 1] || "").trim() !== ""){
-      lines.splice(insertAt, 0, "");
-      insertAt += 1;
-    }
-
-    // Insert new break + a blank line for typing
-    lines.splice(insertAt, 0, BREAK_LINE, "");
-
-    ta.value = lines.join("\n");
-    state.project.fullText = ta.value;
-
-    // Move cursor to the blank line right after the inserted break
-    try{
-      const targetLine = insertAt + 1; // the blank line after BREAK_LINE
-      let idx = 0;
-      for(let i=0;i<lines.length;i++){
-        if(i === targetLine){ break; }
-        idx += lines[i].length + 1;
-      }
-      ta.focus();
-      ta.setSelectionRange(idx, idx);
-    }catch{}
-
-    onFullTextareaInput();
-    positionOverlayPills();
-  }
-
-  function deleteSectionByOccurrence(occIdx){
-    const parsed = parseBreakLinesFromText(ta.value);
-    const lines = parsed.lines.slice();
-    const breaks = parsed.breaks;
-
-    if(!breaks.length) return;
-
-    // If this is the only section, just clear its content (keep one break)
-    if(breaks.length <= 1){
-      ta.value = `${BREAK_LINE}\n\n`;
-      state.project.fullText = ta.value;
-      onFullTextareaInput();
-      positionOverlayPills();
-      return;
-    }
-
-    const startLine = breaks[occIdx].lineIndex;
-    const endLine = (occIdx + 1 < breaks.length) ? breaks[occIdx + 1].lineIndex : lines.length;
-
-    lines.splice(startLine, Math.max(0, endLine - startLine));
-
-    // Always ensure the text begins with a break line
-    if(String(lines[0] || "").trim() !== BREAK_LINE){
-      lines.unshift(BREAK_LINE, "");
-    }
-
-    ta.value = lines.join("\n");
-    state.project.fullText = ta.value;
-
-    onFullTextareaInput();
-    positionOverlayPills();
-  }
-
-
-  function positionOverlayPills(){
-    overlay.innerHTML = "";
-
-    const parsed = parseBreakLinesFromText(ta.value);
-    const breaks = parsed.breaks;
-    if(!breaks.length) return;
-
-    const cs = getComputedStyle(ta);
-    const lineH = parseFloat(cs.lineHeight) || 18;
-    const padT = parseFloat(cs.paddingTop) || 0;
-    const padB = parseFloat(cs.paddingBottom) || 0;
-    const scrollTop = ta.scrollTop || 0;
-    const viewH = ta.clientHeight || 0;
-
-    // Visual sizes for overlay elements
-    const pillH = 34;
-    const rowH  = Math.max(pillH + 8, lineH + 10); // also masks the raw break-line text
-
-    const pages = pillPages.slice();
-    for(let i=0;i<breaks.length;i++){
-      const sec = pages[i] || null;
-      if(!sec) break;
-
-      const y = padT + (breaks[i].lineIndex * lineH) - scrollTop;
-
-      // Only render if near viewport (small buffer)
-      if(y < -80 || y > viewH + 80) continue;
-
-      const row = document.createElement("div");
-      row.className = "breakRow";
-      // Center the pill over the break-line, and mask the literal "__________TITLE" text behind it
-      row.style.top = `${Math.max(0, Math.round(y - ((rowH - lineH) / 2)))}px`;
-      row.style.height = `${Math.round(rowH)}px`;
-      // Allow editing the pill input (row acts as a mask, input handles the interaction)
-      row.style.pointerEvents = "auto";
-      row.style.background = "#fff";
-      row.style.borderRadius = "16px";
-
-      const inp = document.createElement("input");
-      inp.type = "text";
-      inp.className = "songPartPill";
-      inp.placeholder = "Song Part";
-
-      // CRP: force the Full Song section title itself to the gold control style.
-      // Use inline !important so mobile Chromium/theme rules cannot turn it dark.
-      inp.style.setProperty("background", "#efc85d", "important");
-      inp.style.setProperty("background-image", "linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)", "important");
-      inp.style.setProperty("color", "#111", "important");
-      inp.style.setProperty("-webkit-text-fill-color", "#111", "important");
-      inp.style.setProperty("border", "1px solid #d6aa3f", "important");
-      inp.style.setProperty("font-weight", "1000", "important");
-      inp.style.setProperty("text-shadow", "none", "important");
-      inp.style.setProperty("caret-color", "#111", "important");
-      row.style.setProperty("background", "transparent", "important");
-
-      // Two-way: prefer explicit project title, else derive from Full break line
-      const stored = (state.project.sectionTitles && state.project.sectionTitles[sec])
-        ? String(state.project.sectionTitles[sec] || "").trim()
-        : "";
-      const derived = String(breaks[i].title || "").trim();
-      inp.value = stored || derived;
-
-      inp.addEventListener("keydown", (e) => {
-        if(e.key === "Enter"){ e.preventDefault(); inp.blur(); }
-      });
-
-      // keep the pill sized so it doesn't block lyrics (lyrics start beneath a blank line)
-      inp.style.height = `${pillH}px`;
-
-      let tmrP = null;
-      inp.addEventListener("input", () => {
-        if(tmrP) clearTimeout(tmrP);
-        tmrP = setTimeout(() => {
-          const val = String(inp.value || "").trim();
-          editProject("fullBreakTitle", () => {
-            ensurePageMeta();
-            if(val) state.project.sectionTitles[sec] = val;
-            else { try{ delete state.project.sectionTitles[sec]; }catch{} }
-          });
-
-          // Update the actual break line text for this occurrence so parsing/sync stays correct
-          setBreakLineTitleByOccurrence(i, val);
-
-          // Keep pages + Full synced
-          editProject("syncAfterFullBreakTitle", () => {
-            syncFullTextFromSections();
-          });
-          updateFullIfVisible();
-        }, 180);
-      });
-
-      row.appendChild(inp);
-      overlay.appendChild(row);
-
-      // + / × action row UNDER this section's text (not on top of lyrics)
-      try{
-        const endLine = (i + 1 < breaks.length) ? breaks[i + 1].lineIndex : parsed.lines.length;
-
-        // Find last non-empty line within this section (between this break and the next break)
-        let last = breaks[i].lineIndex;
-        for(let k=endLine-1;k>breaks[i].lineIndex;k--){
-          const t = String(parsed.lines[k] || "").trim();
-          if(t){ last = k; break; }
-        }
-
-        let yBtn = padT + ((last + 1) * lineH) - scrollTop + 6;
-
-        // Keep the controls at least under the pill area
-        yBtn = Math.max(y + rowH + 6, yBtn);
-
-        // Clamp above next pill to prevent collisions
-        if(i + 1 < breaks.length){
-          const yNext = padT + (breaks[i + 1].lineIndex * lineH) - scrollTop;
-          yBtn = Math.min(yBtn, yNext - rowH - 8);
-        }
-
-        if(yBtn >= -80 && yBtn <= viewH + 80){
-          const act = document.createElement("div");
-          act.className = "breakActions";
-          act.style.top = `${Math.max(0, Math.round(yBtn))}px`;
-          act.style.pointerEvents = "auto";
-
-          const bAdd = document.createElement("button");
-          bAdd.type = "button";
-          bAdd.className = "breakActBtn";
-          bAdd.textContent = "+";
-          bAdd.addEventListener("click", (e) => {
-            e.preventDefault(); e.stopPropagation();
-            insertSectionAfterOccurrence(i);
-          });
-
-          const bDel = document.createElement("button");
-          bDel.type = "button";
-          bDel.className = "breakActBtn";
-          bDel.textContent = "×";
-          bDel.addEventListener("click", (e) => {
-            e.preventDefault(); e.stopPropagation();
-            deleteSectionByOccurrence(i);
-          });
-
-          act.appendChild(bAdd);
-          act.appendChild(bDel);
-          overlay.appendChild(act);
-        }
-      }catch{}
-
-    }
-
-    // prevent overlay from blocking textarea bottom taps
-    overlay.style.paddingBottom = `${padB}px`;
-  }
-
-  // Debounced Full input handler (shared by typing and pill edits)
-  let tmr = null;
-  let fullTextBurstBefore = null;
-  function onFullTextareaInput(){
-    // Capture the PRE-edit project once for this typing burst before mutating the
-    // live fullText. This makes the on-screen Undo button actually restore text.
-    if(!fullTextBurstBefore) fullTextBurstBefore = deepClone(state.project);
-    state.project.fullText = ta.value;
-
-    if(tmr) clearTimeout(tmr);
-    tmr = setTimeout(() => {
-      const before = fullTextBurstBefore;
-      fullTextBurstBefore = null;
-
-      state.project.fullText = ta.value;
-      applyFullTextToProjectSections(state.project.fullText || "");
-      state.project.fullText = ensureFullBreaksPresent(state.project.fullText || "");
-
-      if(before && projectSignature(before) !== projectSignature(state.project)){
-        historyCommitBeforeSnapshot(before);
-      }
-      upsertProject(state.project);
-      updateFullIfVisible();
-      refreshKeyUI();
-      // re-align pills after parsing may normalize break lines
-      positionOverlayPills();
-    }, 220);
-  }
-
-  // Keep overlay aligned while scrolling
-  ta.addEventListener("scroll", () => positionOverlayPills(), { passive:true });
-
-  // Rebuild overlay as the user types
-  ta.addEventListener("input", () => {
-    onFullTextareaInput();
-    positionOverlayPills();
-  });
-
-  // Initial overlay build
-  queueMicrotask(() => positionOverlayPills());
-
-  wrap.appendChild(host);
-
-  // (the rest of the Full-view render continues below)
-
-  // ✅ On first open: optionally seed sections from Full text ONCE (prevents freezes)
-  if(!didInitialFullApply){
-    didInitialFullApply = true;
-
-    const ft = String(state.project?.fullText || "");
-    // Only auto-apply if sections are essentially empty (otherwise preserve existing cards)
-    const hasAnyCards = FULL_EDIT_SECTIONS.some(sec => {
-      const arr = state.project?.sections?.[sec] || [];
-      return Array.isArray(arr) && arr.some(lineHasContent);
-    });
-
-    if(ft.trim() && !hasAnyCards){
-      // defer so UI can paint first
-      setTimeout(()=>{
-        try{
-          applyFullTextToProjectSections(ft);
-          upsertProject(state.project); // ok to keep (no history needed on first open)
-          // re-render after seeding
-          try{ renderAllSections?.(); }catch{}
-          try{ renderAll?.(); }catch{}
-        }catch(e){
-          console.error("Full->cards seed failed:", e);
-        }
-      }, 0);
-    }
-  }
-
-  // textarea is inside `host` (so overlay can sit on top)
-(el.sheetInner || el.sheetBody).appendChild(wrap);
-  return;
 }
 
   el.sheetHint.textContent = "";
@@ -10892,7 +10374,6 @@ addBtn.addEventListener("click", (e) => {
     syncFullTextFromSections();
   });
   renderSheet();
-  updateFullIfVisible();
   updateKeyFromAllNotes();
   clearTick(); applyTick();
   refreshDisplayedNoteCells();
@@ -10929,7 +10410,6 @@ delBtn.addEventListener("click", (e) => {
     syncFullTextFromSections();
   });
   renderSheet();
-  updateFullIfVisible();
   updateKeyFromAllNotes();
   clearTick(); applyTick();
   refreshDisplayedNoteCells();
@@ -11059,7 +10539,6 @@ card.appendChild(top);
 
         upsertProject(state.project);
         updateKeyFromAllNotes();
-        updateFullIfVisible();
       });
 
       inp.addEventListener("blur", () => {
@@ -11069,7 +10548,6 @@ card.appendChild(top);
           line.notes[i] = rawNow;
         });
         updateKeyFromAllNotes();
-        updateFullIfVisible();
 
         inp.value = (state.capo ? transposeChordName(rawNow, state.capo) : rawNow);
       });
@@ -11112,7 +10590,6 @@ card.appendChild(top);
         editProject("beat", () => {
           line.beats[i] = nextBeat;
         });
-        updateFullIfVisible();
       });
 
       beatInputs.push(inp);
@@ -13480,7 +12957,6 @@ function wireAudioProgressControl(){
   
   clearTick();
   applyTick();
-  updateFullIfVisible();
   refreshRhymesFromActive();
   refreshDisplayedNoteCells();
   
@@ -15737,7 +15213,6 @@ function goToSection(sec){
   lastLyricsTextarea = null;
   refreshRhymesFromActive();
   refreshDisplayedNoteCells();
-  updateFullIfVisible();
 
 scrollToTopOfSheet();
 }
@@ -15949,7 +15424,6 @@ if(el.capoInput){
     ensureCapoStepToggle();
     refreshDisplayedNoteCells();
     updateKeyFromAllNotes();
-    updateFullIfVisible?.();
     if(state.currentSection === "Full"){ try{ renderSheet(); }catch{} }
 
     // Commit once, after editing is complete, to the same hard sync bus used by CRP + BD.
@@ -15962,9 +15436,6 @@ if(el.capoInput){
   el.capoInput.addEventListener("blur", commitCapoStep_CAPTURE, true);
 }
 // ===== CAPO / STEP input (mode-aware, supports .5 in STEP) =====
-function roundToHalf(n){
-  return Math.round(n * 2) / 2;
-}
 
 function commitCapoOrStepFromInput(){
   const mode = state.transposeMode || "capo";
@@ -15990,7 +15461,6 @@ function commitCapoOrStepFromInput(){
   if(state.project) upsertProject(state.project);
   refreshDisplayedNoteCells();
   updateKeyFromAllNotes();
-  updateFullIfVisible();
   ensureCapoStepToggle(); // ✅ re-paint label CAPO/STEP every commit
   if(state.currentSection === "Full"){
     try{ renderSheet(); }catch{}
@@ -16668,7 +16138,6 @@ async function init(){
   // Tick visuals + misc
   clearTick();
   applyTick();
-  updateFullIfVisible();
   refreshRhymesFromActive();
   refreshDisplayedNoteCells();
   updateAudioButtonsUI();
