@@ -1,0 +1,77 @@
+{
+ "id": "acoustic_grand_piano",
+ "name": "Salamander Grand Piano (test fixture subset)",
+ "source": "https://tonejs.github.io/audio/salamander/",
+ "license": "CC-BY 3.0",
+ "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+ "attribution": "Salamander Grand Piano V3 by Alexander Holm, via Tone.js audio samples",
+ "samples": [
+  {
+   "midi": 48,
+   "file": "C3.mp3",
+   "vel": 100,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 51,
+   "file": "Ds3.mp3",
+   "vel": 100,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 54,
+   "file": "Fs3.mp3",
+   "vel": 100,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 57,
+   "file": "A3.mp3",
+   "vel": 100,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 60,
+   "file": "C4.mp3",
+   "vel": 100,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 63,
+   "file": "Ds4.mp3",
+   "vel": 100,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 66,
+   "file": "Fs4.mp3",
+   "vel": 100,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 69,
+   "file": "A4.mp3",
+   "vel": 100,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 72,
+   "file": "C5.mp3",
+   "vel": 100,
+   "loopStart": null,
+   "loopEnd": null
+  }
+ ],
+ "release": 0.6,
+ "sustained": false,
+ "gain": 1.0,
+ "notes": "Test fixture only (tests/ is not deployed). Nine notes C3-C5 in minor thirds so tests exercise pitch-shifting between samples."
+}

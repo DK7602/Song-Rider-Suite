@@ -28,6 +28,13 @@ npm test               # API contract tests + browser tests
     on-off, Chord Rider's drum volume, Beat Maker edits and Chord Rider Undo.
   - `srp.test.mjs`: Song Rider Pro conflicts, deletes, Chord Rider link, full storage, XSS,
     typing cost, idle timers, dictation, paste confirmation.
+  - `instruments.test.mjs`: the instrument engine (`instruments.js`) with a small Salamander piano
+    fixture (`tests/fixtures/instruments/`) and generated guitar/brass sets: every sound loads and
+    renders offline and in realtime, level within 1.5 dB of the piano, master peaks, pitch (incl.
+    pitch-shifting between samples), click-free ends/stops/steals, oscillator budget, graph cleanup,
+    SoundFont fallback for missing or broken sets, Baby DAW live playback + WAV export, Chord Rider.
+    `PRINT_LEVELS=1` prints the level table; `INSTRUMENT_SETS=<dir>` serves real sets from `<dir>`
+    first (to re-measure levels when the recorded sets land).
 
 Each browser test was checked to fail on the code before these fixes.
 
