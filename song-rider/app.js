@@ -1673,23 +1673,20 @@ function parseNotesBackupRaw(raw){
   }
 }
 
+// Notes HTML comes from storage and other devices, so it is untrusted. It is only ever parsed
+// into an inert document (DOMParser: no scripts run, no images load) and reduced to an
+// allowlist of tags and attributes before it reaches the live page.
+function parseInertHtml(html){
+  return new DOMParser().parseFromString(`<!doctype html><body>${String(html || "")}</body>`, "text/html").body;
+}
+
 // Notes are user-critical data. Treat an unexpected blank note document as
 // dangerous unless there is no older non-empty copy anywhere. This protects
 // notes across app updates, cloud merges, reloads, and delayed sync races.
 function notesPlainTextFromHtml(html){
-  try{
-    const div = document.createElement("div");
-    div.innerHTML = String(html || "");
-    div.querySelectorAll("script,style").forEach(n => n.remove());
-    return String(div.textContent || "").replace(/ /g, " ").trim();
-  }catch{
-    return String(html || "")
-      .replace(/<[^>]*>/g, " ")
-      .replace(/&nbsp;/gi, " ")
-      .replace(/&amp;/gi, "&")
-      .replace(/s+/g, " ")
-      .trim();
-  }
+  const body = parseInertHtml(html);
+  body.querySelectorAll("script,style,template").forEach(n => n.remove());
+  return String(body.textContent || "").replace(/\u00a0/g, " ").trim();
 }
 
 function notesDocHasMeaningfulContent(html){
@@ -11110,8 +11107,16 @@ async function uploadAudioFile(){
 // ----------------------
 // ✅ IMPORT: Text -> Full -> Cards (with chord parsing)
 // ----------------------
+function songHasContent(p){
+  if(!p) return false;
+  if(String(p.fullText || "").split("\n").some(line => line.trim() && !_parseBreakLine(line))) return true;
+  return Object.values(p.sections || {}).some(cards => Array.isArray(cards) && cards.some(lineHasContent));
+}
+
+// Replaces the open song's lyrics with imported text (paste outside an editor, PDF, .txt).
+// Asks first when the song already has lyrics; the import is one Undo step.
 async function importTextToFull(text){
-  if(!state.project) return;
+  if(!state.project) return false;
 
   // Normalize and lightly clean import text
   let cleaned = normalizeLineBreaks(String(text || ""));
@@ -11119,8 +11124,9 @@ async function importTextToFull(text){
   cleaned = cleaned.trim();
   if(!cleaned){
     alert("No text found to import.");
-    return;
+    return false;
   }
+  if(songHasContent(state.project) && !confirm(`Replace the lyrics of “${state.project.name || "this song"}” with the imported text?\n\nYou can undo this with the ↶ button.`)) return false;
 
   // ✅ Full Song View uses the break-line block editor.
   // If the import has no break-lines, it may still parse into cards,
@@ -11195,6 +11201,7 @@ async function importTextToFull(text){
   updateKeyFromAllNotes();
   renderAll();
   goToSection("Full");
+  return true;
 }
 
 // ----------------------
@@ -11208,9 +11215,8 @@ async function importPdfToFull(file){
       alert("PDF imported, but no selectable text was found.\n\nThis usually means the PDF is a scanned image (picture-only). Export a text-based PDF (not scanned), or save as .txt and import that.");
       return;
     }
-    await importTextToFull(text);
-    // ✅ After PDF import, jump straight to the first parsed song-part cards.
-    try{ goToSection("PAGE 1"); renderTabs(); renderSheet(); }catch{}
+    // After a PDF import, jump straight to the first parsed song-part cards.
+    if(await importTextToFull(text)) goToSection("PAGE 1");
 }catch(err){
     console.error(err);
     const online = (typeof navigator !== "undefined" && "onLine" in navigator) ? navigator.onLine : "unknown";
@@ -11563,8 +11569,9 @@ function installClipboardImport(){
       }
 
       // If the user pastes copied chord/lyric text while focus is NOT already in an editor,
-      // treat it as a song import. Pasting inside an SRP textarea/contenteditable stays normal;
-      // its own input handler will parse the updated Full Song text automatically.
+      // treat it as a song import (importTextToFull asks before replacing existing lyrics).
+      // Pasting inside an SRP textarea/contenteditable stays normal; its own input handler
+      // will parse the updated Full Song text automatically.
       const target = e.target;
       const editable = !!(target && (
         target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable ||
@@ -12535,8 +12542,7 @@ function getLastWord(text){
 
 function notesHtmlToText(src){
   try{
-    const root = (src && src.nodeType) ? src.cloneNode(true) : document.createElement("div");
-    if(!(src && src.nodeType)) root.innerHTML = String(src || "");
+    const root = (src && src.nodeType) ? src.cloneNode(true) : parseInertHtml(src);
     const out = [];
     const BLOCK = new Set(["DIV","P","LI","UL","OL","BLOCKQUOTE","PRE","H1","H2","H3","H4","H5","H6"]);
 
@@ -14906,7 +14912,7 @@ function applyNotesHistoryAt(index){
   if(!el.notesEditor) return;
   const snap = normalizeNotesHtml(state.notesHistory[index] ?? "");
   state.notesApplyingHistory = true;
-  el.notesEditor.innerHTML = snap;
+  el.notesEditor.innerHTML = sanitizeNotesHtml(snap);
   resolveNotesImageElementSources();
   applyNotesEditorDefaults();
   state.notesApplyingHistory = false;
@@ -14978,12 +14984,47 @@ function applyNotesEditorDefaults(){
   }catch{}
 }
 
+const NOTES_ALLOWED_TAGS = new Set(["DIV","P","BR","SPAN","B","STRONG","I","EM","U","S","STRIKE","FONT","SMALL","BIG","MARK","SUB","SUP","UL","OL","LI","H1","H2","H3","H4","H5","H6","BLOCKQUOTE","PRE","CODE","HR","IMG","A","INPUT"]);
+const NOTES_DROPPED_TAGS = new Set(["SCRIPT","STYLE","TEMPLATE","IFRAME","FRAME","FRAMESET","OBJECT","EMBED","APPLET","SVG","MATH","NOSCRIPT","TEXTAREA","SELECT","OPTION","BUTTON","FORM","LINK","META","BASE","TITLE","HEAD","VIDEO","AUDIO","SOURCE","TRACK","CANVAS","PORTAL"]);
+const NOTES_ALLOWED_ATTRS = new Set(["class","style","contenteditable","aria-hidden","alt","title","loading","decoding","width","height","color","size","face","type","checked","href","src",
+  "data-notes-image-id","data-notes-checkbox","data-notes-rhyme-marker","data-free-x","data-free-y"]);
+const NOTES_SAFE_URL = /^(?:https?:|mailto:|blob:|data:image\/(?:png|jpe?g|gif|webp);|\/|\.{0,2}\/|#|[^:]*$)/i;
+const NOTES_UNSAFE_STYLE = /url\s*\(|expression\s*\(|javascript:|@import|behavior\s*:|-moz-binding/i;
+
+// Allowlist sanitizer for notes HTML (see parseInertHtml).
 function sanitizeNotesHtml(html){
-  let s = stripNotesRhymeMarkers(String(html || ""));
+  const s = stripNotesRhymeMarkers(String(html || ""));
   if(!s.trim()) return "";
-  s = s.replace(/<script[\s\S]*?<\/script>/gi, "");
-  s = s.replace(/ on\w+=("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
-  return s;
+  const body = parseInertHtml(s);
+  const clean = (node) => {
+    for(const child of Array.from(node.childNodes)){
+      if(child.nodeType === Node.COMMENT_NODE){ child.remove(); continue; }
+      if(child.nodeType !== Node.ELEMENT_NODE) continue;
+      const tag = child.tagName.toUpperCase();
+      if(NOTES_DROPPED_TAGS.has(tag) || (tag === "INPUT" && String(child.getAttribute("type") || "").toLowerCase() !== "checkbox")){
+        child.remove();
+        continue;
+      }
+      if(!NOTES_ALLOWED_TAGS.has(tag)){
+        clean(child);
+        child.replaceWith(...Array.from(child.childNodes)); // unknown wrapper: keep its text
+        continue;
+      }
+      for(const attr of Array.from(child.attributes)){
+        const name = attr.name.toLowerCase();
+        const value = String(attr.value || "").trim();
+        const ok = NOTES_ALLOWED_ATTRS.has(name)
+          && !(name === "style" && NOTES_UNSAFE_STYLE.test(value))
+          && !(name === "href" && (tag !== "A" || !NOTES_SAFE_URL.test(value)));
+        if(!ok) child.removeAttribute(attr.name);
+      }
+      // Note photos get their src at runtime from local storage; keep only harmless sources.
+      if(tag === "IMG" && child.hasAttribute("src") && !NOTES_SAFE_URL.test(String(child.getAttribute("src")).trim())) child.removeAttribute("src");
+      clean(child);
+    }
+  };
+  clean(body);
+  return body.innerHTML;
 }
 
 function getNotesDoc(){
