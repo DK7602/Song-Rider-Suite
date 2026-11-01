@@ -8055,7 +8055,6 @@ function ensureCapoStepToggle(){
       updateKeyFromAllNotes();
       if(state.project) upsertProject(state.project);
       window.CRP_SRP_syncMetaToCrp?.();
-      window.CRP_SRP_writeHardSyncFromSrp?.();
     });
   }
 
@@ -9085,21 +9084,23 @@ function buildAlignedLine(line, semis=0){
   return { notesLine, lyricsLine, beatsLine: lyricsLine };
 }
 
+// Chord line placed over a lyric line: each chord goes to its slot's column, but never on top
+// of (or glued to) the previous chord, even when the lyric is short. Two spaces between chords
+// keep the line readable as an aligned chord row when the Full text is parsed back into cards.
 function buildChordSheetLines(noteRows, lyric){
   const L = String(lyric || "");
   const slots = Array.isArray(noteRows) ? noteRows.slice(0,8) : [];
   if(!L.trim() || !slots.some(x => String(x||"").trim())) return { chordLine: "", lyricLine: L };
   const len = Math.max(1, L.length);
-  let arr = Array(len).fill(" ");
+  let line = "";
   for(let i=0;i<8;i++){
     const ch = String(slots[i]||"").trim();
     if(!ch) continue;
-    const col = Math.max(0, Math.min(len-1, Math.round(i * (len-1) / 7)));
-    for(let k=0;k<ch.length && col+k < len;k++){
-      arr[col+k] = ch[k];
-    }
+    const want = Math.max(0, Math.min(len-1, Math.round(i * (len-1) / 7)));
+    const col = line.length ? Math.max(want, line.length + 2) : want;
+    line = line.padEnd(col, " ") + ch;
   }
-  return { chordLine: arr.join(""), lyricLine: L };
+  return { chordLine: line.padEnd(len, " "), lyricLine: L };
 }
 
 
@@ -15640,7 +15641,6 @@ if(el.capoInput){
 
     // Commit once, after editing is complete, to the same hard sync bus used by CRP + BD.
     window.CRP_SRP_syncMetaToCrp?.();
-    window.CRP_SRP_writeHardSyncFromSrp?.()
   };
 
   el.capoInput.addEventListener("input", previewCapoStep_CAPTURE, true);
@@ -15707,7 +15707,8 @@ if(el.capoInput){
     if(state.currentSection === "Full"){
       try{ renderSheet(); }catch{}
     }
-    if(state.project){ upsertProject(state.project); window.CRP_SRP_syncMetaToCrp?.(); }
+    // Linked CRP/BD hears about the value once editing is finished (change/blur/Enter).
+    if(state.project) upsertProject(state.project);
   });
 
   el.capoInput.addEventListener("change", () => {
@@ -16023,7 +16024,6 @@ if(el.capoInput){
     if(state.drumsOn) startDrums();
     restartClockIfRunning();
     window.CRP_SRP_syncMetaToCrp?.();
-    window.CRP_SRP_writeHardSyncFromSrp?.();
   }
 
   if(el.bpmInput) el.bpmInput.addEventListener("input", () => {
@@ -16064,7 +16064,6 @@ if(el.bpmInput){
     if(!el.capoInput) return;
     commitCapoStepFromInput();
     window.CRP_SRP_syncMetaToCrp?.();
-    window.CRP_SRP_writeHardSyncFromSrp?.();
   }
 
  if(el.capoInput) el.capoInput.addEventListener("input", () => {
@@ -16610,623 +16609,331 @@ KEEP RHYME UI ABOVE KEYBOARD
 
 
 
-/* CRP / SRP integration bridge. In v2.1 the CRP-integrated Song Rider runs as a real page,
-   not inside an iframe. This eliminates Android/iOS nested-scroll gesture conflicts. */
+/* CRP / SRP integration bridge.
+   Song Rider Pro runs as its own page next to Chord Rider Pro / Baby DAW (same origin). One SRP
+   song can be linked to one CRP project; the pair then shares BPM / capo / step / key, and the CRP
+   chord rows are merged into PAGE 1 of the SRP song.
+
+   Shared localStorage keys (root app.js is unchanged and keeps using all of them):
+     crp-srp-links-v1                persistent links: CRP id -> {srpProjectId, srpName, linkedAt}
+     crp-srp-link-session-v3         the pair that is open right now (CRP only syncs with this pair)
+     crp-srp-active-link-id-v1       raw CRP id of that pair
+     crp-srp-handoff-v2              CRP's last handoff payload (fallback when crp-projects lacks it)
+     song-rider-suite-transport-v6   live BPM / capo / octave / pitch mode of the pair (read first)
+     crp-srp-canonical-v1:<crpId>    per-project transport + key / transpose (CRP reads key here)
+     crp-srp-meta-v1:<crpId>         per-project shared meta (base record)
+   Older generations (crp-srp-live-meta-v3, crp-srp-unified-meta-v1:<id>, crp-srp-hard-sync-v1) are
+   still read as fallbacks but no longer written.
+
+   Updates are event driven: storage events and the transport BroadcastChannel, plus one re-read at
+   startup, pageshow, focus and when the tab becomes visible. SRP writes carry source:'srp' and a
+   rev, and values are compared before applying or publishing, so neither side re-applies, re-saves
+   or re-publishes an echo of its own change. */
 (function(){
   const q=new URLSearchParams(location.search);
-  const embedded=q.get('embedded')==='1';
   const integrated=q.get('crpMode')==='1';
   const lyricsOverlay=q.get('lyricsOverlay')==='1';
   if(lyricsOverlay)document.documentElement.classList.add('srp-lyrics-overlay-mode');
-  if(!embedded && !integrated) return;
+  if(!integrated) return;
+  const insideFrame=!!(window.parent&&window.parent!==window);
+
   const HANDOFF_KEY='crp-srp-handoff-v2';
   const LINKS_KEY='crp-srp-links-v1';
-  const SHARED_META_PREFIX='crp-srp-meta-v1:';
-  // v2.5.0: CRP/BD/SRP share one authoritative live metadata record.
-  // This deliberately does not depend on the CRP project being present in SRP's local project cache.
-  const LIVE_META_KEY='crp-srp-live-meta-v3';
-  // v2.5.1: use one project-scoped metadata record for the exact CRP project linked to SRP.
-  // This removes the previous ambiguity between active CRP id, handoff id, link-map id and a
-  // single global live-meta record.
-  const ACTIVE_LINK_KEY='crp-srp-active-link-id-v1';
-  const UNIFIED_META_PREFIX='crp-srp-unified-meta-v1:';
-  const HARD_SYNC_KEY='crp-srp-hard-sync-v1';
-  // v2.6.0: exact linked-project transport state. One authority for BPM/CAPO/STEP.
-  const CANONICAL_PREFIX='crp-srp-canonical-v1:';
-  // v2.7.0: explicit pair link. Merely opening SRP is never a link.
   const LINK_SESSION_KEY='crp-srp-link-session-v3';
-  // v3.3.0 LINK-SCOPED TRANSPORT: the same-origin BPM/CAPO/STEP record is shared
-  // only by the exact CRP/BD <-> SRP project pair that is actively linked. Unlinked SRP
-  // projects keep independent transport values and must neither publish to nor consume this bus.
-  const SRS_TRANSPORT_KEY='song-rider-suite-transport-v6';
-  function readSuiteTransport(){
-    try{const m=readJson(SRS_TRANSPORT_KEY,null);return m&&typeof m==='object'?m:null}catch{return null}
-  }
-  function writeSuiteTransport(id,meta,source='srp'){
-    try{
-      const sid=String(id||'');
-      if(!sid)return null;
-      const prev=readSuiteTransport()||{};
-      const session=readLinkSession?.();
-      const next={
-        bpm:Math.max(40,Math.min(240,Number(meta?.bpm ?? prev.bpm ?? state.bpm)||95)),
-        capo:Math.max(0,Math.min(12,Number(meta?.capo ?? prev.capo ?? state.capo)||0)),
-        octave:Math.max(-2,Math.min(3,Number(meta?.octave ?? prev.octave ?? state.steps)||0)),
-        pitchMode:(meta?.pitchMode==='step'||meta?.pitchMode==='capo')?meta.pitchMode:(prev.pitchMode==='step'?'step':'capo'),
-        crpProjectId:sid,
-        source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()
-      };
-      writeJson(SRS_TRANSPORT_KEY,next);
-      try{window.__SRS_TRANSPORT_CHANNEL?.postMessage(next)}catch{}
-      return next;
-    }catch{return null}
-  }
-  function sharedMetaKey(id){return SHARED_META_PREFIX+String(id||'')}
-  function unifiedMetaKey(id){return UNIFIED_META_PREFIX+String(id||'')}
-  function canonicalMetaKey(id){return CANONICAL_PREFIX+String(id||'')}
-  function readLinkSession(){try{const x=readJson(LINK_SESSION_KEY,null);return x&&x.linked===true?x:null}catch{return null}}
-  function writeLinkSession(crpProjectId,srpProjectId){const prev=readJson(LINK_SESSION_KEY,{})||{};const next={linked:true,crpProjectId:String(crpProjectId||''),srpProjectId:String(srpProjectId||''),rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};writeJson(LINK_SESSION_KEY,next);return next}
-  function clearLinkSession(){try{localStorage.removeItem(LINK_SESSION_KEY)}catch{}}
+  const ACTIVE_LINK_KEY='crp-srp-active-link-id-v1';
+  const TRANSPORT_KEY='song-rider-suite-transport-v6';
+  const CANONICAL_PREFIX='crp-srp-canonical-v1:';
+  const SHARED_META_PREFIX='crp-srp-meta-v1:';
+  const LEGACY_LIVE_META_KEY='crp-srp-live-meta-v3';
+  const LEGACY_UNIFIED_PREFIX='crp-srp-unified-meta-v1:';
+  const LEGACY_HARD_SYNC_KEY='crp-srp-hard-sync-v1';
+  let transportChannel=null;
+  try{transportChannel=new BroadcastChannel(TRANSPORT_KEY);}catch{}
 
-  // v3.2.9 PROJECT-SCOPED LINKING
-  // The link map is persistent truth (CRP id -> SRP id). LINK_SESSION_KEY is only the
-  // currently loaded SRP project's active pair. This prevents a link from visually or
-  // behaviorally following every SRP project as the user switches projects.
-  function persistentLinkForSrpProject(project=state.project, repair=true){
-    try{
-      const sid=String(project?.id||'');
-      if(!sid)return null;
-      const all=links();
-      const matches=Object.entries(all).filter(([,rec])=>String(rec?.srpProjectId||'')===sid);
-      const projectCrpId=String(project?.linkedCrpProjectId||'');
-      let chosen=null;
-      if(matches.length){
-        chosen=matches.find(([crpId])=>String(crpId)===projectCrpId) ||
-          matches.slice().sort((a,b)=>(Number(b[1]?.linkedAt)||0)-(Number(a[1]?.linkedAt)||0))[0];
-        if(repair && matches.length>1){
-          for(const [crpId] of matches){ if(String(crpId)!==String(chosen[0])) delete all[crpId]; }
-          setLinks(all);
-        }
-      }else if(projectCrpId){
-        const occupying=all[projectCrpId];
-        if(!occupying){
-          // Migrate a valid legacy per-project link into the link map once.
-          const rec={srpProjectId:sid,srpName:project?.name||'Song Rider project',linkedAt:Date.now()};
-          all[projectCrpId]=rec;
-          if(repair)setLinks(all);
-          chosen=[projectCrpId,rec];
-        }else if(repair){
-          // The CRP project is owned by another SRP project. This field is stale.
-          project.linkedCrpProjectId='';
-          project.linkedOctave=0;
-          project.linkedTranspose=false;
-          upsertProject(project);
-        }
-      }
-      if(!chosen)return null;
-      const crpId=String(chosen[0]);
-      const rec=chosen[1]||{};
-      if(repair && String(project.linkedCrpProjectId||'')!==crpId){
-        project.linkedCrpProjectId=crpId;
-        upsertProject(project);
-      }
-      return {crpProjectId:crpId,srpProjectId:sid,srpName:rec.srpName||project?.name||'Song Rider project',linkedAt:Number(rec.linkedAt)||0};
-    }catch{return null}
+  function readJson(key,fallback){
+    try{const raw=localStorage.getItem(key);return raw?(JSON.parse(raw)??fallback):fallback;}
+    catch(err){console.warn('Unreadable linked-workspace record',key,err);return fallback;}
   }
+  function writeJson(key,value){
+    try{localStorage.setItem(key,JSON.stringify(value));return true;}
+    catch(err){console.warn('Could not save linked-workspace record',key,err);return false;}
+  }
+  const handoff=()=>readJson(HANDOFF_KEY,{})||{};
+  const links=()=>readJson(LINKS_KEY,{})||{};
+  const setLinks=(v)=>writeJson(LINKS_KEY,v||{});
+  function readLinkSession(){const x=readJson(LINK_SESSION_KEY,null);return x&&x.linked===true?x:null;}
+  function writeLinkSession(crpProjectId,srpProjectId){
+    const prev=readJson(LINK_SESSION_KEY,{})||{};
+    writeJson(LINK_SESSION_KEY,{linked:true,crpProjectId:String(crpProjectId||''),srpProjectId:String(srpProjectId||''),rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()});
+  }
+  function clearLinkSession(){try{localStorage.removeItem(LINK_SESSION_KEY);}catch{}}
+  function setActiveLinkId(id){try{if(id)localStorage.setItem(ACTIVE_LINK_KEY,String(id));else localStorage.removeItem(ACTIVE_LINK_KEY);}catch{}}
+
+  // The link map is the persistent truth (CRP id -> SRP id); the session is only the pair open now.
+  // repair=true fixes stale per-project link fields (bookkeeping, never a content edit).
+  function persistentLinkForSrpProject(project=state.project, repair=true){
+    const sid=String(project?.id||'');
+    if(!sid)return null;
+    const all=links();
+    const matches=Object.entries(all).filter(([,rec])=>String(rec?.srpProjectId||'')===sid);
+    const projectCrpId=String(project?.linkedCrpProjectId||'');
+    let chosen=null;
+    if(matches.length){
+      chosen=matches.find(([crpId])=>String(crpId)===projectCrpId)||
+        matches.slice().sort((a,b)=>(Number(b[1]?.linkedAt)||0)-(Number(a[1]?.linkedAt)||0))[0];
+      if(repair&&matches.length>1){
+        for(const [crpId] of matches){if(String(crpId)!==String(chosen[0]))delete all[crpId];}
+        setLinks(all);
+      }
+    }else if(projectCrpId){
+      if(!all[projectCrpId]){
+        // Migrate a valid legacy per-project link into the link map once.
+        const rec={srpProjectId:sid,srpName:project?.name||'Song Rider project',linkedAt:Date.now()};
+        all[projectCrpId]=rec;
+        if(repair)setLinks(all);
+        chosen=[projectCrpId,rec];
+      }else if(repair){
+        // That CRP project now belongs to another SRP song; this field is stale.
+        project.linkedCrpProjectId='';project.linkedOctave=0;project.linkedTranspose=false;
+        upsertProject(project,{bump:false,select:false});
+      }
+    }
+    if(!chosen)return null;
+    const crpId=String(chosen[0]),rec=chosen[1]||{};
+    if(repair&&String(project.linkedCrpProjectId||'')!==crpId){
+      project.linkedCrpProjectId=crpId;
+      upsertProject(project,{bump:false,select:false});
+    }
+    return {crpProjectId:crpId,srpProjectId:sid,srpName:rec.srpName||project?.name||'Song Rider project',linkedAt:Number(rec.linkedAt)||0};
+  }
+  function activeLinkedCrpId(){
+    const rec=persistentLinkForSrpProject(state.project,false);
+    if(rec?.crpProjectId)return String(rec.crpProjectId);
+    const x=readLinkSession(),sid=String(state.project?.id||'');
+    return (x?.crpProjectId&&sid&&String(x.srpProjectId||'')===sid)?String(x.crpProjectId):'';
+  }
+  function exactLinkForCurrentProject(){
+    const rec=persistentLinkForSrpProject(state.project,false),x=readLinkSession();
+    return !!(rec&&x&&String(x.crpProjectId||'')===String(rec.crpProjectId||'')&&String(x.srpProjectId||'')===String(rec.srpProjectId||''));
+  }
+  function isCurrentCrpSrpLinked(){
+    return exactLinkForCurrentProject()&&String(readLinkSession()?.srpProjectId||'')===String(state.project?.id||'');
+  }
+  window.CRP_SRP_isCurrentProjectLinked=isCurrentCrpSrpLinked;
 
   function activateLinkForCurrentSrpProject(){
-    const p=state.project;
-    const rec=persistentLinkForSrpProject(p,true);
+    const rec=persistentLinkForSrpProject(state.project,true);
     if(rec){
       const x=readLinkSession();
-      if(!x || String(x.crpProjectId||'')!==rec.crpProjectId || String(x.srpProjectId||'')!==rec.srpProjectId){
-        writeLinkSession(rec.crpProjectId,rec.srpProjectId);
-      }
-      try{localStorage.setItem(ACTIVE_LINK_KEY,rec.crpProjectId)}catch{}
+      if(!x||String(x.crpProjectId||'')!==rec.crpProjectId||String(x.srpProjectId||'')!==rec.srpProjectId)writeLinkSession(rec.crpProjectId,rec.srpProjectId);
+      setActiveLinkId(rec.crpProjectId);
     }else{
-      clearLinkSession();
-      try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}
+      if(readLinkSession())clearLinkSession();
+      setActiveLinkId('');
     }
-    try{refreshCrpLinkUi();}catch{}
-    try{renderSheetTitleBar();}catch{}
+    refreshCrpLinkUi();
+    renderSheetTitleBar();
     return rec;
   }
   window.CRP_SRP_onSrpProjectChanged=()=>{
     const rec=activateLinkForCurrentSrpProject();
-    if(rec)setTimeout(()=>{try{syncFromHandoff(false);applyLiveMetaToSrp();}catch{}},0);
+    if(rec)setTimeout(reconcileLinkedWorkspace,0);
     return rec;
   };
 
-  function exactLinkForCurrentProject(){
-    const rec=persistentLinkForSrpProject(state.project,false);
-    const x=readLinkSession();
-    return !!(rec && x &&
-      String(x.crpProjectId||'')===String(rec.crpProjectId||'') &&
-      String(x.srpProjectId||'')===String(rec.srpProjectId||''));
-  }
-  function readCanonicalMeta(id){try{const sid=String(id||activeUnifiedCrpId()||'');if(!sid)return null;const m=readJson(canonicalMetaKey(sid),null);return m&&String(m.projectId||'')===sid?m:null}catch{return null}}
-  function writeCanonicalMeta(id,meta,source='srp'){
+  // ---------------------------------------------------------------- transport (BPM / capo / step / key)
+  function readLinkedMeta(crpId){
+    const id=String(crpId||'');
     if(!id)return null;
-    try{const sid=String(id),prev=readCanonicalMeta(sid)||{};const next={...prev,...meta,projectId:sid,source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};writeJson(canonicalMetaKey(sid),next);try{window.__CRP_SRP_CANONICAL_CHANNEL?.postMessage(next)}catch{}return next}catch{return null}
+    const matching=(m,...fields)=>m&&fields.some(f=>String(m[f]||'')===id)?m:null;
+    const legacy=matching(readJson(CANONICAL_PREFIX+id,null),'projectId')||
+      matching(readJson(LEGACY_UNIFIED_PREFIX+id,null),'crpProjectId')||
+      matching(readJson(LEGACY_LIVE_META_KEY,null),'crpProjectId')||
+      matching(readJson(LEGACY_HARD_SYNC_KEY,null),'projectId','crpProjectId');
+    const transport=matching(readJson(TRANSPORT_KEY,null),'crpProjectId');
+    return transport?{...(legacy||{}),...transport}:legacy;
   }
-  function activeUnifiedCrpId(){
-    try{
-      const rec=persistentLinkForSrpProject(state.project,false);
-      if(rec?.crpProjectId)return String(rec.crpProjectId);
-      const x=readLinkSession();
-      const sid=String(state.project?.id||'');
-      if(x?.crpProjectId && sid && String(x.srpProjectId||'')===sid)return String(x.crpProjectId);
-      return String(state.project?.linkedCrpProjectId||'');
-    }catch{return String(state.project?.linkedCrpProjectId||'')}
+  function transportFromMeta(m,p){
+    return {
+      bpm:clamp(Number(m.bpm)||Number(p.bpm)||95,40,240),
+      capo:clamp(Number(m.capo)||0,0,12),
+      steps:clamp(Number(m.octave)||0,-2,3),
+      transposeMode:m.pitchMode==='step'?'step':'capo',
+      crpKey:m.key!=null?String(m.key||''):String(p.crpKey||''),
+      linkedTranspose:typeof m.transpose==='boolean'?m.transpose:!!p.linkedTranspose
+    };
   }
-  function readLiveMeta(){
-    const id=activeUnifiedCrpId();
-    if(!id || !exactLinkForCurrentProject())return null;
-    const canonical=readCanonicalMeta(id);
-    const unified=readJson(unifiedMetaKey(id),null);
-    const globalLive=readJson(LIVE_META_KEY,null);
-    const legacy=(canonical?{...canonical,crpProjectId:id}:(unified&&String(unified.crpProjectId||'')===id?unified:(globalLive&&String(globalLive.crpProjectId||'')===id?globalLive:null)));
-    const suite=readSuiteTransport();
-    const suiteForPair=(suite&&String(suite.crpProjectId||'')===String(id))?suite:null;
-    return suiteForPair?{...(legacy||{}),...suiteForPair,crpProjectId:String(id)}:legacy;
+  // CRP's values -> the open SRP song. Settings that came from the other app are saved without
+  // counting as an edit of the song, and nothing happens when the values are already the same.
+  function applyCrpMetaToSrp(){
+    if(!exactLinkForCurrentProject())return false;
+    const p=state.project,crpId=activeLinkedCrpId();
+    const m=crpId?readLinkedMeta(crpId):null;
+    if(!p||!m)return false;
+    const active=document.activeElement;
+    if(active===el?.bpmInput||active===el?.capoInput)return false; // the user is typing a value
+    const next=transportFromMeta(m,p);
+    const pitchChanged=next.capo!==Number(p.capo)||next.steps!==Number(p.steps)||next.transposeMode!==p.transposeMode||next.crpKey!==String(p.crpKey||'');
+    if(!pitchChanged&&next.bpm===Number(p.bpm)&&next.linkedTranspose===!!p.linkedTranspose)return false;
+    Object.assign(p,next,{linkedCrpProjectId:crpId,linkedOctave:next.steps});
+    upsertProject(p,{bump:false});
+    applyProjectSettingsToUI();
+    if(pitchChanged)renderAll();
+    else if(shouldClockRun())startBeatClock();
+    return true;
   }
-  function writeLiveMeta(id,meta){
-    if(!id)return null;
-    const sid=String(id);
-    writeCanonicalMeta(sid,meta,String(meta?.source||'srp'));
-    // ACTIVE_LINK_KEY is intentionally a raw string for easy use from the CRP page too.
-    try{localStorage.setItem(ACTIVE_LINK_KEY,sid)}catch{}
-    const old=readJson(unifiedMetaKey(sid),null);
-    const prev=(old&&String(old.crpProjectId||'')===sid)?old:{};
-    const next={...prev,...meta,crpProjectId:sid,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
-    writeJson(unifiedMetaKey(sid),next);
-    writeJson(LIVE_META_KEY,next);
-    try{window.__CRP_SRP_META_CHANNEL?.postMessage(next)}catch{}
+  function sameTransport(a,b){
+    return !!(a&&b)&&Number(a.bpm)===Number(b.bpm)&&Number(a.capo)===Number(b.capo)&&Number(a.octave)===Number(b.octave)&&
+      (a.pitchMode==='step'?'step':'capo')===(b.pitchMode==='step'?'step':'capo')&&String(a.key??'')===String(b.key??'')&&!!a.transpose===!!b.transpose;
+  }
+  function writeRecord(key,meta,extra){
+    const prev=readJson(key,{})||{};
+    const next={...prev,...meta,...extra,source:'srp',rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
+    writeJson(key,next);
     return next;
   }
-  function readHardSync(){
+  // The open SRP song's values -> the linked CRP project (only when they actually changed).
+  function publishSrpTransport(){
     if(!exactLinkForCurrentProject())return null;
-    const id=String(activeUnifiedCrpId()||'');
-    if(!id)return null;
-    const suite=readSuiteTransport();
-    if(suite&&String(suite.crpProjectId||'')===id)return suite;
-    const canonical=readCanonicalMeta(id);
-    if(canonical)return canonical;
-    const legacy=readJson(HARD_SYNC_KEY,null);
-    return legacy&&String(legacy.projectId||legacy.crpProjectId||'')===id?legacy:null;
-  }
-  function writeHardSyncFromSrp(){
-    try{
-      if(!exactLinkForCurrentProject())return null;
-      const projectId=String(activeLinkedCrpId()||'');
-      if(!projectId)return null;
-      const mode=state.transposeMode==='step'?'step':'capo';
-      const raw=Number(el?.capoInput?.value);
-      const bpm=Math.max(40,Math.min(240,Number(el?.bpmInput?.value)||Number(state.bpm)||95));
-      let capo=Math.max(0,Math.min(12,Number(state.capo)||0));
-      let octave=Math.max(-2,Math.min(3,Number(state.steps)||0));
-      if(Number.isFinite(raw)){
-        if(mode==='capo'){capo=Math.max(0,Math.min(12,Math.round(raw)));state.capo=capo;if(state.project)state.project.capo=capo;}
-        else{octave=Math.max(-2,Math.min(3,raw));state.steps=octave;if(state.project){state.project.steps=octave;state.project.linkedOctave=octave;}}
-      }
-      state.bpm=bpm;if(state.project){state.project.bpm=bpm;state.project.transposeMode=mode;}
-      const next=writeSuiteTransport(projectId,{bpm,capo,octave,pitchMode:mode},'srp');
-      // Legacy records are mirrors only, retained for key/chord-link compatibility.
-      writeCanonicalMeta(projectId,{bpm,capo,octave,pitchMode:mode},'srp');
-      writeJson(HARD_SYNC_KEY,next||{bpm,capo,octave,pitchMode:mode,projectId,source:'srp',rev:1,updatedAt:Date.now()});
-      return next;
-    }catch{return null}
-  }
-  window.CRP_SRP_writeHardSyncFromSrp=writeHardSyncFromSrp;
-  let __hardSyncRev=-1;
-  function applyHardSyncToSrp(){
-    try{
-      if(!exactLinkForCurrentProject())return false;
-      const m=readHardSync();if(!m)return false;
-      const linkedId=String(activeLinkedCrpId()||'');
-      if(!linkedId)return false;
-      const metaId=String(m.crpProjectId||m.projectId||'');
-      if(metaId&&metaId!==linkedId)return false;
-      // Do not let the background sync poll fight the user's active BPM/CAPO/STEP edit.
-      // Crucially, do not mark this revision applied until the field is no longer focused.
-      const active=document.activeElement;
-      if(active===el?.bpmInput||active===el?.capoInput)return false;
-      const rev=Number(m.rev)||0;if(rev===__hardSyncRev)return false;__hardSyncRev=rev;
-      state.bpm=Math.max(40,Math.min(240,Number(m.bpm)||state.bpm||95));
-      state.capo=Math.max(0,Math.min(12,Number(m.capo)||0));
-      state.steps=Math.max(-2,Math.min(3,Number(m.octave)||0));
-      state.transposeMode=m.pitchMode==='step'?'step':'capo';
-      if(state.project){state.project.bpm=state.bpm;state.project.capo=state.capo;state.project.steps=state.steps;state.project.transposeMode=state.transposeMode;upsertProject(state.project);}
-      if(el?.bpmInput)el.bpmInput.value=String(state.bpm);
-      if(el?.capoInput)el.capoInput.value=String(state.transposeMode==='step'?state.steps:state.capo);
-      applyProjectSettingsToUI();renderAll();
-      return true;
-    }catch{return false}
-  }
-  function readSharedMeta(id){
-    if(!id)return null;
-    const sid=String(id), base=readJson(sharedMetaKey(sid),null);
-    const session=readLinkSession();
-    const explicitlyLinked=!!(session&&String(session.crpProjectId||'')===sid);
-    if(!explicitlyLinked)return base;
-    const canonical=readCanonicalMeta(sid);
-    const live=readLiveMeta();
-    const legacy=(canonical?{...(base||{}),...canonical,crpProjectId:sid}:(live&&String(live.crpProjectId||'')===sid?{...(base||{}),...live}:base));
-    const suite=readSuiteTransport();
-    const suiteForPair=(suite&&String(suite.crpProjectId||'')===sid)?suite:null;
-    return suiteForPair?{...(legacy||{}),...suiteForPair,crpProjectId:sid}:legacy;
-  }
-  function writeSharedMeta(id,meta){if(!id)return;const base=readJson(sharedMetaKey(id),{})||{};writeJson(sharedMetaKey(id),{...base,...meta,projectId:String(id),updatedAt:Date.now()});}
-
-  // Native SRP is a separate page, so the original CRP/BD audio engine would otherwise
-  // be gone after navigation. Keep a tiny hidden same-origin copy of the main workspace
-  // alive strictly as the linked playback engine. Calling its CRPParts methods directly
-  // from the user's tap preserves browser audio permission and plays the actual saved parts.
-  let linkedPlaybackFrame=null;
-  let linkedPlaybackReady=false;
-  let linkedPlaybackWatch=0;
-  function watchLinkedPlaybackState(){
-    clearInterval(linkedPlaybackWatch);
-    linkedPlaybackWatch=setInterval(()=>{
-      try{
-        const actual=!!linkedPlaybackFrame?.contentWindow?.CRPParts?.isPlaying?.();
-        if(actual!==!!window.__SRP_LINKED_PLAYING){
-          window.__SRP_LINKED_PLAYING=actual;
-          renderSheetTitleBar();
-        }
-      }catch{}
-    },250);
-  }
-  function ensureLinkedPlaybackBridge(){
-    if(!integrated || lyricsOverlay || (window.parent&&window.parent!==window)) return null;
-    if(linkedPlaybackFrame?.isConnected) return linkedPlaybackFrame;
-    const f=document.createElement('iframe');
-    f.id='crpLinkedPlaybackBridge';
-    f.title='Linked Chord Rider playback engine';
-    f.setAttribute('aria-hidden','true');
-    f.tabIndex=-1;
-    Object.assign(f.style,{position:'fixed',width:'1px',height:'1px',left:'-10000px',top:'-10000px',opacity:'0',pointerEvents:'none',border:'0'});
-    f.src='../index.html?playbackBridge=1';
-    f.addEventListener('load',()=>{linkedPlaybackReady=true;watchLinkedPlaybackState();});
-    document.body.appendChild(f);
-    linkedPlaybackFrame=f;
-    return f;
-  }
-  function refreshLinkedPlaybackProject(w){
-    try{
-      if(!exactLinkForCurrentProject()) return false;
-      const session=readLinkSession();
-      const linkedId=String(session?.crpProjectId||'');
-      if(linkedId && typeof w?.CRPCore?.loadProjectById==='function'){
-        w.CRPCore.loadProjectById(linkedId);
-        return true;
-      }
-    }catch(err){console.warn('Could not refresh linked CRP playback project',err)}
-    return false;
-  }
-  window.CRP_SRP_getLinkedPlaybackTiming=function(){
-    try{
-      const f=ensureLinkedPlaybackBridge();
-      const parts=f?.contentWindow?.CRPParts;
-      return parts?.getPlaybackTiming?.() || null;
-    }catch{return null;}
-  };
-
-  window.CRP_SRP_linkedPlaybackCommand=function(command){
-    // Only the exact SRP<->CRP pair may use the hidden CRP/Baby DAW audio engine.
-    // Unlinked SRP songs play their own parsed chords locally instead.
-    if(!exactLinkForCurrentProject()){
-      window.__SRP_LINKED_PLAYING=false;
-      return false;
-    }
-    const f=ensureLinkedPlaybackBridge();
-    const w=f?.contentWindow;
-    if(!w){ return false; }
-    try{
-      // Reload the active saved project immediately before Play so BPM, capo, drums,
-      // chord parts, lead/bass parts, enabled states and volumes are current.
-      if(command==='play') refreshLinkedPlaybackProject(w);
-      const parts=w.CRPParts;
-      if(!parts){
-        // The bridge is preloaded on SRP entry. If a very fast tap beats initialization,
-        // leave the UI stopped rather than pretending audio started.
-        window.__SRP_LINKED_PLAYING=false;
-        setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);
-        return false;
-      }
-      if(command==='play') parts.startPlayback?.();
-      else if(command==='pause'||command==='stop') parts.stopPlayback?.();
-      const on=command==='play';
-      window.__SRP_LINKED_PLAYING=on;
-      setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);
-      return true;
-    }catch(err){
-      console.error('Linked CRP/BD playback failed',err);
-      window.__SRP_LINKED_PLAYING=false;
-      setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);
-      return false;
-    }
-  };
-
-  function readJson(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'')||fallback}catch{return fallback}}
-  function writeJson(key,v){try{localStorage.setItem(key,JSON.stringify(v))}catch{}}
-  function handoff(){return readJson(HANDOFF_KEY,{})||{}}
-  function links(){return readJson(LINKS_KEY,{})||{}}
-  function setLinks(v){writeJson(LINKS_KEY,v||{})}
-  function recoverCrpPayload(preferredCrpId=''){
-    try{
-      const projects=readJson('crp-projects',[])||[];
-      const h=handoff();
-      const session=readLinkSession();
-      // Explicit Link SRP targets the CRP/Baby DAW project actually open right now.
-      // Background sync for an already-linked SRP project instead asks for that project's
-      // persisted CRP partner via preferredCrpId, so the link never follows another project.
-      const activeId=String(preferredCrpId||localStorage.getItem('crp-active-project-id')||h?.payload?.crpProjectId||session?.crpProjectId||'');
-      let p=(activeId&&projects.find(x=>String(x?.id||'')===activeId)) ||
-        (!preferredCrpId&&h?.payload?.crpProjectId&&projects.find(x=>String(x?.id||'')===String(h.payload.crpProjectId))) || null;
-      if(p?.id){
-        // v2.4.8: shared meta is the single authority for BPM/capo/octave.
-        // This prevents a page reload or cloud/current-project restore from resurrecting stale values.
-        const activeSession=readLinkSession();
-        const shared=(activeSession&&String(activeSession.crpProjectId||'')===String(p.id))?readSharedMeta(p.id):null;
-        if(shared){
-          p={...p,
-            bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,
-            capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,
-            octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,
-            transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,
-            key:String(shared.key ?? p.key ?? '')
-          };
-          const idx=projects.findIndex(x=>String(x?.id||'')===String(p.id));
-          if(idx>=0){projects[idx]={...projects[idx],bpm:p.bpm,capo:p.capo,octave:p.octave,transpose:p.transpose,key:p.key};writeJson('crp-projects',projects);}
-        }
-        const payload={
-          crpProjectId:p.id,name:p.name||'Untitled',bpm:Number(p.bpm)||92,beats:Number(p.beats)||4,
-          key:String(p.key||''),capo:Number(p.capo)||0,octave:Number(p.octave)||0,transpose:!!p.transpose,pitchMode:(shared?.pitchMode==='step'?'step':'capo'),
-          rows:(Array.isArray(p.rows)?p.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))
-        };
-        writeJson(HANDOFF_KEY,{payload,rec:links()[p.id]||h?.rec||null,ts:Date.now()});
-        return payload;
-      }
-      if(h?.payload?.crpProjectId && (!preferredCrpId || String(h.payload.crpProjectId)===String(preferredCrpId))) return h.payload;
-      return null;
-    }catch(err){ console.error('Could not recover CRP project for SRP link',err); return handoff()?.payload||null; }
-  }
-
-  function reportLink(payload,p){
-    if(!payload?.crpProjectId||!p)return;
-    if(integrated){
-      const all=links();
-      all[payload.crpProjectId]={srpProjectId:p.id,srpName:p.name||payload.name||'Song Rider project',linkedAt:Date.now()};
-      setLinks(all);
-      writeLinkSession(payload.crpProjectId,p.id);
-      try{localStorage.setItem(ACTIVE_LINK_KEY,String(payload.crpProjectId))}catch{}
-      refreshCrpLinkUi();
-    }else{
-      try{parent.postMessage({type:'srp-link-result',crpProjectId:payload.crpProjectId,srpProjectId:p.id,srpName:p.name},location.origin)}catch{}
-    }
-  }
-
-  function importCrpStructure(payload, forceCreate, requestedId){
-    if(!payload?.crpProjectId) return null;
-    try{
-      persistActiveProjectState?.();
-      let all=loadAllProjects().map(normalizeProject).filter(Boolean);
-      let p=null;
-      if(forceCreate){
-        // A tap on Link SRP always links the SRP project currently on screen.
-        // Never jump to an older SRP project that happened to be linked to this CRP before.
-        p=state.project?normalizeProject(deepClone(state.project)):defaultProject('New Song');
-
-        // Keep links one-to-one. Detach stale records that point either side at another project.
-        const linkMap=links();
-        for(const [oldCrpId,rec] of Object.entries(linkMap)){
-          const oldSrpId=String(rec?.srpProjectId||'');
-          if(String(oldCrpId)===String(payload.crpProjectId) || oldSrpId===String(p.id||'')){
-            delete linkMap[oldCrpId];
-            if(oldSrpId && oldSrpId!==String(p.id||'')){
-              const oldProj=all.find(x=>String(x.id||'')===oldSrpId);
-              if(oldProj && String(oldProj.linkedCrpProjectId||'')===String(oldCrpId)){
-                oldProj.linkedCrpProjectId='';
-                oldProj.linkedOctave=0;
-                oldProj.linkedTranspose=false;
-                upsertProject(oldProj);
-              }
-            }
-          }
-        }
-        setLinks(linkMap);
-      }else{
-        if(requestedId)p=all.find(x=>String(x.id)===String(requestedId));
-        if(!p)p=all.find(x=>String(x.linkedCrpProjectId||'')===String(payload.crpProjectId));
-      }
-      if(!p)return null;
-      p.linkedCrpProjectId=payload.crpProjectId;
-      // SRP owns its own project name. Linking/syncing must never rename it to the CRP name.
-      p.bpm=Number(payload.bpm)||p.bpm||95;
-      p.crpKey=String(payload.key||'');
-      p.capo=Math.max(0,Math.min(12,Number(payload.capo)||0));
-      p.transposeMode=payload.pitchMode==='step'?'step':'capo';
-      p.steps=Math.max(-2,Math.min(3,Number(payload.octave)||0));
-      p.linkedOctave=p.steps;
-      p.linkedTranspose=!!payload.transpose;
-      p.crpBeatsPerChord=Number(payload.beats)||4;
-      p.crpChordRows=payload.rows||[];
-      const sec='PAGE 1';
-      const old=Array.isArray(p.sections?.[sec])?p.sections[sec]:[];
-      const rows=Array.isArray(payload.rows)?payload.rows:[];
-      p.sections=p.sections||{};
-      p.sections[sec]=rows.length?rows.map((r,i)=>{
-        const prev=old[i]||newLine();
-        const chords=(r.cards||[]).filter(c=>c.type==='chord').map(c=>String(c.value||'')).filter(Boolean);
-        const slots=Array(8).fill('');
-        if(chords.length)chords.forEach((ch,j)=>{slots[Math.min(7,Math.floor(j*8/chords.length))]=ch});
-        return {...prev,id:prev.id||String(r.lineId||uuid()),notes:slots,lyrics:String(prev.lyrics||''),beats:Array.isArray(prev.beats)?prev.beats:Array(4).fill('')};
-      }):[old[0]||newLine()];
-      p.enabledSections=Array.from(new Set(['PAGE 1',...(p.enabledSections||[])]));
-      p.updatedAt=now();
+    const p=state.project,crpId=activeLinkedCrpId();
+    if(!p||!crpId)return null;
+    const mode=state.transposeMode==='step'?'step':'capo';
+    const bpm=clamp(Number(el?.bpmInput?.value)||Number(state.bpm)||95,40,240);
+    let capo=clamp(Number(state.capo)||0,0,12),octave=clamp(Number(state.steps)||0,-2,3);
+    const raw=Number(el?.capoInput?.value);
+    if(Number.isFinite(raw)){if(mode==='capo')capo=clamp(Math.round(raw),0,12);else octave=clamp(raw,-2,3);}
+    Object.assign(state,{bpm,capo,steps:octave,transposeMode:mode});
+    if(Number(p.bpm)!==bpm||Number(p.capo)!==capo||Number(p.steps)!==octave||p.transposeMode!==mode){
+      Object.assign(p,{bpm,capo,steps:octave,linkedOctave:octave,transposeMode:mode});
       upsertProject(p);
-      state.project=normalizeProject(p);
-      state.bpm=p.bpm;
-      setCurrentProjectIdForScope(getStorageScope(),p.id);
-      applyProjectSettingsToUI();
-      renderAll();
-      reportLink(payload,p);
-      return p;
-    }catch(err){console.error('CRP/SRP link sync failed',err);return null}
+    }
+    const meta={bpm,capo,octave,pitchMode:mode,key:String(p.crpKey||el?.keyOutput?.value||'').trim(),transpose:!!p.linkedTranspose};
+    if(sameTransport(readLinkedMeta(crpId),meta))return null; // already there (e.g. it came from CRP)
+    const transport=writeRecord(TRANSPORT_KEY,{bpm,capo,octave,pitchMode:mode},{crpProjectId:crpId});
+    try{transportChannel?.postMessage(transport);}catch{}
+    writeRecord(CANONICAL_PREFIX+crpId,meta,{projectId:crpId});
+    writeRecord(SHARED_META_PREFIX+crpId,meta,{projectId:crpId});
+    // Keep CRP's local copy in step for its hidden playback engine. Not a CRP edit: no timestamp bump.
+    const projects=readJson('crp-projects',[])||[];
+    const i=projects.findIndex(x=>String(x?.id||'')===crpId);
+    if(i>=0){
+      const cp=projects[i],upd={bpm,capo,octave,transpose:meta.transpose,...(meta.key?{key:meta.key}:{})};
+      if(Object.keys(upd).some(k=>cp[k]!==upd[k])){projects[i]={...cp,...upd};writeJson('crp-projects',projects);}
+    }
+    return transport;
   }
-
-  function activeLinkedCrpId(){
-    const rec=persistentLinkForSrpProject(state.project,false);
-    if(rec?.crpProjectId)return String(rec.crpProjectId);
-    const x=readLinkSession();
-    const sid=String(state.project?.id||'');
-    return (x?.crpProjectId && sid && String(x.srpProjectId||'')===sid)?String(x.crpProjectId):'';
-  }
-  function syncMetaToCrp(){
-    try{
-      let p=state.project;if(!p)return;
-      const crpId=activeLinkedCrpId();if(!crpId)return;
-      // Never change the SRP project selection from background link sync.
-      const session=readLinkSession();
-      // Project-level metadata only belongs to the exact pair on screen.
-      // Global BPM/CAPO/STEP sync is handled separately by the suite transport bus.
-      if(!session || String(session.srpProjectId||'')!==String(p.id||'') || String(session.crpProjectId||'')!==String(crpId)) return;
-      p.linkedCrpProjectId=crpId;
-      const liveBpm=Number(el?.bpmInput?.value);
-      const rawAmount=Number(el?.capoInput?.value);
-      const mode=(state.transposeMode==='step'?'step':'capo');
-      p.transposeMode=mode;
-      if(Number.isFinite(liveBpm)){state.bpm=Math.max(40,Math.min(240,liveBpm));p.bpm=state.bpm;}
-      if(Number.isFinite(rawAmount)){
-        if(mode==='capo'){state.capo=Math.max(0,Math.min(12,Math.round(rawAmount)));p.capo=state.capo;}
-        else{state.steps=Math.max(-2,Math.min(3,rawAmount));p.steps=state.steps;p.linkedOctave=state.steps;}
-      }
-      upsertProject(p);
-
-      const bpm=Math.max(40,Math.min(240,Number(state.bpm ?? p.bpm)||92));
-      const capo=Math.max(0,Math.min(12,Number(state.capo ?? p.capo)||0));
-      const octave=Math.max(-2,Math.min(3,Number(state.steps ?? p.steps ?? p.linkedOctave)||0));
-      const key=String(p.crpKey||el?.keyOutput?.value||'').trim();
-      const transpose=!!p.linkedTranspose;
-
-      // WRITE FIRST. This is the key v2.5.0 change: SRP no longer needs to find a local CRP
-      // project record before BPM/capo/STEP can reach CRP/BD.
-      const meta={bpm,capo,octave,transpose,key,pitchMode:mode,source:'srp'};
-      writeHardSyncFromSrp();
-      writeLiveMeta(crpId,meta);
-      writeSharedMeta(crpId,meta);
-
-      // Update the local CRP backup too when it exists, but its absence is no longer a sync failure.
-      const projects=readJson('crp-projects',[])||[];
-      const i=projects.findIndex(x=>String(x?.id||'')===String(crpId));
-      let cp=i>=0?{...projects[i]}:null;
-      if(cp){
-        cp.bpm=bpm;cp.capo=capo;cp.octave=octave;cp.transpose=transpose;
-        if(key)cp.key=key;
-        cp.updatedAt=Date.now();projects[i]=cp;writeJson('crp-projects',projects);
-      }
-
-      const h=handoff();
-      const oldPayload=h?.payload||{};
-      const payload={...oldPayload,crpProjectId:crpId,name:cp?.name||oldPayload.name||p.name||'Untitled',bpm,beats:Number(cp?.beats??oldPayload.beats)||4,key:key||String(cp?.key||oldPayload.key||''),capo,octave,transpose,pitchMode:mode,rows:oldPayload.rows||[]};
-      writeJson(HANDOFF_KEY,{payload,rec:links()[crpId]||h?.rec||null,ts:Date.now()});
-    }catch(err){console.warn('Could not sync SRP metadata back to CRP',err)}
-  }
-  window.CRP_SRP_syncMetaToCrp=syncMetaToCrp;
-  // v2.5.4: number fields are editing buffers. Do not hard-sync on every keystroke.
-  // Mobile number keyboards emit intermediate values (e.g. 1 -> 12 -> 120), and the old
-  // 250 ms reconciliation loop could clamp/write those partial values back into the box.
-  // Commit only when the user finishes the edit (change/blur/Enter).
-  const commitSrpLinkedNumber=()=>{ syncMetaToCrp(); writeHardSyncFromSrp(); };
+  window.CRP_SRP_syncMetaToCrp=publishSrpTransport;
+  // Number fields are editing buffers: publish only when the user finishes (change/blur/Enter).
   [el?.bpmInput,el?.capoInput].filter(Boolean).forEach(node=>{
-    ['change','blur'].forEach(type=>node.addEventListener(type,commitSrpLinkedNumber,true));
-    node.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitSrpLinkedNumber();node.blur();}},true);
+    ['change','blur'].forEach(type=>node.addEventListener(type,publishSrpTransport,true));
+    node.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();publishSrpTransport();node.blur();}},true);
   });
 
-  let __lastAppliedLiveRev=-1;
-  function applyLiveMetaToSrp(){
-    try{
-      if(!integrated||!exactLinkForCurrentProject())return false;
-      const crpId=activeLinkedCrpId();
-      if(!crpId)return false;
-      const live=readLiveMeta();
-      if(!live||String(live.crpProjectId||'')!==String(crpId))return false;
-      const rev=Number(live.rev)||0;
-      if(rev===__lastAppliedLiveRev)return false;
-      __lastAppliedLiveRev=rev;
-
-      const session=readLinkSession();
-      let p=state.project;
-      if(!p || !session || String(session.srpProjectId||'')!==String(p.id||'')) return false;
-      p.linkedCrpProjectId=crpId;
-      p.bpm=Math.max(40,Math.min(240,Number(live.bpm)||p.bpm||95));
-      p.capo=Math.max(0,Math.min(12,Number(live.capo)||0));
-      p.steps=Math.max(-2,Math.min(3,Number(live.octave)||0));
+  // ---------------------------------------------------------------- CRP chord rows -> PAGE 1
+  function crpPayloadFor(preferredCrpId=''){
+    const projects=readJson('crp-projects',[])||[];
+    const h=handoff(),session=readLinkSession();
+    // Linking targets the CRP/Baby DAW project open right now; background sync asks for the
+    // song's saved partner (preferredCrpId) so the link never follows another project.
+    const activeId=String(preferredCrpId||localStorage.getItem('crp-active-project-id')||h?.payload?.crpProjectId||session?.crpProjectId||'');
+    const p=(activeId&&projects.find(x=>String(x?.id||'')===activeId))||
+      (!preferredCrpId&&h?.payload?.crpProjectId&&projects.find(x=>String(x?.id||'')===String(h.payload.crpProjectId)))||null;
+    if(p?.id){
+      const shared=(session&&String(session.crpProjectId||'')===String(p.id))?readLinkedMeta(p.id):null;
+      const src={...p,...(shared?{bpm:shared.bpm??p.bpm,capo:shared.capo??p.capo,octave:shared.octave??p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')}:{})};
+      return {
+        crpProjectId:p.id,name:p.name||'Untitled',bpm:Number(src.bpm)||92,beats:Number(p.beats)||4,
+        key:String(src.key||''),capo:Number(src.capo)||0,octave:Number(src.octave)||0,transpose:!!src.transpose,pitchMode:shared?.pitchMode==='step'?'step':'capo',
+        rows:(Array.isArray(p.rows)?p.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))
+      };
+    }
+    if(h?.payload?.crpProjectId&&(!preferredCrpId||String(h.payload.crpProjectId)===String(preferredCrpId)))return h.payload;
+    return null;
+  }
+  function crpRowChords(row){
+    return (Array.isArray(row?.cards)?row.cards:[]).filter(c=>(c?.type||'chord')==='chord').map(c=>String(c?.value||'').trim()).filter(Boolean);
+  }
+  function crpRowsFingerprint(rows){
+    const text=JSON.stringify((Array.isArray(rows)?rows:[]).map(crpRowChords));
+    let h=2166136261;
+    for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}
+    return `${(h>>>0).toString(36)}-${text.length}`;
+  }
+  // Put each CRP row's chords on the matching PAGE 1 card, in order. Lyrics, beats and any
+  // extra cards stay. A row with more than 8 chords continues on the next card(s).
+  function mergeCrpRowsIntoPage1(project,rows){
+    const cards=Array.isArray(project.sections?.['PAGE 1'])?project.sections['PAGE 1']:[];
+    let at=0;
+    for(const row of rows){
+      const chords=crpRowChords(row);
+      for(let start=0;start===0||start<chords.length;start+=8){
+        const chunk=chords.slice(start,start+8);
+        if(at>=cards.length)cards.push(newLine());
+        const slots=Array(8).fill('');
+        chunk.forEach((ch,j)=>{slots[Math.floor(j*8/chunk.length)]=ch;});
+        cards[at].notes=slots;
+        at++;
+      }
+    }
+    project.sections['PAGE 1']=cards;
+    project.enabledSections=Array.from(new Set(['PAGE 1',...(project.enabledSections||[])]));
+  }
+  // Link (forceCreate) or refresh the open song from its CRP partner. The chord merge only runs
+  // when CRP's rows actually changed, goes through editProject (so Undo works) and rewrites the
+  // Full text from the cards so both views agree.
+  function importCrpStructure(payload,forceCreate){
+    const p=state.project;
+    if(!payload?.crpProjectId||!p)return null;
+    const crpId=String(payload.crpProjectId);
+    persistActiveProjectState();
+    if(forceCreate){
+      // Keep links one-to-one: detach records pointing either side at another project.
+      const linkMap=links();
+      for(const [oldCrpId,rec] of Object.entries(linkMap)){
+        const oldSrpId=String(rec?.srpProjectId||'');
+        if(String(oldCrpId)!==crpId&&oldSrpId!==String(p.id))continue;
+        delete linkMap[oldCrpId];
+        const oldProj=oldSrpId&&oldSrpId!==String(p.id)?libraryProject(oldSrpId):null;
+        if(oldProj&&String(oldProj.linkedCrpProjectId||'')===String(oldCrpId)){
+          oldProj.linkedCrpProjectId='';oldProj.linkedOctave=0;oldProj.linkedTranspose=false;
+          upsertProject(oldProj,{bump:false,select:false});
+        }
+      }
+      setLinks(linkMap);
+    }
+    const rows=Array.isArray(payload.rows)?payload.rows:[];
+    const sig=crpRowsFingerprint(rows);
+    if(forceCreate||p.crpRowsSig!==sig){
+      editProject('linkCrpChords',()=>{
+        mergeCrpRowsIntoPage1(p,rows);
+        syncFullTextFromSections();
+      });
+    }
+    p.linkedCrpProjectId=crpId;
+    p.crpRowsSig=sig;
+    p.crpChordRows=rows;
+    p.crpBeatsPerChord=Number(payload.beats)||4;
+    if(forceCreate){
+      // Linking adopts CRP's transport. SRP keeps its own song name.
+      Object.assign(p,transportFromMeta({bpm:payload.bpm,capo:payload.capo,octave:payload.octave,pitchMode:payload.pitchMode,key:payload.key,transpose:payload.transpose},p));
       p.linkedOctave=p.steps;
-      p.transposeMode=live.pitchMode==='step'?'step':'capo';
-      p.linkedTranspose=!!live.transpose;
-      if(live.key!=null)p.crpKey=String(live.key||'');
-      state.project=normalizeProject(p);
-      state.bpm=p.bpm;state.capo=p.capo;state.steps=p.steps;state.transposeMode=p.transposeMode;
-      upsertProject(state.project);
-      setCurrentProjectIdForScope(getStorageScope(),state.project.id);
-      applyProjectSettingsToUI();
-      renderAll();
-      return true;
-    }catch(err){console.warn('Could not apply live CRP/SRP metadata',err);return false;}
-  }
-
-  function isCurrentCrpSrpLinked(){
-    const rec=persistentLinkForSrpProject(state.project,false);
-    const x=readLinkSession();
-    return !!(rec&&x&&state.project&&
-      String(x.crpProjectId||'')===String(rec.crpProjectId||'')&&
-      String(x.srpProjectId||'')===String(state.project.id||'')&&
-      String(rec.srpProjectId||'')===String(state.project.id||''));
-  }
-  window.CRP_SRP_isCurrentProjectLinked=()=>isCurrentCrpSrpLinked();
-
-  function unlinkCurrentCrpSrp(){
-    const currentId=String(state.project?.id||'');
-    const rec=persistentLinkForSrpProject(state.project,false);
-    const crpId=String(rec?.crpProjectId||'');
-    // Stop the linked arrangement before removing the pair so no hidden CRP/BD audio
-    // can continue after the UI says this SRP project is unlinked.
-    if(window.__SRP_LINKED_PLAYING && exactLinkForCurrentProject()){
-      try{ window.CRP_SRP_linkedPlaybackCommand?.('stop'); }catch{}
     }
-    window.__SRP_LINKED_PLAYING=false;
-    if(crpId){
-      const all=links();
-      if(String(all[crpId]?.srpProjectId||'')===currentId){delete all[crpId];setLinks(all);}
-    }
-    if(state.project){
-      state.project.linkedCrpProjectId='';
-      state.project.linkedOctave=0;
-      state.project.linkedTranspose=false;
-      upsertProject(state.project);
-    }
-    const x=readLinkSession();
-    if(!x || String(x.srpProjectId||'')===currentId)clearLinkSession();
-    try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}
-    refreshCrpLinkUi();
-    try{renderSheetTitleBar();}catch{}
+    upsertProject(p,{bump:false});
+    applyProjectSettingsToUI();
+    renderAll();
+    return p;
   }
+  window.CRP_SRP_importCrpStructure=importCrpStructure;
 
+  // ---------------------------------------------------------------- link UI
   function crpProjectNameForLink(crpId,payload=null){
     const id=String(crpId||'');
     if(!id)return '';
     if(payload&&String(payload.crpProjectId||'')===id&&String(payload.name||'').trim())return String(payload.name).trim();
-    try{
-      const projects=readJson('crp-projects',[])||[];
-      const found=projects.find(x=>String(x?.id||'')===id);
-      if(String(found?.name||'').trim())return String(found.name).trim();
-    }catch{}
-    try{
-      const h=handoff();
-      if(String(h?.payload?.crpProjectId||'')===id&&String(h?.payload?.name||'').trim())return String(h.payload.name).trim();
-    }catch{}
+    const found=(readJson('crp-projects',[])||[]).find(x=>String(x?.id||'')===id);
+    if(String(found?.name||'').trim())return String(found.name).trim();
+    const h=handoff();
+    if(String(h?.payload?.crpProjectId||'')===id&&String(h?.payload?.name||'').trim())return String(h.payload.name).trim();
     return 'Linked CRP / BD';
   }
   function setCrpLinkButtonContent(button,{linked=false,name='',busy=false}={}){
@@ -17247,134 +16954,202 @@ KEEP RHYME UI ABOVE KEYBOARD
       button.setAttribute('aria-label',busy?'Linking Song Rider Pro project':'Link SRP project');
     }
   }
-
   function refreshCrpLinkUi(){
-    if(!integrated)return;
     const rec=persistentLinkForSrpProject(state.project,false);
-    const payload=recoverCrpPayload(rec?.crpProjectId||'');
+    const payload=rec?null:crpPayloadFor('');
     const st=document.getElementById('crpSrpLinkStatus');
     const b=document.getElementById('crpSrpLinkBtn');
-    if(!rec && !payload?.crpProjectId){
+    if(!b&&!st)return;
+    if(!rec&&!payload?.crpProjectId){
       if(st)st.textContent='Save this CRP project first';
-      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});b.classList.remove('is-linked');b.title='Link this project to Song Rider Pro'}
+      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});b.classList.remove('is-linked');b.title='Link this project to Song Rider Pro';}
       return;
     }
-    const linked=!!rec;
-    const crpName=linked?crpProjectNameForLink(rec.crpProjectId,payload):'';
-    if(st)st.textContent=linked?`Linked • ${crpName}`:'Not linked';
+    const crpName=rec?crpProjectNameForLink(rec.crpProjectId,null):'';
+    if(st)st.textContent=rec?`Linked • ${crpName}`:'Not linked';
     if(b){
       b.disabled=false;
-      setCrpLinkButtonContent(b,{linked,name:crpName});
-      b.title=linked?`Unlink this SRP project from ${crpName}`:'Link this SRP project to the CRP/Baby DAW project currently open';
-      b.classList.toggle('is-linked',linked);
+      setCrpLinkButtonContent(b,{linked:!!rec,name:crpName});
+      b.title=rec?`Unlink this SRP project from ${crpName}`:'Link this SRP project to the CRP/Baby DAW project currently open';
+      b.classList.toggle('is-linked',!!rec);
     }
   }
-
+  function unlinkCurrentCrpSrp(){
+    const currentId=String(state.project?.id||'');
+    const rec=persistentLinkForSrpProject(state.project,false);
+    const crpId=String(rec?.crpProjectId||'');
+    // Stop the linked arrangement before removing the pair so no hidden CRP/BD audio keeps playing.
+    if(window.__SRP_LINKED_PLAYING&&exactLinkForCurrentProject())window.CRP_SRP_linkedPlaybackCommand?.('stop');
+    window.__SRP_LINKED_PLAYING=false;
+    if(crpId){
+      const all=links();
+      if(String(all[crpId]?.srpProjectId||'')===currentId){delete all[crpId];setLinks(all);}
+    }
+    if(state.project){
+      state.project.linkedCrpProjectId='';state.project.linkedOctave=0;state.project.linkedTranspose=false;
+      upsertProject(state.project,{bump:false});
+    }
+    const x=readLinkSession();
+    if(!x||String(x.srpProjectId||'')===currentId)clearLinkSession();
+    setActiveLinkId('');
+    refreshCrpLinkUi();
+    renderSheetTitleBar();
+  }
+  // forceCreate: the user tapped Link SRP. Otherwise refresh the open song from its saved partner.
   function syncFromHandoff(forceCreate=false){
     const savedRec=persistentLinkForSrpProject(state.project,false);
-    // A user tap links to the CRP/BD project currently open. Automatic/background sync
-    // must stay pinned to this SRP project's already-saved CRP partner.
-    const payload=recoverCrpPayload(forceCreate?'':(savedRec?.crpProjectId||''));
+    const payload=crpPayloadFor(forceCreate?'':(savedRec?.crpProjectId||''));
     const b=document.getElementById('crpSrpLinkBtn');
     const st=document.getElementById('crpSrpLinkStatus');
     if(!payload?.crpProjectId){
-      if(st)st.textContent='No saved CRP project was handed off. Return to Chord Rider, save it once, then open Song Rider again.';
-      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false})}
+      if(forceCreate){
+        if(st)st.textContent='No saved CRP project was handed off. Return to Chord Rider, save it once, then open Song Rider again.';
+        if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});}
+      }
       return null;
     }
-    const rec=forceCreate?null:savedRec;
-    if(!forceCreate && (!rec || !state.project || String(rec.srpProjectId||'')!==String(state.project.id||''))){refreshCrpLinkUi();return null}
-    if(b){b.disabled=true;setCrpLinkButtonContent(b,{busy:true})}
-    const linked=importCrpStructure(payload,forceCreate,rec?.srpProjectId||'');
-    if(linked){
+    if(!forceCreate&&(!savedRec||!state.project||String(savedRec.srpProjectId||'')!==String(state.project.id||''))){refreshCrpLinkUi();return null;}
+    const linked=importCrpStructure(payload,forceCreate);
+    if(!linked){
+      if(st)st.textContent='Link failed — tap Link SRP to try again.';
+      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});}
+      return null;
+    }
+    if(forceCreate){
       const all=links();
-      const recNow=all[payload.crpProjectId]||{
-        srpProjectId:linked.id,
-        srpName:linked.name||payload.name||'Song Rider project',
-        linkedAt:Date.now()
-      };
-      all[payload.crpProjectId]=recNow;
+      const rec={srpProjectId:linked.id,srpName:linked.name||payload.name||'Song Rider project',linkedAt:Date.now()};
+      all[payload.crpProjectId]=rec;
       setLinks(all);
       writeLinkSession(payload.crpProjectId,linked.id);
-      writeJson(HANDOFF_KEY,{payload,rec:recNow,ts:Date.now()});
-      // Seed the shared transport immediately from the just-linked project. This makes
-      // refresh deterministic before either workspace has a chance to restore an older snapshot.
-      syncMetaToCrp();
-      writeHardSyncFromSrp();
-      const linkedCrpName=crpProjectNameForLink(payload.crpProjectId,payload);
-      if(st)st.textContent=`Linked • ${linkedCrpName}`;
-      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:true,name:linkedCrpName});b.classList.add('is-linked');b.title=`Unlink this SRP project from ${linkedCrpName}`}
-      setTimeout(refreshCrpLinkUi,900);
-    }else{
-      if(st)st.textContent='Link failed — tap Link SRP to try again.';
-      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false})}
+      setActiveLinkId(payload.crpProjectId);
+      writeJson(HANDOFF_KEY,{payload,rec,ts:Date.now()});
+      // Seed the shared transport from the just-linked song so both apps start from the same values.
+      publishSrpTransport();
+      ensureLinkedPlaybackBridge();
     }
+    refreshCrpLinkUi();
     return linked;
   }
 
-  if(embedded){
-    window.addEventListener('message',e=>{if(e.origin!==location.origin)return;const d=e.data||{};if(d.type==='crp-srp-link-sync')importCrpStructure(d.payload,!!d.forceCreate,d.linkedSrpProjectId||'');});
+  // ---------------------------------------------------------------- hidden CRP playback engine
+  // SRP is a separate page, so the CRP/BD audio engine is gone after navigation. A tiny hidden
+  // same-origin copy of the main workspace is kept as the linked playback engine; calling its
+  // CRPParts from the user's tap preserves browser audio permission.
+  let linkedPlaybackFrame=null;
+  function setLinkedPlaying(on){
+    if(!!on===!!window.__SRP_LINKED_PLAYING)return;
+    window.__SRP_LINKED_PLAYING=!!on;
+    renderSheetTitleBar();
   }
-  if(integrated){
-    if(!readLinkSession()){try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}}
-    window.CRP_SRP_importCrpStructure=importCrpStructure;
-    if(!lyricsOverlay && !(window.parent&&window.parent!==window)) setTimeout(()=>{if(isCurrentCrpSrpLinked())ensureLinkedPlaybackBridge();},0);
-    document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{
-      e.preventDefault();
-      e.stopPropagation();
-      const b=e.currentTarget;
-      if(persistentLinkForSrpProject(state.project,false)){
-        b.disabled=true;
-        b.textContent='Unlinking…';
-        unlinkCurrentCrpSrp();
-        return;
+  // Follow the engine's own play/stop (e.g. when it stops by itself) without polling.
+  function observeLinkedPlayback(frame){
+    const core=frame.contentWindow?.CRPCore;
+    if(!core||typeof core.setPlaying!=='function'||core.__srpObserved)return;
+    const setPlaying=core.setPlaying;
+    core.setPlaying=function(on){const r=setPlaying.apply(this,arguments);setLinkedPlaying(on);return r;};
+    core.__srpObserved=true;
+  }
+  function ensureLinkedPlaybackBridge(){
+    if(lyricsOverlay||insideFrame)return null;
+    if(linkedPlaybackFrame?.isConnected)return linkedPlaybackFrame;
+    const f=document.createElement('iframe');
+    f.id='crpLinkedPlaybackBridge';
+    f.title='Linked Chord Rider playback engine';
+    f.setAttribute('aria-hidden','true');
+    f.tabIndex=-1;
+    Object.assign(f.style,{position:'fixed',width:'1px',height:'1px',left:'-10000px',top:'-10000px',opacity:'0',pointerEvents:'none',border:'0'});
+    f.src='../index.html?playbackBridge=1';
+    f.addEventListener('load',()=>{try{observeLinkedPlayback(f);}catch(err){console.warn('Could not observe linked playback',err);}});
+    document.body.appendChild(f);
+    linkedPlaybackFrame=f;
+    return f;
+  }
+  window.CRP_SRP_getLinkedPlaybackTiming=function(){
+    try{return ensureLinkedPlaybackBridge()?.contentWindow?.CRPParts?.getPlaybackTiming?.()||null;}
+    catch{return null;}
+  };
+  window.CRP_SRP_linkedPlaybackCommand=function(command){
+    // Only the exact SRP<->CRP pair may use the hidden engine; unlinked songs play SRP's own chords.
+    if(!exactLinkForCurrentProject()){setLinkedPlaying(false);return false;}
+    const w=ensureLinkedPlaybackBridge()?.contentWindow;
+    if(!w)return false;
+    try{
+      if(command==='play'){
+        // Reload the saved CRP project right before Play so parts, BPM, drums and volumes are current.
+        const linkedId=String(readLinkSession()?.crpProjectId||'');
+        if(linkedId&&typeof w.CRPCore?.loadProjectById==='function')w.CRPCore.loadProjectById(linkedId);
       }
-      b.disabled=true;
-      b.textContent='Linking…';
-      const st=document.getElementById('crpSrpLinkStatus');
-      if(st)st.textContent='Linking CRP project…';
-      setTimeout(()=>syncFromHandoff(true),0);
-    });
-    try{window.__CRP_SRP_META_CHANNEL=new BroadcastChannel('crp-srp-live-meta-v3');window.__CRP_SRP_META_CHANNEL.onmessage=()=>setTimeout(applyLiveMetaToSrp,0);}catch{}
-    try{window.__CRP_SRP_CANONICAL_CHANNEL=new BroadcastChannel('crp-srp-canonical-v1');window.__CRP_SRP_CANONICAL_CHANNEL.onmessage=()=>setTimeout(applyHardSyncToSrp,0);}catch{}
-    try{window.__SRS_TRANSPORT_CHANNEL=new BroadcastChannel('song-rider-suite-transport-v6');window.__SRS_TRANSPORT_CHANNEL.onmessage=()=>setTimeout(applyHardSyncToSrp,0);}catch{}
-    window.addEventListener('storage',e=>{if(e.key===HARD_SYNC_KEY||String(e.key||'').startsWith(CANONICAL_PREFIX)||e.key===SRS_TRANSPORT_KEY)setTimeout(applyHardSyncToSrp,0);});
-    window.addEventListener('pageshow',()=>setTimeout(applyHardSyncToSrp,0));
-    window.addEventListener('focus',()=>setTimeout(applyHardSyncToSrp,0));
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSyncToSrp,0);});
-    setInterval(applyHardSyncToSrp,250);
-    window.addEventListener('storage',e=>{if(e.key===LIVE_META_KEY||String(e.key||'').startsWith(UNIFIED_META_PREFIX)){applyLiveMetaToSrp();return;}if(e.key===HANDOFF_KEY||e.key===LINKS_KEY||e.key===LINK_SESSION_KEY||String(e.key||'').startsWith(SHARED_META_PREFIX)){refreshCrpLinkUi();syncFromHandoff(false);applyLiveMetaToSrp();}});
-    const reconcileLinkedWorkspace=()=>{try{activateLinkForCurrentSrpProject();syncFromHandoff(false);applyLiveMetaToSrp();if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}}catch{}};
-    // init() is async and used to overwrite the linked project after the early 80ms import.
-    // Reconcile after init, and again on browser restore/focus.
-    window.addEventListener('srp-init-done',reconcileLinkedWorkspace);
-    window.addEventListener('pageshow',()=>{normalizeWorkspaceLinks();setTimeout(reconcileLinkedWorkspace,0)});
-    window.addEventListener('focus',()=>setTimeout(reconcileLinkedWorkspace,0));
-    normalizeWorkspaceLinks();
-    setTimeout(reconcileLinkedWorkspace,80);
-    setTimeout(reconcileLinkedWorkspace,700);
-    // A lightweight revision poll closes the last Android/WebView timing gap where a storage/focus
-    // event can be skipped during page navigation. It does nothing unless the live revision changed.
-    setInterval(applyLiveMetaToSrp,500);
-    if(window.__SRP_INIT_DONE)setTimeout(reconcileLinkedWorkspace,0);
-    // Flush the live number fields SYNCHRONOUSLY before leaving SRP for CRP/BD.
-    // The actual header uses absolute /index.html links; the old ../index.html selector matched nothing.
-    const flushSrpTransport=()=>{
-      try{
-        if(el?.bpmInput)commitBpm();
-        if(el?.capoInput)commitCapoStepFromInput();
-        syncMetaToCrp();
-        writeHardSyncFromSrp();
-      }catch{}
-    };
-    document.querySelectorAll('a.workspace-mode-btn').forEach(a=>{
-      if(!String(a.getAttribute('href')||'').includes('/song-rider/'))a.addEventListener('pointerdown',flushSrpTransport,true);
-    });
-    document.getElementById('srpTrackMasterBtn')?.addEventListener('pointerdown',flushSrpTransport,true);
-    window.addEventListener('pagehide',flushSrpTransport);
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSrpTransport();});
-    window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='srp-show-full-song'){try{goToSection('Full');}catch{}}if(e.data?.type==='crp-playback-state'){window.__SRP_LINKED_PLAYING=!!e.data.playing;try{renderSheetTitleBar();}catch{}}});
+      const parts=w.CRPParts;
+      if(!parts){setLinkedPlaying(false);return false;} // engine still starting: stay stopped, don't pretend
+      observeLinkedPlayback(linkedPlaybackFrame);
+      if(command==='play')parts.startPlayback?.();
+      else if(command==='pause'||command==='stop')parts.stopPlayback?.();
+      setLinkedPlaying(command==='play');
+      return true;
+    }catch(err){
+      console.error('Linked CRP/BD playback failed',err);
+      setLinkedPlaying(false);
+      return false;
+    }
+  };
+
+  // ---------------------------------------------------------------- wiring
+  function reconcileLinkedWorkspace(){
+    activateLinkForCurrentSrpProject();
+    syncFromHandoff(false);
+    applyCrpMetaToSrp();
+    if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}
   }
+  if(!readLinkSession())setActiveLinkId('');
+  document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    const b=e.currentTarget;
+    b.disabled=true;
+    if(persistentLinkForSrpProject(state.project,false)){
+      b.textContent='Unlinking…';
+      unlinkCurrentCrpSrp();
+      return;
+    }
+    setCrpLinkButtonContent(b,{busy:true});
+    const st=document.getElementById('crpSrpLinkStatus');
+    if(st)st.textContent='Linking CRP project…';
+    setTimeout(()=>syncFromHandoff(true),0);
+  });
+  if(transportChannel)transportChannel.onmessage=()=>applyCrpMetaToSrp();
+  window.addEventListener('storage',e=>{
+    const k=String(e.key||'');
+    if(k===TRANSPORT_KEY||k.startsWith(CANONICAL_PREFIX)||k===LEGACY_LIVE_META_KEY||k.startsWith(LEGACY_UNIFIED_PREFIX)||k===LEGACY_HARD_SYNC_KEY||k.startsWith(SHARED_META_PREFIX)){applyCrpMetaToSrp();return;}
+    if(k===LINKS_KEY||k===LINK_SESSION_KEY){refreshCrpLinkUi();renderSheetTitleBar();return;}
+    if(k==='crp-projects'||k===HANDOFF_KEY)syncFromHandoff(false); // CRP rows may have changed
+  });
+  const onAppReady=()=>{
+    reconcileLinkedWorkspace();
+    if(isCurrentCrpSrpLinked())ensureLinkedPlaybackBridge();
+  };
+  if(window.__SRP_INIT_DONE)setTimeout(onAppReady,0);
+  else window.addEventListener('srp-init-done',onAppReady,{once:true});
+  window.addEventListener('pageshow',e=>{normalizeWorkspaceLinks();if(e.persisted&&window.__SRP_INIT_DONE)reconcileLinkedWorkspace();});
+  window.addEventListener('focus',()=>{if(window.__SRP_INIT_DONE)reconcileLinkedWorkspace();});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&window.__SRP_INIT_DONE)reconcileLinkedWorkspace();});
+  normalizeWorkspaceLinks();
+  // Publish the live number fields and save synchronously before leaving SRP for CRP/BD.
+  const flushSrpTransport=()=>{
+    if(!state.project)return;
+    publishSrpTransport();
+    flushLibrary();
+  };
+  document.querySelectorAll('a.workspace-mode-btn').forEach(a=>{
+    if(!String(a.getAttribute('href')||'').includes('/song-rider/'))a.addEventListener('pointerdown',flushSrpTransport,true);
+  });
+  document.getElementById('srpTrackMasterBtn')?.addEventListener('pointerdown',flushSrpTransport,true);
+  window.addEventListener('pagehide',flushSrpTransport);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSrpTransport();});
+  window.addEventListener('message',e=>{
+    if(e.origin!==location.origin)return;
+    if(e.data?.type==='srp-show-full-song')goToSection('Full');
+    if(e.data?.type==='crp-playback-state')setLinkedPlaying(!!e.data.playing);
+  });
 })();
 
 // v3.0.0: end Song Rider Pro main application IIFE. Transport sync is owned by the bridge above.
