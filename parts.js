@@ -536,7 +536,7 @@
     if(!ctx?.audioWorklet||typeof AudioWorkletNode==='undefined')return Promise.resolve(false);
     let promise=vocalWorkletLoads.get(ctx);
     if(!promise){
-      promise=ctx.audioWorklet.addModule('./vocal-autotune-worklet.js?v=3.3.15').then(()=>{vocalWorkletReady.add(ctx);return true;},err=>{console.warn('Vocal worklet unavailable',err);return false;});
+      promise=ctx.audioWorklet.addModule('./vocal-autotune-worklet.js?v=3.4.0').then(()=>{vocalWorkletReady.add(ctx);return true;},err=>{console.warn('Vocal worklet unavailable',err);return false;});
       vocalWorkletLoads.set(ctx,promise);
     }
     return promise;
