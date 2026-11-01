@@ -12,7 +12,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 176400,
+   "tune": -8.8
   },
   {
    "midi": 43,
@@ -20,7 +21,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176334
+   "frames": 176334,
+   "tune": 6.7
   },
   {
    "midi": 46,
@@ -28,7 +30,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 176400,
+   "tune": -3.9
   },
   {
    "midi": 49,
@@ -36,7 +39,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 174952
+   "frames": 174952,
+   "tune": -6.9
   },
   {
    "midi": 52,
@@ -44,7 +48,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 175549
+   "frames": 175549,
+   "tune": -4.5
   },
   {
    "midi": 55,
@@ -52,7 +57,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176378
+   "frames": 176378,
+   "tune": 5.0
   },
   {
    "midi": 58,
@@ -68,7 +74,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 175253
+   "frames": 175253,
+   "tune": -2.6
   },
   {
    "midi": 64,
@@ -76,7 +83,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 174966
+   "frames": 174966,
+   "tune": -3.8
   },
   {
    "midi": 68,

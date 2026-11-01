@@ -20,7 +20,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 176400,
+   "tune": 4.7
   },
   {
    "midi": 42,
@@ -36,7 +37,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 150104
+   "frames": 150104,
+   "tune": -3.5
   },
   {
    "midi": 48,
@@ -44,7 +46,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 175888
+   "frames": 175888,
+   "tune": -9.1
   },
   {
    "midi": 51,

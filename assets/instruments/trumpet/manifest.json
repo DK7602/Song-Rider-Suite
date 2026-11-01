@@ -12,7 +12,8 @@
    "vel": 90,
    "loopStart": 3.767528,
    "loopEnd": 4.339569,
-   "frames": 235494
+   "frames": 235494,
+   "tune": 3.6
   },
   {
    "midi": 57,
@@ -20,7 +21,8 @@
    "vel": 90,
    "loopStart": 2.618027,
    "loopEnd": 4.810295,
-   "frames": 248283
+   "frames": 248283,
+   "tune": 2.5
   },
   {
    "midi": 60,
@@ -44,7 +46,8 @@
    "vel": 90,
    "loopStart": 4.38678,
    "loopEnd": 5.690181,
-   "frames": 264600
+   "frames": 264600,
+   "tune": -3.9
   },
   {
    "midi": 70,
@@ -60,7 +63,8 @@
    "vel": 90,
    "loopStart": 3.442993,
    "loopEnd": 5.690159,
-   "frames": 264600
+   "frames": 264600,
+   "tune": -3.8
   },
   {
    "midi": 77,
@@ -76,7 +80,8 @@
    "vel": 90,
    "loopStart": 4.344422,
    "loopEnd": 5.690363,
-   "frames": 264600
+   "frames": 264600,
+   "tune": -4.2
   },
   {
    "midi": 84,

@@ -11,7 +11,8 @@
   "notes": "per-set details for the engine",
   "samples[].frames": "true length of the decoded file in sample frames at sampleRate (gapless decode); the engine uses it to undo the start padding of MP3 decoders that ignore the LAME gapless header (Safari), so loop points stay exact",
   "sampleRate": "sample rate of the files",
-  "trim": "optional linear level adjustment on top of the engine's own levelling (the engine renders a reference phrase with each set when it loads and levels it to the piano)"
+  "trim": "optional linear level adjustment on top of the engine's own levelling (the engine renders a reference phrase with each set when it loads and levels it to the piano)",
+  "samples[].tune": "pitch correction in cents applied by the player (measured settled pitch of the note, median over its sustain); absent when the note is within 2 cents"
  },
  "delivered": [
   "acoustic_grand_piano",

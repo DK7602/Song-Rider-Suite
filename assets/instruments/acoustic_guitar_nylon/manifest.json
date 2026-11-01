@@ -1,134 +1,142 @@
 {
  "id": "acoustic_guitar_nylon",
- "name": "University of Iowa MIS - Classical guitar (Raimundo 118)",
- "source": "https://theremin.music.uiowa.edu/MISguitar.html",
- "license": "Free for any use without restrictions (University of Iowa MIS usage statement)",
- "licenseUrl": "https://theremin.music.uiowa.edu/MIS.html",
- "attribution": "University of Iowa Electronic Music Studios, Musical Instrument Samples (Lawrence Fritts); guitar played by Brian Penkrot",
+ "name": "Fluid (R3) General MIDI SoundFont - Nylon String Guitar (rendered dry with FluidSynth)",
+ "source": "https://packages.debian.org/source/sid/fluid-soundfont",
+ "license": "MIT",
+ "licenseUrl": "https://opensource.org/license/mit",
+ "attribution": "Fluid (R3) General MIDI SoundFont, Copyright (c) 2000-2002, 2008 Frank Wen",
+ "release": 0.3,
+ "notes": "Nylon String Guitar (GM program 25) from FluidR3_GM.sf2 (Frank Wen, MIT license), rendered note by note with FluidSynth 2.3 at 44.1 kHz with reverb and chorus off, velocity 100, held 4 s. 16 notes E2-C#6 every minor third. Trimmed to the attack, faded once the note is 62 dB down (max 4.5 s), first 0.25 s loudness evened across the range, peak -1 dBFS, mono, LAME VBR V2. Replaces the University of Iowa recording, which had low-frequency rumble, a high noise floor and a muffled tone.",
+ "sustained": false,
+ "sampleRate": 44100,
  "samples": [
   {
    "midi": 40,
    "file": "E2.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 198450
   },
   {
    "midi": 43,
    "file": "G2.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 198450
   },
   {
    "midi": 46,
    "file": "As2.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 198450
   },
   {
    "midi": 49,
    "file": "Cs3.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 198450
   },
   {
    "midi": 52,
    "file": "E3.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 198450
   },
   {
    "midi": 55,
    "file": "G3.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 198450
   },
   {
    "midi": 58,
    "file": "As3.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 198450
   },
   {
    "midi": 61,
    "file": "Cs4.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 193970
   },
   {
    "midi": 64,
    "file": "E4.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 196348
   },
   {
    "midi": 67,
    "file": "G4.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 196472
   },
   {
    "midi": 70,
    "file": "As4.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 197842
   },
   {
    "midi": 73,
    "file": "Cs5.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 194924
   },
   {
    "midi": 76,
    "file": "E5.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 152880
   },
   {
    "midi": 79,
    "file": "G5.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 153981
   },
   {
    "midi": 82,
    "file": "As5.mp3",
-   "vel": 80,
+   "vel": 100,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 155857
+  },
+  {
+   "midi": 85,
+   "file": "Cs6.mp3",
+   "vel": 100,
+   "loopStart": null,
+   "loopEnd": null,
+   "frames": 111636
   }
- ],
- "release": 0.3,
- "sustained": false,
- "notes": "Raimundo 118 classical (nylon-string) guitar recorded in an anechoic chamber (very dry), mezzo-forte, mono centre mic. 15 notes E2-A#5 every minor third, each taken from the lowest-position string (open/low frets). The recording was tuned about 10-40 cents flat; every note was retuned to A440 equal temperament by resampling. Natural decay trimmed to 4 s. Add a little room reverb in the engine. Recommended release 0.25-0.35 s.",
- "sampleRate": 44100
+ ]
 }

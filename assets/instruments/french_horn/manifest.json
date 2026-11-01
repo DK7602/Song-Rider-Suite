@@ -20,7 +20,8 @@
    "vel": 80,
    "loopStart": 2.587846,
    "loopEnd": 4.729955,
-   "frames": 233730
+   "frames": 233730,
+   "tune": 3.7
   },
   {
    "midi": 43,
@@ -44,7 +45,8 @@
    "vel": 80,
    "loopStart": 3.191655,
    "loopEnd": 5.691293,
-   "frames": 264600
+   "frames": 264600,
+   "tune": 3.7
   },
   {
    "midi": 53,
@@ -52,7 +54,8 @@
    "vel": 80,
    "loopStart": 3.286689,
    "loopEnd": 5.690159,
-   "frames": 264600
+   "frames": 264600,
+   "tune": 3.3
   },
   {
    "midi": 57,
@@ -68,7 +71,8 @@
    "vel": 80,
    "loopStart": 4.510431,
    "loopEnd": 5.690907,
-   "frames": 264600
+   "frames": 264600,
+   "tune": 2.2
   },
   {
    "midi": 63,
@@ -84,7 +88,8 @@
    "vel": 80,
    "loopStart": 0.596417,
    "loopEnd": 2.171179,
-   "frames": 109395
+   "frames": 109395,
+   "tune": -6.3
   },
   {
    "midi": 69,
@@ -108,7 +113,8 @@
    "vel": 80,
    "loopStart": 0.426281,
    "loopEnd": 2.150635,
-   "frames": 108647
+   "frames": 108647,
+   "tune": 5.9
   },
   {
    "midi": 77,

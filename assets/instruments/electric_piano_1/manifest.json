@@ -20,7 +20,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 264600
+   "frames": 264600,
+   "tune": -5.0
   },
   {
    "midi": 40,
@@ -28,7 +29,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 264600
+   "frames": 264600,
+   "tune": -7.0
   },
   {
    "midi": 45,
@@ -36,7 +38,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 264600
+   "frames": 264600,
+   "tune": -3.1
   },
   {
    "midi": 50,
@@ -44,7 +47,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 264600
+   "frames": 264600,
+   "tune": -5.9
   },
   {
    "midi": 55,
@@ -52,7 +56,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 264600
+   "frames": 264600,
+   "tune": -3.3
   },
   {
    "midi": 59,
@@ -60,7 +65,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 264600
+   "frames": 264600,
+   "tune": -2.3
   },
   {
    "midi": 62,
@@ -68,7 +74,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 264600
+   "frames": 264600,
+   "tune": -5.1
   },
   {
    "midi": 65,
@@ -84,7 +91,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 220500
+   "frames": 220500,
+   "tune": -3.8
   },
   {
    "midi": 76,
@@ -92,7 +100,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 220500
+   "frames": 220500,
+   "tune": -4.7
   },
   {
    "midi": 81,
@@ -100,7 +109,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 176400,
+   "tune": -4.7
   },
   {
    "midi": 86,
@@ -108,7 +118,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 176400
+   "frames": 176400,
+   "tune": -4.0
   },
   {
    "midi": 91,
@@ -116,7 +127,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 132300
+   "frames": 132300,
+   "tune": -6.2
   },
   {
    "midi": 96,
@@ -124,7 +136,8 @@
    "vel": 80,
    "loopStart": null,
    "loopEnd": null,
-   "frames": 94815
+   "frames": 94815,
+   "tune": -5.7
   }
  ],
  "release": 0.35,

@@ -2,7 +2,7 @@
 
 Song Rider Suite's recorded instruments (`assets/instruments/<id>/`) are built from the free sample
 libraries below. Every set was checked against the license published by its original author. Two
-licenses (CC BY 3.0 and CC BY 4.0) require visible attribution; the app links to this list from the
+licenses (CC BY 3.0, CC BY 4.0 and MIT) require visible attribution; the app links to this list from the
 "Sound credits" link under the instrument picker in Chord Rider (`sound-credits.html`).
 
 The same processing was applied to every set unless an entry says otherwise:
@@ -16,7 +16,12 @@ The same processing was applied to every set unless an entry says otherwise:
 - converted to mono, except for the piano and vibraphone;
 - resampled to 44.1 kHz where needed and encoded to MP3 with LAME (VBR V2; VBR V3 for the piano);
 - for the winds and brass, found a seamless sustain loop, baked in a crossfade, and stored the loop points
-  in `manifest.json`. A few notes had a slow level drift of at most 6 dB flattened so that they could loop.
+  in `manifest.json`. A few notes had a slow level drift of at most 6 dB flattened so that they could loop;
+- measured the settled pitch of every note again (median over the sustain, ignoring attacks) and stored a
+  correction in cents (`tune` in `manifest.json`, applied by the player) for each note 2 cents or more off
+  equal temperament: 80 notes across the guitars, bass, electric pianos, brass, flute and marimba, the
+  largest 19 cents. The piano keeps its natural stretch tuning; the vibraphone and a few very short or very
+  low notes, whose pitch could not be measured reliably, are left as recorded.
 
 | Set (`id`) | Library | Author | License |
 |---|---|---|---|
@@ -24,7 +29,7 @@ The same processing was applied to every set unless an entry says otherwise:
 | `electric_grand_piano` | Yamaha CP80 Electric Grand | Greg Sullivan | CC BY 4.0 |
 | `electric_piano_1` | jRhodes (Discord SFZ GM Bank version) | Jeff Learman | CC0 1.0 |
 | `acoustic_guitar_steel` | Martin HD-28 (Discord SFZ GM Bank) | Jeff Learman | CC0 1.0 |
-| `acoustic_guitar_nylon` | University of Iowa MIS – Guitar | Univ. of Iowa EMS / Lawrence Fritts | Free for any use, without restrictions |
+| `acoustic_guitar_nylon` | Fluid (R3) General MIDI SoundFont – Nylon String Guitar | Frank Wen | MIT |
 | `electric_bass_finger` | Fashionbass | Karoryfer Samples (D. Smolken) | CC0 1.0 |
 | `electric_guitar_clean` | FSBS Electric Guitar (direct) | FreePats | CC0 1.0 |
 | `tenor_sax` | VCSL Tenor Saxophone | Versilian Studios | CC0 1.0 |
@@ -104,20 +109,23 @@ The same processing was applied to every set unless an entry says otherwise:
   - Extended short notes to 3-4 s by repeating the author's loop with a matched decay.
   - Loudness-matched, normalized and encoded to mono MP3.
 
-## acoustic_guitar_nylon: University of Iowa Musical Instrument Samples, Guitar
+## acoustic_guitar_nylon: Fluid (R3) General MIDI SoundFont, Nylon String Guitar
 
-- **Author:** University of Iowa Electronic Music Studios, created by Lawrence Fritts. The guitar is a
-  Raimundo 118 classical guitar played by Brian Penkrot, recorded on 11 Dec 2011.
-- **License:** the usage statement at <https://theremin.music.uiowa.edu/MIS.html> says: "Since 1997, these
-  recordings have been freely available on this website and may be downloaded and used for any projects,
-  without restrictions."
-- **Source:** <https://theremin.music.uiowa.edu/MISguitar.html> (`Guitar.mono.1644.1.zip`, mezzo-forte files).
+- **Author:** Frank Wen (Fluid R3 GM SoundFont), with the contributors named in its README.
+- **License:** MIT: "I hereby release Fluid under the MIT license, as described in COPYING." The copyright
+  and permission notice is in `assets/instruments/acoustic_guitar_nylon/LICENSE.txt` and must stay with the
+  samples.
+- **Source:** `FluidR3_GM.sf2` from the Debian/Ubuntu `fluid-soundfont-gm` package (3.1), originally
+  <http://www.musescore.org/download/fluid-soundfont.tar.gz>.
 - **Changes:**
-  - Cut single notes out of the chromatic-scale recordings. Each note comes from the lowest-position string.
-  - Kept 15 notes, E2-A#5.
-  - Retuned every note: the recording was 9-41 cents flat.
-  - Trimmed to 4 s.
-  - Loudness-matched, normalized and encoded to mono MP3.
+  - Rendered program 25 (Nylon String Guitar) note by note with FluidSynth 2.3 at 44.1 kHz, reverb and
+    chorus off, velocity 100, each note held 4 s.
+  - Kept 16 notes, E2-C#6, every minor third. Pitch measured within 2 cents; no retuning needed.
+  - Trimmed to the attack, faded out once the note is 62 dB down (at most 4.5 s), evened out the loudness
+    of the first 0.25 s across the range, normalized and encoded to mono MP3.
+- **Why:** it replaces the University of Iowa classical guitar recording used at first, which had
+  low-frequency rumble (up to 43% of a note's energy below 100 Hz), a noise floor only 29-47 dB below the
+  notes and a muffled tone.
 
 ## electric_bass_finger: Karoryfer Fashionbass
 

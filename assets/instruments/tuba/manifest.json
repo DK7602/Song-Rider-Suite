@@ -52,7 +52,8 @@
    "vel": 80,
    "loopStart": 3.786281,
    "loopEnd": 5.689138,
-   "frames": 264600
+   "frames": 264600,
+   "tune": 6.0
   },
   {
    "midi": 53,
@@ -60,7 +61,8 @@
    "vel": 80,
    "loopStart": 3.630181,
    "loopEnd": 5.689683,
-   "frames": 264600
+   "frames": 264600,
+   "tune": 4.4
   },
   {
    "midi": 58,
@@ -68,7 +70,8 @@
    "vel": 80,
    "loopStart": 3.19966,
    "loopEnd": 5.689138,
-   "frames": 264600
+   "frames": 264600,
+   "tune": -6.0
   },
   {
    "midi": 62,
@@ -76,7 +79,8 @@
    "vel": 80,
    "loopStart": 3.708073,
    "loopEnd": 5.690204,
-   "frames": 264600
+   "frames": 264600,
+   "tune": 2.6
   }
  ],
  "release": 0.25,
