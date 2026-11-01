@@ -4321,7 +4321,7 @@ function thinChordFreqsForLive(freqs, maxVoices=4){
 
 function ensureCtx(){
   if(!state.ctx){
-    state.ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:"interactive" });
+    state.ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:"playback" }); // larger buffers: no crackling on Android
 
     // safer master levels (prevents harsh “screech” perception on phones)
     state.masterGain = state.ctx.createGain();

@@ -482,14 +482,18 @@
   const CRPAudio=(()=>{
     let ctx=null,input=null;
     function context(){
-      if(!ctx)ctx=new (window.AudioContext||window.webkitAudioContext)();
+      // 'playback' asks for larger audio buffers. The default ('interactive') uses the smallest
+      // buffers, and on Android phones a full mix then misses audio deadlines and crackles.
+      // Recording stays in sync: latency compensation measures the context's real latency.
+      if(!ctx){const AC=window.AudioContext||window.webkitAudioContext;try{ctx=new AC({latencyHint:'playback'});}catch{ctx=new AC();}}
       if(ctx.state==='suspended')ctx.resume().catch(()=>{});
       return ctx;
     }
     function safetyClipCurve(){
-      // Unity gain up to 0.9, then a smooth knee that never exceeds full scale.
+      // Unity gain up to 0.95, then a smooth knee that never exceeds full scale. The limiter
+      // keeps the signal below the knee, so this only catches rare overshoots.
       const n=2048,curve=new Float32Array(n);
-      for(let i=0;i<n;i++){const x=i/(n-1)*2-1,a=Math.abs(x);curve[i]=Math.sign(x)*(a<=.9?a:.9+.1*Math.tanh((a-.9)/.1));}
+      for(let i=0;i<n;i++){const x=i/(n-1)*2-1,a=Math.abs(x);curve[i]=Math.sign(x)*(a<=.95?a:.95+.05*Math.tanh((a-.95)/.05));}
       return curve;
     }
     // Loudness. The SoundFont instruments and drum samples are recorded quietly: a full mix
@@ -501,7 +505,7 @@
       const drive=c.createGain(),glue=c.createDynamicsCompressor(),limiter=c.createDynamicsCompressor(),trim=c.createGain(),clip=c.createWaveShaper();
       drive.gain.value=Math.pow(10,DRIVE_DB/20);
       for(const [node,cfg] of [[glue,GLUE],[limiter,LIMIT]])for(const k of Object.keys(cfg))node[k].value=cfg[k];
-      trim.gain.value=TRIM;clip.curve=safetyClipCurve();clip.oversample='2x';
+      trim.gain.value=TRIM;clip.curve=safetyClipCurve();clip.oversample='none'; // transparent below the knee: no need to spend CPU oversampling
       drive.connect(glue);glue.connect(limiter);limiter.connect(trim);trim.connect(clip);clip.connect(destination);
       return drive;
     }
