@@ -1504,7 +1504,8 @@ function reconcileDeletedBaseSections(){
 
 // Back-compat alias: older code calls cleanupDeletedBaseSections()
 function cleanupDeletedBaseSections(){
-  try{ reconcileDeletedBaseSections(); }catch{}
+  try{ reconcileDeletedBaseSections(); }
+  catch(err){ console.error("Could not tidy deleted pages", err); }
 }
 
 function applyFullTextToProjectSections(fullText){
@@ -2292,6 +2293,12 @@ function setAuthBusy(v, message=""){
   updateAuthModalUI(message);
 }
 
+// Tell the CRP link bridge the open song changed (switch, new, delete, reload).
+function notifyLinkedProjectChanged(){
+  try{ window.CRP_SRP_onSrpProjectChanged?.(); }
+  catch(err){ console.error("Could not refresh the CRP link for this song", err); }
+}
+
 async function reloadProjectForCurrentScope(){
   state.project = getCurrentProject();
   state.currentSection = "Full";
@@ -2309,7 +2316,7 @@ async function reloadProjectForCurrentScope(){
   refreshRhymesFromActive();
   refreshDisplayedNoteCells();
   updateAudioButtonsUI();
-  try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch(err){ console.warn("Link refresh failed", err); }
+  notifyLinkedProjectChanged();
 }
 
 async function handleAuthSessionChange(user, reason=""){
@@ -2950,7 +2957,7 @@ function refreshAfterLibraryChange({ currentChanged } = {}){
     renderAll();
     renderRecordings();
     restoreEditorFocus(focus);
-    try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch(err){ console.warn("Link refresh failed", err); }
+    notifyLinkedProjectChanged();
   }
   renderProjectsDropdown();
   renderArchiveModal();
@@ -3372,7 +3379,7 @@ function normalizeProject(p){
       }
     }
     p.enabledSections = migratedEnabled;
-  }catch{}
+  }catch(err){ console.error("Could not migrate old section names for", p.id, err); }
 
   // sanitize enabledSections to valid pages (base + extras)
   {
@@ -10660,7 +10667,8 @@ if(state.currentSection === "Full"){
       }
       // Remove the corresponding page/card immediately (if it exists)
       if(sec){
-        try{ deleteSectionPage(sec); }catch{}
+        try{ deleteSectionPage(sec); }
+        catch(err){ console.error("Could not remove the page for this song part", err); }
       }
       state.project.fullText = blocksToFullText(blocks);
       quickSaveFullText();
@@ -12246,7 +12254,7 @@ function moveProjectToArchive(projectId){
     resetProjectHistory();
     applyProjectSettingsToUI();
     renderAll();
-    try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
+    notifyLinkedProjectChanged();
   }else{
     renderProjectsDropdown();
   }
@@ -12384,7 +12392,7 @@ function loadProjectById(id){
   // v3.2.9: the CRP↔SRP link is project-scoped. Switching SRP projects must
   // immediately activate ONLY this project's saved pair (or no pair at all),
   // instead of leaving the previous project's global link-session/UI behind.
-  try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
+  notifyLinkedProjectChanged();
 }
 
 /***********************
@@ -14324,7 +14332,8 @@ async function getNoteImageRecordForCrop(imageId){
   const id = String(imageId || '').trim();
   if(!id || !state.project) return null;
   let rec = null;
-  try{ rec = await dbGetNoteImage(id); }catch{}
+  try{ rec = await dbGetNoteImage(id); }
+  catch(err){ console.warn("Could not read the note photo to crop", err); }
   if(rec?.blob) return rec;
 
   const manifestEntry = getProjectNotesImages(state.project).find((entry) => String(entry.id || '') === id && !entry.deleted);
@@ -15593,8 +15602,9 @@ function wire(){
 
   if(el.saveBtn) el.saveBtn.addEventListener("click", () => {
     if(!state.project) return;
-    // force commit + visual feedback
+    // Save now (not after the usual short delay); a storage failure shows the banner.
     persistActiveProjectState({ saveNotes:true });
+    flushLibrary();
     updateUndoRedoUI();
 
     try{
@@ -16238,7 +16248,7 @@ const v = Number.isFinite(raw) ? raw : 0;
     resetProjectHistory();
     applyProjectSettingsToUI();
     renderAll();
-    try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
+    notifyLinkedProjectChanged();
   });
 
   if(el.renameProjectBtn) el.renameProjectBtn.addEventListener("click", () => {
@@ -16267,7 +16277,7 @@ const v = Number.isFinite(raw) ? raw : 0;
     applyProjectSettingsToUI();
     renderAll();
     renderArchiveModal();
-    try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
+    notifyLinkedProjectChanged();
   });
 if(el.uploadAudioBtn){
   el.uploadAudioBtn.addEventListener("click", async () => {
