@@ -1787,7 +1787,7 @@
     if(decodedSoundsCtx!==audioCtx){decodedSounds.clear();decodedSoundsCtx=audioCtx;decodeSink=audioCtx.createGain();}
     let entry=decodedSounds.get(sound);
     if(!entry){
-      if(!window.Soundfont)throw new Error('Sound engine unavailable');
+      if(!window.Soundfont&&!window.CRPInstruments)throw new Error('Sound engine unavailable');
       entry={base:null};
       entry.promise=Promise.resolve(core.loadSoundfontInstrument?core.loadSoundfontInstrument(audioCtx,sound,decodeSink):Soundfont.instrument(audioCtx,sound,{format:'mp3',soundfont:'MusyngKite',destination:decodeSink}))
         .then(base=>{entry.base=base;return base;},err=>{if(decodedSounds.get(sound)===entry)decodedSounds.delete(sound);throw err;});
@@ -1800,9 +1800,12 @@
     const inUse=new Set(parts.map(requestedPartSound));
     for(const [sound,entry] of decodedSounds)if(decodedSounds.size>MAX_IDLE_DECODED_SOUNDS&&entry.base&&!inUse.has(sound))decodedSounds.delete(sound);
   }
-  // window.SamplePlayer is exported by vendor/soundfont-player.js; it is the
-  // player Soundfont.instrument() builds, minus the fetch/decode.
+  // Instruments from the engine (instruments.js) make their own per-part players from the shared
+  // decoded/synth model on any context (live or offline export). SoundFont instruments use
+  // window.SamplePlayer (vendor/soundfont-player.js): the player Soundfont.instrument() builds,
+  // minus the fetch/decode.
   function samplePlayerOn(ctx,base,destination){
+    if(typeof base?.createPlayer==='function')return base.createPlayer(ctx,destination);
     if(typeof window.SamplePlayer!=='function'||!base?.buffers)throw new Error('Sound engine unavailable');
     return window.SamplePlayer(ctx,base.buffers,{}).connect(destination);
   }
@@ -2154,7 +2157,7 @@
     activeVocalSources.clear();scheduledWindows=[];scheduledVocalPlan='';
     for(const entry of vocalChains.values())disconnectVocalChain(entry.chain);
     vocalChains.clear();
-    for(const {player} of partPlayers.values())try{player.out?.disconnect();}catch{}
+    for(const {player} of partPlayers.values())try{player.dispose?.();player.out?.disconnect();}catch{}
     partPlayers.clear();
     for(const bus of partBuses.values()){try{bus.gain.cancelScheduledValues(now);bus.gain.value=0;bus.disconnect();}catch{}}
     for(const gate of partHandoffGates.values())try{gate.disconnect();}catch{}
@@ -2412,10 +2415,11 @@
     onProgress('Loading sounds…');
     const play=(player,note,at,opts)=>{try{player.play(note,at,opts);}catch{}};
     for(const p of selected.filter(x=>x.type==='chord'||x.type==='lead')){
-      const sound=requestedPartSound(p),bus=ctx.createGain();
+      const sound=requestedPartSound(p),bus=ctx.createGain(),base=await decodedSound(sound).promise;
+      // After the load: the level depends on which engine served the sound.
       bus.gain.value=soundGain(sound)*p.volume*(p.type==='lead'?LEAD_OUTPUT_BOOST:1);
       const fx=core.createInstrumentFxChain?.(ctx,out);if(fx){bus.connect(fx.input);fx.setSound(sound);}else bus.connect(out);
-      const player=samplePlayerOn(ctx,await decodedSound(sound).promise,bus);
+      const player=samplePlayerOn(ctx,base,bus);
       if(p.type==='chord')scheduleChordNotes(p,player,sound,win,play);
       else scheduleLeadNotes(p,player,sound,win,!!core.loop,play);
     }
@@ -2461,7 +2465,7 @@
   async function exportAudioMix(modal){
     const ids=[...modal.querySelectorAll('[data-audio-part]:checked')].map(x=>x.dataset.audioPart),selected=parts.filter(p=>ids.includes(p.id)),drums=!!modal.querySelector('#audioExportDrums')?.checked;
     if(!selected.length&&!drums){core.status('Choose at least one audio part to export.');return;}
-    if(!window.Soundfont&&selected.some(p=>p.type==='chord'||p.type==='lead')){core.status('Sound engine unavailable. Reload while online and try again.');return;}
+    if(!window.Soundfont&&!window.CRPInstruments&&selected.some(p=>p.type==='chord'||p.type==='lead')){core.status('Sound engine unavailable. Reload while online and try again.');return;}
     const go=modal.querySelector('#audioExportGo');go.disabled=true;go.textContent='Preparing…';
     stopPreview();
     try{

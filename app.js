@@ -71,20 +71,43 @@
     wah_wah_guitar:{source:'overdriven_guitar',fx:'wah'},
     funky_worm:{source:'lead_5_charang',fx:'worm'}
   };
+  // Bus gain per GM SoundFont patch (the fallback engine), measured so every patch plays within
+  // +-0.5 dB of the piano (gated RMS of a reference chord + melody through the bus and fx chain, before
+  // the master; MusyngKite mp3). Sounds served by instruments.js are level-matched there instead.
   const SOUND_OUTPUT_GAIN={
-    acoustic_grand_piano:3.15,bright_acoustic_piano:3.00,electric_grand_piano:2.85,electric_piano_1:2.75,electric_piano_2:2.55,
-    synth_strings_1:1.10,pad_2_warm:1.18,pad_3_polysynth:1.20,lead_2_sawtooth:1.18,electric_bass_finger:1.10,
-    acoustic_guitar_steel:2.95,acoustic_guitar_nylon:2.95,electric_guitar_clean:2.85,electric_guitar_jazz:2.75,electric_guitar_muted:2.85,
-    overdriven_guitar:2.10,distortion_guitar:1.85,wah_wah_guitar:2.05,
-    tenor_sax:2.05,alto_sax:2.00,french_horn:1.95,brass_section:1.55,trumpet:1.85,trombone:1.90,tuba:2.00,flute:2.10,
-    clavinet:2.35,funky_worm:1.35,drawbar_organ:1.55,vibraphone:1.90,marimba:1.90,whistle:1.90,synth_brass_1:1.45
+    acoustic_grand_piano:3.15,bright_acoustic_piano:3.03,electric_grand_piano:2.45,electric_piano_1:1.17,electric_piano_2:2.58,
+    synth_strings_1:2.30,pad_2_warm:0.92,pad_3_polysynth:1.29,lead_2_sawtooth:1.69,electric_bass_finger:0.61,
+    acoustic_guitar_steel:3.16,acoustic_guitar_nylon:2.57,electric_guitar_clean:3.89,electric_guitar_jazz:1.26,electric_guitar_muted:3.63,
+    overdriven_guitar:1.37,distortion_guitar:1.32,wah_wah_guitar:0.96,
+    tenor_sax:1.52,alto_sax:1.40,french_horn:2.09,brass_section:2.32,trumpet:2.41,trombone:2.39,tuba:0.70,flute:1.98,
+    clavinet:2.07,funky_worm:0.45,drawbar_organ:1.84,vibraphone:2.59,marimba:0.92,whistle:1.49,synth_brass_1:2.38
   };
   function normalizeInstrument(value){return VALID_INSTRUMENTS.has(value)?value:'piano';}
   function soundPreset(sound){const base=SOUND_PRESETS[sound]||{};return {id:sound,source:base.source||sound,fx:base.fx||'none'};}
-  function soundOutputGain(sound){return SOUND_OUTPUT_GAIN[sound]||SOUND_OUTPUT_GAIN[soundPreset(sound).source]||1.0;}
+  // Which engine last served each sound: 'engine' (instruments.js, already level-matched, played at
+  // CRPInstruments.busGain) or 'soundfont' (levelled by SOUND_OUTPUT_GAIN). Before a sound has loaded,
+  // the engine's own guess decides.
+  const soundProvider=new Map();
+  function instrumentProvider(sound){
+    const known=soundProvider.get(sound);if(known)return known;
+    return window.CRPInstruments?.provides?.(sound)===true?'engine':'soundfont';
+  }
+  function soundOutputGain(sound){
+    if(instrumentProvider(sound)==='engine')return Number(window.CRPInstruments?.busGain)||1;
+    return SOUND_OUTPUT_GAIN[sound]||SOUND_OUTPUT_GAIN[soundPreset(sound).source]||1.0;
+  }
   function isBassSound(sound){return /(?:^|_)bass(?:_|$)/.test(String(sound||''))||String(sound||'')==='electric_bass_finger';}
+  // Returns a player with play(note,when,{duration,gain}) -> voice (voice.stop(when)), stop(when),
+  // connect(dest). The instrument engine (instruments.js: recorded sets, derived and synthesized voices)
+  // comes first; any sound it cannot serve yet (set not delivered, offline) uses the GM SoundFont.
   async function loadSoundfontInstrument(ctx,sound,destination){
+    const engine=window.CRPInstruments;
+    if(engine&&!engine.disabled){
+      try{const player=await engine.load(ctx,sound,destination);soundProvider.set(sound,'engine');return player;}
+      catch(e){if(!e?.unavailable)console.warn(`Instrument engine could not load ${sound}; using the SoundFont.`,e);}
+    }
     if(!window.Soundfont)throw new Error('Sound engine unavailable');
+    soundProvider.set(sound,'soundfont');
     const preset=soundPreset(sound),opts={format:'mp3',soundfont:'MusyngKite',destination};
     try{return await Soundfont.instrument(ctx,preset.source,opts);}
     catch(firstError){
@@ -531,16 +554,29 @@
     const fx=createInstrumentFxChain(state.audioCtx,CRPAudio.master());bus.connect(fx.input);
     state.instrumentBus=bus;state.instrumentFxChain=fx;
   }
+  let lastLoadedPlayer=null;
+  function setInstrumentBusGain(target,timeConstant){
+    const now=state.audioCtx.currentTime,g=state.instrumentBus.gain;
+    try{if(typeof g.cancelAndHoldAtTime==='function')g.cancelAndHoldAtTime(now);else g.cancelScheduledValues(now);g.setTargetAtTime(target,now,timeConstant);}catch{g.value=target;}
+  }
   function ensureAudio(){
     state.audioCtx=CRPAudio.context();
     ensureInstrumentBus();
     state.instrumentFxChain?.setSound(state.sound);
-    const now=state.audioCtx.currentTime,target=instrumentOutputGain();
-    try{if(typeof state.instrumentBus.gain.cancelAndHoldAtTime==='function')state.instrumentBus.gain.cancelAndHoldAtTime(now);else state.instrumentBus.gain.cancelScheduledValues(now);state.instrumentBus.gain.setTargetAtTime(target,now,.018);}catch{state.instrumentBus.gain.value=target;}
+    setInstrumentBusGain(instrumentOutputGain(),.018);
     if(state.player&&state.playerName===state.sound)return Promise.resolve(state.player);
-    if(!window.Soundfont)return Promise.reject(new Error('Sound engine unavailable'));
+    if(!window.Soundfont&&!window.CRPInstruments)return Promise.reject(new Error('Sound engine unavailable'));
     $('status').textContent='Loading instrument samples…';
-    return loadSoundfontInstrument(state.audioCtx,state.sound,state.instrumentBus).then(p=>{state.player=p;state.playerName=state.sound;$('status').textContent='';return p;}).catch(err=>{$('status').textContent='Could not load that instrument.';throw err;});
+    const sound=state.sound;
+    return loadSoundfontInstrument(state.audioCtx,sound,state.instrumentBus).then(p=>{
+      // An engine player replaced by another sound is released once its notes have rung out.
+      const old=lastLoadedPlayer;lastLoadedPlayer=p;
+      if(old&&old!==p&&typeof old.dispose==='function')setTimeout(()=>{if(old!==state.player)old.dispose();},6000);
+      state.player=p;state.playerName=sound;$('status').textContent='';
+      // The level depends on which engine served the sound, known only now.
+      if(state.sound===sound)setInstrumentBusGain(instrumentOutputGain(),.004);
+      return p;
+    }).catch(err=>{$('status').textContent='Could not load that instrument.';throw err;});
   }
   function automaticMidiNotesForCard(card){
     const val=displayedValue(card);let notes;
@@ -2936,7 +2972,7 @@
     }
   }
   window.CRPCore={
-    snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,cardDurationBeats,soundPreset,soundOutputGain,isBassSound,loadSoundfontInstrument,createInstrumentFxChain,normalizeInstrument,
+    snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,cardDurationBeats,soundPreset,soundOutputGain,instrumentProvider,isBassSound,loadSoundfontInstrument,createInstrumentFxChain,normalizeInstrument,
     scheduleAutoSave,flushAutoSaveNow,renderAll,syncBuildInput,publishSrpHandoff,loadProjectById:loadProject,
     recordUndo,undo:undoEdit,redo:redoEdit,get canUndo(){return undoHistory.undo.length>0;},
     keyTonicName,spellInKey,
