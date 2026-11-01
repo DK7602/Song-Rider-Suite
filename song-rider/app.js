@@ -11206,7 +11206,7 @@ async function importTextToFull(text){
 
 // ----------------------
 // ✅ IMPORT: PDF -> extract text -> Full -> Cards (with chord parsing)
-// Requires PDF.js (pdfjsLib global)
+// PDF.js is loaded on demand (loadPdfJs)
 // ----------------------
 async function importPdfToFull(file){
   try{
@@ -11251,194 +11251,44 @@ function fixPdfLetterSpacing(text){
   }).join("\n");
 }
 
-async function extractTextFromPdfFile(file){
-  // ✅ Bulletproof PDF import for Android Chrome + GitHub Pages
-  // Strategy:
-  // 1) Load PDF.js *legacy* build via <script> (best compatibility).
-  // 2) Prefer local ./pdf.min.js (recommended), then fall back to CDNs.
-  // 3) Always parse with disableWorker:true (workers often fail on mobile/CDN/SW).
-  // 4) Handle password-protected PDFs (prompt).
-  //
-  // NOTE: For best reliability + offline, add these to your repo root:
-  //   - pdf.min.js
-  //   - pdf.worker.min.js (optional when disableWorker:true, but nice to have)
-
-  const withTimeout = (p, ms, label) => new Promise((res, rej) => {
-    const t = setTimeout(()=>rej(new Error(label + " (timeout)")), ms);
-    p.then(v=>{ clearTimeout(t); res(v); }).catch(e=>{ clearTimeout(t); rej(e); });
-  });
-
-  const fetchOk = async (url) => {
-    // Try a quick HEAD/GET to verify the file exists and isn't returning an HTML error page.
-    try{
-      const r = await fetch(url, { method:"GET", cache:"no-store" });
-      const ct = (r.headers.get("content-type") || "").toLowerCase();
-      return !!(r.ok && (ct.includes("javascript") || ct.includes("ecmascript") || ct.includes("text/plain") || ct.includes("application/octet-stream")));
-    }catch{
-      return false;
-    }
-  };
-
-  const loadScript = (src) => withTimeout(new Promise((res, rej) => {
-    const s = document.createElement("script");
-    s.src = src;
-    s.async = true;
-    s.crossOrigin = "anonymous";
-    s.onload = () => res(true);
-    s.onerror = () => rej(new Error("Failed to load script: " + src));
-    document.head.appendChild(s);
-  }), 15000, "Failed to load script: " + src);
-
-  async function ensurePdfJs(){
-    // ✅ Reliable PDF.js loader for GitHub Pages + Android Chrome/PWA
-    // We intentionally prefer the CLASSIC build (pdf.min.js + pdf.worker.min.js)
-    // because ESM (pdf.mjs) requires a matching pdf.worker.mjs which most repos don't include.
-    if(window.pdfjsLib?.getDocument) return;
-
-    const base = document.baseURI || location.href;
-    const stamp = String(Date.now());
-    const asUrl = (p)=> new URL(p, base).toString();
-
-    const localClassicCandidates = [
-      asUrl("pdf.min.js?v="+stamp),
-      asUrl("./pdf.min.js?v="+stamp),
-      asUrl("../pdf.min.js?v="+stamp),
-      // some users keep it in /lib
-      asUrl("lib/pdf.min.js?v="+stamp),
-      asUrl("./lib/pdf.min.js?v="+stamp),
-    ];
-    const localModuleCandidates = [
-      asUrl("pdf.mjs?v="+stamp),
-      asUrl("./pdf.mjs?v="+stamp),
-      asUrl("../pdf.mjs?v="+stamp),
-      asUrl("lib/pdf.mjs?v="+stamp),
-      asUrl("./lib/pdf.mjs?v="+stamp),
-    ];
-
-    // CDN fallbacks (classic / legacy builds)
-    const cdnClassicCandidates = [
-      { js:"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.js", worker:"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.js" },
-      { js:"https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.min.js", worker:"https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.js" },
-      { js:"https://unpkg.com/pdfjs-dist@4.10.38/legacy/build/pdf.min.js", worker:"https://unpkg.com/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.js" },
-    ];
-
-    const fetchOk = async (url) => {
-      try{
-        const r = await fetch(url, { method:"GET", cache:"no-store" });
-        const ct = (r.headers.get("content-type") || "").toLowerCase();
-        return !!(r.ok && (ct.includes("javascript") || ct.includes("ecmascript") || ct.includes("text/plain") || ct.includes("application/octet-stream")));
-      }catch{
-        return false;
-      }
-    };
-
-    const loadScript = (src) => withTimeout(new Promise((res, rej) => {
-      const s = document.createElement("script");
-      s.src = src;
-      s.async = true;
-      s.crossOrigin = "anonymous";
-      s.onload = () => res(true);
-      s.onerror = () => rej(new Error("Failed to load script: " + src));
-      document.head.appendChild(s);
-    }), 15000, "Failed to load script: " + src);
-
-    async function setWorkerSrc(preferred){
-      try{
-        const lib = window.pdfjsLib;
-        if(!lib) return false;
-        if(lib.GlobalWorkerOptions && lib.GlobalWorkerOptions.workerSrc) return true;
-
-        const workerCandidates = [
-          // repo root
-          asUrl("pdf.worker.min.js?v="+stamp),
-          asUrl("./pdf.worker.min.js?v="+stamp),
-          asUrl("../pdf.worker.min.js?v="+stamp),
-          // /lib folder
-          asUrl("lib/pdf.worker.min.js?v="+stamp),
-          asUrl("./lib/pdf.worker.min.js?v="+stamp),
-          // ESM worker (only if you have it)
-          asUrl("pdf.worker.mjs?v="+stamp),
-          asUrl("./pdf.worker.mjs?v="+stamp),
-          asUrl("lib/pdf.worker.mjs?v="+stamp),
-        ];
-
-        for(const u of workerCandidates){
-          if(await fetchOk(u)){
-            lib.GlobalWorkerOptions = lib.GlobalWorkerOptions || {};
-            lib.GlobalWorkerOptions.workerSrc = u;
-            return true;
-          }
-        }
-
-        if(preferred){
-          lib.GlobalWorkerOptions = lib.GlobalWorkerOptions || {};
-          lib.GlobalWorkerOptions.workerSrc = preferred;
-          return true;
-        }
-      }catch(e){}
-      return false;
-    }
-
-    // 1) Local classic
-    for(const jsUrl of localClassicCandidates){
-      const ok = await fetchOk(jsUrl);
-      if(!ok) continue;
-      try{
-        await loadScript(jsUrl);
-        if(window.pdfjsLib?.getDocument){
-          // ensure workerSrc exists (some builds throw if missing)
-          await setWorkerSrc(null);
-          return;
-        }
-      }catch(e){}
-    }
-
-    // 2) Local ESM build. This repo ships pdf.mjs/pdf.worker.mjs, so use them
-    // before going to the network when the classic pdf.min.js file is absent.
-    for(const mjsUrl of localModuleCandidates){
-      const ok = await fetchOk(mjsUrl);
-      if(!ok) continue;
-      try{
-        const mod = await import(mjsUrl);
-        const lib = (mod && typeof mod.getDocument === "function") ? mod : mod?.default;
-        if(lib && typeof lib.getDocument === "function"){
-          window.pdfjsLib = lib;
-          await setWorkerSrc(null);
-          return;
-        }
-      }catch(e){
-        console.warn("Local PDF.js module load failed", e);
-      }
-    }
-
-    // 3) CDN classic with known worker URL pair
-    for(const cdn of cdnClassicCandidates){
-      const ok = await fetchOk(cdn.js);
-      if(!ok) continue;
-      try{
-        await loadScript(cdn.js);
-        if(window.pdfjsLib?.getDocument){
-          await setWorkerSrc(cdn.worker);
-          return;
-        }
-      }catch(e){}
-    }
-
-    throw new Error("PDF.js failed to load. Ensure `pdf.min.js` + `pdf.worker.min.js` are present in your repo root (recommended).");
+// Large vendored libraries (pdf.js ~800 KB, lame ~150 KB) load on first use only.
+// The promise is cached; a failed load is retried next time.
+const lazyLibraries = { pdf:null, lame:null };
+function loadPdfJs(){
+  if(!lazyLibraries.pdf){
+    lazyLibraries.pdf = import(new URL("pdf.mjs?v=20", document.baseURI).href).then((lib) => {
+      lib.GlobalWorkerOptions.workerSrc = new URL("pdf.worker.mjs?v=20", document.baseURI).href;
+      return lib;
+    }).catch((err) => {
+      lazyLibraries.pdf = null;
+      throw err;
+    });
   }
-await ensurePdfJs();
-  const pdfjsLib = window.pdfjsLib;
-  if(!pdfjsLib?.getDocument) throw new Error("pdfjsLib.getDocument missing");
+  return lazyLibraries.pdf;
+}
+function loadLame(){
+  if(!lazyLibraries.lame){
+    lazyLibraries.lame = new Promise((resolve, reject) => {
+      if(window.lamejs?.Mp3Encoder){ resolve(window.lamejs); return; }
+      const script = document.createElement("script");
+      script.src = new URL("lame.min.js?v=63", document.baseURI).href;
+      script.onload = () => window.lamejs?.Mp3Encoder ? resolve(window.lamejs) : reject(new Error("The MP3 encoder did not initialise."));
+      script.onerror = () => reject(new Error("Could not load the MP3 encoder."));
+      document.head.appendChild(script);
+    }).catch((err) => {
+      lazyLibraries.lame = null;
+      throw err;
+    });
+  }
+  return lazyLibraries.lame;
+}
 
-  // Always disable worker (most reliable on mobile/PWA/CDN)
+async function extractTextFromPdfFile(file){
+  const pdfjsLib = await loadPdfJs();
   const ab = await file.arrayBuffer();
 
   // Support password-protected PDFs
-  const loadPdf = (password) => pdfjsLib.getDocument({
-    data: ab,
-    disableWorker: true,
-    password
-  }).promise;
+  const loadPdf = (password) => pdfjsLib.getDocument({ data: ab.slice(0), password }).promise;
 
   let pdf;
   try{
@@ -11939,10 +11789,6 @@ MP3 AUTO-CONVERT (WebM/Opus -> MP3 using lamejs)
 - converts immediately after recording stops
 - stores MP3 blob into IndexedDB so in-app playback + download are MP3
 ***********************/
-function hasLame(){
-  return !!(window.lamejs && window.lamejs.Mp3Encoder);
-}
-
 function blobToArrayBuffer(blob){
   if(blob.arrayBuffer) return blob.arrayBuffer();
   return new Response(blob).arrayBuffer();
@@ -12029,8 +11875,12 @@ async function encodeMp3FromBlob(inputBlob, opts={}){
 
 // High-level: try convert -> if fails, return original blob
 async function convertRecordingBlobToMp3(blob){
-  // If lame isn't loaded, we cannot encode
-  if(!hasLame()) return blob;
+  try{
+    await loadLame();
+  }catch(err){
+    console.warn("MP3 encoder unavailable, keeping the original recording:", err);
+    return blob;
+  }
 
   try{
     const mp3 = await encodeMp3FromBlob(blob, { kbps: 192 });

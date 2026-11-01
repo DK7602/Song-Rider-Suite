@@ -3346,12 +3346,7 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
     </div>
   </div>
 
-<script src="./lame.min.js?v=63"></script>
-<script type="module">
-  import * as pdfjsLib from "./pdf.mjs?v=20";
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf.worker.mjs?v=20";
-  window.pdfjsLib = pdfjsLib; // <-- makes your existing app.js code work unchanged
-</script>
+<!-- pdf.mjs and lame.min.js are loaded by app.js on first use (PDF import / MP3 encoding). -->
 <!-- cache-buster -->
 <script src="./app.js?v=3.3.127-SRP-BAR-SPACING"></script>
 <script src="../skins.js?v=3.3.116-SAPPHIRE-PAISLEY"></script>
