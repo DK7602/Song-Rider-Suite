@@ -1735,70 +1735,6 @@ function pickBestNotesBackup(items){
   return best;
 }
 
-function readNotesBackup(projectId){
-  try{
-    if(!projectId) return null;
-    const candidates = [];
-    const seen = new Set();
-    const scope = getStorageScope();
-    const scopes = [scope].filter(Boolean);
-
-    for(const oneScope of scopes){
-      const key = notesBackupKey(projectId, oneScope);
-      if(seen.has(key)) continue;
-      seen.add(key);
-      const parsed = parseNotesBackupRaw(localStorage.getItem(key));
-      if(parsed) candidates.push(parsed);
-    }
-
-    const legacy = parseNotesBackupRaw(localStorage.getItem(legacyNotesBackupKey(projectId)));
-    if(legacy) candidates.push(legacy);
-
-    return pickBestNotesBackup(candidates);
-  }catch{
-    return null;
-  }
-}
-
-function writeNotesBackup(project, opts={}){
-  try{
-    if(!project || !project.id) return;
-
-    const incomingDoc = String(project.notesDoc || "");
-    const incomingHasNotes = notesDocHasMeaningfulContent(incomingDoc);
-    const allowBlankOverwrite = !!opts.allowBlankOverwrite;
-    const existing = readNotesBackup(project.id);
-    const existingHasNotes = notesDocHasMeaningfulContent(existing?.notesDoc || "");
-
-    // Keep protection against accidental blank saves, but allow a deliberate
-    // user delete-all to become the authoritative state for this project.
-    const protectedCopy = (!allowBlankOverwrite && !incomingHasNotes && existingHasNotes) ? existing : null;
-    const notesUpdatedAt = protectedCopy
-      ? (Number(protectedCopy.notesUpdatedAt ?? protectedCopy.updatedAt) || Number(project.notesUpdatedAt) || Number(project.updatedAt) || now())
-      : (Number(project.notesUpdatedAt) || Number(project.updatedAt) || now());
-
-    const payload = {
-      notesDoc: protectedCopy ? String(protectedCopy.notesDoc || "") : incomingDoc,
-      notesColor: protectedCopy ? String(protectedCopy.notesColor || project.notesColor || "") : String(project.notesColor || ""),
-      notesUpdatedAt,
-      notesClearedAt: protectedCopy
-        ? (Number(protectedCopy.notesClearedAt) || 0)
-        : (allowBlankOverwrite && !incomingHasNotes ? (Number(project.notesClearedAt) || notesUpdatedAt) : (Number(project.notesClearedAt) || 0)),
-      updatedAt: notesUpdatedAt
-    };
-    const json = JSON.stringify(payload);
-    const scopes = [getStorageScope(), "guest", getAuthUserId()].filter(Boolean);
-    const seen = new Set();
-    for(const scope of scopes){
-      const key = notesBackupKey(project.id, scope);
-      if(seen.has(key)) continue;
-      seen.add(key);
-      localStorage.setItem(key, json);
-    }
-    localStorage.setItem(legacyNotesBackupKey(project.id), json);
-  }catch{}
-}
-
 function deleteNotesBackup(projectId){
   try{
     if(!projectId) return;
@@ -1817,38 +1753,39 @@ function deleteNotesBackup(projectId){
 
 /***********************
 CLOUD SYNC (Cloudflare / Song Rider Suite)
-- Local-first app with automatic cloud backup/restore
-- Uses the Suite's existing authenticated Cloudflare account
-- Project target: D1 srp_projects
-- Media target: R2 via authenticated Worker API
+- Local-first: songs live in the library below; the cloud is a backup that follows the
+  user across devices. See docs/SYNC.md for the server contract.
+- Every song remembers the server revision it was last synced at. Only songs with real
+  local changes are pushed, always with that revision as baseRev, so a stale device can
+  never silently overwrite newer work: the server answers 409 and we keep both copies.
+- Pulls happen at startup, when the tab becomes visible or focused, when the device comes
+  back online and on Sync Now.
+- Media (recordings, note photos) lives in R2 and is listed in per-song manifests.
 ***********************/
-const CLOUD_PROVIDER = "cloudflare";
 const CLOUD_SRP_PROJECTS_API = "/api/srp/projects";
 const CLOUD_SRP_MEDIA_API = "/api/srp/media";
+const CLOUD_PUSH_DELAY_MS = 1500;
+const CLOUD_FOCUS_PULL_GAP_MS = 2000;
 
 const cloud = {
-  client: null,
   ready: false,
-  initTried: false,
   syncing: false,
   syncQueued: false,
+  mediaQueued: false,
   queueTimer: null,
-  suspendQueue: false,
+  lastPullAt: 0,
   status: "local",
   lastError: "",
-  onlineListenerWired: false,
+  listenersWired: false,
   user: null,
-  session: null,
   authBusy: false,
   authInitialized: false,
   authChangeSeq: 0,
-  appMounted: false,
-  pendingSyncReasons: [],
-  deferInitialMerge: false
+  appMounted: false
 };
 
-function canUseCloudSync(){
-  return typeof window.fetch === "function";
+function cloudSignedIn(){
+  return !!(cloud.ready && cloud.user && getAuthUserId());
 }
 
 async function suiteCloudApi(path, options={}){
@@ -1862,11 +1799,12 @@ async function suiteCloudApi(path, options={}){
   const type = String(res.headers.get("Content-Type") || "").toLowerCase();
   let payload = null;
   if(type.includes("application/json")){
-    try{ payload = await res.json(); }catch{}
+    try{ payload = await res.json(); }catch(err){ console.warn("Cloud response was not valid JSON", path, err); }
   }
   if(!res.ok || payload?.ok === false){
     const err = new Error(payload?.error || `Cloud request failed (${res.status})`);
     err.status = res.status;
+    err.payload = payload;
     throw err;
   }
   return payload || { ok:true };
@@ -1886,7 +1824,7 @@ function cloudMediaUrl(path, projectId=""){
 
 function setCloudStatus(kind, extra=""){
   cloud.status = kind || "local";
-  cloud.lastError = extra || cloud.lastError || "";
+  cloud.lastError = (kind === "error") ? (extra || cloud.lastError || "") : "";
 
   const btn = document.getElementById("cloudSyncBtn");
   if(!btn) return;
@@ -1921,10 +1859,7 @@ function serializeProjectForCloud(project){
     project_id: normalized.id,
     name: String(normalized.name || "Untitled"),
     data: normalized,
-    updated_at: Number(normalized.updatedAt) || now(),
-    deleted: false,
-    deleted_at: null,
-    last_synced_at: new Date().toISOString()
+    updated_at: Number(normalized.updatedAt) || now()
   };
 }
 
@@ -1937,6 +1872,7 @@ function projectFromCloudRow(row){
   const data = (source && typeof source === "object") ? deepClone(source) : {};
   data.id = String(data.id || row.project_id || "");
   if(!data.id) return null;
+  delete data.deleted;
   if(typeof row.name === "string" && row.name.trim()) data.name = row.name.trim();
   if(Number.isFinite(Number(row.updated_at))){
     data.updatedAt = Number(row.updated_at);
@@ -1945,234 +1881,369 @@ function projectFromCloudRow(row){
 }
 
 async function fetchCloudProjects(){
-  if(!cloud.client || !getAuthUserId()) return [];
+  if(!cloudSignedIn()) return [];
   const result = await suiteCloudApi(CLOUD_SRP_PROJECTS_API);
   return Array.isArray(result?.projects) ? result.projects : [];
 }
 
-async function pushProjectToCloud(project){
-  if(!cloud.client || !getAuthUserId() || !project || !project.id) return;
-  const row = serializeProjectForCloud(project);
-  await suiteCloudApi(CLOUD_SRP_PROJECTS_API, {
-    method:"POST",
-    body:JSON.stringify({ project: row })
-  });
-}
-
-async function deleteProjectFromCloud(projectId){
-  if(!cloud.client || !getAuthUserId() || !projectId) return;
-  await suiteCloudApi(`${CLOUD_SRP_PROJECTS_API}/${encodeURIComponent(String(projectId))}`, {
-    method:"DELETE"
-  });
-}
-
-async function mergeCloudIntoLocal(){
-  if(!cloud.client) return;
-
-  const remoteRows = await fetchCloudProjects();
-
-  const remoteMap = new Map();
-  for(const row of remoteRows){
-    if(!row || !row.project_id) continue;
-    remoteMap.set(String(row.project_id), row);
+// Manifests (recordings, note photos) are merged entry by entry: the newest change to an
+// entry wins, and deletes are kept as tombstones so they travel to the other devices.
+function mergeMediaManifests(a, b){
+  const map = new Map();
+  for(const entry of [...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]){
+    if(!entry || !entry.id) continue;
+    const prev = map.get(String(entry.id));
+    if(!prev || (Number(entry.updatedAt) || 0) > (Number(prev.updatedAt) || 0)) map.set(String(entry.id), { ...entry });
   }
+  return Array.from(map.values()).sort((x, y) => (Number(y.updatedAt) || 0) - (Number(x.updatedAt) || 0));
+}
 
-  const localList = loadAllProjects().map(normalizeProject).filter(Boolean);
-  const localMap = new Map(localList.map(p => [String(p.id), p]));
+// Apply what a media sync pass changed (before -> after) onto the project's current
+// manifest, without undoing anything that changed meanwhile (e.g. a delete during an upload).
+function applyManifestUpdate(liveList, beforeList, afterList){
+  const key = (e) => JSON.stringify(e || null);
+  const live = new Map((liveList || []).map(e => [String(e.id), e]));
+  const before = new Map((beforeList || []).map(e => [String(e.id), e]));
+  for(const [id, entry] of before){
+    if(!(afterList || []).some(e => String(e.id) === id) && key(live.get(id)) === key(entry)) live.delete(id);
+  }
+  for(const entry of (afterList || [])){
+    const id = String(entry.id), cur = live.get(id);
+    if(!cur || key(cur) === key(before.get(id)) || (Number(entry.updatedAt) || 0) >= (Number(cur.updatedAt) || 0)) live.set(id, entry);
+  }
+  return Array.from(live.values());
+}
 
-  let localChanged = false;
-  let remoteNeedsPush = false;
+// Stable comparison of song content (key order and bookkeeping fields ignored).
+function stableContentKey(p){
+  const walk = (v, top) => {
+    if(Array.isArray(v)) return v.map(x => walk(x, false));
+    if(v && typeof v === "object"){
+      const out = {};
+      for(const k of Object.keys(v).sort()){
+        if(top && NON_CONTENT_FIELDS.has(k)) continue;
+        out[k] = walk(v[k], false);
+      }
+      return out;
+    }
+    return v;
+  };
+  const n = normalizeProject(deepClone(p));
+  // Blank-line differences in the Full text are formatting, not content.
+  n.fullText = String(n.fullText || "").trim() ? fullTextBlocksToText(splitFullTextBlocks(n.fullText)) : "";
+  return JSON.stringify(walk(n, true));
+}
 
-  // apply cloud deletions / newer cloud versions
-  for(const [id, row] of remoteMap.entries()){
-    const local = localMap.get(id);
-    const rowUpdated = Number(row.updated_at) || 0;
+function conflictStamp(){
+  try{
+    return new Date().toLocaleString(undefined, { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+  }catch{
+    return new Date().toISOString().slice(0, 16).replace("T", " ");
+  }
+}
+
+// Keep the local version of a song as a separate project (new id) so nothing is lost.
+function keepLocalAsConflictCopy(local){
+  const copy = normalizeProject(deepClone(local));
+  copy.id = uuid();
+  copy.name = `${String(local.name || "Untitled").trim() || "Untitled"} (conflict copy ${conflictStamp()})`;
+  copy.createdAt = now();
+  copy.archived = false;
+  // Recordings stay with the original song; a copied manifest would re-download deleted takes.
+  copy.cloudAudioManifest = [];
+  copy.linkedCrpProjectId = "";
+  copy.linkedOctave = 0;
+  copy.linkedTranspose = false;
+  addProjectToLibrary(copy);
+  markProjectsDirty([copy.id]);
+  return copy;
+}
+
+// Replace a local song with the server copy, keeping media manifest entries and notes
+// the server does not have yet. Returns true when the result still differs from the server.
+function adoptServerCopy(remote, rev, local){
+  let differs = false;
+  if(local){
+    const mergedAudio = mergeMediaManifests(local.cloudAudioManifest, remote.cloudAudioManifest);
+    const mergedImages = mergeMediaManifests(local.notesImages, remote.notesImages);
+    if(JSON.stringify(mergedAudio) !== JSON.stringify(mergeMediaManifests(remote.cloudAudioManifest, []))) differs = true;
+    if(JSON.stringify(mergedImages) !== JSON.stringify(mergeMediaManifests(remote.notesImages, []))) differs = true;
+    setProjectCloudAudioManifest(remote, mergedAudio);
+    setProjectNotesImages(remote, mergedImages);
+    const best = mergeNotesSafely(
+      { notesDoc: remote.notesDoc, notesColor: remote.notesColor, notesUpdatedAt: Number(remote.notesUpdatedAt) || 0, notesClearedAt: Number(remote.notesClearedAt) || 0 },
+      { notesDoc: local.notesDoc, notesColor: local.notesColor, notesUpdatedAt: Number(local.notesUpdatedAt) || 0, notesClearedAt: Number(local.notesClearedAt) || 0 }
+    );
+    if(best && String(best.notesDoc || "") !== String(remote.notesDoc || "")){
+      remote.notesDoc = String(best.notesDoc || "");
+      remote.notesUpdatedAt = Number(best.notesUpdatedAt) || remote.notesUpdatedAt;
+      remote.notesClearedAt = Number(best.notesClearedAt) || 0;
+      differs = true;
+    }
+    // Local link bookkeeping belongs to this device's CRP pairing.
+    for(const k of ["linkedCrpProjectId", "linkedOctave", "linkedTranspose", "crpRowsSig"]){
+      if(local[k] !== undefined && remote[k] === undefined) remote[k] = local[k];
+    }
+  }
+  replaceProjectFromCloud(remote);
+  updateSyncMeta(m => {
+    m.rev[remote.id] = rev;
+    if(differs) m.dirty[remote.id] = dirtyStamp();
+    else delete m.dirty[remote.id];
+  });
+  return differs;
+}
+
+// Reconcile the server's rows with the local library. Returns {changed, currentChanged}.
+function applyCloudRows(rows){
+  const lib = ensureLibrary();
+  const meta = readSyncMeta();
+  const result = { changed:false, currentChanged:false, notices:[] };
+  const currentId = String(state.project?.id || "");
+  const seen = new Set();
+  const touch = (id) => { result.changed = true; if(String(id) === currentId) result.currentChanged = true; };
+
+  for(const row of rows){
+    const id = String(row?.project_id || "");
+    if(!id) continue;
+    seen.add(id);
+    const rev = Number(row.rev) || 0;
+    const known = Object.prototype.hasOwnProperty.call(meta.rev, id) ? Number(meta.rev[id]) : null;
+    const local = libraryProject(id);
+    const dirty = !!meta.dirty[id] || lib.pending.has(id);
 
     if(row.deleted){
-      if(local && (rowUpdated >= (Number(local.updatedAt) || 0))){
-        localMap.delete(id);
-        localChanged = true;
-      }else if(local){
-        remoteNeedsPush = true;
+      if(meta.deleted[id]){
+        updateSyncMeta(m => { delete m.deleted[id]; delete m.rev[id]; delete m.dirty[id]; });
+        continue;
       }
+      if(!local){
+        if(known !== null) updateSyncMeta(m => { delete m.rev[id]; });
+        continue;
+      }
+      const deletedAt = Date.parse(row.deleted_at || "") || Number(row.updated_at) || 0;
+      if(dirty && (Number(local.updatedAt) || 0) > deletedAt){
+        const copy = keepLocalAsConflictCopy(local);
+        result.notices.push(`“${local.name || "Untitled"}” was deleted on another device after you edited it here. Your version was kept as “${copy.name}”.`);
+      }else{
+        result.notices.push(`“${local.name || "Untitled"}” was deleted on another device.`);
+      }
+      removeProjectFromLibrary(id);
+      updateSyncMeta(m => { delete m.rev[id]; delete m.dirty[id]; });
+      touch(id);
       continue;
     }
 
-    const remoteProject = projectFromCloudRow(row);
-    if(!remoteProject) continue;
+    if(meta.deleted[id]) continue; // deleted here; the DELETE is still on its way
+    const remote = projectFromCloudRow(row);
+    if(!remote) continue;
 
     if(!local){
-      localMap.set(id, remoteProject);
-      localChanged = true;
+      adoptServerCopy(remote, rev, null);
+      touch(id);
       continue;
     }
+    if(known === rev) continue; // nothing new on the server
 
-    const localUpdated = Number(local.updatedAt) || 0;
-    if(rowUpdated > localUpdated){
-      const bestNotes = mergeNotesSafely(
-        { notesDoc: remoteProject.notesDoc, notesColor: remoteProject.notesColor, notesUpdatedAt: Number(remoteProject.notesUpdatedAt) || Number(remoteProject.updatedAt) || rowUpdated, notesClearedAt: Number(remoteProject.notesClearedAt) || 0, updatedAt: Number(remoteProject.notesUpdatedAt) || Number(remoteProject.updatedAt) || rowUpdated },
-        { notesDoc: local.notesDoc, notesColor: local.notesColor, notesUpdatedAt: Number(local.notesUpdatedAt) || 0, notesClearedAt: Number(local.notesClearedAt) || 0, updatedAt: Number(local.notesUpdatedAt) || 0 },
-        readNotesBackup(id)
-      );
-      if(bestNotes){
-        remoteProject.notesDoc = String(bestNotes.notesDoc || "");
-        remoteProject.notesClearedAt = Number(bestNotes.notesClearedAt) || 0;
-        remoteProject.notesUpdatedAt = Number(bestNotes.notesUpdatedAt ?? bestNotes.updatedAt) || remoteProject.notesUpdatedAt || 0;
-        if(String(bestNotes.notesColor || "").trim()) remoteProject.notesColor = String(bestNotes.notesColor || remoteProject.notesColor || "");
-      }
-      localMap.set(id, remoteProject);
-      localChanged = true;
-    }else if(localUpdated > rowUpdated){
-      remoteNeedsPush = true;
+    const sameContent = stableContentKey(local) === stableContentKey(remote);
+    if(!sameContent && (known === null ? (Number(local.updatedAt) || 0) > (Number(row.updated_at) || 0) : dirty)){
+      // Both sides changed (or an older build left local edits we cannot place): keep both.
+      const copy = keepLocalAsConflictCopy(local);
+      result.notices.push(`“${local.name || "Untitled"}” was changed on another device while you were editing it here. The other device's version is now in “${remote.name || "Untitled"}”, and your version was saved as “${copy.name}”.`);
     }
+    adoptServerCopy(remote, rev, local);
+    touch(id);
   }
 
-  // local-only projects should get pushed up
-  for(const [id] of localMap.entries()){
-    if(!remoteMap.has(id)) remoteNeedsPush = true;
+  // Songs the server has never seen (or lost) are pushed as new.
+  const missing = lib.list.filter(p => !seen.has(String(p.id)) && !meta.dirty[p.id]).map(p => p.id);
+  if(missing.length){
+    updateSyncMeta(m => { for(const id of missing){ delete m.rev[id]; m.dirty[id] = dirtyStamp(); } });
   }
+  return result;
+}
 
-  if(localChanged){
-    const merged = Array.from(localMap.values()).sort((a,b)=>(Number(b.updatedAt)||0) - (Number(a.updatedAt)||0));
-    cloud.suspendQueue = true;
+// Server answered 409 for a save or delete: resolve it the same way a pull would.
+function resolveCloudConflict(id, err, outcome){
+  const row = err?.payload?.project;
+  if(!row) return;
+  const r = applyCloudRows([{ ...row, project_id: String(row.project_id || id) }]);
+  outcome.notices.push(...r.notices);
+  outcome.changed = outcome.changed || r.changed;
+  outcome.currentChanged = outcome.currentChanged || r.currentChanged;
+}
+
+async function pushDirtyProjects(outcome, scope){
+  const meta = readSyncMeta();
+  for(const id of Object.keys(meta.dirty)){
+    assertSyncScope(scope);
+    if(meta.deleted[id]){ updateSyncMeta(m => { delete m.dirty[id]; }); continue; }
+    const project = libraryProject(id);
+    if(!project){ updateSyncMeta(m => { delete m.dirty[id]; }); continue; }
+    const stamp = meta.dirty[id];
+    const baseRev = Number(meta.rev[id]) || 0;
     try{
-      saveAllProjects(merged);
-      merged.forEach((proj) => {
-        try{ writeNotesBackup(proj); }catch{}
+      const res = await suiteCloudApi(CLOUD_SRP_PROJECTS_API, {
+        method:"POST",
+        body:JSON.stringify({ project: serializeProjectForCloud(project), baseRev })
       });
-      const curId = getCurrentProjectIdForScope(getStorageScope());
-      if(curId && !merged.some(p => p.id === curId)){
-        setCurrentProjectIdForScope(getStorageScope(), merged[0]?.id || "");
-      }
-    }finally{
-      cloud.suspendQueue = false;
-    }
-
-    // ✅ Important: when remote projects land on a device that is already signed in
-    // (for example computer -> phone), localStorage updates alone are not enough.
-    // Refresh the in-memory project list/UI immediately so the new cloud projects
-    // show up without needing a hard browser refresh or sign-out/sign-in cycle.
-    if(cloud.appMounted){
-      try{
-        await reloadProjectForCurrentScope();
-      }catch(err){
-        console.error("Reload after cloud merge failed", err);
-      }
+      updateSyncMeta(m => {
+        m.rev[id] = Number(res.rev) || baseRev;
+        if(m.dirty[id] === stamp) delete m.dirty[id];
+      });
+    }catch(err){
+      if(err.status !== 409) throw err;
+      resolveCloudConflict(id, err, outcome);
     }
   }
+}
 
-  scheduleDeferredCloudAudioSync("merge");
-  scheduleDeferredCloudNoteImageSync("merge");
-
-  if(remoteNeedsPush){
-    await syncAllProjectsToCloud();
+async function pushPendingDeletes(outcome, scope){
+  const meta = readSyncMeta();
+  for(const [id, tomb] of Object.entries(meta.deleted)){
+    assertSyncScope(scope);
+    try{
+      await suiteCloudApi(`${CLOUD_SRP_PROJECTS_API}/${encodeURIComponent(id)}?baseRev=${encodeURIComponent(Number(tomb?.rev) || 0)}`, { method:"DELETE" });
+      updateSyncMeta(m => { delete m.deleted[id]; delete m.rev[id]; delete m.dirty[id]; });
+    }catch(err){
+      if(err.status !== 409 || !err.payload?.project) throw err;
+      // Edited on another device since this device last saw it: bring it back instead of deleting.
+      updateSyncMeta(m => { delete m.deleted[id]; delete m.rev[id]; });
+      const name = err.payload.project?.name || "A song";
+      outcome.notices.push(`“${name}” was changed on another device, so it was not deleted. Delete it again if you still want it gone.`);
+      resolveCloudConflict(id, err, outcome);
+    }
   }
 }
 
-function enqueuePendingCloudSync(reason=""){
-  const why = String(reason || "unspecified").trim() || "unspecified";
-  if(!Array.isArray(cloud.pendingSyncReasons)) cloud.pendingSyncReasons = [];
-  cloud.pendingSyncReasons.push(why);
-  if(cloud.pendingSyncReasons.length > 20) cloud.pendingSyncReasons = cloud.pendingSyncReasons.slice(-20);
-}
-
-function consumePendingCloudSyncReason(fallback=""){
-  const list = Array.isArray(cloud.pendingSyncReasons) ? cloud.pendingSyncReasons : [];
-  const pending = list.length ? list.join(",") : "";
-  cloud.pendingSyncReasons = [];
-  return String(pending || fallback || "manual");
-}
-
-function queueCloudSync(reason=""){
-  if(cloud.suspendQueue) return;
-  if(!cloud.ready || !cloud.client || !getAuthUserId()){
-    enqueuePendingCloudSync(reason || "queued-before-ready");
-    return;
+// The account can change while a sync is waiting on the network; never apply its results
+// to another account's songs.
+function assertSyncScope(scope){
+  if(getStorageScope() !== scope){
+    const err = new Error("Account changed during sync");
+    err.scopeChanged = true;
+    throw err;
   }
-
-  if(cloud.queueTimer) clearTimeout(cloud.queueTimer);
-  cloud.syncQueued = true;
-  const why = consumePendingCloudSyncReason(reason || "queued");
-  cloud.queueTimer = setTimeout(() => {
-    cloud.queueTimer = null;
-    syncAllProjectsToCloud(why).catch(err => {
-      console.error("Cloud sync failed", err);
-    });
-  }, 700);
 }
 
-function triggerImmediateCloudSync(reason=""){
-  // Recording changes can enqueue sync even before auth/cloud is fully ready.
-  // triggerImmediateCloudSync() persists the reason first, then syncs immediately when possible.
-  if(cloud.suspendQueue) return;
-  if(!cloud.ready || !cloud.client || !getAuthUserId()){
-    enqueuePendingCloudSync(reason || "immediate-before-ready");
-    return;
-  }
-  if(cloud.queueTimer){
-    clearTimeout(cloud.queueTimer);
-    cloud.queueTimer = null;
-  }
-  cloud.syncQueued = true;
-  const why = consumePendingCloudSyncReason(reason || "immediate");
-  setTimeout(() => {
-    syncAllProjectsToCloud(why).catch(err => {
-      console.error("Immediate cloud sync failed", err);
-    });
-  }, 120);
+function withCloudSyncLock(fn){
+  // One sync at a time across tabs, so two tabs never push the same song with the same baseRev.
+  if(navigator.locks?.request) return navigator.locks.request(`srp-cloud-sync:${getStorageScope()}`, fn);
+  return fn();
 }
 
-async function syncAllProjectsToCloud(reason=""){
-  if(cloud.suspendQueue) return;
+async function syncWithCloud(reason="", opts={}){
+  if(!cloudSignedIn()) return;
   if(cloud.syncing){
     cloud.syncQueued = true;
+    if(opts.media) cloud.mediaQueued = true;
     return;
   }
-  if(!cloud.ready || !cloud.client || !getAuthUserId()) return;
-
+  clearTimeout(cloud.queueTimer);
+  cloud.queueTimer = null;
   cloud.syncing = true;
   cloud.syncQueued = false;
   setCloudStatus("syncing");
-
+  const scope = getStorageScope();
+  const outcome = { notices:[], changed:false, currentChanged:false };
   try{
-    // ✅ Always start by pulling latest cloud state down first.
-    // This makes "Sync Now" truly bidirectional so a second device can fetch
-    // newly uploaded recordings / manifests instead of only pushing its own state.
-    await mergeCloudIntoLocal();
-
-    // ✅ Upload any local audio blobs and refresh per-project manifests.
-    await syncCloudAudioForAllProjects(reason || "projects");
-    await syncCloudNoteImagesForAllProjects(reason || "projects");
-
-    // ✅ Re-read projects AFTER audio sync so freshly-written manifests get pushed
-    // in the same sync pass (important for new recordings/uploads).
-    const all = loadAllProjects().map(normalizeProject).filter(Boolean);
-    for(const project of all){
-      await pushProjectToCloud(project);
-    }
-
-    // ✅ Pull once more so this device also picks up anything that landed remotely
-    // during the same sync window.
-    await mergeCloudIntoLocal();
-
+    await withCloudSyncLock(async () => {
+      flushLibrary({ quiet:true });
+      const rows = await fetchCloudProjects();
+      assertSyncScope(scope);
+      const pulled = applyCloudRows(rows);
+      cloud.lastPullAt = Date.now();
+      outcome.notices.push(...pulled.notices);
+      flushLibrary({ quiet:true });
+      if(pulled.changed) refreshAfterLibraryChange(pulled);
+      await pushDirtyProjects(outcome, scope);
+      if(opts.media || cloud.mediaQueued || pulled.changed){
+        cloud.mediaQueued = false;
+        await syncCloudAudioForAllProjects(reason);
+        assertSyncScope(scope);
+        await syncCloudNoteImagesForAllProjects(reason);
+        assertSyncScope(scope);
+        flushLibrary({ quiet:true });
+        await pushDirtyProjects(outcome, scope);
+      }
+      await pushPendingDeletes(outcome, scope);
+      flushLibrary({ quiet:true });
+      if(outcome.changed) refreshAfterLibraryChange(outcome);
+    });
     setCloudStatus("ok");
   }catch(err){
+    if(err?.scopeChanged) return;
     console.error("Cloud sync failed", reason, err);
     setCloudStatus("error", err?.message || String(err || "Unknown error"));
     throw err;
   }finally{
     cloud.syncing = false;
-    if(cloud.syncQueued && !cloud.suspendQueue && cloud.ready && cloud.client && getAuthUserId()){
+    if(outcome.notices.length) showSyncNotice(outcome.notices);
+    if(cloud.syncQueued && cloudSignedIn()){
       cloud.syncQueued = false;
-      setTimeout(() => {
-        syncAllProjectsToCloud("queued-followup").catch(err => {
-          console.error("Queued cloud sync failed", err);
-        });
-      }, 180);
+      queueCloudSync("queued-followup", 200);
     }
   }
 }
 
+// Called after local saves: push soon, but not on every keystroke.
+function queueCloudSync(reason="", delay=CLOUD_PUSH_DELAY_MS){
+  if(!cloudSignedIn()) return;
+  if(cloud.syncing){ cloud.syncQueued = true; return; }
+  clearTimeout(cloud.queueTimer);
+  cloud.queueTimer = setTimeout(() => {
+    cloud.queueTimer = null;
+    syncWithCloud(reason).catch(() => {});
+  }, delay);
+}
+
+// Recording / note-photo changes: sync media now.
+function triggerImmediateCloudSync(reason=""){
+  if(!cloudSignedIn()) return;
+  if(cloud.syncing){ cloud.syncQueued = true; cloud.mediaQueued = true; return; }
+  clearTimeout(cloud.queueTimer);
+  cloud.queueTimer = setTimeout(() => {
+    cloud.queueTimer = null;
+    syncWithCloud(reason, { media:true }).catch(() => {});
+  }, 120);
+}
+
+function pullFromCloudSoon(reason){
+  if(!cloudSignedIn() || !cloud.appMounted) return;
+  if(Date.now() - cloud.lastPullAt < CLOUD_FOCUS_PULL_GAP_MS) return;
+  cloud.lastPullAt = Date.now();
+  syncWithCloud(reason).catch(() => {});
+}
+
+// Plain-language notices for sync conflicts (kept on screen until dismissed).
+function showSyncNotice(messages){
+  const list = (Array.isArray(messages) ? messages : [messages]).filter(Boolean);
+  if(!list.length) return;
+  let box = document.getElementById("srpNotice");
+  if(!box){
+    box = document.createElement("div");
+    box.id = "srpNotice";
+    box.className = "srpNotice";
+    box.setAttribute("role", "status");
+    box.setAttribute("aria-live", "polite");
+    const text = document.createElement("div");
+    text.className = "srpNoticeText";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "srpNoticeClose";
+    close.textContent = "OK";
+    close.addEventListener("click", () => { box.hidden = true; text.textContent = ""; });
+    box.append(text, close);
+    document.body.appendChild(box);
+  }
+  const text = box.querySelector(".srpNoticeText");
+  for(const msg of list){
+    const p = document.createElement("p");
+    p.textContent = msg;
+    text.appendChild(p);
+  }
+  box.hidden = false;
+}
 
 function updateAuthModalUI(message=""){
   const modal = document.getElementById("authModal");
@@ -2216,23 +2287,9 @@ function setAuthBusy(v, message=""){
 }
 
 async function reloadProjectForCurrentScope(){
-  const prevProject = state.project ? deepClone(state.project) : null;
   state.project = getCurrentProject();
-  if(prevProject && state.project && prevProject.id === state.project.id){
-    const bestNotes = mergeNotesSafely(
-      { notesDoc: state.project.notesDoc, notesColor: state.project.notesColor, notesUpdatedAt: Number(state.project.notesUpdatedAt) || 0, notesClearedAt: Number(state.project.notesClearedAt) || 0, updatedAt: Number(state.project.notesUpdatedAt) || 0 },
-      { notesDoc: prevProject.notesDoc, notesColor: prevProject.notesColor, notesUpdatedAt: Number(prevProject.notesUpdatedAt) || 0, notesClearedAt: Number(prevProject.notesClearedAt) || 0, updatedAt: Number(prevProject.notesUpdatedAt) || 0 },
-      readNotesBackup(state.project.id)
-    );
-    if(bestNotes){
-      state.project.notesDoc = String(bestNotes.notesDoc || "");
-      state.project.notesClearedAt = Number(bestNotes.notesClearedAt) || 0;
-      state.project.notesUpdatedAt = Number(bestNotes.notesUpdatedAt ?? bestNotes.updatedAt) || state.project.notesUpdatedAt || 0;
-      if(String(bestNotes.notesColor || "").trim()) state.project.notesColor = String(bestNotes.notesColor || state.project.notesColor || "");
-    }
-    writeNotesBackup(state.project);
-  }
   state.currentSection = "Full";
+  resetProjectHistory();
   applyProjectSettingsToUI();
   renderProjectsDropdown();
   renderArchiveModal();
@@ -2246,37 +2303,36 @@ async function reloadProjectForCurrentScope(){
   refreshRhymesFromActive();
   refreshDisplayedNoteCells();
   updateAudioButtonsUI();
-  try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
+  try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch(err){ console.warn("Link refresh failed", err); }
 }
 
-async function handleAuthSessionChange(session, reason=""){
+async function handleAuthSessionChange(user, reason=""){
   const seq = ++cloud.authChangeSeq;
   const prevScope = getStorageScope();
+  if(cloud.appMounted) flushLibrary();
 
-  cloud.session = session || null;
-  cloud.user = session?.user || null;
+  cloud.user = user || null;
+  cloud.ready = !!cloud.user;
 
   if(cloud.user){
-    cloud.ready = true;
     setCloudStatus("syncing");
     try{
-      /* Returning users already have a scoped local cache. During initial boot, render that cache immediately after auth and reconcile Cloudflare just after the app mounts. This removes the large SRP project-list network/JSON merge from the critical paint path. New devices with no cached projects still perform the full cloud restore before rendering, so we never create/push a stray blank project. */
-      const cachedForUser = loadAllProjectsForScope(getAuthUserId());
-      const canDeferInitialMerge = reason === "init" && Array.isArray(cachedForUser) && cachedForUser.length > 0;
-      if(canDeferInitialMerge){
-        cloud.deferInitialMerge = true;
-        updateAuthModalUI();
-      }else{
-        // Only adopt guest projects when this account has no SRP cloud projects yet.
-        // Migrated/established accounts must never be polluted by a device's guest scratch data.
-        const existingRemote = await fetchCloudProjects();
-        if(!existingRemote.length) maybeSeedSignedInScopeFromGuest();
-        await mergeCloudIntoLocal();
+      // Returning users already have a local copy: render it first and reconcile with the
+      // cloud right after the app mounts. A new device with nothing cached restores from
+      // the cloud before rendering, so it never creates and pushes a stray blank song.
+      const cached = readStoredProjects(getAuthUserId()).list;
+      if(!(reason === "init" && cached.length)){
+        const rows = await fetchCloudProjects();
         if(seq !== cloud.authChangeSeq) return;
+        // Only adopt this device's signed-out songs when the account has none yet.
+        if(!rows.length) maybeSeedSignedInScopeFromGuest();
+        const pulled = applyCloudRows(rows);
+        if(pulled.notices.length) showSyncNotice(pulled.notices);
+        flushLibrary();
         setCloudStatus("ok");
-        queueCloudSync(reason || "auth");
-        updateAuthModalUI();
+        queueCloudSync(reason || "auth", 200);
       }
+      updateAuthModalUI();
     }catch(err){
       if(seq !== cloud.authChangeSeq) return;
       console.error("Cloud auth sync failed", err);
@@ -2284,42 +2340,50 @@ async function handleAuthSessionChange(session, reason=""){
       updateAuthModalUI(err?.message || "Cloud sync failed.");
     }
   }else{
-    cloud.ready = false;
     setCloudStatus("local");
     updateAuthModalUI();
   }
 
-  const nextScope = getStorageScope();
-  if(cloud.appMounted && prevScope !== nextScope){
+  if(cloud.appMounted && prevScope !== getStorageScope()){
     await reloadProjectForCurrentScope();
   }
+}
+
+function wireLibraryAndCloudEvents(){
+  if(cloud.listenersWired) return;
+  cloud.listenersWired = true;
+  // Another tab saved songs: take its changes so neither tab overwrites the other.
+  window.addEventListener("storage", (e) => {
+    if(!library.scope) return;
+    if(e.key === getCurrentProjectStorageKey(library.scope)){
+      currentProjectIdCache = { scope:null, id:null };
+      return;
+    }
+    if(e.key !== getProjectsStorageKey(library.scope) || e.newValue === null || e.newValue === library.lastRaw) return;
+    if(library.pending.size || library.removed.size){
+      flushLibrary();
+      return;
+    }
+    const merged = mergeStoredLibrary(e.newValue, new Set(), new Set());
+    library.lastRaw = e.newValue;
+    if(merged.changed) refreshAfterLibraryChange(merged);
+  });
+  window.addEventListener("pagehide", () => flushLibrary());
+  document.addEventListener("visibilitychange", () => {
+    if(document.visibilityState === "hidden") flushLibrary();
+    else pullFromCloudSoon("visible");
+  });
+  window.addEventListener("focus", () => pullFromCloudSoon("focus"));
+  window.addEventListener("online", () => { syncWithCloud("online", { media:true }).catch(() => {}); });
 }
 
 async function initCloudSync(){
   if(cloud.authInitialized) return;
   cloud.authInitialized = true;
-
-  if(!canUseCloudSync()){
-    setCloudStatus("local");
-    return;
-  }
-
-  // Keep a lightweight provider marker so all existing cloud-ready guards remain intact.
-  cloud.client = { provider:CLOUD_PROVIDER };
-
+  wireLibraryAndCloudEvents();
   try{
     const result = await suiteCloudApi("/api/auth/me");
-    const user = result?.user || null;
-    await handleAuthSessionChange(user ? { user } : null, "init");
-
-    if(!cloud.onlineListenerWired){
-      cloud.onlineListenerWired = true;
-      window.addEventListener("online", () => {
-        if(cloud.user){
-          syncAllProjectsToCloud("online").catch(err => console.error(err));
-        }
-      });
-    }
+    await handleAuthSessionChange(result?.user || null, "init");
   }catch(err){
     console.error("Cloud init failed", err);
     cloud.ready = false;
@@ -2327,32 +2391,8 @@ async function initCloudSync(){
   }
 }
 
-function scheduleDeferredCloudAudioSync(reason="deferred"){
-  try{
-    if(!cloud.client || !cloud.user || !getAuthUserId()) return;
-    clearTimeout(cloud._audioDeferredTimer);
-    cloud._audioDeferredTimer = setTimeout(() => {
-      syncCloudAudioForAllProjects(reason).catch(err => {
-        console.error("Deferred cloud audio sync failed", err);
-      });
-    }, 1200);
-  }catch{}
-}
-
-function scheduleDeferredCloudNoteImageSync(reason="deferred"){
-  try{
-    if(!cloud.client || !cloud.user || !getAuthUserId()) return;
-    clearTimeout(cloud._noteImageDeferredTimer);
-    cloud._noteImageDeferredTimer = setTimeout(() => {
-      syncCloudNoteImagesForAllProjects(reason).catch(err => {
-        console.error("Deferred cloud note image sync failed", err);
-      });
-    }, 1200);
-  }catch{}
-}
-
 async function submitAuthSignIn(){
-  if(!cloud.client) await initCloudSync();
+  if(!cloud.authInitialized) await initCloudSync();
   const email = String(document.getElementById("authEmailInput")?.value || "").trim();
   const password = String(document.getElementById("authPasswordInput")?.value || "");
   if(!email || !password){
@@ -2365,7 +2405,7 @@ async function submitAuthSignIn(){
       method:"POST",
       body:JSON.stringify({ email, password })
     });
-    await handleAuthSessionChange(result?.user ? { user:result.user } : null, "SIGNED_IN");
+    await handleAuthSessionChange(result?.user || null, "SIGNED_IN");
     updateAuthModalUI("Signed in.");
     closeAuthModal();
   }catch(err){
@@ -2376,7 +2416,7 @@ async function submitAuthSignIn(){
 }
 
 async function submitAuthSignUp(){
-  if(!cloud.client) await initCloudSync();
+  if(!cloud.authInitialized) await initCloudSync();
   const email = String(document.getElementById("authEmailInput")?.value || "").trim();
   const password = String(document.getElementById("authPasswordInput")?.value || "");
   if(!email || !password){
@@ -2398,7 +2438,7 @@ async function submitAuthSignUp(){
       method:"POST",
       body:JSON.stringify({ email, password, displayName, inviteCode })
     });
-    await handleAuthSessionChange(result?.user ? { user:result.user } : null, "SIGNED_UP");
+    await handleAuthSessionChange(result?.user || null, "SIGNED_UP");
     updateAuthModalUI("Account created and signed in.");
     closeAuthModal();
   }catch(err){
@@ -2409,9 +2449,10 @@ async function submitAuthSignUp(){
 }
 
 async function submitAuthSignOut(){
-  if(!cloud.client) return;
+  if(!cloud.user) return;
   try{
     setAuthBusy(true, "Signing out…");
+    await syncWithCloud("sign-out").catch(err => console.warn("Final sync before sign-out failed", err));
     await suiteCloudApi("/api/auth/logout", { method:"POST", body:"{}" });
     await handleAuthSessionChange(null, "SIGNED_OUT");
     closeAuthModal();
@@ -2437,9 +2478,8 @@ function wireAuthModal(){
   document.getElementById("authSyncNowBtn")?.addEventListener("click", async () => {
     try{
       updateAuthModalUI("Syncing now…");
-      await syncAllProjectsToCloud("manual");
-      try{ await reloadProjectForCurrentScope(); }catch{}
-      updateAuthModalUI("Synced.");
+      await syncWithCloud("manual", { media:true });
+      updateAuthModalUI(cloud.status === "error" ? `Sync failed: ${cloud.lastError}` : "Synced.");
     }catch(err){
       updateAuthModalUI(err?.message || "Sync failed.");
     }
@@ -2521,6 +2561,9 @@ function pruneLegacyTrailingBlankFullBlocks(fullText){
     }
     break;
   }
+  // Nothing to prune: return the text unchanged so normalizing is idempotent
+  // (rebuilding it here used to add a blank line on every pass).
+  if(lastKeep === blocks.length - 1) return txt;
 
   const kept = blocks.slice(0, Math.max(1, lastKeep + 1));
   const out = [];
@@ -2567,185 +2610,436 @@ steps: 0,
 };
 }
 
-function hydrateProjectsArrayWithNotes(projects, scope){
-  const arr = Array.isArray(projects) ? projects : [];
-  let changed = false;
+/***********************
+Project library (local-first store)
+- One in-memory list of projects per storage scope ("guest" or the signed-in user id).
+  state.project and the editors hold live references into this list.
+- Saves are debounced and flushed on pagehide / when the tab is hidden, so typing does
+  not re-serialize the whole library on every keystroke.
+- localStorage keeps the same key and JSON array format older builds use. Before writing,
+  changes another tab made to other songs are merged in (no lost multi-tab edits).
+- A small per-scope sync record remembers each song's server revision, which songs have
+  unsynced changes and which deletes still have to reach the server.
+- If storage is full the songs stay in memory (and are still pushed to the cloud) and a
+  banner tells the user.
+***********************/
+const LS_SYNC = "songrider_v25_sync";
+const LIBRARY_SAVE_DELAY_MS = 300;
+// Bookkeeping fields: changing them must not move a song's "last changed" time.
+const NON_CONTENT_FIELDS = new Set(["updatedAt", "cloudAudioManifest", "notesImages", "linkedCrpProjectId", "linkedOctave", "linkedTranspose", "crpChordRows", "crpBeatsPerChord", "crpKey", "crpRowsSig"]);
 
-  const out = arr.map((proj) => {
-    if(!proj || typeof proj !== "object") return proj;
+const library = {
+  scope: null,
+  list: [],
+  written: new Map(),     // id -> JSON last written to (or read from) storage
+  content: new Map(),     // id -> content signature at that point
+  pending: new Set(),     // ids changed in memory since the last write
+  bump: new Set(),        // pending ids whose change may count as a content edit
+  removed: new Set(),     // ids deleted in memory since the last write
+  lastRaw: null,          // the exact string we last read/wrote, to spot other tabs' writes
+  writeFailed: false,
+  legacyNoteKeys: [],     // old notes backup keys to drop after the next good write
+  saveTimer: 0,
+  forceWrite: false,      // rewrite even without pending edits (server copies adopted)
+  syncMetaFallback: null  // sync record kept in memory while storage is full
+};
+let currentProjectIdCache = { scope:null, id:null };
 
-    const next = deepClone(proj);
-    const projectId = String(next.id || "").trim();
-    if(!projectId) return next;
-
-    const candidates = [];
-    const existingDoc = (typeof next.notesDoc === "string") ? next.notesDoc : "";
-    const existingColor = (typeof next.notesColor === "string") ? next.notesColor : "";
-    candidates.push({
-      notesDoc: existingDoc,
-      notesColor: existingColor,
-      notesUpdatedAt: Number(next.notesUpdatedAt) || 0,
-      notesClearedAt: Number(next.notesClearedAt) || 0,
-      updatedAt: Number(next.notesUpdatedAt) || 0
-    });
-
-    try{
-      const scopedBackup = parseNotesBackupRaw(localStorage.getItem(notesBackupKey(projectId, scope)));
-      if(scopedBackup) candidates.push(scopedBackup);
-    }catch{}
-
-    try{
-      const legacyBackup = parseNotesBackupRaw(localStorage.getItem(legacyNotesBackupKey(projectId)));
-      if(legacyBackup) candidates.push(legacyBackup);
-    }catch{}
-
-    const best = pickBestNotesBackup(candidates);
-    if(best){
-      const bestDoc = String(best.notesDoc || "");
-      const bestColor = String(best.notesColor || "");
-      const bestNotesUpdatedAt = Number(best.notesUpdatedAt ?? best.updatedAt) || 0;
-      const bestNotesClearedAt = Number(best.notesClearedAt) || 0;
-
-      if(bestDoc !== existingDoc){
-        next.notesDoc = bestDoc;
-        changed = true;
-      }else if(typeof next.notesDoc !== "string"){
-        next.notesDoc = bestDoc;
-        changed = true;
-      }
-
-      if(bestNotesUpdatedAt !== (Number(next.notesUpdatedAt) || 0)){
-        next.notesUpdatedAt = bestNotesUpdatedAt;
-        changed = true;
-      }
-      if(bestNotesClearedAt !== (Number(next.notesClearedAt) || 0)){
-        next.notesClearedAt = bestNotesClearedAt;
-        changed = true;
-      }
-
-      if(bestColor && bestColor !== existingColor){
-        next.notesColor = bestColor;
-        changed = true;
-      }else if(!existingColor && bestColor){
-        next.notesColor = bestColor;
-        changed = true;
-      }
-    }else{
-      if(typeof next.notesDoc !== "string"){
-        next.notesDoc = "";
-        changed = true;
-      }
-      if(typeof next.notesColor !== "string"){
-        next.notesColor = "#151515";
-        changed = true;
-      }
-      if(!Number.isFinite(Number(next.notesUpdatedAt))){
-        next.notesUpdatedAt = 0;
-        changed = true;
-      }
-      if(!Number.isFinite(Number(next.notesClearedAt))){
-        next.notesClearedAt = 0;
-        changed = true;
-      }
-    }
-
-    return next;
-  });
-
-  return { projects: out, changed };
+function contentSignature(p){
+  return JSON.stringify(p, function(k, v){ return (this === p && NON_CONTENT_FIELDS.has(k)) ? undefined : v; });
 }
 
-function loadAllProjectsForScope(scope){
+function readStoredProjects(scope){
   try{
     const raw = localStorage.getItem(getProjectsStorageKey(scope));
     const arr = raw ? JSON.parse(raw) : [];
-    const list = Array.isArray(arr) ? arr : [];
-    const hydrated = hydrateProjectsArrayWithNotes(list, scope);
-    if(hydrated.changed){
-      try{ localStorage.setItem(getProjectsStorageKey(scope), JSON.stringify(hydrated.projects)); }catch{}
-    }
-    return hydrated.projects;
-  }catch{
-    return [];
+    return { raw, list: (Array.isArray(arr) ? arr : []).filter(p => p && typeof p === "object" && p.id) };
+  }catch(err){
+    console.error("Could not read saved songs", err);
+    return { raw:null, list:[] };
   }
 }
 
-function saveAllProjectsForScope(scope, projects){
-  const hydrated = hydrateProjectsArrayWithNotes(projects, scope);
-  localStorage.setItem(getProjectsStorageKey(scope), JSON.stringify(hydrated.projects));
+// Older builds kept up to three extra copies of each song's notes in separate keys.
+// They are read once here, merged into the song if they hold better notes, and removed
+// after the library has been written successfully.
+function adoptLegacyNotesBackups(project, scope){
+  const candidates = [];
+  for(const key of [notesBackupKey(project.id, scope), legacyNotesBackupKey(project.id)]){
+    let raw = null;
+    try{ raw = localStorage.getItem(key); }catch{}
+    if(raw === null) continue;
+    library.legacyNoteKeys.push(key);
+    const parsed = parseNotesBackupRaw(raw);
+    if(parsed) candidates.push(parsed);
+  }
+  if(!candidates.length) return false;
+  const own = { notesDoc: String(project.notesDoc || ""), notesColor: String(project.notesColor || ""), notesUpdatedAt: Number(project.notesUpdatedAt) || 0, notesClearedAt: Number(project.notesClearedAt) || 0 };
+  const best = pickBestNotesBackup([own, ...candidates]);
+  if(!best || best === own || String(best.notesDoc || "") === own.notesDoc) return false;
+  project.notesDoc = String(best.notesDoc || "");
+  project.notesUpdatedAt = Number(best.notesUpdatedAt) || own.notesUpdatedAt;
+  project.notesClearedAt = Number(best.notesClearedAt) || 0;
+  if(String(best.notesColor || "").trim()) project.notesColor = String(best.notesColor);
+  return true;
+}
+
+function rememberWritten(p){
+  library.written.set(p.id, JSON.stringify(p));
+  library.content.set(p.id, contentSignature(p));
+}
+
+function ensureLibrary(){
+  const scope = getStorageScope();
+  if(library.scope === scope) return library;
+  if(library.scope) flushLibrary();
+  library.scope = scope;
+  library.list = [];
+  library.written.clear();
+  library.content.clear();
+  library.pending.clear();
+  library.bump.clear();
+  library.removed.clear();
+  library.legacyNoteKeys = [];
+  library.writeFailed = false;
+  library.syncMetaFallback = null;
+  const stored = readStoredProjects(scope);
+  library.lastRaw = stored.raw;
+  for(const raw of stored.list){
+    const notesRecovered = adoptLegacyNotesBackups(raw, scope);
+    const p = normalizeProject(raw);
+    if(library.list.some(x => x.id === p.id)) continue;
+    library.list.push(p);
+    rememberWritten(p);
+    if(notesRecovered){
+      library.written.delete(p.id);
+      library.pending.add(p.id);
+    }
+  }
+  if(library.pending.size || library.legacyNoteKeys.length) scheduleLibrarySave();
+  return library;
+}
+
+function libraryProject(id){
+  const sid = String(id || "");
+  if(!sid) return null;
+  // The open song is the one the editors write to; keep the library pointing at it.
+  if(state.project && String(state.project.id || "") === sid){
+    const lib = ensureLibrary();
+    const i = lib.list.findIndex(p => String(p.id) === sid);
+    if(i >= 0 && lib.list[i] !== state.project) lib.list[i] = state.project;
+    if(i >= 0) return state.project;
+  }
+  return ensureLibrary().list.find(p => String(p.id) === sid) || null;
+}
+
+function scheduleLibrarySave(){
+  clearTimeout(library.saveTimer);
+  library.saveTimer = setTimeout(flushLibrary, LIBRARY_SAVE_DELAY_MS);
+}
+
+function addProjectToLibrary(p){
+  const lib = ensureLibrary();
+  if(!lib.list.some(x => x.id === p.id)) lib.list.unshift(p);
+  lib.removed.delete(p.id);
+  lib.pending.add(p.id);
+  scheduleLibrarySave();
+}
+
+function removeProjectFromLibrary(id){
+  const lib = ensureLibrary();
+  const sid = String(id);
+  lib.list = lib.list.filter(p => String(p.id) !== sid);
+  lib.pending.delete(sid);
+  lib.bump.delete(sid);
+  lib.written.delete(sid);
+  lib.content.delete(sid);
+  lib.removed.add(sid);
+  scheduleLibrarySave();
+}
+
+// A server copy replaces the local one. This is not a local edit: it is written but not
+// marked for upload.
+function replaceProjectFromCloud(remote){
+  const lib = ensureLibrary();
+  const i = lib.list.findIndex(p => String(p.id) === String(remote.id));
+  if(i >= 0) lib.list[i] = remote; else lib.list.push(remote);
+  if(state.project && String(state.project.id) === String(remote.id)) state.project = remote;
+  lib.pending.delete(remote.id);
+  lib.bump.delete(remote.id);
+  lib.removed.delete(remote.id);
+  library.forceWrite = true;
+  rememberWritten(remote);
+  scheduleLibrarySave();
+}
+
+function dirtyStamp(){
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getSyncMetaKey(scope){
+  return scopedStorageKey(LS_SYNC, scope);
+}
+
+function readSyncMeta(scope){
+  const s = scope || ensureLibrary().scope;
+  let m = (s === library.scope) ? library.syncMetaFallback : null;
+  if(!m){
+    try{ m = JSON.parse(localStorage.getItem(getSyncMetaKey(s)) || "null"); }
+    catch(err){ console.warn("Sync record unreadable; starting fresh", err); m = null; }
+  }
+  m = (m && typeof m === "object") ? m : {};
+  return {
+    v: 1,
+    rev: (m.rev && typeof m.rev === "object") ? m.rev : {},
+    dirty: (m.dirty && typeof m.dirty === "object") ? m.dirty : {},
+    deleted: (m.deleted && typeof m.deleted === "object") ? m.deleted : {}
+  };
+}
+
+function updateSyncMeta(fn){
+  const scope = ensureLibrary().scope;
+  const m = readSyncMeta(scope);
+  fn(m);
+  try{
+    localStorage.setItem(getSyncMetaKey(scope), JSON.stringify(m));
+    library.syncMetaFallback = null;
+  }catch(err){
+    library.syncMetaFallback = m;
+    reportStorageError(err);
+  }
+  return m;
+}
+
+function markProjectsDirty(ids){
+  if(!ids.length || library.scope === "guest") return;
+  updateSyncMeta(m => { for(const id of ids) m.dirty[id] = dirtyStamp(); });
+}
+
+// Merge another tab's write into memory. Songs this tab changed (or deleted) keep this
+// tab's version; everything else takes the stored version.
+function mergeStoredLibrary(raw, keepIds, droppedIds){
+  let stored = [];
+  try{ stored = JSON.parse(raw || "[]"); }catch(err){ console.warn("Another tab wrote unreadable songs; ignoring", err); return { currentChanged:false, changed:false }; }
+  if(!Array.isArray(stored)) return { currentChanged:false, changed:false };
+  const lib = library;
+  const meta = readSyncMeta(lib.scope);
+  const currentId = String(state.project?.id || "");
+  const storedIds = new Set();
+  let changed = false, currentChanged = false;
+  for(const s of stored){
+    if(!s || !s.id) continue;
+    const id = String(s.id);
+    storedIds.add(id);
+    if(keepIds.has(id) || droppedIds.has(id) || meta.deleted[id]) continue;
+    const json = JSON.stringify(s);
+    if(json === lib.written.get(id)) continue;
+    const p = normalizeProject(s);
+    const i = lib.list.findIndex(x => String(x.id) === id);
+    if(i >= 0) lib.list[i] = p; else lib.list.push(p);
+    lib.written.set(id, json);
+    lib.content.set(id, contentSignature(p));
+    if(id === currentId) currentChanged = true;
+    changed = true;
+  }
+  const before = lib.list.length;
+  lib.list = lib.list.filter(p => storedIds.has(String(p.id)) || keepIds.has(String(p.id)));
+  if(lib.list.length !== before){
+    changed = true;
+    if(currentId && !lib.list.some(p => String(p.id) === currentId)) currentChanged = true;
+  }
+  return { changed, currentChanged };
+}
+
+// Write pending changes now. quiet: called from inside a cloud sync, which pushes them itself.
+function flushLibrary(opts={}){
+  clearTimeout(library.saveTimer);
+  library.saveTimer = 0;
+  const lib = library;
+  if(!lib.scope) return true;
+  if(!lib.pending.size && !lib.removed.size && !lib.writeFailed && !lib.forceWrite && !lib.legacyNoteKeys.length) return true;
+
+  const changedIds = [];
+  for(const id of lib.pending){
+    const p = lib.list.find(x => x.id === id);
+    if(!p) continue;
+    let json = JSON.stringify(p);
+    if(json === lib.written.get(id)) continue; // nothing actually changed (echo / repeated save)
+    const sig = contentSignature(p);
+    if(lib.bump.has(id) && lib.content.has(id) && sig !== lib.content.get(id)){
+      p.updatedAt = now(); // a real content edit
+      json = JSON.stringify(p);
+    }
+    lib.written.set(id, json);
+    lib.content.set(id, contentSignature(p));
+    changedIds.push(id);
+  }
+  const keep = new Set([...lib.pending]);
+  const dropped = new Set([...lib.removed]);
+  lib.pending.clear();
+  lib.bump.clear();
+  lib.removed.clear();
+  lib.forceWrite = false;
+
+  const key = getProjectsStorageKey(lib.scope);
+  let merged = { changed:false, currentChanged:false };
+  try{
+    const raw = localStorage.getItem(key);
+    if(raw !== null && raw !== lib.lastRaw) merged = mergeStoredLibrary(raw, keep, dropped);
+  }catch(err){ console.warn("Could not check for other tabs' changes", err); }
+
+  const text = "[" + lib.list.map(p => lib.written.get(p.id) || JSON.stringify(p)).join(",") + "]";
+  let ok = true;
+  try{
+    localStorage.setItem(key, text);
+    lib.lastRaw = text;
+    lib.writeFailed = false;
+    reportStorageError(null);
+    if(lib.legacyNoteKeys.length){
+      for(const k of lib.legacyNoteKeys){ try{ localStorage.removeItem(k); }catch{} }
+      lib.legacyNoteKeys = [];
+    }
+  }catch(err){
+    ok = false;
+    lib.writeFailed = true;
+    reportStorageError(err);
+  }
+  markProjectsDirty(changedIds);
+  if((changedIds.length || dropped.size) && !opts.quiet) queueCloudSync("local-save");
+  if(merged.changed && cloud.appMounted) refreshAfterLibraryChange(merged);
+  return ok;
+}
+
+// Persistent, visible warning when the browser refuses to store songs.
+function reportStorageError(err){
+  let bar = document.getElementById("srpStorageBanner");
+  if(!err){
+    if(bar) bar.hidden = true;
+    return;
+  }
+  if(!bar || bar.hidden) console.error("Saving songs on this device failed", err);
+  if(!bar){
+    bar = document.createElement("div");
+    bar.id = "srpStorageBanner";
+    bar.className = "srpStorageBanner";
+    bar.setAttribute("role", "alert");
+    document.body.prepend(bar);
+  }
+  const quota = /quota|exceeded|full/i.test(String(err?.name || "") + " " + String(err?.message || ""));
+  bar.textContent = (quota ? "This device's storage is full, so your latest changes could not be saved on this device. " : "Your latest changes could not be saved on this device. ")
+    + (cloudSignedIn() ? "They are still being backed up to your cloud account. " : "Sign in to back them up to the cloud, ")
+    + "Keep this tab open, then free up space (delete old songs or recordings, or clear other site data).";
+  bar.hidden = false;
+}
+
+// Re-render after songs changed underneath the editors (cloud pull, another tab).
+function refreshAfterLibraryChange({ currentChanged } = {}){
+  if(!cloud.appMounted) return;
+  if(currentChanged || !state.project || !library.list.includes(state.project)){
+    const focus = captureEditorFocus();
+    const keepSection = state.currentSection;
+    state.project = getCurrentProject();
+    state.currentSection = (keepSection === "Full" || isSectionVisible(keepSection)) ? keepSection : "Full";
+    applyProjectSettingsToUI();
+    renderAll();
+    renderRecordings();
+    restoreEditorFocus(focus);
+    try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch(err){ console.warn("Link refresh failed", err); }
+  }
+  renderProjectsDropdown();
+  renderArchiveModal();
+}
+
+function captureEditorFocus(){
+  const a = document.activeElement;
+  if(!a || !a.matches?.("textarea.fullSectionText, textarea.lyrics")) return null;
+  const sel = a.matches("textarea.fullSectionText") ? "textarea.fullSectionText" : "textarea.lyrics";
+  return { sel, index: Array.from(document.querySelectorAll(sel)).indexOf(a), start: a.selectionStart, end: a.selectionEnd };
+}
+
+function restoreEditorFocus(f){
+  if(!f || f.index < 0) return;
+  const ta = document.querySelectorAll(f.sel)[f.index];
+  if(!ta) return;
+  try{
+    ta.focus({ preventScroll:true });
+    const max = ta.value.length;
+    ta.setSelectionRange(Math.min(f.start, max), Math.min(f.end, max));
+  }catch{}
 }
 
 function getCurrentProjectIdForScope(scope){
-  try{ return localStorage.getItem(getCurrentProjectStorageKey(scope)) || ""; }catch{ return ""; }
+  if(currentProjectIdCache.scope === scope) return currentProjectIdCache.id || "";
+  let id = "";
+  try{ id = localStorage.getItem(getCurrentProjectStorageKey(scope)) || ""; }catch{}
+  currentProjectIdCache = { scope, id };
+  return id;
 }
 
 function setCurrentProjectIdForScope(scope, id){
-  try{ localStorage.setItem(getCurrentProjectStorageKey(scope), String(id || "")); }catch{}
+  const sid = String(id || "");
+  if(currentProjectIdCache.scope === scope && currentProjectIdCache.id === sid) return;
+  currentProjectIdCache = { scope, id:sid };
+  try{ localStorage.setItem(getCurrentProjectStorageKey(scope), sid); }catch(err){ console.warn("Could not remember the open song", err); }
 }
 
 function clearCurrentProjectIdForScope(scope){
+  currentProjectIdCache = { scope, id:"" };
   try{ localStorage.removeItem(getCurrentProjectStorageKey(scope)); }catch{}
 }
 
+// A brand-new account adopts the songs this device made while signed out.
 function maybeSeedSignedInScopeFromGuest(){
-  const userId = getAuthUserId();
-  if(!userId) return;
-  const userProjects = loadAllProjectsForScope(userId);
-  if(Array.isArray(userProjects) && userProjects.length) return;
-  const guestProjects = loadAllProjectsForScope("guest");
-  if(!Array.isArray(guestProjects) || !guestProjects.length) return;
-  saveAllProjectsForScope(userId, deepClone(guestProjects));
+  const lib = ensureLibrary();
+  if(lib.scope === "guest" || lib.list.length) return;
+  const guest = readStoredProjects("guest").list;
+  if(!guest.length) return;
+  for(const raw of guest) addProjectToLibrary(normalizeProject(deepClone(raw)));
   const guestCur = getCurrentProjectIdForScope("guest");
-  if(guestCur) setCurrentProjectIdForScope(userId, guestCur);
+  if(guestCur) setCurrentProjectIdForScope(lib.scope, guestCur);
+  flushLibrary();
 }
 
-
+// Snapshot copies (callers may modify them freely and save them with upsertProject).
 function loadAllProjects(){
-  return loadAllProjectsForScope(getStorageScope());
+  return ensureLibrary().list.map(p => deepClone(p));
 }
 
-function saveAllProjects(projects){
-  saveAllProjectsForScope(getStorageScope(), projects);
-  if(!cloud.suspendQueue) queueCloudSync("saveAllProjects");
+// Save a project. Options:
+//   bump:false   - bookkeeping / echo: never moves the song's "last changed" time
+//   select:false - do not make it the song that opens next time
+function upsertProject(p, opts={}){
+  if(!p || !p.id) return;
+  const lib = ensureLibrary();
+  const i = lib.list.findIndex(x => x.id === p.id);
+  if(i >= 0) lib.list[i] = p; else lib.list.unshift(p);
+  lib.removed.delete(p.id);
+  lib.pending.add(p.id);
+  if(opts.bump !== false) lib.bump.add(p.id);
+  if(opts.select === true || (opts.select !== false && (!state.project || state.project === p))) setCurrentProjectIdForScope(lib.scope, p.id);
+  scheduleLibrarySave();
 }
 
-function upsertProject(p){
-  const all = loadAllProjects();
-  const i = all.findIndex(x => x.id === p.id);
-  p.updatedAt = now();
-  if(i >= 0) all[i] = p;
-  else all.unshift(p);
-  saveAllProjects(all);
-  writeNotesBackup(p);
-  setCurrentProjectIdForScope(getStorageScope(), p.id);
-  if(!cloud.suspendQueue) queueCloudSync("upsertProject");
-}
-
-// Some newer UI paths call this helper.
-// Keep it simple and reliable: persist the current project snapshot.
 function saveCurrentProject(){
-  try{
-    if(state && state.project) upsertProject(state.project);
-  }catch(err){
-    console.error(err);
-  }
+  if(state && state.project) upsertProject(state.project);
 }
 
 function deleteProjectById(id){
-  const all = loadAllProjects().filter(p => p.id !== id);
-  saveAllProjects(all);
-  deleteNotesBackup(id);
-  clearCurrentProjectIdForScope(getStorageScope());
-  if(!cloud.suspendQueue && getAuthUserId()){
-    deleteProjectFromCloud(id).then(() => {
-      setCloudStatus("ok");
-    }).catch(err => {
-      console.error("Cloud delete failed", err);
-      setCloudStatus("error", err?.message || String(err || "Unknown error"));
+  const lib = ensureLibrary();
+  const sid = String(id || "");
+  if(!sid) return;
+  removeProjectFromLibrary(sid);
+  deleteNotesBackup(sid);
+  clearCurrentProjectIdForScope(lib.scope);
+  if(lib.scope !== "guest"){
+    // Keep a local tombstone until the server confirms, so a pull cannot bring it back.
+    updateSyncMeta(m => {
+      m.deleted[sid] = { at: now(), rev: Number(m.rev[sid]) || 0 };
+      delete m.dirty[sid];
     });
   }
+  flushLibrary();
 }
-
 
 async function dbGet(id){
   const db = await openDB();
@@ -2755,11 +3049,6 @@ async function dbGet(id){
     req.onsuccess = () => resolve(req.result || null);
     req.onerror = () => reject(req.error);
   });
-}
-
-function getProjectByIdLocal(projectId){
-  const all = loadAllProjects().map(normalizeProject).filter(Boolean);
-  return all.find(p => String(p.id || "") === String(projectId || "")) || null;
 }
 
 function getCloudAudioManifest(project){
@@ -2822,7 +3111,7 @@ function recordingToManifestEntry(rec){
 }
 
 async function uploadRecordingToCloud(rec){
-  if(!cloud.client || !cloud.user || !rec || !rec.id || !rec.blob) return null;
+  if(!cloudSignedIn() || !rec || !rec.id || !rec.blob) return null;
   const entry = recordingToManifestEntry(rec);
   const path = entry.path;
   const url = cloudMediaUrl(path, rec.projectId || entry.projectId);
@@ -2843,7 +3132,7 @@ async function uploadRecordingToCloud(rec){
 }
 
 async function downloadRecordingFromCloud(entry){
-  if(!cloud.client || !cloud.user || !entry?.path) return null;
+  if(!cloudSignedIn() || !entry?.path) return null;
   const url = cloudMediaUrl(entry.path, entry.projectId);
   if(!url) return null;
   const res = await fetch(url, { credentials:"same-origin", cache:"no-store" });
@@ -2870,7 +3159,7 @@ async function downloadRecordingFromCloud(entry){
 }
 
 async function removeRecordingFromCloud(entry){
-  if(!cloud.client || !cloud.user || !entry?.path) return;
+  if(!cloudSignedIn() || !entry?.path) return;
   try{
     const url = cloudMediaUrl(entry.path, entry.projectId);
     if(!url) return;
@@ -2885,26 +3174,18 @@ async function removeRecordingFromCloud(entry){
   }
 }
 
-async function saveProjectAudioManifest(project, manifest){
-  if(!project || !project.id) return;
-  const next = normalizeProject(deepClone(project));
-  setProjectCloudAudioManifest(next, manifest);
-
-  if(state.project && String(state.project.id || "") === String(next.id || "")) state.project = next;
-
-  cloud.suspendQueue = true;
-  try{
-    upsertProject(next);
-  }finally{
-    cloud.suspendQueue = false;
-  }
+// Apply a manifest change to the song as it is now (the open song keeps its identity, so the
+// editors' references stay valid and nothing typed meanwhile is reverted).
+function saveProjectAudioManifest(projectId, beforeManifest, nextManifest){
+  const live = libraryProject(projectId);
+  if(!live) return;
+  setProjectCloudAudioManifest(live, applyManifestUpdate(getCloudAudioManifest(live), beforeManifest, nextManifest));
+  upsertProject(live, { bump:false, select:false });
 }
 
-async function tombstoneRecordingInProject(projectId, rec){
-  if(!projectId || !rec) return;
-  const project = getProjectByIdLocal(projectId) || (state.project && String(state.project.id||"")===String(projectId) ? normalizeProject(deepClone(state.project)) : null);
-  if(!project) return;
-  const manifest = getCloudAudioManifest(project);
+function tombstoneRecordingInProject(projectId, rec){
+  const live = libraryProject(projectId);
+  if(!live || !rec) return;
   const path = String(rec.cloudPath || getCloudAudioPath(projectId, rec.id, rec.blob || rec.contentType || "audio/mpeg"));
   const tomb = {
     id: String(rec.id),
@@ -2919,108 +3200,106 @@ async function tombstoneRecordingInProject(projectId, rec){
     size: Number(rec.blob?.size || rec.size || 0),
     deleted: true
   };
-  const map = new Map(manifest.map(e => [String(e.id || ""), { ...(e || {}) }]));
-  map.set(tomb.id, tomb);
-  const nextManifest = Array.from(map.values());
-  await saveProjectAudioManifest(project, nextManifest);
+  const manifest = getCloudAudioManifest(live).filter(e => String(e.id || "") !== tomb.id);
+  manifest.push(tomb);
+  setProjectCloudAudioManifest(live, manifest);
+  upsertProject(live, { bump:false, select:false });
   triggerImmediateCloudSync("recording-delete");
 }
 
 async function syncCloudAudioForAllProjects(reason=""){
-  if(!cloud.client || !cloud.user || !getAuthUserId()) return;
+  if(!cloudSignedIn()) return;
 
-  const allProjects = loadAllProjects().map(normalizeProject).filter(Boolean);
-  const allRecs = await dbGetAll().catch(() => []);
+  const allProjects = ensureLibrary().list.slice();
+  const allRecs = await dbGetAll().catch(err => { console.error("Could not read recordings", err); return []; });
   const recMap = new Map((Array.isArray(allRecs) ? allRecs : []).map(r => [String(r.id || ""), r]));
-  let anyManifestChanged = false;
   let currentProjectTouched = false;
+  let firstError = null;
 
   for(const project of allProjects){
     const projectId = String(project.id || "");
     if(!projectId) continue;
 
-    const manifestMap = new Map(getCloudAudioManifest(project).map(e => [String(e.id || ""), { ...(e || {}) }]));
+    const before = getCloudAudioManifest(project);
+    const manifestMap = new Map(before.map(e => [String(e.id || ""), { ...(e || {}) }]));
     const localProjectRecs = (Array.isArray(allRecs) ? allRecs : []).filter(r => String(r.projectId || "") === projectId);
-    let manifestChanged = false;
     let projectTouched = false;
 
-    for(const rec of localProjectRecs){
-      if(!rec || !rec.id || !rec.blob) continue;
-      const localUpdated = Number(rec.updatedAt) || Number(rec.createdAt) || now();
-      const remoteEntry = manifestMap.get(String(rec.id));
-      const remoteUpdated = Number(remoteEntry?.updatedAt) || 0;
+    try{
+      for(const rec of localProjectRecs){
+        if(!rec || !rec.id || !rec.blob) continue;
+        const localUpdated = Number(rec.updatedAt) || Number(rec.createdAt) || now();
+        const remoteEntry = manifestMap.get(String(rec.id));
+        const remoteUpdated = Number(remoteEntry?.updatedAt) || 0;
 
-      if(!remoteEntry || remoteEntry.deleted || localUpdated > remoteUpdated){
-        const uploadedEntry = await uploadRecordingToCloud(rec);
-        uploadedEntry.updatedAt = localUpdated;
-        uploadedEntry.createdAt = Number(rec.createdAt) || uploadedEntry.createdAt;
-        uploadedEntry.offsetSec = Number(rec.offsetSec) || 0;
-        uploadedEntry.title = String(rec.title || "");
-        manifestMap.set(String(rec.id), uploadedEntry);
-        manifestChanged = true;
-      }else if(remoteUpdated > localUpdated){
-        const remoteRec = await downloadRecordingFromCloud(remoteEntry);
-        if(!remoteRec){
-          manifestMap.delete(String(rec.id));
-          manifestChanged = true;
-          continue;
-        }
-        await dbPut(remoteRec);
-        recMap.set(String(remoteRec.id), remoteRec);
-        projectTouched = true;
-      }
-    }
-
-    for(const [recId, entry] of manifestMap.entries()){
-      const localRec = recMap.get(String(recId));
-      const localUpdated = Number(localRec?.updatedAt) || Number(localRec?.createdAt) || 0;
-      const remoteUpdated = Number(entry?.updatedAt) || 0;
-
-      if(entry?.deleted){
-        if(localRec && remoteUpdated >= localUpdated){
-          await dbDelete(recId);
-          recMap.delete(recId);
+        if(!remoteEntry || remoteEntry.deleted || localUpdated > remoteUpdated){
+          if(remoteEntry?.deleted && remoteUpdated >= localUpdated) continue; // deleted after this copy was made
+          const uploadedEntry = await uploadRecordingToCloud(rec);
+          uploadedEntry.updatedAt = localUpdated;
+          uploadedEntry.createdAt = Number(rec.createdAt) || uploadedEntry.createdAt;
+          uploadedEntry.offsetSec = Number(rec.offsetSec) || 0;
+          uploadedEntry.title = String(rec.title || "");
+          manifestMap.set(String(rec.id), uploadedEntry);
+        }else if(remoteUpdated > localUpdated){
+          const remoteRec = await downloadRecordingFromCloud(remoteEntry);
+          if(!remoteRec){
+            manifestMap.delete(String(rec.id));
+            continue;
+          }
+          await dbPut(remoteRec);
+          recMap.set(String(remoteRec.id), remoteRec);
           projectTouched = true;
         }
-        await removeRecordingFromCloud(entry);
-        continue;
       }
 
-      if(!localRec){
-        const remoteRec = await downloadRecordingFromCloud(entry);
-        if(!remoteRec){
-          manifestMap.delete(String(recId));
-          manifestChanged = true;
+      for(const [recId, entry] of manifestMap.entries()){
+        const localRec = recMap.get(String(recId));
+        const localUpdated = Number(localRec?.updatedAt) || Number(localRec?.createdAt) || 0;
+        const remoteUpdated = Number(entry?.updatedAt) || 0;
+
+        if(entry?.deleted){
+          if(localRec && remoteUpdated >= localUpdated){
+            await dbDelete(recId);
+            recMap.delete(recId);
+            projectTouched = true;
+          }
+          await removeRecordingFromCloud(entry);
           continue;
         }
-        await dbPut(remoteRec);
-        recMap.set(String(remoteRec.id), remoteRec);
-        projectTouched = true;
+
+        if(!localRec){
+          const remoteRec = await downloadRecordingFromCloud(entry);
+          if(!remoteRec){
+            manifestMap.delete(String(recId));
+            continue;
+          }
+          await dbPut(remoteRec);
+          recMap.set(String(remoteRec.id), remoteRec);
+          projectTouched = true;
+        }
       }
+    }catch(err){
+      // Keep going with the other songs; report the failure at the end.
+      console.error("Recording sync failed for", projectId, err);
+      firstError = firstError || err;
     }
 
-    const nextManifest = Array.from(manifestMap.values())
-      .filter(Boolean)
-      .sort((a,b) => (Number(b.updatedAt)||0) - (Number(a.updatedAt)||0));
-
-    if(JSON.stringify(getCloudAudioManifest(project)) !== JSON.stringify(nextManifest)){
-      await saveProjectAudioManifest(project, nextManifest);
-      manifestChanged = true;
+    const nextManifest = Array.from(manifestMap.values()).filter(Boolean);
+    if(JSON.stringify(mergeMediaManifests(before, [])) !== JSON.stringify(mergeMediaManifests(nextManifest, []))){
+      saveProjectAudioManifest(projectId, before, nextManifest);
     }
-
-    if(manifestChanged) anyManifestChanged = true;
-    if(projectTouched) currentProjectTouched = currentProjectTouched || (state.project && String(state.project.id||"") === projectId);
+    if(projectTouched && state.project && String(state.project.id || "") === projectId) currentProjectTouched = true;
   }
 
-  if(anyManifestChanged) queueCloudSync(`audio-manifest-${reason || "sync"}`);
   if(currentProjectTouched) await renderRecordings();
+  if(firstError) throw firstError;
 }
 
 async function deleteRecordingWithSync(rec){
   if(!rec || !rec.id) return;
   const projectId = String(rec.projectId || "");
-  if(cloud.ready && cloud.user && projectId){
-    await tombstoneRecordingInProject(projectId, rec);
+  if(cloudSignedIn() && projectId){
+    tombstoneRecordingInProject(projectId, rec);
   }
   await dbDelete(rec.id);
   if(state.audioSyncRecId === rec.id) stopAudioSync();
@@ -3049,27 +3328,6 @@ function normalizeProject(p){
     deleted: !!entry.deleted
   })).filter((entry) => entry.id);
 
-  const notesBackup = readNotesBackup(p.id);
-  if(notesBackup){
-    const bestNotes = mergeNotesSafely(
-      {
-        notesDoc: String(p.notesDoc || ""),
-        notesColor: String(p.notesColor || ""),
-        notesUpdatedAt: Number(p.notesUpdatedAt) || 0,
-        notesClearedAt: Number(p.notesClearedAt) || 0,
-        updatedAt: Number(p.notesUpdatedAt) || 0
-      },
-      notesBackup
-    );
-    if(bestNotes){
-      p.notesDoc = String(bestNotes.notesDoc || "");
-      p.notesClearedAt = Number(bestNotes.notesClearedAt) || 0;
-      p.notesUpdatedAt = Number(bestNotes.notesUpdatedAt ?? bestNotes.updatedAt) || p.notesUpdatedAt || 0;
-      if(String(bestNotes.notesColor || "").trim()){
-        p.notesColor = String(bestNotes.notesColor || p.notesColor || "#151515");
-      }
-    }
-  }
   if(typeof p.fullSeeded !== "boolean") p.fullSeeded = false; // ✅ NEW
   if(!p.sections || typeof p.sections !== "object") p.sections = {};
   // ✅ Pages-only model: enabledSections must be a subset of BASE_PAGES
@@ -3152,15 +3410,17 @@ function normalizeProject(p){
   return p;
 }
 
+// The song to show: the remembered one, else the first active song, else a new blank one.
+// Returns the live library object (editors write straight into it).
 function getCurrentProject(){
-  const all = loadAllProjects().map(normalizeProject).filter(Boolean);
-  const active = all.filter(p => !p.archived);
+  const lib = ensureLibrary();
+  const active = lib.list.filter(p => !p.archived);
   if(active.length === 0){
     const p = defaultProject("New Song");
-    upsertProject(p);
+    upsertProject(p, { bump:false, select:true });
     return p;
   }
-  const curId = getCurrentProjectIdForScope(getStorageScope());
+  const curId = getCurrentProjectIdForScope(lib.scope);
   return (curId && active.find(p => p.id === curId)) || active[0];
 }
 
@@ -10027,20 +10287,13 @@ if(state.currentSection === "Full"){
   if(el.sheetHint) el.sheetHint.textContent = "";
   (el.sheetInner || el.sheetBody).innerHTML = "";
 
-  // Ensure at least one section exists
-  if(!String(state.project.fullText || "").trim()){
-    state.project.fullText = `${BREAK_LINE}\n\n`;
-    upsertProject(state.project);
-  }
-
   const splitBlocks = splitFullTextBlocks;
   const blocksToFullText = fullTextBlocksToText;
 
+  // Show the text in canonical block form. This is formatting only: it is saved with the
+  // next real edit, not on its own (a render must never count as a change to sync).
   let blocks = splitBlocks(pruneLegacyTrailingBlankFullBlocks(state.project.fullText || ""));
-  if(String(state.project.fullText || "") !== blocksToFullText(blocks)){
-    state.project.fullText = blocksToFullText(blocks);
-    upsertProject(state.project);
-  }
+  state.project.fullText = blocksToFullText(blocks);
 
   // Ensure we have enough section names for block mapping
   const pageOrder = getAllSectionOrder().filter(s => s !== "Full");
@@ -11826,12 +12079,13 @@ function compareProjectsBySort(a, b, sort){
   return (Number(b.updatedAt)||0) - (Number(a.updatedAt)||0);
 }
 
+// Read-only views of the library for lists and pickers (do not modify the results).
 function getVisibleProjects(){
-  return loadAllProjects().map(normalizeProject).filter(p => p && !p.archived);
+  return ensureLibrary().list.filter(p => p && !p.archived);
 }
 
 function getArchivedProjects(){
-  return loadAllProjects().map(normalizeProject).filter(p => p && p.archived);
+  return ensureLibrary().list.filter(p => p && p.archived);
 }
 
 function renderArchiveLoadedName(){
@@ -11877,7 +12131,7 @@ function renderProjectsDropdown(){
 
   if(!list.length){
     const p = defaultProject("New Song");
-    upsertProject(p);
+    upsertProject(p, { bump:false, select:true });
     state.project = p;
     return renderProjectsDropdown();
   }
@@ -12124,8 +12378,7 @@ function loadProjectById(id){
    closeNotesModal?.();
    // ✅ prevent “wrong project audio” weirdness
   if(state.audioSyncOn) stopAudioSync();
-  const all = loadAllProjects().map(normalizeProject).filter(Boolean);
-  const p = all.find(x => x.id === id);
+  const p = libraryProject(id);
   if(!p) return;
   // Stop the OLD project's linked CRP/BD playback before state.project changes,
   // otherwise the exact-pair guard correctly refuses to stop it after the switch.
@@ -13022,7 +13275,7 @@ function noteImageToManifestEntry(rec){
 }
 
 async function uploadNoteImageToCloud(rec){
-  if(!cloud.client || !cloud.user || !rec || !rec.id || !rec.blob) return null;
+  if(!cloudSignedIn() || !rec || !rec.id || !rec.blob) return null;
   const entry = noteImageToManifestEntry(rec);
   const url = cloudMediaUrl(entry.path, rec.projectId || entry.projectId);
   if(!url) throw new Error("Cloud note-image path is invalid.");
@@ -13042,7 +13295,7 @@ async function uploadNoteImageToCloud(rec){
 }
 
 async function downloadNoteImageFromCloud(entry){
-  if(!cloud.client || !cloud.user || !entry?.path) return null;
+  if(!cloudSignedIn() || !entry?.path) return null;
   const url = cloudMediaUrl(entry.path, entry.projectId);
   if(!url) return null;
   const res = await fetch(url, { credentials:"same-origin", cache:"no-store" });
@@ -13067,7 +13320,7 @@ async function downloadNoteImageFromCloud(entry){
 }
 
 async function removeNoteImageFromCloud(entry){
-  if(!cloud.client || !cloud.user || !entry?.path) return;
+  if(!cloudSignedIn() || !entry?.path) return;
   try{
     const url = cloudMediaUrl(entry.path, entry.projectId);
     if(!url) return;
@@ -13082,97 +13335,93 @@ async function removeNoteImageFromCloud(entry){
   }
 }
 
-async function saveProjectNotesImageManifest(project, manifest){
-  if(!project || !project.id) return;
-  const next = normalizeProject(deepClone(project));
-  setProjectNotesImages(next, manifest);
-  if(state.project && String(state.project.id || "") === String(next.id || "")) state.project = next;
-  cloud.suspendQueue = true;
-  try{
-    upsertProject(next);
-  }finally{
-    cloud.suspendQueue = false;
-  }
+// Same contract as saveProjectAudioManifest: change the song in place, never swap it out.
+function saveProjectNotesImageManifest(projectId, beforeManifest, nextManifest){
+  const live = libraryProject(projectId);
+  if(!live) return;
+  setProjectNotesImages(live, applyManifestUpdate(getProjectNotesImages(live), beforeManifest, nextManifest));
+  upsertProject(live, { bump:false, select:false });
 }
 
 async function syncCloudNoteImagesForAllProjects(reason=""){
-  if(!cloud.client || !cloud.user || !getAuthUserId()) return;
-  const allProjects = loadAllProjects().map(normalizeProject).filter(Boolean);
-  const allImages = await dbGetAllNoteImages().catch(() => []);
+  if(!cloudSignedIn()) return;
+  const allProjects = ensureLibrary().list.slice();
+  const allImages = await dbGetAllNoteImages().catch(err => { console.error("Could not read note photos", err); return []; });
   const imageMap = new Map((Array.isArray(allImages) ? allImages : []).map(r => [String(r.id || ""), r]));
-  let anyManifestChanged = false;
   let currentProjectTouched = false;
+  let firstError = null;
 
   for(const project of allProjects){
     const projectId = String(project.id || "");
     if(!projectId) continue;
-    const manifestMap = new Map(getProjectNotesImages(project).map(e => [String(e.id || ""), { ...(e || {}) }]));
+    const before = getProjectNotesImages(project);
+    const manifestMap = new Map(before.map(e => [String(e.id || ""), { ...(e || {}) }]));
     const localProjectImages = (Array.isArray(allImages) ? allImages : []).filter(r => String(r.projectId || "") === projectId);
-    let manifestChanged = false;
     let projectTouched = false;
 
-    for(const rec of localProjectImages){
-      if(!rec || !rec.id || !rec.blob) continue;
-      const localUpdated = Number(rec.updatedAt) || Number(rec.createdAt) || now();
-      const remoteEntry = manifestMap.get(String(rec.id));
-      const remoteUpdated = Number(remoteEntry?.updatedAt) || 0;
-      if(!remoteEntry || remoteEntry.deleted || localUpdated > remoteUpdated){
-        const uploadedEntry = await uploadNoteImageToCloud(rec);
-        uploadedEntry.updatedAt = localUpdated;
-        uploadedEntry.createdAt = Number(rec.createdAt) || uploadedEntry.createdAt;
-        uploadedEntry.title = String(rec.title || "");
-        manifestMap.set(String(rec.id), uploadedEntry);
-        manifestChanged = true;
-      }else if(remoteUpdated > localUpdated){
-        const remoteRec = await downloadNoteImageFromCloud(remoteEntry);
-        if(!remoteRec){
-          manifestMap.delete(String(rec.id));
-          manifestChanged = true;
-          continue;
-        }
-        await dbPutNoteImage(remoteRec);
-        imageMap.set(String(remoteRec.id), remoteRec);
-        projectTouched = true;
-      }
-    }
-
-    for(const [imageId, entry] of manifestMap.entries()){
-      const localRec = imageMap.get(String(imageId));
-      const localUpdated = Number(localRec?.updatedAt) || Number(localRec?.createdAt) || 0;
-      const remoteUpdated = Number(entry?.updatedAt) || 0;
-      if(entry?.deleted){
-        if(localRec && remoteUpdated >= localUpdated){
-          await dbDeleteNoteImage(imageId);
-          imageMap.delete(imageId);
+    try{
+      for(const rec of localProjectImages){
+        if(!rec || !rec.id || !rec.blob) continue;
+        const localUpdated = Number(rec.updatedAt) || Number(rec.createdAt) || now();
+        const remoteEntry = manifestMap.get(String(rec.id));
+        const remoteUpdated = Number(remoteEntry?.updatedAt) || 0;
+        if(!remoteEntry || remoteEntry.deleted || localUpdated > remoteUpdated){
+          if(remoteEntry?.deleted && remoteUpdated >= localUpdated) continue; // deleted after this copy was made
+          const uploadedEntry = await uploadNoteImageToCloud(rec);
+          uploadedEntry.updatedAt = localUpdated;
+          uploadedEntry.createdAt = Number(rec.createdAt) || uploadedEntry.createdAt;
+          uploadedEntry.title = String(rec.title || "");
+          manifestMap.set(String(rec.id), uploadedEntry);
+        }else if(remoteUpdated > localUpdated){
+          const remoteRec = await downloadNoteImageFromCloud(remoteEntry);
+          if(!remoteRec){
+            manifestMap.delete(String(rec.id));
+            continue;
+          }
+          await dbPutNoteImage(remoteRec);
+          imageMap.set(String(remoteRec.id), remoteRec);
           projectTouched = true;
         }
-        await removeNoteImageFromCloud(entry);
-        continue;
       }
-      if(!localRec){
-        const remoteRec = await downloadNoteImageFromCloud(entry);
-        if(!remoteRec){
-          manifestMap.delete(String(imageId));
-          manifestChanged = true;
+
+      for(const [imageId, entry] of manifestMap.entries()){
+        const localRec = imageMap.get(String(imageId));
+        const localUpdated = Number(localRec?.updatedAt) || Number(localRec?.createdAt) || 0;
+        const remoteUpdated = Number(entry?.updatedAt) || 0;
+        if(entry?.deleted){
+          if(localRec && remoteUpdated >= localUpdated){
+            await dbDeleteNoteImage(imageId);
+            imageMap.delete(imageId);
+            projectTouched = true;
+          }
+          await removeNoteImageFromCloud(entry);
           continue;
         }
-        await dbPutNoteImage(remoteRec);
-        imageMap.set(String(remoteRec.id), remoteRec);
-        projectTouched = true;
+        if(!localRec){
+          const remoteRec = await downloadNoteImageFromCloud(entry);
+          if(!remoteRec){
+            manifestMap.delete(String(imageId));
+            continue;
+          }
+          await dbPutNoteImage(remoteRec);
+          imageMap.set(String(remoteRec.id), remoteRec);
+          projectTouched = true;
+        }
       }
+    }catch(err){
+      console.error("Note photo sync failed for", projectId, err);
+      firstError = firstError || err;
     }
 
-    const nextManifest = Array.from(manifestMap.values()).filter(Boolean).sort((a,b) => (Number(b.updatedAt)||0) - (Number(a.updatedAt)||0));
-    if(JSON.stringify(getProjectNotesImages(project)) !== JSON.stringify(nextManifest)){
-      await saveProjectNotesImageManifest(project, nextManifest);
-      manifestChanged = true;
+    const nextManifest = Array.from(manifestMap.values()).filter(Boolean);
+    if(JSON.stringify(mergeMediaManifests(before, [])) !== JSON.stringify(mergeMediaManifests(nextManifest, []))){
+      saveProjectNotesImageManifest(projectId, before, nextManifest);
     }
-    if(manifestChanged) anyManifestChanged = true;
-    if(projectTouched) currentProjectTouched = currentProjectTouched || (state.project && String(state.project.id||"") === projectId);
+    if(projectTouched && state.project && String(state.project.id || "") === projectId) currentProjectTouched = true;
   }
 
-  if(anyManifestChanged) queueCloudSync(`notes-image-manifest-${reason || "sync"}`);
   if(currentProjectTouched && state.notesOpen) resolveNotesImageElementSources();
+  if(firstError) throw firstError;
 }
 
 /***********************
@@ -13375,7 +13624,7 @@ function insertChecklistIntoNotes(){
   setCaretAtStartOfNode(text);
   saveNotesDoc({ allowBlank:true });
   pushNotesHistorySnapshot(true);
-  if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-move');
+  if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-move');
   return true;
 }
 
@@ -13511,7 +13760,7 @@ async function moveNotesImageBlockBy(id, direction){
   selectNotesImageBlockById(imageId);
   saveNotesDoc({ allowBlank:true });
   pushNotesHistorySnapshot(true);
-  if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-delete');
+  if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-delete');
   return true;
 }
 
@@ -13544,7 +13793,7 @@ function stopNotesImageResize(commit=false){
   if(commit){
     saveNotesDoc();
     pushNotesHistorySnapshot(true);
-    if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-resize');
+    if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-resize');
   }
 }
 
@@ -13670,7 +13919,7 @@ function stopNotesImageDrag(){
   if(drag?.active){
     saveNotesDoc();
     pushNotesHistorySnapshot(true);
-    if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-move');
+    if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-move');
   }
   state.notesImageDrag = null;
 }
@@ -13688,7 +13937,7 @@ function removeSelectedNotesImageBlock(){
   setCaretAtStartOfNode(next);
   saveNotesDoc({ allowBlank:true });
   pushNotesHistorySnapshot(true);
-  if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-delete');
+  if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-delete');
   return true;
 }
 
@@ -14391,7 +14640,7 @@ async function applyNotesCrop(){
       setProjectNotesImages(state.project, manifest);
     });
 
-    if(cloud.ready && cloud.client && getAuthUserId()){
+    if(cloudSignedIn()){
       try{
         const uploaded = await uploadNoteImageToCloud(updatedRec);
         if(uploaded){
@@ -14414,7 +14663,7 @@ async function applyNotesCrop(){
     await refreshNotesImageElementFromBlob(updatedRec.id, newBlob);
     saveNotesDoc();
     pushNotesHistorySnapshot(true);
-    if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-crop');
+    if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-crop');
     closeNotesCropModal();
     selectNotesImageBlockById(updatedRec.id);
     return true;
@@ -14468,7 +14717,7 @@ async function insertNotesImageFromFile(file){
     setProjectNotesImages(state.project, manifest);
   });
 
-  if(cloud.ready && cloud.client && getAuthUserId()){
+  if(cloudSignedIn()){
     try{
       const uploaded = await uploadNoteImageToCloud(rec);
       if(uploaded){
@@ -14505,7 +14754,7 @@ async function insertNotesImageFromFile(file){
   await resolveNotesImageElementSources();
   saveNotesDoc({ allowBlank:true });
   pushNotesHistorySnapshot(true);
-  if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-add');
+  if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-add');
   return true;
 }
 
@@ -14633,40 +14882,22 @@ function saveNotesDoc(opts={}){
   const newHasNotes = notesDocHasMeaningfulContent(newDoc);
   const allowBlank = !!opts.allowBlank;
   const prevDoc = String(state.project.notesDoc || "");
-  const backup = readNotesBackup(state.project.id);
-  const prevHasNotes = notesDocHasMeaningfulContent(prevDoc);
-  const backupHasNotes = notesDocHasMeaningfulContent(backup?.notesDoc || "");
 
-  // Preserve real notes only for non-user/background blank saves. A deliberate
+  // Preserve real notes for non-user/background blank saves. A deliberate
   // editor mutation is allowed to clear the document completely.
-  if(!allowBlank && !newHasNotes && (prevHasNotes || backupHasNotes)){
-    const bestNotes = mergeNotesSafely(
-      { notesDoc: prevDoc, notesColor: state.project.notesColor, notesUpdatedAt: Number(state.project.notesUpdatedAt) || 0, notesClearedAt: Number(state.project.notesClearedAt) || 0, updatedAt: Number(state.project.notesUpdatedAt) || 0 },
-      backup
-    );
-    if(bestNotes){
-      state.project.notesDoc = String(bestNotes.notesDoc || "");
-      state.project.notesUpdatedAt = Number(bestNotes.notesUpdatedAt ?? bestNotes.updatedAt) || Number(state.project.notesUpdatedAt) || 0;
-      state.project.notesClearedAt = Number(bestNotes.notesClearedAt) || 0;
-      if(String(bestNotes.notesColor || "").trim()) state.project.notesColor = String(bestNotes.notesColor);
-    }
-    writeNotesBackup(state.project);
-    upsertProject(state.project);
-    return false;
-  }
+  if(!allowBlank && !newHasNotes && notesDocHasMeaningfulContent(prevDoc)) return false;
 
   // Canonical empty state: don't keep harmless browser scaffolding such as
   // <div><br></div> after the user has deleted everything.
   if(!newHasNotes) newDoc = "";
+  if(newDoc === prevDoc && state.project.notesColor) return false;
 
   const stamp = now();
   state.project.notesDoc = newDoc;
   state.project.notesUpdatedAt = stamp;
   state.project.notesClearedAt = newHasNotes ? 0 : stamp;
-  state.project.updatedAt = stamp;
   if(!state.project.notesColor) state.project.notesColor = state.notesDefaultColor || "#151515";
 
-  writeNotesBackup(state.project, { allowBlankOverwrite: allowBlank && !newHasNotes });
   upsertProject(state.project);
   return true;
 }
@@ -14683,13 +14914,7 @@ function persistActiveProjectState(opts={}){
     String(state.notesEditorProjectId || "") === String(state.project.id || "")
   );
 
-  if(requestedSave && editorOwnsCurrentProject){
-    saveNotesDoc({ allowBlank:true });
-    return;
-  }
-
-  // Keep a fresh notes backup even when the notes modal is closed.
-  writeNotesBackup(state.project);
+  if(requestedSave && editorOwnsCurrentProject) saveNotesDoc({ allowBlank:true });
   upsertProject(state.project);
 }
 
@@ -14837,19 +15062,6 @@ function renderNotesFromProject(){
 
 function openNotesModal(){
   if(!el.notesModal || !el.notesEditor) return;
-  const backup = readNotesBackup(state?.project?.id);
-  if(state.project && backup){
-    const bestNotes = mergeNotesSafely(
-      { notesDoc: state.project.notesDoc, notesColor: state.project.notesColor, notesUpdatedAt: Number(state.project.notesUpdatedAt) || 0, notesClearedAt: Number(state.project.notesClearedAt) || 0, updatedAt: Number(state.project.notesUpdatedAt) || 0 },
-      backup
-    );
-    if(bestNotes){
-      state.project.notesDoc = String(bestNotes.notesDoc || "");
-      state.project.notesClearedAt = Number(bestNotes.notesClearedAt) || 0;
-      state.project.notesUpdatedAt = Number(bestNotes.notesUpdatedAt ?? bestNotes.updatedAt) || state.project.notesUpdatedAt || 0;
-      if(String(bestNotes.notesColor || "").trim()) state.project.notesColor = String(bestNotes.notesColor || state.project.notesColor || "");
-    }
-  }
   state.notesOpen = true;
   renderNotesFromProject();
   resetNotesHistory(getNotesDoc());
@@ -15734,12 +15946,10 @@ if(el.capoInput){
   }
 
   const flushNotesPersistence = () => {
-    try{
-      if(state.project){
-        if(state.notesOpen && el.notesEditor && String(state.notesEditorProjectId || "") === String(state.project.id || "")) saveNotesDoc({ allowBlank:true });
-        else writeNotesBackup(state.project);
-      }
-    }catch{}
+    if(state.project && state.notesOpen && el.notesEditor && String(state.notesEditorProjectId || "") === String(state.project.id || "")){
+      saveNotesDoc({ allowBlank:true });
+    }
+    flushLibrary();
   };
   window.addEventListener("beforeunload", flushNotesPersistence);
   window.addEventListener("pagehide", flushNotesPersistence);
@@ -15998,8 +16208,8 @@ const v = Number.isFinite(raw) ? raw : 0;
     const name = prompt("New project name:", "New Song");
     if(name === null) return;
     const p = defaultProject(name.trim() || "New Song");
-    upsertProject(p);
     closeNotesModal?.();
+    upsertProject(p, { bump:false, select:true });
     state.project = p;
     state.currentSection = "Full";
     resetProjectHistory();
@@ -16156,24 +16366,12 @@ async function init(){
   cloud.appMounted = true;
   updateAuthModalUI();
   if(cloud.user){
-    if(cloud.deferInitialMerge){
-      cloud.deferInitialMerge = false;
-      setTimeout(() => {
-        if(!cloud.user) return;
-        mergeCloudIntoLocal().then(() => {
-          setCloudStatus("ok");
-          updateAuthModalUI();
-        }).catch(err => {
-          console.error("Deferred initial cloud merge failed", err);
-          setCloudStatus("error", err?.message || String(err || "Unknown error"));
-          updateAuthModalUI(err?.message || "Cloud sync failed.");
-        });
-      }, 60);
-    }else{
-      scheduleDeferredCloudAudioSync("post-init");
-      scheduleDeferredCloudNoteImageSync("post-init");
-      queueCloudSync("post-init");
-    }
+    // Reconcile with the cloud (including recordings / note photos) right after first paint.
+    setTimeout(() => {
+      syncWithCloud("startup", { media:true }).then(() => updateAuthModalUI()).catch(err => {
+        updateAuthModalUI(err?.message || "Cloud sync failed.");
+      });
+    }, 60);
   }
 
   stopBeatClock();

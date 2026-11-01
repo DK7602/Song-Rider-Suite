@@ -1987,6 +1987,56 @@
       color:#666;
     }
 
+    /* Storage-full banner and cloud sync notices (created by app.js when needed). */
+    .srpStorageBanner{
+      position:sticky;
+      top:0;
+      z-index:400;
+      margin:0;
+      padding:10px 14px;
+      background:#b3261e;
+      color:#fff;
+      font-size:14px;
+      font-weight:900;
+      line-height:1.35;
+      text-align:center;
+    }
+    .srpNotice{
+      position:fixed;
+      left:50%;
+      bottom:calc(16px + env(safe-area-inset-bottom, 0px));
+      transform:translateX(-50%);
+      z-index:410;
+      width:min(520px, calc(100vw - 24px));
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      padding:12px 14px;
+      border-radius:14px;
+      background:#151515;
+      color:#fff;
+      border:1px solid rgba(233,196,106,.65);
+      box-shadow:0 14px 36px rgba(0,0,0,.35);
+      font-size:14px;
+      font-weight:800;
+      line-height:1.35;
+    }
+    .srpNotice[hidden], .srpStorageBanner[hidden]{ display:none; }
+    .srpNoticeText{ flex:1 1 auto; }
+    .srpNoticeText p{ margin:0 0 6px; }
+    .srpNoticeText p:last-child{ margin-bottom:0; }
+    .srpNoticeClose{
+      flex:0 0 auto;
+      min-width:52px;
+      height:34px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.3);
+      background:#e9c46a;
+      color:#111;
+      font-weight:1000;
+      cursor:pointer;
+    }
+
 
 
 
