@@ -10009,8 +10009,13 @@ function renderSheetTitleBar(){
 // - Audio is cut into phrases at pauses and transcribed in order; text is inserted strictly in
 //   that order, so a failed phrase holds back the ones after it until it is retried.
 // - Leaving the page or locking the screen *stops* the session: the phrase being spoken is
-//   still sent and in-flight results are still inserted (nothing is thrown away).
-// - Re-rendering the Full view hands the session the section's new textarea.
+//   still sent and in-flight results are still inserted (nothing is thrown away). While the
+//   microphone is still starting, hiding the page does not end the session (some Android
+//   phones show the permission prompt as its own screen); it is checked once the mic is open.
+// - The session follows the song by id, not one copy of it: a cloud pull, another tab or Undo
+//   can swap in a new copy of the open song and re-render the Full view, and the session then
+//   carries on in the section's new textarea. Opening a different song stops it; text that
+//   cannot be placed any more is shown in a notice instead of being dropped.
 const DICTATION_STYLE_KEY = "srp-dictation-style-v1";
 const DICTATION_STYLES = [
   ["hiphop", "Hip-hop/Rap"],
@@ -10084,58 +10089,103 @@ function makeDictationStyleSelect(){
   select.addEventListener("pointerdown", (e) => e.stopPropagation());
   return select;
 }
+function waitUntilVisible(ms){
+  return new Promise(resolve => {
+    if(!document.hidden){ resolve(true); return; }
+    const done = (v) => { clearTimeout(timer); document.removeEventListener("visibilitychange", onChange); resolve(v); };
+    const onChange = () => { if(!document.hidden) done(true); };
+    const timer = setTimeout(() => done(!document.hidden), ms);
+    document.addEventListener("visibilitychange", onChange);
+  });
+}
+// The context made in the tap can still be suspended once the microphone is open (Android can
+// interrupt audio for the permission prompt). Resume it; if it will not run, use a fresh one
+// (the tap still counts as user activation). A context that never runs is caught by the
+// session's no-audio check.
+async function runningDictationContext(ctx){
+  const resume = (c) => Promise.race([Promise.resolve(c.resume?.()).catch(() => {}), new Promise(r => setTimeout(r, 1500))]);
+  if(ctx && ctx.state !== "closed"){
+    if(ctx.state !== "running") await resume(ctx);
+    if(ctx.state === "running") return ctx;
+    ctx.close?.().catch?.(() => {});
+  }
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const fresh = new Ctx();
+  if(fresh.state !== "running") await resume(fresh);
+  return fresh;
+}
 function attachFullLyricsMic(ta, card, actions, sectionIndex){
   const mic=document.createElement('button');mic.type='button';mic.className='pillBtn fullLyricsMic';
   mic.textContent='🎤';mic.title='Speak lyrics into this section';mic.setAttribute('aria-label',mic.title);mic.setAttribute('aria-pressed','false');
   const info=document.createElement('div');info.className='fullLyricsVoiceInfo';info.setAttribute('role','status');info.setAttribute('aria-live','polite');info.hidden=true;
-  card.appendChild(info);actions.appendChild(makeDictationStyleSelect());actions.appendChild(mic);
+  // The mic stays next to + / × with the style picker after it, so on a phone the floating
+  // R button (bottom right) cannot cover it.
+  card.appendChild(info);actions.appendChild(mic);actions.appendChild(makeDictationStyleSelect());
   mic.addEventListener('click',e=>{
     e.preventDefault();e.stopPropagation();
-    if(fullLyricsDictation?.mic===mic&&!fullLyricsDictation.isStopped()){fullLyricsDictation.stop();return;}
+    const cur=fullLyricsDictation;
+    if(cur?.mic===mic&&!cur.isStopped()){cur.stop();return;}
     stopFullLyricsDictation();
+    // A session that is still finishing (or waiting for Retry) keeps its own status line.
+    let status=cur?.info||info;
+    if(cur&&!cur.isFinished()&&status.isConnected&&card.contains(status)){
+      status=document.createElement('div');status.className='fullLyricsVoiceInfo';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+      cur.info.after(status);
+    }else status=info;
     // iOS Safari only lets audio start inside the tap itself: create/resume before any await.
     let context=null;
     try{const Ctx=window.AudioContext||window.webkitAudioContext;context=new Ctx();context.resume?.().catch(()=>{});}
-    catch(err){info.hidden=false;info.textContent='Microphone recording is unavailable in this browser.';return;}
-    startFullLyricsDictation({ta,mic,info,sectionIndex,context});
+    catch(err){status.hidden=false;status.textContent='Microphone recording is unavailable in this browser.';return;}
+    startFullLyricsDictation({ta,mic,info:status,sectionIndex,context});
   });
-  // A re-render replaced this section while a session was running: continue in the new editor.
-  if(fullLyricsDictation&&fullLyricsDictation.project===state.project&&fullLyricsDictation.sectionIndex===sectionIndex){
-    fullLyricsDictation.rebind(ta,mic,info);
-  }
+  // The Full view was re-rendered (this song, possibly a newer copy of it): continue in the new editor.
+  const s=fullLyricsDictation;
+  if(s&&s.projectId===String(state.project?.id||'')&&s.sectionIndex===sectionIndex)s.rebind(ta,mic,info);
 }
 function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
   const tip='Say “new bar” (or “next bar”) to leave a blank line between bars. Tap the mic to stop. Text appears after a pause.';
-  const project=state.project;
-  let stopped=false,stream=null,source=null,processor=null,gain=null;
-  let parts=[],samples=0,hasSpeech=false,quiet=0;
+  const projectId=String(state.project?.id||'');
+  const songName=String(state.project?.name||'').trim()||'this song';
+  let boundProject=state.project; // the copy of the song the textarea was rendered from
+  let stopped=false,finished=false,starting=true,stream=null,source=null,processor=null,gain=null;
+  let parts=[],samples=0,hasSpeech=false,quiet=0,frames=0,waiting=false,watchdog=0;
   let cursor=ta.selectionStart??ta.value.length,end=ta.selectionEnd??cursor;
   let pendingCommand='',failure=null,pumping=false,held='';
   const segments=[]; // phrases waiting to be transcribed / inserted, oldest first
-  const session={project,sectionIndex,mic,stop,rebind,isStopped:()=>stopped};
+  const session={projectId,sectionIndex,mic,info,stop,rebind,onHidden,isStopped:()=>stopped,isFinished:()=>finished};
   fullLyricsDictation=session;
   info.hidden=false;
-  const live=()=>state.project===project;
+  const sameSong=()=>String(state.project?.id||'')===projectId;
+  // Write only into the editor that shows the song's current copy; otherwise hold the text
+  // until the Full view is rendered again (rebind) or the session ends (notice).
+  const canWrite=()=>sameSong()&&state.project===boundProject&&ta.isConnected;
   const setStatus=(text)=>{info.hidden=false;info.textContent=text;};
   const paintMic=()=>{
     const active=fullLyricsDictation===session;
+    if(!active&&fullLyricsDictation?.mic===session.mic)return; // a newer session owns this button
     session.mic.textContent=!active||failure?'🎤':(stopped?'…':'⏹');
     session.mic.setAttribute('aria-pressed',active&&!stopped?'true':'false');
   };
   const manual=e=>{if(e.isTrusted){cursor=ta.selectionStart??ta.value.length;end=ta.selectionEnd??cursor;}};
   ta.addEventListener('input',manual);
   function rebind(newTa,newMic,newInfo){
+    if(finished)return;
     ta.removeEventListener('input',manual);
-    newInfo.replaceWith(info);
-    ta=newTa;session.mic=newMic;
-    cursor=Math.min(cursor,ta.value.length);end=Math.min(end,ta.value.length);
+    if(newInfo!==info)newInfo.replaceWith(info);
+    const oldValue=ta.value;
+    ta=newTa;session.mic=newMic;boundProject=state.project;
+    if(ta.value===oldValue){cursor=Math.min(cursor,ta.value.length);end=Math.min(end,ta.value.length);}
+    else{
+      // A newer copy of the song arrived: keep inserting in front of the same text if it is still there.
+      const tail=oldValue.slice(end);
+      cursor=end=(tail&&ta.value.endsWith(tail))?ta.value.length-tail.length:ta.value.length;
+    }
     ta.addEventListener('input',manual);
     paintMic();
-    if(held){const t=held;held='';insertText(t);}
+    if(held&&canWrite()){const t=held;held='';insertText(t);}
   }
   function insertText(text){
-    if(!live())return;
-    if(!ta.isConnected){held+=text;return;} // re-render in progress; placed on rebind
+    if(!canWrite()){held+=(held&&!/\s$/.test(held)&&!/^\s/.test(text)?' ':'')+text;return;}
     let words=text;
     const before=ta.value.slice(0,cursor),after=ta.value.slice(end);
     if(before&&!/\s$/.test(before)&&!/^\s/.test(words))words=' '+words;
@@ -10154,15 +10204,18 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
     if(words)insertText(words);
   }
   function cleanupCapture(){
+    clearTimeout(watchdog);
     if(processor){processor.onaudioprocess=null;processor.disconnect();}
     source?.disconnect();gain?.disconnect();stream?.getTracks().forEach(t=>t.stop());
     if(context){context.close().catch(()=>{});context=null;}
   }
   function finish(){
+    if(finished)return;
+    finished=true;
     ta.removeEventListener('input',manual);
     if(fullLyricsDictation===session)fullLyricsDictation=null;
     paintMic();
-    if(held&&live())showSyncNotice([`Dictated text could not be placed in the song (the Full view was closed): “${held.trim()}”`]);
+    if(held.trim())showSyncNotice([`Dictated text could not be placed in “${songName}” because the song or its Full view was closed. Here it is so you can paste it: “${held.trim()}”`]);
     held='';
     if(!failure){info.hidden=true;info.textContent='';}
   }
@@ -10183,16 +10236,15 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
     if(pumping)return;
     pumping=true;
     try{
-      while(segments.length&&live()){
+      while(segments.length){
         const seg=segments[0];
         if(seg.state==='failed')return; // waits for Retry; later phrases stay behind it
         if(seg.state==='queued'){
           seg.state='sending';
           setStatus((stopped?'Finishing transcription… ':'Listening / transcribing… ')+tip);
-          try{seg.text=String((await transcribeLyricsAudio(seg.blob)).text||'');seg.state='done';}
+          try{seg.text=String((await transcribeLyricsAudio(seg.blob))?.text||'');seg.state='done';}
           catch(err){
             seg.state='failed';
-            if(!live())return;
             // Stop listening, keep every captured phrase in order until this one succeeds.
             if(!stopped){stopped=true;flush();cleanupCapture();}
             showFailure(seg,err);
@@ -10200,15 +10252,15 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
             return;
           }
         }
-        if(!live())return;
         segments.shift();
-        insert(seg.text);
+        try{insert(seg.text);}
+        catch(err){console.error('Could not insert dictated text',err);held+=(held?' ':'')+String(seg.text||'');}
         if(!stopped)setStatus('Listening… '+tip);
       }
     }finally{
       pumping=false;
-      if(stopped&&!segments.length&&fullLyricsDictation===session){
-        if(pendingCommand&&live()){const word=pendingCommand;pendingCommand='';insert(word,true);}
+      if(stopped&&!segments.length&&!finished){
+        if(pendingCommand){const word=pendingCommand;pendingCommand='';insert(word,true);}
         finish();
       }
     }
@@ -10216,7 +10268,7 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
   function flush(){
     const audioParts=parts,rate=context?.sampleRate,speech=hasSpeech;
     parts=[];samples=0;hasSpeech=false;quiet=0;
-    if(!speech||!audioParts.length||!rate||!live())return;
+    if(!speech||!audioParts.length||!rate)return;
     segments.push({blob:lyricsPcmWav(audioParts,rate),state:'queued',text:''});
     pump();
   }
@@ -10225,6 +10277,26 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
     stopped=true;flush();cleanupCapture();paintMic();
     if(!segments.length)pump();
   }
+  // Screen lock / app switch. While the microphone is starting this is usually the permission
+  // prompt, so the decision waits until the microphone is open.
+  function onHidden(){
+    if(!starting)stop();
+  }
+  function fail(message){
+    failure=failure||{};
+    setStatus(message);
+    stop();
+  }
+  // No audio frames at all means the context or the microphone is not running.
+  function checkAudio(){
+    if(stopped||frames)return;
+    waiting=true;
+    if(context&&context.state!=='running')context.resume?.().catch(()=>{});
+    setStatus('Waiting for sound from the microphone… '+tip);
+    watchdog=setTimeout(()=>{
+      if(!stopped&&!frames)fail('No sound is reaching voice to text from the microphone. Make sure no other app is using it, then tap 🎤 to try again.');
+    },4000);
+  }
   paintMic();
   setStatus('Starting microphone… '+tip+' Audio is transcribed by Cloudflare.');
   (async()=>{
@@ -10232,13 +10304,23 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone recording is unavailable in this browser.');
       // Authenticate and check the transcription service before asking for the microphone.
       await suiteCloudApi('/api/lyrics-dictation',{method:'GET'});
-      if(!live()||stopped){cleanupCapture();return;}
+      if(stopped){cleanupCapture();return;}
       stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
-      if(!live()||stopped){cleanupCapture();return;}
+      if(stopped){cleanupCapture();return;}
+      if(!(await waitUntilVisible(1500))){
+        starting=false;
+        fail('Voice to text stopped because the screen was locked or another app opened. Tap 🎤 to start again.');
+        return;
+      }
+      context=await runningDictationContext(context);
+      starting=false;
+      if(stopped){cleanupCapture();return;}
       source=context.createMediaStreamSource(stream);processor=context.createScriptProcessor(4096,1,1);gain=context.createGain();gain.gain.value=0;
       source.connect(processor);processor.connect(gain);gain.connect(context.destination);
       processor.onaudioprocess=e=>{
-        if(!live()||stopped)return;
+        if(stopped)return;
+        frames++;
+        if(waiting){waiting=false;clearTimeout(watchdog);setStatus('Listening… '+tip);}
         const data=new Float32Array(e.inputBuffer.getChannelData(0));
         let power=0;for(const x of data)power+=x*x;
         const speech=Math.sqrt(power/data.length)>0.008;
@@ -10251,9 +10333,11 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
         if(segments.length>8){setStatus('Transcription is falling behind. Finishing captured audio…');stop();}
       };
       stream.getTracks().forEach(t=>t.addEventListener('ended',()=>{if(!stopped){setStatus('Microphone disconnected. Finishing captured audio…');stop();}}));
+      watchdog=setTimeout(checkAudio,2500);
       if(!stopped)setStatus('Listening… '+tip);
     }catch(err){
-      failure={};
+      starting=false;
+      failure=failure||{};
       setStatus('Could not start voice to text: '+(err?.message||err));
       stopped=true;cleanupCapture();finish();
     }
@@ -10262,11 +10346,13 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
 // Screen lock, app switch or navigation: finish, never discard.
 window.addEventListener("pagehide", stopFullLyricsDictation);
 document.addEventListener("visibilitychange", () => {
-  if(document.hidden) stopFullLyricsDictation();
+  if(document.hidden) fullLyricsDictation?.onHidden();
 });
 function renderSheet(){
-  // A Full-view re-render hands a running dictation the new textarea; any other view ends it.
-  if(state.currentSection !== "Full" || state.fullPerfMode) stopFullLyricsDictation();
+  // A Full-view re-render of the same song hands a running dictation the new textarea; any
+  // other view or another song ends it (what was captured is still transcribed).
+  const dictation = fullLyricsDictation;
+  if(dictation && (state.currentSection !== "Full" || state.fullPerfMode || dictation.projectId !== String(state.project?.id || ""))) stopFullLyricsDictation();
   cancelChordDragCopy();
   renderSheetTitleBar();
   renderSheetActions();

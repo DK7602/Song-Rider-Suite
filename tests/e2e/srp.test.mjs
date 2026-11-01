@@ -389,6 +389,88 @@ await test('dictation: ordered insert with retry, stop (not cancel) on hide, sty
   await ctx.close();
 });
 
+await test('dictation signed in on a phone: survives the permission prompt (blur / hidden / focus) and cloud pulls that replace the song', async () => {
+  const user = await newUser();
+  const A = await device(browser, user); // the user's other device
+  await open(A.page);
+  await typeFull(A.page, 'cloud line');
+  await sleep(3500);
+  // Real sign-in and cloud sync; only the microphone and Workers AI are stubbed.
+  const P = await device(browser, user, {
+    phone: true,
+    init: () => {
+      window.__speak = (on) => { if (window.__micGain) window.__micGain.gain.value = on ? 0.5 : 0; };
+      const OrigAC = window.AudioContext;
+      navigator.mediaDevices.getUserMedia = async () => {
+        if (window.__permissionPrompt) await window.__permissionPrompt();
+        const c = new OrigAC(), osc = c.createOscillator(), g = c.createGain(), dest = c.createMediaStreamDestination();
+        g.gain.value = 0; osc.connect(g); g.connect(dest); osc.start(); window.__micGain = g; return dest.stream;
+      };
+      window.__answers = [];
+      const of = window.fetch;
+      window.fetch = async (url, opts = {}) => {
+        if (!String(url).includes('/api/lyrics-dictation')) return of(url, opts);
+        if ((opts.method || 'GET').toUpperCase() === 'GET') return new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ ok: true, text: window.__answers.shift() || '' }), { headers: { 'Content-Type': 'application/json' } });
+      };
+    }
+  });
+  await open(P.page);
+  await sleep(1000);
+  assert.equal(await fullText(P.page), 'cloud line');
+  // The floating R button must not cover the mic on a 390 px phone.
+  const [mic, r] = await P.page.evaluate(() => [document.querySelector('button.fullLyricsMic'), document.getElementById('rBtn')].map((e) => { const b = e.getBoundingClientRect(); return { left: b.left, right: b.right }; }));
+  assert.ok(mic.right <= r.left, `the R button covers the mic (mic ${mic.left}-${mic.right}, R from ${r.left})`);
+
+  // The other device edits the song; the phone pulls it when the permission prompt closes.
+  await typeFull(A.page, ' + desk one');
+  await sleep(3500);
+  await P.page.evaluate(() => {
+    const hide = (on) => {
+      for (const [k, v] of [['hidden', true], ['visibilityState', 'hidden']]) {
+        if (on) Object.defineProperty(document, k, { configurable: true, get: () => v }); else delete document[k];
+      }
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    window.__permissionPrompt = async () => {
+      window.dispatchEvent(new Event('blur'));
+      hide(true); // some Android phones show the prompt as its own screen
+      await new Promise((res) => setTimeout(res, 400));
+      hide(false);
+      window.dispatchEvent(new Event('focus'));
+      await new Promise((res) => setTimeout(res, 1500));
+    };
+  });
+  const say = async (ms) => { await P.page.evaluate(() => window.__speak(true)); await sleep(ms); await P.page.evaluate(() => window.__speak(false)); };
+  await P.page.locator('button.fullLyricsMic').first().tap();
+  await sleep(2600);
+  assert.equal(await fullText(P.page), 'cloud line + desk one', 'the focus pull did not run');
+  assert.equal(await P.page.locator('button.fullLyricsMic').first().textContent(), '⏹', 'dictation stopped during the permission prompt');
+  await P.page.evaluate(() => { window.__answers.push('alpha'); });
+  await say(2300); await sleep(3000);
+  assert.equal(await fullText(P.page), 'cloud line + desk one alpha');
+
+  // Mid-session: the other device pulls, edits again, and the phone pulls the newer copy.
+  await sleep(2500); // the phone's upload of "alpha"
+  await A.page.evaluate(() => window.dispatchEvent(new Event('focus'))); await sleep(2000);
+  await typeFull(A.page, ' + desk two');
+  await sleep(3500);
+  await P.page.evaluate(() => window.dispatchEvent(new Event('focus'))); await sleep(2000);
+  assert.equal(await fullText(P.page), 'cloud line + desk one alpha + desk two', 'the pull did not bring the other device\'s edit');
+  assert.equal(await P.page.locator('button.fullLyricsMic').first().textContent(), '⏹', 'dictation stopped when the pull replaced the song');
+  await P.page.evaluate(() => { window.__answers.push('bravo'); });
+  await say(2300); await sleep(3000);
+  await P.page.locator('button.fullLyricsMic').first().tap(); await sleep(1500);
+  assert.equal(await P.page.locator('button.fullLyricsMic').first().textContent(), '🎤');
+  assert.equal(await fullText(P.page), 'cloud line + desk one alpha + desk two bravo');
+  await sleep(3500);
+  const rows = (await server(P.page)).filter((x) => !x.deleted);
+  assert.equal(rows.length, 1, rows.map((x) => x.name).join(', '));
+  assert.match(rows[0].data.fullText, /cloud line \+ desk one alpha \+ desk two bravo/);
+  noErrors(A.page, P.page);
+  await A.ctx.close(); await P.ctx.close();
+});
+
 await test('typing cost does not grow with the library; few cloud requests while typing', async () => {
   const user = await newUser();
   const songs = Array.from({ length: 60 }, (_, i) => ({
