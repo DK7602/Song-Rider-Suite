@@ -10126,12 +10126,14 @@ function attachFullLyricsMic(ta, card, actions, sectionIndex){
     const cur=fullLyricsDictation;
     if(cur?.mic===mic&&!cur.isStopped()){cur.stop();return;}
     stopFullLyricsDictation();
+    // This button's status line is the one in its own card (re-renders can replace elements).
+    const ownInfo=info.isConnected?info:(card.querySelector('.fullLyricsVoiceInfo')||info);
     // A session that is still finishing (or waiting for Retry) keeps its own status line.
-    let status=cur?.info||info;
+    let status=cur?.info||ownInfo;
     if(cur&&!cur.isFinished()&&status.isConnected&&card.contains(status)){
       status=document.createElement('div');status.className='fullLyricsVoiceInfo';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
       cur.info.after(status);
-    }else status=info;
+    }else status=ownInfo;
     // iOS Safari only lets audio start inside the tap itself: create/resume before any await.
     let context=null;
     try{const Ctx=window.AudioContext||window.webkitAudioContext;context=new Ctx();context.resume?.().catch(()=>{});}
@@ -10185,7 +10187,10 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
   function rebind(newTa,newMic,newInfo){
     if(finished)return;
     ta.removeEventListener('input',manual);
-    if(newInfo!==info)newInfo.replaceWith(info);
+    // Adopt the new view's status line (moving any Retry/Download controls into it). Swapping our
+    // old element into the page instead left the new mic button pointing at a detached status
+    // line, so every later session ran invisibly.
+    if(newInfo&&newInfo!==info){newInfo.hidden=info.hidden;newInfo.replaceChildren(...info.childNodes);info.remove();info=newInfo;session.info=newInfo;}
     const oldValue=ta.value;
     ta=newTa;session.mic=newMic;boundProject=state.project;
     if(ta.value===oldValue){cursor=Math.min(cursor,ta.value.length);end=Math.min(end,ta.value.length);}

@@ -630,6 +630,46 @@ await test('dictation sends phrases at each pause even with steady background no
   await ctx.close();
 });
 
+await test('dictation still shows its status line on later sessions after the view re-rendered mid-session', async () => {
+  const { ctx, page } = await device(browser, null, {
+    init: () => {
+      window.__speak = (on) => { if (window.__micGain) window.__micGain.gain.value = on ? 0.5 : 0; };
+      const OrigAC = window.AudioContext;
+      navigator.mediaDevices.getUserMedia = async () => {
+        const c = new OrigAC(), osc = c.createOscillator(), g = c.createGain(), dest = c.createMediaStreamDestination();
+        g.gain.value = 0; osc.connect(g); g.connect(dest); osc.start(); window.__micGain = g; return dest.stream;
+      };
+      window.__posts = 0;
+      const of = window.fetch;
+      window.fetch = async (url, opts = {}) => {
+        if (!String(url).includes('/api/lyrics-dictation')) return of(url, opts);
+        if ((opts.method || 'GET').toUpperCase() === 'GET') return new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } });
+        window.__posts++;
+        return new Response(JSON.stringify({ ok: true, text: 'take' + window.__posts }), { headers: { 'Content-Type': 'application/json' } });
+      };
+    }
+  });
+  await open(page);
+  const mic = () => page.locator('button.fullLyricsMic').first();
+  const statusVisible = () => page.locator('.fullLyricsVoiceInfo').first().isVisible();
+  const say = async (ms) => { await page.evaluate(() => window.__speak(true)); await sleep(ms); await page.evaluate(() => window.__speak(false)); };
+  await mic().click(); await sleep(800);
+  await say(1600); await sleep(1800);
+  // Another tab saves the song while the session runs: this tab re-renders the Full view.
+  const p2 = await ctx.newPage(); p2.errors = []; p2.on('pageerror', (e) => p2.errors.push(String(e)));
+  await open(p2); await typeFull(p2, ' other'); await sleep(1500); await p2.close();
+  await mic().click(); await sleep(1500);
+  for (let round = 2; round <= 3; round++) {
+    await mic().click(); await sleep(800);
+    assert.ok(await statusVisible(), `session ${round}: no status line (it went to a detached element)`);
+    await say(1600); await sleep(1800);
+    await mic().click(); await sleep(1500);
+  }
+  assert.match(await fullText(page), /take1.*take2.*take3/s);
+  noErrors(page);
+  await ctx.close();
+});
+
 await test('typing cost does not grow with the library; few cloud requests while typing', async () => {
   const user = await newUser();
   const songs = Array.from({ length: 60 }, (_, i) => ({
