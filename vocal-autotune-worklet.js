@@ -281,49 +281,32 @@ class CRPVocalAutotuneProcessor extends AudioWorkletProcessor {
 }
 registerProcessor('crp-vocal-autotune',CRPVocalAutotuneProcessor);
 
-// Sample-accurate vocal capture. The main thread schedules, in this context's
-// time, when the gate opens and closes and when capture stops, so a take's
-// start, pause and resume line up with the backing to the sample. Captured audio
-// is posted back in blocks; {type:'done'} follows the last block.
+// Vocal capture: streams the mic input back to the main thread in blocks
+// stamped with their first frame (this context's currentFrame), so parts.js can
+// cut the take at exact times. {type:'stop'} ends the stream after a final
+// partial block.
 class CRPVocalRecorderProcessor extends AudioWorkletProcessor {
   constructor(){
     super();
-    this.open=false;
-    this.openAt=Infinity;
-    this.closeAt=Infinity;
-    this.stopAt=Infinity;
     this.block=new Float32Array(4096);
     this.fill=0;
+    this.blockFrame=0;
     this.stopped=false;
-    this.port.onmessage=e=>{
-      const d=e.data||{},at=Number(d.at);
-      if(d.type==='open'){this.openAt=at;this.closeAt=Infinity;}
-      else if(d.type==='close')this.closeAt=at;
-      else if(d.type==='stop')this.stopAt=at;
-    };
+    this.port.onmessage=e=>{if(e.data?.type==='stop')this.stopped=true;};
   }
   flush(){
     if(!this.fill)return;
     const samples=this.block.slice(0,this.fill);
+    this.port.postMessage({type:'audio',frame:this.blockFrame,samples},[samples.buffer]);
     this.fill=0;
-    this.port.postMessage({type:'audio',samples},[samples.buffer]);
   }
   process(inputs){
-    if(this.stopped)return false;
+    if(this.stopped){this.flush();return false;}
     const src=inputs[0]?.[0],frames=src?src.length:128;
     for(let i=0;i<frames;i++){
-      const t=(currentFrame+i)/sampleRate;
-      if(t>=this.stopAt){
-        this.flush();this.stopped=true;
-        this.port.postMessage({type:'done'});
-        return false;
-      }
-      if(!this.open&&t>=this.openAt){this.open=true;this.openAt=Infinity;}
-      if(this.open&&t>=this.closeAt){this.open=false;this.closeAt=Infinity;}
-      if(this.open){
-        this.block[this.fill++]=src?src[i]:0;
-        if(this.fill===this.block.length)this.flush();
-      }
+      if(!this.fill)this.blockFrame=currentFrame+i;
+      this.block[this.fill++]=src?src[i]:0;
+      if(this.fill===this.block.length)this.flush();
     }
     return true;
   }

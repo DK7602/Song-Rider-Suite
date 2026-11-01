@@ -113,9 +113,10 @@
   // v3.3.54 — cached waveform envelopes keep Track Master navigation from rescanning
   // millions of audio samples on the UI thread while WebAudio playback is running.
   const voxWaveformPeakCache=new Map();
-  let micStream=null,micCtx=null,micSource=null,micAnalyser=null,micProcessor=null,micSilentGain=null,micMeterRaf=0;
-  let recording=false,recordingPaused=false,recordingResuming=false,recordChunks=[],recordSampleRate=48000,recordStartedAt=0,recordCaptureStartMicTime=0,recordInitialTrimSec=0,recordPausedAt=0,recordPausedTotal=0,recordTimer=null,recordResumeTimer=null,currentPreview=null,recordInsertBeat=0,recordTargetPartId=null,recordStartedFromVox=false,recordResumeBeat=0;
-  let leadBarClipboard=null, speechRec=null, speechBase='';
+  let micStream=null,micCtx=null,micSource=null,micAnalyser=null,micMeterRaf=0,currentPreview=null;
+  let recorder=null,recording=false,recordingPaused=false,recordingResuming=false,recordTimer=null,recordScope=null,recordInsertBeat=0,recordTargetPartId=null,recordStartedFromVox=false,recordResumeBeat=0;
+  let recordedSec=0,recordOpenedAtPerf=null; // captured seconds: closed gate spans + the open one
+  let leadBarClipboard=null;
   let partsUpdatedAt=0, partsFingerprint='';
   let voxBoxOpen=false,voxCropMode=false,voxRangeMode=false,voxRangeSelection=null,voxSelected=null,voxSelections=[],voxInstrumentSelection=null,voxInstrumentSelections=[],voxInstrumentTrackFocus=null,voxTargetPartId=null,voxClipboard=null,voxPlayheadBeat=0,voxRenderToken=0,voxAutoScroll=true,voxShowInstrumentals=false,voxOpenedFromVocal=false,voxToolMode='playhead',voxUndoStack=[],voxRedoStack=[],voxInspectorManualOverride=null;
   // v3.3.36 — persists across Track Master rerenders so Android's synthesized dblclick/click
@@ -1142,88 +1143,187 @@
   async function ensureMic(){
     if(micStream?.active)return micStream;if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone recording is not available in this browser.');
     micStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,sampleRate:{ideal:48000},sampleSize:{ideal:24},echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
-    micCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000});if(micCtx.state==='suspended')await micCtx.resume();recordSampleRate=micCtx.sampleRate;micSource=micCtx.createMediaStreamSource(micStream);micAnalyser=micCtx.createAnalyser();micAnalyser.fftSize=1024;micAnalyser.smoothingTimeConstant=.72;micSource.connect(micAnalyser);startMicMeter();const track=micStream.getAudioTracks()[0];const st=track.getSettings?.()||{};$('vocalMicInfo').textContent=`${track.label||'Phone microphone'} • ${st.sampleRate||recordSampleRate} Hz${st.channelCount?` • ${st.channelCount} ch`:''}`;if($('vocalArmMic')){$('vocalArmMic').textContent='Mic test off';$('vocalArmMic').setAttribute('aria-pressed','true');}return micStream;
+    micCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000});if(micCtx.state==='suspended')await micCtx.resume();micSource=micCtx.createMediaStreamSource(micStream);micAnalyser=micCtx.createAnalyser();micAnalyser.fftSize=1024;micAnalyser.smoothingTimeConstant=.72;micSource.connect(micAnalyser);startMicMeter();const track=micStream.getAudioTracks()[0];const st=track.getSettings?.()||{};$('vocalMicInfo').textContent=`${track.label||'Phone microphone'} • ${st.sampleRate||micCtx.sampleRate} Hz${st.channelCount?` • ${st.channelCount} ch`:''}`;if($('vocalArmMic')){$('vocalArmMic').textContent='Mic test off';$('vocalArmMic').setAttribute('aria-pressed','true');}return micStream;
   }
   async function disableMic(){
     if(recording)return;cancelAnimationFrame(micMeterRaf);micMeterRaf=0;try{micSource?.disconnect();}catch{}try{micAnalyser?.disconnect();}catch{}for(const t of micStream?.getTracks?.()||[])try{t.stop();}catch{}micStream=null;micSource=null;micAnalyser=null;try{await micCtx?.close();}catch{}micCtx=null;if($('vocalMicMeter'))$('vocalMicMeter').style.width='0%';if($('vocalMicDb'))$('vocalMicDb').textContent='— dB';if($('vocalMicInfo'))$('vocalMicInfo').textContent='Mic test off.';if($('vocalArmMic')){$('vocalArmMic').textContent='Mic check';$('vocalArmMic').setAttribute('aria-pressed','false');}
   }
   function startMicMeter(){cancelAnimationFrame(micMeterRaf);const data=new Float32Array(micAnalyser?.fftSize||1024);const tick=()=>{if(!micAnalyser)return;micAnalyser.getFloatTimeDomainData(data);let sum=0,peak=0;for(const v of data){sum+=v*v;peak=Math.max(peak,Math.abs(v));}const rms=Math.sqrt(sum/data.length),db=rms>0?20*Math.log10(rms):-90,pct=Math.max(0,Math.min(100,(db+60)/60*100));if($('vocalMicMeter'))$('vocalMicMeter').style.width=`${pct}%`;if($('vocalMicDb'))$('vocalMicDb').textContent=db<=-89?'— dB':`${db.toFixed(1)} dB`;micMeterRaf=requestAnimationFrame(tick);};tick();}
-  function startSpeechToText(p){
-    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!SR){if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Live transcription is not supported by this browser. You can still edit the transcript manually.';return;}
-    try{
-      speechRec=new SR();speechRec.continuous=true;speechRec.interimResults=true;speechRec.lang='en-US';speechBase=(p.transcript||'').trim();let committed='';
-      if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Listening for lyrics…';
-      speechRec.onresult=e=>{let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const t=(e.results[i][0]?.transcript||'').trim();if(!t)continue;if(e.results[i].isFinal)committed+=(committed?' ':'')+t;else interim+=(interim?' ':'')+t;}const text=[speechBase,committed,interim].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();p.transcript=text;if($('vocalTranscript'))$('vocalTranscript').value=text;};
-      speechRec.onerror=e=>{if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent=`Transcription: ${e.error||'unavailable'}. Recording is still safe.`;};
-      speechRec.onend=()=>{if(recording&&speechRec){try{speechRec.start();}catch{}}else if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent=p.transcript?.trim()?'Transcript captured — edit anything it misheard.':'No speech was transcribed — you can type/edit lyrics below.';};
-      speechRec.start();
-    }catch(e){console.warn('Speech recognition unavailable',e);if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Live transcription could not start. Recording is unaffected.';}
-  }
-  function stopSpeechToText(){try{speechRec?.stop();}catch{}speechRec=null;}
-  function floatToWav(chunks,sampleRate,trimStartSamples=0){
-    const total=chunks.reduce((n,a)=>n+a.length,0),trim=Math.max(0,Math.min(total,Math.round(Number(trimStartSamples)||0))),length=Math.max(0,total-trim),samples=new Float32Array(length);
-    let skip=trim,o=0;
-    for(const a of chunks){
-      if(skip>=a.length){skip-=a.length;continue;}
-      const src=skip>0?a.subarray(skip):a;skip=0;
-      const n=Math.min(src.length,length-o);if(n<=0)break;samples.set(src.subarray(0,n),o);o+=n;
-    }
+  function floatToWav(chunks,sampleRate){
+    const length=chunks.reduce((n,a)=>n+a.length,0),samples=new Float32Array(length);let o=0;
+    for(const a of chunks){samples.set(a,o);o+=a.length;}
     const buffer=new ArrayBuffer(44+samples.length*2),view=new DataView(buffer),write=(off,str)=>{for(let i=0;i<str.length;i++)view.setUint8(off+i,str.charCodeAt(i));};write(0,'RIFF');view.setUint32(4,36+samples.length*2,true);write(8,'WAVE');write(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);write(36,'data');view.setUint32(40,samples.length*2,true);let pos=44;for(let i=0;i<samples.length;i++){let x=Math.max(-1,Math.min(1,samples[i]));view.setInt16(pos,x<0?x*0x8000:x*0x7fff,true);pos+=2;}return new Blob([buffer],{type:'audio/wav'});
   }
+
+  // ---- Recording ----
+  // Capture runs in the mic's own context behind a gate that opens and closes
+  // at exact mic-clock times. Those times are where the backing beat is *sung*:
+  // when it is heard (playback output latency) plus the time the voice takes to
+  // reach the capture (the input track's reported latency) plus the user's
+  // calibration offset. Sample 0 of a take is therefore the downbeat it was sung
+  // on, and pause/resume joins without shifting. Recorder: AudioWorklet, with a
+  // ScriptProcessor fallback.
+  const RECORD_OFFSET_KEY='crp-vocal-record-offset-ms-v1';
+  function recordOffsetMs(){try{const v=Number(localStorage.getItem(RECORD_OFFSET_KEY));return Number.isFinite(v)?Math.max(-500,Math.min(500,v)):0;}catch{return 0;}}
+  function recordLatencySec(){
+    const output=(Number(audioCtx?.outputLatency)||0)+(Number(audioCtx?.baseLatency)||0);
+    const input=Number(micStream?.getAudioTracks?.()[0]?.getSettings?.().latency)||0;
+    return output+input+recordOffsetMs()/1000;
+  }
+  // Each context's currentTime advances in render-callback steps, so a single
+  // reading of both clocks is off by up to a callback each. While recording they
+  // are read together every 20 ms; the median difference is used.
+  let clockOffsets=[],clockTimer=null;
+  function sampleClockOffset(){if(!micCtx||!audioCtx)return;clockOffsets.push(micCtx.currentTime-audioCtx.currentTime);if(clockOffsets.length>31)clockOffsets.shift();}
+  function trackRecordingClocks(on){clearInterval(clockTimer);clockTimer=null;clockOffsets=[];if(on){sampleClockOffset();clockTimer=setInterval(sampleClockOffset,20);}}
+  function playbackToMicOffset(){sampleClockOffset();const sorted=[...clockOffsets].sort((a,b)=>a-b);return sorted[sorted.length>>1];}
+  // The mic-context time at which sound the playback context renders at
+  // `audioTime` is sung into the mic.
+  function micTimeForPlaybackTime(audioTime){return (audioCtx?audioTime+playbackToMicOffset():micCtx.currentTime)+recordLatencySec();}
+  function micTimeSungNow(){return micTimeForPlaybackTime(audioCtx?audioCtx.currentTime:0);}
+  const delay=ms=>new Promise(r=>setTimeout(r,ms));
+  // The take is cut from the mic stream by open/close spans (micCtx times). A
+  // span may open or close up to a second in the past (a negative calibration
+  // offset, clock jitter), so recently rejected audio is kept to recover from.
+  function createTakeGate(sampleRate){
+    const kept=[],recent=[],lookBack=sampleRate;
+    let openFrame=Infinity,closeFrame=Infinity,isOpen=false,endFrame=0;
+    const keep=(frame,samples)=>{if(samples.length)kept.push({frame,samples});};
+    const reject=(frame,samples)=>{
+      if(samples.length)recent.push({frame,samples});
+      while(recent.length&&recent[0].frame+recent[0].samples.length<endFrame-lookBack)recent.shift();
+    };
+    return {
+      get endTime(){return endFrame/sampleRate;},
+      add(frame,samples){
+        endFrame=Math.max(endFrame,frame+samples.length);
+        for(let i=0;i<samples.length;){
+          const f=frame+i,inside=f>=openFrame&&f<closeFrame,boundary=inside?closeFrame:f<openFrame?openFrame:Infinity;
+          const end=Math.min(samples.length,Math.max(i+1,boundary-frame)),piece=samples.subarray(i,end);
+          if(inside)keep(f,piece);else reject(f,piece);
+          i=end;
+        }
+      },
+      open(at){
+        openFrame=Math.round(at*sampleRate);closeFrame=Infinity;isOpen=true;
+        for(const {frame,samples} of recent.splice(0)){
+          const cut=Math.max(0,Math.min(samples.length,openFrame-frame));
+          if(cut)recent.push({frame,samples:samples.subarray(0,cut)});
+          keep(frame+cut,samples.subarray(cut));
+        }
+      },
+      close(at){
+        if(!isOpen)return;
+        closeFrame=Math.round(at*sampleRate);isOpen=false;
+        const back=[];
+        while(kept.length){
+          const last=kept[kept.length-1];
+          if(last.frame>=closeFrame){back.unshift(kept.pop());continue;}
+          const n=closeFrame-last.frame;
+          if(n<last.samples.length){back.unshift({frame:closeFrame,samples:last.samples.subarray(n)});last.samples=last.samples.subarray(0,n);}
+          break;
+        }
+        for(const b of back)reject(b.frame,b.samples);
+      },
+      samples(){return kept.map(k=>k.samples);}
+    };
+  }
+  // {open(at), close(at), finish(at) -> Float32Array[]}: the mic stream through a
+  // take gate. AudioWorklet recorder (frame-stamped blocks), or a ScriptProcessor
+  // whose block times are estimated from playbackTime.
+  async function createRecorder(){
+    const rate=micCtx.sampleRate,gate=createTakeGate(rate),sink=micCtx.createGain();
+    sink.gain.value=0;sink.connect(micCtx.destination);
+    let stopStream=null;
+    if(await ensureVocalWorklet(micCtx)){
+      try{
+        const node=new AudioWorkletNode(micCtx,'crp-vocal-recorder',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1]});
+        node.port.onmessage=e=>{if(e.data?.type==='audio')gate.add(e.data.frame,e.data.samples);};
+        micSource.connect(node);node.connect(sink);
+        stopStream=()=>{node.port.postMessage({type:'stop'});node.port.onmessage=null;try{micSource.disconnect(node);node.disconnect();}catch{}};
+      }catch(err){console.warn('Recorder worklet unavailable; using ScriptProcessor',err);}
+    }
+    if(!stopStream){
+      const proc=micCtx.createScriptProcessor(4096,1,1);
+      proc.onaudioprocess=e=>{const input=e.inputBuffer.getChannelData(0);gate.add(Math.round(e.playbackTime*rate)-input.length,new Float32Array(input));};
+      micSource.connect(proc);proc.connect(sink);
+      stopStream=()=>{proc.onaudioprocess=null;try{micSource.disconnect(proc);proc.disconnect();}catch{}};
+    }
+    return {
+      open:at=>gate.open(at),
+      close:at=>gate.close(at),
+      async finish(at){
+        gate.close(at);
+        const deadline=performance.now()+Math.max(0,at-micCtx.currentTime)*1000+1500;
+        while(gate.endTime<at&&performance.now()<deadline)await delay(30);
+        stopStream();try{sink.disconnect();}catch{}
+        return gate.samples();
+      }
+    };
+  }
+  // Seconds captured so far (for the timer and Track Master's playhead).
+  function recordedSeconds(){return recordedSec+(recordOpenedAtPerf!=null?Math.max(0,(performance.now()-recordOpenedAtPerf)/1000):0);}
+  // Starts the backing at `beat` (muted per the recording scope, which only
+  // affects what is heard) and opens the gate where that beat is sung. Returns
+  // the beat the take starts on.
+  async function startBackingAndCapture(beat){
+    // Past the song end there is no backing left; the take just continues.
+    if(beat<mediaDurationBeats()-.001)await startPlayback({fromBeat:beat,scope:clone(recordScope)});
+    const backing=!!((playing||starting)&&audioCtx&&playbackClockStartAudioTime);
+    const openAt=backing?micTimeForPlaybackTime(playbackClockStartAudioTime):micTimeSungNow();
+    recorder.open(openAt);
+    recordOpenedAtPerf=performance.now()+Math.max(0,openAt-micCtx.currentTime)*1000;
+    return backing?playbackClockStartBeat:beat;
+  }
+  function stopCaptureClock(){if(recordOpenedAtPerf!=null){recordedSec=recordedSeconds();recordOpenedAtPerf=null;}}
   async function beginRecording(options={}){
     const requestedPartId=options?.partId||null;
     if(requestedPartId){const rp=parts.find(x=>x.type==='vocal'&&String(x.id)===String(requestedPartId));if(rp)activePartId=rp.id;}
     const p=active();if(!p||p.type!=='vocal'||recording)return;
-    const fromBeat=Math.max(0,Number(options?.fromBeat)||0);
     const fromVox=!!options?.voxBox;
     try{
-      requestPersistentStorage();stopPreview();await ensureMic();window.CRPParts?.stopPlayback?.();
-      clearTimeout(recordResumeTimer);recordResumeTimer=null;recordingResuming=false;
-      recordChunks=[];recordInsertBeat=fromBeat;recordTargetPartId=p.id;recordStartedFromVox=fromVox;recordResumeBeat=fromBeat;recordInitialTrimSec=0;
-      micProcessor=micCtx.createScriptProcessor(4096,1,1);micSilentGain=micCtx.createGain();micSilentGain.gain.value=0;micSource.connect(micProcessor);micProcessor.connect(micSilentGain);micSilentGain.connect(micCtx.destination);
-      recordCaptureStartMicTime=micCtx.currentTime;
-      micProcessor.onaudioprocess=e=>{if(recording&&!recordingPaused)recordChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));};
-      recording=true;recordingPaused=false;recordPausedAt=0;recordPausedTotal=0;recordStartedAt=performance.now();
+      requestPersistentStorage();stopPreview();await ensureMic();stopPlayback();
+      recorder=await createRecorder();trackRecordingClocks(true);
+      recordTargetPartId=p.id;recordStartedFromVox=fromVox;recordedSec=0;recordOpenedAtPerf=null;
+      // The vocal part's backing choices become a playback scope. Nothing in the
+      // parts or the drum settings changes, so autosave cannot store them.
+      const backingGain=Math.max(0,Math.min(1,Number(p.backingVolume??.8)));
+      recordScope={kind:'record',ownerId:p.id,playableIds:(p.backingPartIds||[]).filter(id=>parts.some(x=>x.id===id&&(x.type==='chord'||x.type==='lead'))),vocalIds:allVocalParts().filter(x=>x.enabled).map(x=>x.id),drums:p.backingDrums!==false,backingGain,drumGain:backingGain};
+      recording=true;recordingPaused=false;recordingResuming=false;
       if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Recording clean WAV. Cloud transcription runs after the take is saved.';
       if($('vocalRecordBtn')){$('vocalRecordBtn').classList.add('recording');$('vocalRecordBtn').disabled=true;}
       if($('vocalStopBtn'))$('vocalStopBtn').disabled=false;
-      const oldStates=new Map(parts.map(x=>[x.id,x.enabled]));p._recordOldStates=oldStates;p._recordOldVolumes=new Map(parts.map(x=>[x.id,x.volume]));
-      parts.forEach(x=>{if(x.type==='chord'||x.type==='lead'){x.enabled=p.backingPartIds.includes(x.id);x.volume=(p._recordOldVolumes.get(x.id)??x.volume)*(p.backingVolume??.8);}});
-      const drumToggle=$('crpDrumsToggle');if(drumToggle){p._recordOldDrums=drumToggle.checked;drumToggle.checked=p.backingDrums!==false;drumToggle.dispatchEvent(new Event('change'));}
-      const drumVol=$('crpDrumVolume');if(drumVol){p._recordOldDrumVol=drumVol.value;drumVol.value=String(Math.round(+drumVol.value*(p.backingVolume??.8)));drumVol.dispatchEvent(new Event('input'));}
-      renderParts();
-
-      // v3.3.67 — remove arbitrary recorder delay. Start the backing, measure the
-      // actual preload + WebAudio lead-in, and trim that exact pre-roll from the
-      // saved WAV so sample 0 lands on the backing downbeat.
-      await startPlayback({fromBeat:recordInsertBeat});
-      const micElapsed=Math.max(0,(micCtx?.currentTime||0)-recordCaptureStartMicTime),backingStarted=!!((playing||starting)&&audioCtx&&playbackClockStartAudioTime);
-      recordInitialTrimSec=backingStarted?Math.max(0,micElapsed+playbackLeadRemainingSec()):0;
-      recordTimer=setInterval(()=>{const now=recordingPaused?recordPausedAt:performance.now(),elapsed=Math.max(0,(now-recordStartedAt-recordPausedTotal-recordInitialTrimSec*1000)/1000);if($('vocalTimer'))$('vocalTimer').textContent=fmtTime(elapsed);updateVoxTransportState();},100);
-
+      recordInsertBeat=await startBackingAndCapture(Math.max(effectiveSongStartBeat(),Number(options?.fromBeat)||0));
+      recordResumeBeat=recordInsertBeat;
+      recordTimer=setInterval(()=>{if($('vocalTimer'))$('vocalTimer').textContent=fmtTime(recordedSeconds());updateVoxTransportState();},100);
       if(fromVox){voxTargetPartId=p.id;updateVoxPlayhead(recordInsertBeat,true);voxStatus(`Recording into ${p.name} from beat ${recordInsertBeat.toFixed(2)}…`);}
       core.status('Recording dry WAV in beat sync. Use headphones so the backing does not bleed into the mic.');updateVoxTransportState();
-    }catch(e){console.error(e);core.status(e.message||'Could not start microphone.');recordStartedFromVox=false;recordTargetPartId=null;recordInitialTrimSec=0;recordCaptureStartMicTime=0;}
+    }catch(e){
+      console.error(e);core.status(e.message||'Could not start microphone.');
+      if(recorder)await recorder.finish(micCtx?.currentTime??0).catch(()=>{});
+      recorder=null;recording=false;recordScope=null;recordStartedFromVox=false;recordTargetPartId=null;trackRecordingClocks(false);
+      if($('vocalRecordBtn')){$('vocalRecordBtn').classList.remove('recording');$('vocalRecordBtn').disabled=false;}
+      if($('vocalStopBtn'))$('vocalStopBtn').disabled=true;
+      updateVoxTransportState();
+    }
   }
   async function endRecording(){
-    const p=parts.find(x=>x.type==='vocal'&&String(x.id)===String(recordTargetPartId))||active();if(!p||p.type!=='vocal'||!recording)return;
-    const wasVox=recordStartedFromVox,insertBeat=recordInsertBeat;
-    clearTimeout(recordResumeTimer);recordResumeTimer=null;recordingResuming=false;
-    if(recordingPaused&&recordPausedAt){recordPausedTotal+=performance.now()-recordPausedAt;}recordingPaused=false;recordPausedAt=0;recording=false;stopSpeechToText();clearInterval(recordTimer);recordTimer=null;
+    const p=parts.find(x=>x.type==='vocal'&&String(x.id)===String(recordTargetPartId))||active();if(!p||p.type!=='vocal'||!recording||!recorder)return;
+    const wasVox=recordStartedFromVox,insertBeat=recordInsertBeat,rec=recorder;
+    // Everything sung up to the beat being heard now is part of the take.
+    const stopAt=recordingPaused?micCtx.currentTime:micTimeSungNow();
+    stopCaptureClock();
+    recording=false;recordingPaused=false;recordingResuming=false;clearInterval(recordTimer);recordTimer=null;recorder=null;recordScope=null;
     if($('vocalRecordBtn')){$('vocalRecordBtn').classList.remove('recording');$('vocalRecordBtn').disabled=false;}
     if($('vocalStopBtn'))$('vocalStopBtn').disabled=true;
-    window.CRPParts?.stopPlayback?.();micProcessor?.disconnect();micSilentGain?.disconnect();if(micProcessor)micProcessor.onaudioprocess=null;micProcessor=null;micSilentGain=null;
-    if(p._recordOldStates){for(const x of parts)x.enabled=p._recordOldStates.get(x.id)??x.enabled;delete p._recordOldStates;}if(p._recordOldVolumes){for(const x of parts)x.volume=p._recordOldVolumes.get(x.id)??x.volume;delete p._recordOldVolumes;}
-    const drumToggle=$('crpDrumsToggle');if(drumToggle&&p._recordOldDrums!==undefined){drumToggle.checked=p._recordOldDrums;drumToggle.dispatchEvent(new Event('change'));delete p._recordOldDrums;}
-    const drumVol=$('crpDrumVolume');if(drumVol&&p._recordOldDrumVol!==undefined){drumVol.value=p._recordOldDrumVol;drumVol.dispatchEvent(new Event('input'));delete p._recordOldDrumVol;}
-    renderParts();
-    const capturedSamples=recordChunks.reduce((n,a)=>n+a.length,0),trimSamples=Math.max(0,Math.min(capturedSamples,Math.round(recordInitialTrimSec*recordSampleRate))),usableSamples=Math.max(0,capturedSamples-trimSamples),duration=usableSamples/Math.max(1,recordSampleRate);
+    stopPlayback();
+    let chunks=await rec.finish(stopAt);trackRecordingClocks(false);
+    const rate=micCtx.sampleRate,frames=chunks.reduce((n,a)=>n+a.length,0),duration=frames/rate;
     if($('vocalTimer'))$('vocalTimer').textContent=fmtTime(duration);
-    if(duration<.25||usableSamples<Math.max(1,Math.round(recordSampleRate*.25))){core.status('Recording was too short.');recordStartedFromVox=false;recordTargetPartId=null;recordInitialTrimSec=0;recordCaptureStartMicTime=0;updateVoxTransportState();return;}
-    const blob=floatToWav(recordChunks,recordSampleRate,trimSamples),id=uid(),take={id,name:`Take ${p.recordings.length+1}`,createdAt:new Date().toISOString(),duration,sampleRate:recordSampleRate,size:blob.size,recordedAtBeat:insertBeat};
-    recordChunks=[];
     try{
+      if(duration<.25){core.status('Recording was too short.');return;}
+      const blob=floatToWav(chunks,rate),id=uid(),take={id,name:`Take ${p.recordings.length+1}`,createdAt:new Date().toISOString(),duration,sampleRate:rate,size:blob.size,recordedAtBeat:insertBeat};
+      chunks=null;
       // The take joins the part even if this device refuses to store it: it is
       // then kept in memory and storing is retried (storeTakeAudio).
       p.recordings.push(take);
@@ -1234,46 +1334,47 @@
       markPartsDirty();core.scheduleAutoSave();await renderVocalTakes(p);
       if(voxBoxOpen){renderVoxBox();updateVoxPlayhead(insertBeat,true);voxStatus(`${take.name} recorded onto ${p.name} at beat ${insertBeat.toFixed(2)}.`);}
       if(core.loggedIn&&core.currentProjectId){try{if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Uploading and transcribing new take…';await uploadTakeToCloud(take,blob,core.currentProjectId);await transcribeTake(p,take,{quiet:true});core.status(`Saved ${take.name} to cloud and transcribed it.`);}catch(te){console.warn('Automatic cloud transcription pending',te);if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent=`Take is safe. ${te.message||'Tap Transcribe active take after saving.'}`;core.status(`Saved ${take.name}. Cloud transcription can be retried with Transcribe active take.`);}}else if(stored){if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Take is safe. Save/sign in, then tap Transcribe active take.';core.status(core.loggedIn?`Saved ${take.name} locally. Save the project to enable cloud transcription.`:`Saved ${take.name} locally. Sign in and save to use cloud transcription.`);}
-    }catch(e){console.error(e);core.status(`${take.name} was recorded, but saving it failed: ${e.message||e}`);}
-    finally{recordStartedFromVox=false;recordTargetPartId=null;recordInsertBeat=0;recordResumeBeat=0;recordInitialTrimSec=0;recordCaptureStartMicTime=0;recordingResuming=false;clearTimeout(recordResumeTimer);recordResumeTimer=null;updateVoxTransportState();}
+    }catch(e){console.error(e);core.status(`The take was recorded, but saving it failed: ${e.message||e}`);}
+    finally{recordStartedFromVox=false;recordTargetPartId=null;recordInsertBeat=0;recordResumeBeat=0;updateVoxTransportState();}
   }
   async function toggleRecordingPause(){
-    if(!recording)return false;
+    if(!recording||!recorder)return false;
     if(!recordingPaused){
-      clearTimeout(recordResumeTimer);recordResumeTimer=null;recordingResuming=false;
-      recordResumeBeat=currentCycleBeat()??voxPlayheadBeat??recordResumeBeat??0;
+      // The take pauses at the beat being heard now; resuming restarts the
+      // backing on that beat and opens the gate where it is sung.
+      recordResumeBeat=currentCycleBeat()??recordInsertBeat+recordedSeconds()*songBpm()/60;
+      recorder.close(micTimeSungNow());stopCaptureClock();
+      recordingPaused=true;
       if(recordStartedFromVox)updateVoxPlayhead(recordResumeBeat,false);
-      recordingPaused=true;recordPausedAt=performance.now();
-      try{window.CRPParts?.stopPlayback?.();}catch{}
+      stopPlayback();
       core.status('Recording paused.');
     }else{
       if(recordingResuming)return true;
       recordingResuming=true;
       core.status('Resuming recording on the backing downbeat…');
       try{
-        await startPlayback({fromBeat:Math.max(0,Number(recordResumeBeat)||0)});
-        if(!recording||!recordingPaused){recordingResuming=false;return recordingPaused;}
-        const finishResume=()=>{
-          recordResumeTimer=null;
-          if(!recording||!recordingPaused){recordingResuming=false;return;}
-          if(recordPausedAt)recordPausedTotal+=performance.now()-recordPausedAt;
-          recordingPaused=false;recordPausedAt=0;recordingResuming=false;
-          core.status('Recording resumed in beat sync.');
-          updateVoxTransportState();
-        };
-        const delayMs=Math.max(0,playbackLeadRemainingSec()*1000);
-        if(delayMs>4)recordResumeTimer=setTimeout(finishResume,delayMs);else finishResume();
+        await startBackingAndCapture(Math.max(0,Number(recordResumeBeat)||0));
+        core.status('Recording resumed in beat sync.');
       }catch(e){
         console.warn('Could not resume backing playback',e);
-        if(recordPausedAt)recordPausedTotal+=performance.now()-recordPausedAt;
-        recordingPaused=false;recordPausedAt=0;recordingResuming=false;
+        recorder.open(micTimeSungNow());recordOpenedAtPerf=performance.now();
         core.status('Recording resumed without backing.');
-      }
+      }finally{recordingPaused=false;recordingResuming=false;}
     }
     updateVoxTransportState();
     return recordingPaused;
   }
-
+  // "Recording offset (ms)": a per-device calibration added to the measured
+  // latency. Positive values move takes earlier.
+  function ensureRecordOffsetControl(){
+    const info=$('vocalMicInfo');if(!info||$('vocalRecordOffset'))return;
+    const label=document.createElement('label');label.className='vocal-playback-level vocal-record-offset';
+    label.title='If takes land late against the backing, raise this; if early, lower it. Saved on this device.';
+    label.innerHTML='Recording offset (ms) <input id="vocalRecordOffset" type="number" min="-500" max="500" step="1" inputmode="numeric" style="width:5.5em">';
+    info.after(label);
+    const input=$('vocalRecordOffset');input.value=String(recordOffsetMs());
+    input.onchange=()=>{const v=Math.max(-500,Math.min(500,Math.round(Number(input.value)||0)));input.value=String(v);try{localStorage.setItem(RECORD_OFFSET_KEY,String(v));}catch{}core.status(`Recording offset set to ${v} ms.`);};
+  }
   async function downloadTake(take){const blob=await getTakeBlob(take);if(!blob){core.status('This take audio is not available on this device or cloud.');return;}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${(take.name||'vocal-take').replace(/[^a-z0-9_-]+/gi,'-')}.wav`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);}
   function stopPreview(){
     if(!currentPreview)return;
@@ -2290,7 +2391,7 @@
   }
 
   function partsPayloadForSave(){
-    const safe=parts.map(p=>{const q=clone(p);delete q._recordOldStates;delete q._recordOldVolumes;delete q._recordOldDrums;delete q._recordOldDrumVol;if(q.type==='vocal')q.recordings=(q.recordings||[]).map(({blob,...r})=>r);return q;});
+    const safe=parts.map(p=>{const q=clone(p);if(q.type==='vocal')q.recordings=(q.recordings||[]).map(({blob,...r})=>r);return q;});
     return {version:6,activePartId,loadedChordPartId,songStartBeat:effectiveSongStartBeat(),songEndBeat:Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):null,drumEvents:clone(drumEvents),items:safe};
   }
   function refreshPartsFingerprintBaseline(){partsFingerprint=JSON.stringify(partsPayloadForSave());}
@@ -3527,7 +3628,7 @@
   function wireVoxPlayheadDrag(){const grip=$('voxPlayhead')?.querySelector('span');if(!grip||grip.dataset.wired)return;grip.dataset.wired='1';grip.addEventListener('pointerdown',e=>{if(recording&&!recordingPaused){voxStatus('Pause or stop recording before moving the playhead.');return;}e.preventDefault();e.stopPropagation();disableVoxAutoScroll();const sc=$('voxTimelineScroller'),inner=$('voxTimelineInner');if(!sc||!inner)return;try{grip.setPointerCapture(e.pointerId)}catch{};const move=ev=>{ev.preventDefault();const rect=inner.getBoundingClientRect(),beat=quantizeVoxBeat((ev.clientX-rect.left-voxLabelWidth())/voxPpb());updateVoxPlayhead(beat,false);};const up=ev=>{try{grip.releasePointerCapture(ev.pointerId)}catch{};grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',up);grip.removeEventListener('pointercancel',up);voxSeekTo(voxPlayheadBeat,{manual:true});};grip.addEventListener('pointermove',move,{passive:false});grip.addEventListener('pointerup',up);grip.addEventListener('pointercancel',up);});}
 
   function wire(){
-    ensureInitial();setEditorMode(active()?.type||'chord');renderParts();ensureMediaSession();updateMediaMetadata();renderSongEndEditor();scheduleRecoverCheck({banner:true});
+    ensureInitial();setEditorMode(active()?.type||'chord');ensureRecordOffsetControl();renderParts();ensureMediaSession();updateMediaMetadata();renderSongEndEditor();scheduleRecoverCheck({banner:true});
     if($('voxBoxBtn'))$('voxBoxBtn').onclick=()=>openVoxBox({fromVocal:true});
     if($('trackMasterBtn'))$('trackMasterBtn').onclick=openTrackMaster;
     try{
@@ -3604,7 +3705,7 @@
       if(!(playing||starting)){liveEditRefresh();return;}
       if(!queueTempoRestartIfNeeded())liveEditRefresh();
     });
-    let voxFollowRaf=0;const voxFollowTick=()=>{if(voxBoxOpen){let beat=null;if(playing||starting)beat=currentCycleBeat();else if(recording){const now=recordingPaused&&recordPausedAt?recordPausedAt:performance.now(),activeMs=Math.max(0,now-recordStartedAt-recordPausedTotal-recordInitialTrimSec*1000);beat=recordInsertBeat+(activeMs/1000)*(songBpm()/60);}if(Number.isFinite(beat))updateVoxPlayhead(beat,voxAutoScroll);}voxFollowRaf=requestAnimationFrame(voxFollowTick);};if(voxFollowRaf)cancelAnimationFrame(voxFollowRaf);voxFollowRaf=requestAnimationFrame(voxFollowTick);
+    let voxFollowRaf=0;const voxFollowTick=()=>{if(voxBoxOpen){let beat=null;if(playing||starting)beat=currentCycleBeat();else if(recording)beat=recordInsertBeat+recordedSeconds()*songBpm()/60;if(Number.isFinite(beat))updateVoxPlayhead(beat,voxAutoScroll);}voxFollowRaf=requestAnimationFrame(voxFollowTick);};if(voxFollowRaf)cancelAnimationFrame(voxFollowRaf);voxFollowRaf=requestAnimationFrame(voxFollowTick);
     if(songEndUiTimer)clearInterval(songEndUiTimer);songEndUiTimer=setInterval(()=>{renderSongEndEditor();if(voxBoxOpen){updatePartPlaybackButtons();updateVoxTransportState();}},300);
     $('addPartBtn')?.addEventListener('click',openModal);$('closePartModal')?.addEventListener('click',closeModal);document.querySelector('[data-close-part-modal]')?.addEventListener('click',closeModal);document.querySelectorAll('.part-choice').forEach(b=>b.addEventListener('click',()=>addPart(b.dataset.partType)));
     document.querySelectorAll('#leadInstrumentTabs .seg').forEach(b=>b.onclick=()=>{const p=active();if(p?.type!=='lead')return;const nextInstrument=b.dataset.leadInstrument;if(!nextInstrument)return;/* Browsing an instrument family must be non-destructive. Keep the currently selected instrument/sound audible until the user explicitly chooses a sound from the popup. */if(typeof window.CRPShowSoundPicker!=='function')return;window.CRPShowSoundPicker(b,nextInstrument,p.sound,(value)=>{p.instrument=nextInstrument;p.sound=value;renderLeadSoundControls(p);warmLivePlayer(p);core.scheduleAutoSave();});});
