@@ -1,9 +1,0 @@
-Chord Rider Pro v1.7.2
-
-Fix: enabled Vocal parts now participate in the main Play transport.
-- The selected/active take ("Using") starts with the song from bar 1.
-- Vocal part volume and preview FX are applied during main playback.
-- Vocal audio stops immediately with the master Stop control.
-- Repeat loops include the vocal take.
-- Playback length expands to include the active vocal take when needed.
-- Vocal takes remain dry WAV masters in IndexedDB; effects remain non-destructive.

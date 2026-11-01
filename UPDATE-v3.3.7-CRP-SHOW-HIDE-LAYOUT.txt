@@ -1,7 +1,0 @@
-Song Rider Suite v3.3.7 — CRP Show/Hide + Layout Repair
-
-- CRP Hide/Show now directly controls the real setup toolbar and cannot be overridden by stale Baby DAW part-editor classes.
-- The Hide/Show state remains separate from Baby DAW and persists as before.
-- Returning to CRP now restores the Chord editor mode even if a Lead/Bass or Vocal editor was previously active in Baby DAW.
-- Collapsed CRP setup no longer reserves a large empty block; the chord input / transport area moves up cleanly.
-- Cache version bumped so installed PWAs receive the repaired CSS/JS.

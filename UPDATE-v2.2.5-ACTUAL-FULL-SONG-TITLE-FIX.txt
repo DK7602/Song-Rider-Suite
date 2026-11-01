@@ -1,5 +1,0 @@
-Chord Rider Pro v2.2.5 — Actual Full Song View title fix
-
-- Fixed the real visible Full Song View section-title element (.fullPerfPill).
-- Forces CRP gold/yellow background and bold black title text directly when that element is created.
-- Keeps all v2.2.4 layout and SRP behavior unchanged.

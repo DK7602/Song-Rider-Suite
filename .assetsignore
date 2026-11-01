@@ -1,6 +1,16 @@
+# Files that must not be published as static assets by the Worker.
 worker.js
 wrangler.jsonc
 README.md
+CHANGELOG.md
 .git/
 .github/
 node_modules/
+docs/
+tests/
+migrations/
+package.json
+package-lock.json
+test-results/
+playwright-report/
+**/Ignore

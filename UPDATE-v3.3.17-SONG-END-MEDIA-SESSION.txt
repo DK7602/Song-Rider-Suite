@@ -1,8 +1,0 @@
-v3.3.17
-- Replaced Set End Here with a visual Song End slider.
-- Added vertical bar markers, Snap to Bar toggle, +/-0.1s fine adjustment, and Restore Full Song.
-- Song End changes apply live to playback and continue to control WAV export.
-- Playback now hot-refreshes while editing instead of requiring a manual stop/restart.
-- Added Android/Chrome Media Session support with project metadata, play/pause, seek +/- and seek-to-position controls for the notification/system media panel when supported.
-- Added a silent media keepalive so the PWA has a real media session while WebAudio playback is running.
-- Removed the forced playback stop when switching between Baby DAW parts.

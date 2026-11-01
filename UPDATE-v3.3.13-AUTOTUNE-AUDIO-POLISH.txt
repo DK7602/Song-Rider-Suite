@@ -1,6 +1,0 @@
-v3.3.13
-- Desktop SRP BPM field widened so 3-digit BPM values are fully visible; mobile layout unchanged.
-- Baby DAW Vocals adds key-linked Auto-Tune amount slider (0% natural/off to 100% hard robotic correction). Dry WAV masters remain untouched.
-- Piano output raised moderately.
-- Sustain extended for Piano, Electric Piano, and Acoustic Guitar in CRP and Baby DAW playback.
-- Added same-origin AudioWorklet pitch-correction processor and bumped PWA cache.

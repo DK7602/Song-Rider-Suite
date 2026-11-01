@@ -1,6 +1,0 @@
-v3.3.89
-
-Rider Blood Light / Rider Light targeted fixes:
-- Active beat, note, and chord cells now fill solid red.
-- Baby DAW selected tile now uses a red background state rather than a red overlay.
-- CSS version query and service-worker cache names updated.

@@ -1,8 +1,0 @@
-Song Rider Suite v3.3.56
-
-Fixes:
-- Beat Maker Paste/Duplicate now has independent Destination Bars checkboxes (one, several, or All 16). Copied multi-bar patterns repeat across selected destination bars.
-- Beat Maker source selection trims empty leading/trailing bars so selecting All Bars around one active bar still duplicates the active pattern instead of a 16-bar mostly-empty phrase.
-- Lead/Bass paste now exposes Grid 1–6 as real destination choices even when source-grid checkboxes are hidden. Copy from Grid 3 can paste/transposed to any other grid.
-- Track Master Range Select Cut/Delete now uses the same deferred persistence path as Multi Select and stores/restores range state in Undo snapshots.
-- Track Master track deletion now hard-syncs the Baby DAW part list/editor immediately and removes stale backing references.

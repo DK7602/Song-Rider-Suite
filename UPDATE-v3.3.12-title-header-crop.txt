@@ -1,5 +1,0 @@
-v3.3.12
-- Cropped SONG RIDER SUITE banner to remove the white bands above and below.
-- Cropped CHORD RIDER PRO title art to remove excess empty space and better match SRP title layout.
-- Kept Baby DAW button from v3.3.11.
-- Bumped asset query strings and service worker cache version.

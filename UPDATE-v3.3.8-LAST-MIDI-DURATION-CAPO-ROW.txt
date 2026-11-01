@@ -1,7 +1,0 @@
-Song Rider Suite v3.3.8
-
-- CRP Capo, Chord Shape, and Capo mode now share one compact row.
-- Fixed the final CRP MIDI chord/note duration handle racing through beats.
-  The duration drag now ignores browser scrollLeft clamping caused by the final
-  column changing the roll width, while preserving the existing edge-scroll feel.
-- Bumped the PWA cache so phones receive the corrected JavaScript/CSS.

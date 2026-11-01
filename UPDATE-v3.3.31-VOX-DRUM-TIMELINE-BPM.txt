@@ -1,9 +1,0 @@
-Song Rider Suite v3.3.31
-
-Vox Box updates
-- Removed the duplicate top Play button; the floating transport is now the only playback transport.
-- Added a compact editable BPM field in the Vox Box header. BPM commits through the Suite canonical CRP/BD/SRP tempo sync.
-- Rebuilt Drum Map alignment: drum title, generator controls, and drum names stay inside the sticky track-title column.
-- Drum grid now starts exactly at timeline beat 1 with no extra name-column offset.
-- Drum step width derives from the Vox Box pixels-per-beat scale, so every hit lines up with the ruler, chords, notes, leads and vocals on desktop/tablet/mobile.
-- The Beat Maker pattern is repeated visually across the full song timeline, matching actual playback behavior. Editing any repeated occurrence updates the underlying pattern and therefore all repeated occurrences.

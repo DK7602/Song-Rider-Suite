@@ -1,7 +1,0 @@
-Chord Rider Pro v1.9.7 — Lead/Bass Sustain
-
-- Added per-part Sustain notes toggle to every Lead/Bass part.
-- Sustain OFF keeps notes tight to the selected grid step.
-- Sustain ON lets each note ring for a full beat, including tap-to-audition.
-- Sustain state saves with the project and carries into MIDI/DAW export note lengths.
-- No asset changes.

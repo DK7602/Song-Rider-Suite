@@ -1,7 +1,0 @@
-Song Rider Suite v3.3.59 — SRP Google Docs / Print Layout
-
-- Preserves chord/lyric alignment when exported HTML is opened with Google Docs.
-- Encodes spacing explicitly instead of relying on white-space CSS that Google Docs collapses.
-- Uses borderless one-cell tables for each song section so Google Docs/print keeps section headings and bodies grouped more reliably across pages.
-- Keeps bold black lyrics, bold red chords, and bold underlined section titles.
-- Browser export preview remains visually unchanged.

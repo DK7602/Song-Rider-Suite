@@ -870,7 +870,7 @@ html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-li
 html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-inspector,
 html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-header{
   background-color:#fffdf7!important;
-  background-image:url('./assets/rider-blood-light-pattern.png')!important;
+  background-image:url('./assets/rider-blood-light-pattern.jpg')!important;
   background-size:220px auto!important;
   background-repeat:repeat!important;
   color:#201b16!important;
@@ -987,7 +987,7 @@ html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-li
 html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-inspector,
 html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-header{
   background-color:#FFFDF7!important;
-  background-image:linear-gradient(rgba(255,253,247,.10),rgba(255,253,247,.10)),url('./assets/rider-blood-light-pattern.png')!important;
+  background-image:linear-gradient(rgba(255,253,247,.10),rgba(255,253,247,.10)),url('./assets/rider-blood-light-pattern.jpg')!important;
   background-size:auto,270px auto!important;
   background-repeat:repeat,repeat!important;
   background-position:0 0,center top!important;
@@ -1072,7 +1072,7 @@ html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-li
 html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-beat-foot,
 html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .crp-randomizer{
   background-color:#FFFDF7!important;
-  background-image:linear-gradient(rgba(255,253,247,.10),rgba(255,253,247,.10)),url('./assets/rider-blood-light-pattern.png')!important;
+  background-image:linear-gradient(rgba(255,253,247,.10),rgba(255,253,247,.10)),url('./assets/rider-blood-light-pattern.jpg')!important;
   background-size:auto,270px auto!important;
   background-repeat:repeat,repeat!important;
   background-position:0 0,center top!important;
@@ -1197,7 +1197,7 @@ html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-li
 html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-box-tools,
 html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .vox-inspector{
   background-color:#FFFDF7!important;
-  background-image:url('./assets/rider-blood-light-pattern.png')!important;
+  background-image:url('./assets/rider-blood-light-pattern.jpg')!important;
   background-repeat:repeat!important;
   background-size:270px auto!important;
   background-position:center top!important;
@@ -1794,7 +1794,7 @@ html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-li
 }
 html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art img,
 html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art img{
-  content:url('./assets/baby-daw-button-hq-rider-blood-light-active.png')!important;
+  content:url('./assets/baby-daw-button-hq-rider-blood-light-active.webp')!important;
   mix-blend-mode:normal!important;
   opacity:1!important;
   filter:none!important;
@@ -1969,7 +1969,7 @@ html[data-skin-choice="rider-blood"] #babyDawModeBtn.active .baby-exact-art::aft
   box-shadow:none!important;
 }
 html[data-skin-choice="rider-blood"] #babyDawModeBtn.active .baby-exact-art img{
-  content:url('./assets/baby-daw-button-hq-rider-blood-light-active.png')!important;
+  content:url('./assets/baby-daw-button-hq-rider-blood-light-active.webp')!important;
   mix-blend-mode:normal!important;
   opacity:1!important;
   filter:none!important;
@@ -2397,7 +2397,7 @@ html[data-skin] .mobile-line-indicator{
 .preview-sapphire-paisley .srs-preview-icons i:nth-child(3){background:#FFE933!important}
 
 .preview-sapphire-paisley-light{
-  background:#fff url('./assets/sapphire-paisley-light.png') center/150px auto repeat!important;
+  background:#fff url('./assets/sapphire-paisley-light.jpg') center/150px auto repeat!important;
 }
 .preview-sapphire-paisley-light .srs-preview-top{
   background:linear-gradient(90deg,#FFFFFF 0 22%,#0D00FF 22% 47%,#A4DCFF 47% 71%,#D6BC67 71% 86%,#FFE933 86% 100%)!important;
@@ -2545,14 +2545,14 @@ html[data-skin-choice="sapphire-paisley-light"] :is(
   .sheetHeader,.fullPerf,.fullPerfScroll
 ){
   background-color:rgba(255,255,255,.95)!important;
-  background-image:linear-gradient(rgba(255,255,255,.24),rgba(255,255,255,.24)),url('./assets/sapphire-paisley-light.png')!important;
+  background-image:linear-gradient(rgba(255,255,255,.24),rgba(255,255,255,.24)),url('./assets/sapphire-paisley-light.jpg')!important;
   background-size:auto,430px auto!important;background-repeat:repeat,repeat!important;background-position:0 0,center top!important;
   color:#102b4f!important;border-color:#9fc4e8!important;
 }
 html[data-skin-choice="sapphire-paisley-light"] body .page,
 html[data-skin-choice="sapphire-paisley-light"] body header>.panel{
   background-color:#fff!important;
-  background-image:linear-gradient(rgba(255,255,255,.28),rgba(255,255,255,.28)),url('./assets/sapphire-paisley-light.png')!important;
+  background-image:linear-gradient(rgba(255,255,255,.28),rgba(255,255,255,.28)),url('./assets/sapphire-paisley-light.jpg')!important;
   background-size:auto,430px auto!important;background-repeat:repeat,repeat!important;background-position:0 0,center top!important;
   color:#102b4f!important;
 }
@@ -2718,7 +2718,7 @@ html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .
 html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .part-strip,
 html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .active-part-volume-row{
   background-color:rgba(255,255,255,.95)!important;
-  background-image:linear-gradient(rgba(255,255,255,.24),rgba(255,255,255,.24)),url('./assets/sapphire-paisley-light.png')!important;
+  background-image:linear-gradient(rgba(255,255,255,.24),rgba(255,255,255,.24)),url('./assets/sapphire-paisley-light.jpg')!important;
   background-size:auto,430px auto!important;
   background-repeat:repeat,repeat!important;
   background-position:0 0,center top!important;
@@ -2728,7 +2728,7 @@ html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .
 html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] body .page,
 html[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] body header>.panel{
   background-color:#fff!important;
-  background-image:linear-gradient(rgba(255,255,255,.28),rgba(255,255,255,.28)),url('./assets/sapphire-paisley-light.png')!important;
+  background-image:linear-gradient(rgba(255,255,255,.28),rgba(255,255,255,.28)),url('./assets/sapphire-paisley-light.jpg')!important;
   background-size:auto,430px auto!important;
   background-repeat:repeat,repeat!important;
   background-position:0 0,center top!important;

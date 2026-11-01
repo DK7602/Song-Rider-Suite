@@ -1,6 +1,0 @@
-Song Rider Suite v3.3.28 — Wide Track Master
-
-- Track Master now spans the full shared navigation line in CRP, Baby DAW, and SRP.
-- Side clearance matches the three workspace cards: 2.65vw on larger screens and 10px on mobile/tablet.
-- Preserves the existing 24-karat-gold styling and all Track Master navigation behavior.
-- Cache/version bumped so the layout update is picked up immediately after deployment.

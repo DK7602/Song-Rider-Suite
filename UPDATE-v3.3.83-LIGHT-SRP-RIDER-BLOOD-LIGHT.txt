@@ -1,7 +1,0 @@
-Song Rider Suite v3.3.83
-
-Fixes:
-- Full Song View and Card View lyric windows now follow Studio Pastel, Black Label Light, Royal Wave, Candy Pop, Rider Light and Rider Blood Light instead of staying black.
-- Rider Blood Light redesigned with red, patterned white, cream and polished gold from the supplied palette.
-- Added rider-blood-light-pattern.png from the supplied pattern sample for light windows.
-- Presentation only; playback, save/sync, project and timing logic unchanged.

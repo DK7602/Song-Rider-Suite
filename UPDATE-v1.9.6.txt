@@ -1,7 +1,0 @@
-Chord Rider Pro v1.9.6
-
-Lead/Bass note audition
-- Tapping any Lead/Bass grid cell now immediately previews that note using the currently selected sound.
-- The tap still toggles the note on/off exactly as before.
-- Preview respects the Part octave and the bass instrument octave behavior used during playback.
-- Existing playback, repeat, cloud vocals, transcription, chord audit, PDF blueprint and DAW export are unchanged.

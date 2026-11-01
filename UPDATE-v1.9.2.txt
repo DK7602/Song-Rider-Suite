@@ -1,7 +1,0 @@
-Chord Rider Pro v1.9.2
-- Lead/Bass and Vocal parts now have per-part Repeat toggles (default ON).
-- Repeating Lead/Bass events and active vocal takes are scheduled across the full song timeline.
-- Lead/Bass active-part volume slider uses exact visual fill through 100%.
-- PDF drum and Lead/Bass grids use aligned colgroups and musical subdivision headers.
-- Speech-to-text is more resilient: accumulates final phrases correctly, restarts while recording when Chrome ends a recognition session, and shows status/errors instead of failing silently.
-Note: live speech recognition depends on browser/OS support and may use the browser speech service; the dry WAV recording remains independent.

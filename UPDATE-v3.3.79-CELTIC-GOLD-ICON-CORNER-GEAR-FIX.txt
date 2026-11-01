@@ -1,8 +1,0 @@
-Song Rider Suite v3.3.79 - Celtic Gold icon / corner / gear fix
-
-Includes:
-- Swapped Celtic mode icon mapping so Baby DAW uses the circular knot and Song Rider uses the triquetra.
-- Added missing celtic-mode-song.png and celtic-mode-track.png to the upload package.
-- Padded the triquetra icon so it no longer clips on the edge.
-- Restored the Appearance settings gear to the top-right of the Log in box.
-- Kept Celtic corner trim subtle and out of the way.

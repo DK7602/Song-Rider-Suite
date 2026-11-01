@@ -1,61 +1,11 @@
-const CACHE = 'song-rider-suite-v3.3.124-production-cache-recovery-srp';
-const ASSETS = [
-  '../skins.css',
-  '../skins.js',
-  './vocal-autotune-worklet.js',
-  './song-rider-pro-wordmark-hq.png',
-  './song-rider-pro-wordmark-blood.png',
-  './baby-daw-button-hq.png',
-  '../assets/rider-blood-light-pattern.png','../assets/light-diamond-pattern.jpg','../assets/studio-pastel-pattern.jpg','../assets/rider-og-pattern.jpg','../assets/rider-light-og-pattern.jpg','../assets/rider-blood-light-og-pattern.jpg',
-  '../assets/rider-dark-gold-pattern.jpg',
-'./assets/song-rider-pro-wordmark-hq.png',
-  './assets/baby-daw-button-hq.png',
-  './baby-daw-mic.png',
-  './baby-daw-head-chain-sticker.png',
-  './song-rider/suite-header-master.png',
-  './song-rider/branding-shell.css',
-  './assets/suite-header-master.png',
-  './branding-shell.css',
-  './song-rider/suite-header.css',
-  './suite-header.css',
-  './song-rider/song-rider-pro-wordmark.png',
-  './song-rider/baby-daw-sticker.png',
-  './song-rider/assets/baby-daw-sticker.png',
-  './song-rider/assets/song-rider-pro-wordmark.png',
-  './song-rider/assets/song-rider-suite-wordmark.png',
-  './assets/baby-daw-sticker.png',
-  './assets/song-rider-pro-wordmark.png',
-  './assets/song-rider-suite-wordmark.png',
-  './',
-  './index.html',
-  './styles.css',
-  './app.js',
-  './parts.js',
-  './beat-maker.js',
-  './manifest.webmanifest',
-  './apple-touch-icon.png',
-  './icon-512.png',
-  './icon-192.png',
-  './assets/rider-and-bones-icon.png',
-  './assets/rider-and-bones-left.gif',
-  './assets/rider-and-bones-right.gif',
-  './assets/rider-and-bones-left-still.png',
-  './assets/rider-and-bones-right-still.png',
-  './assets/baby-daw-generated-source.png',
-  './assets/rider-bones-mode-sticker.png',
-  './assets/baby-daw-head-chain-sticker.png',
-  './song-rider/index.html',
-  './song-rider/app.js'
-];
-self.addEventListener('install', e => e.waitUntil((async()=>{const c=await caches.open(CACHE);await Promise.allSettled(ASSETS.map(url=>c.add(url)));await self.skipWaiting();})()));
-self.addEventListener('activate', e => e.waitUntil(Promise.all([self.clients.claim(), caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))])));
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET' || new URL(e.request.url).pathname.startsWith('/api/')) return;
-  e.respondWith(
-    fetch(e.request).then(r => {
-      const copy = r.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copy)).catch(()=>{});
-      return r;
-    }).catch(() => caches.match(e.request))
-  );
-});
+// Retired. Song Rider Pro is served by the suite-wide /service-worker.js.
+// Older builds registered this file for the /song-rider/ scope; this version removes itself
+// and its caches so those phones stop serving stale code.
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', event => event.waitUntil((async () => {
+  const keys = await caches.keys();
+  await Promise.all(keys.filter(k => k.startsWith('song-rider-pro') || k.includes('-srp')).map(k => caches.delete(k)));
+  await self.registration.unregister();
+  const clients = await self.clients.matchAll({ type: 'window' });
+  clients.forEach(c => c.navigate(c.url));
+})()));

@@ -1,8 +1,0 @@
-Chord Rider Pro v1.9.5 — Full Chord Audit
-
-- Piano chord voicings are now canonical root-position voicings across playback, app diagrams, and PDF export.
-- Basic triads ascend root → third → fifth (F = F-A-C, D = D-F#-A, Dm = D-F-A).
-- 7th/9th/add9/6/sus/dim/half-diminished/augmented formulas audited.
-- Existing guitar open-shape pitch content audited; generated guitar voicings continue to derive from the same chord formulas.
-- Capo/transpose remains applied before voicing generation, keeping sounding notes and diagrams consistent.
-- Service-worker cache bumped to v1.9.5.

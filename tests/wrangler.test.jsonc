@@ -1,0 +1,10 @@
+// Local-only config used by the automated tests (no AI binding; D1/R2 are simulated on disk).
+{
+  "name": "song-rider-suite-test",
+  "main": "../worker.js",
+  "compatibility_date": "2026-09-11",
+  "assets": { "directory": "..", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "d1_databases": [{ "binding": "DB", "database_name": "song-rider-suite-test-db", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "../migrations" }],
+  "r2_buckets": [{ "binding": "AUDIO", "bucket_name": "song-rider-suite-test-audio" }],
+  "vars": { "INVITE_CODE": "test-invite" }
+}

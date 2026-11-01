@@ -72,8 +72,8 @@
   function updateSkinAssets(skin){
     const blood=skin==='rider-blood'||skin==='rider-blood-light'||skin==='rider-blood-light-og';
     document.querySelectorAll('.srp-exact-wordmark').forEach(img=>{
-      if(!img.dataset.srsOriginalSrc)img.dataset.srsOriginalSrc=img.getAttribute('src')||'./song-rider-pro-wordmark-hq.png?v=3.3.12';
-      img.setAttribute('src',blood?'./song-rider-pro-wordmark-blood.png?v=3.3.71':img.dataset.srsOriginalSrc);
+      if(!img.dataset.srsOriginalSrc)img.dataset.srsOriginalSrc=img.getAttribute('src')||'./song-rider-pro-wordmark-hq.webp?v=3.3.12';
+      img.setAttribute('src',blood?'./song-rider-pro-wordmark-blood.webp?v=3.3.71':img.dataset.srsOriginalSrc);
     });
   }
   function applySkin(skin, persist=true){

@@ -1,9 +1,0 @@
-Song Rider Suite v3.3.6
-
-Lead/Bass transport cleanup:
-- “Play Part” is now “Play”.
-- “Repeat this part” is now “Repeat”.
-- “Sustain notes” is now “Sustain” so Play / Repeat / Sustain stay on one line on mobile.
-- Lead/Bass Play now uses the Baby DAW master checked-part mix: every checked Chord/Note, Lead/Bass, and active Vocal part plays together, plus Drums when enabled.
-- Repeat mirrors the project master Repeat toggle and loops the checked mix instead of acting as a current-part-only control.
-- Existing Lead/Bass sustain behavior is unchanged.

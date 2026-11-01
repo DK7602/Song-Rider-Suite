@@ -1,9 +1,0 @@
-Chord Rider Pro v1.9.11
-
-Playback timing + live sound audit
-- Unified the startup lead-in for Parts and Drum playback so drums no longer launch about 90-100 ms ahead of the musical parts.
-- Parts now use a rolling one-beat Web Audio scheduler instead of scheduling an entire song/cycle at once. Exact note timestamps remain Web Audio-timed, while the shorter look-ahead allows live instrument changes to take effect during playback.
-- Piano/Electric Piano/Synth/Bass and Lead/Bass sound changes are warmed immediately during playback and take effect on upcoming notes without Stop/Play.
-- Starting playback from a later song line now starts the drum pattern at the matching song beat instead of resetting drums to beat 1.
-- Vocal takes remain scheduled as continuous audio rather than being chopped into the rolling instrument scheduler.
-- Existing repeat, sustain, vocals, drums, exports, and project data are preserved.
