@@ -211,14 +211,58 @@
   }
   function currentDrumScopeGain(){return playbackScope?Math.max(0,Math.min(1,Number(playbackScope?.drumGain??1))):1;}
   function effectiveVocalFx(p,e=null){return e?.fx?normalizeVocalFx(e.fx,p?.fx):normalizeVocalFx(p?.fx);}
-  function ensureVoxEventForActiveTake(p,startBeat=0){
-    if(!p||p.type!=='vocal'||!p.activeTakeId||!p.recordings?.some(r=>r.id===p.activeTakeId))return null;
-    if(!Array.isArray(p.voxEvents))p.voxEvents=[];
-    const existing=p.voxEvents.find(e=>e.takeId===p.activeTakeId&&Math.abs((Number(e.startBeat)||0)-Number(startBeat||0))<1e-6);
-    if(existing)return existing;
-    const ev=normalizeVoxEvent({id:uid(),takeId:p.activeTakeId,sourcePartId:p.id,startBeat,trimStartSec:0,trimEndSec:null,volume:1,fx:null},p);
-    p.voxEvents.push(ev);return ev;
+  // ---- Takes and the clips that play them ----
+  // A take sits in the song, when played from its start, at the beat it was
+  // recorded from. Older takes did not store that: infer it from their earliest
+  // clip (start minus trim), else beat 0.
+  function takeAnchorBeat(take){
+    if(!take)return 0;
+    if(take.recordedAtBeat!=null&&Number.isFinite(Number(take.recordedAtBeat)))return Math.max(0,Number(take.recordedAtBeat));
+    const beatsPerSec=songBpm()/60;let anchor=null;
+    for(const p of allVocalParts())for(const e of p.voxEvents||[])if(String(e.takeId)===String(take.id)){const a=Math.max(0,(Number(e.startBeat)||0)-(Number(e.trimStartSec)||0)*beatsPerSec);anchor=anchor==null?a:Math.min(anchor,a);}
+    return anchor??0;
   }
+  // "Use" makes a take the one this track plays: the clips of the previously
+  // active take switch to it, shifted by the difference between where the two
+  // were recorded so they stay in sync. If the track has no such clip, the take
+  // is placed where it was recorded.
+  function useTake(p,take){
+    const prior=p.recordings.find(r=>r.id===p.activeTakeId&&r.id!==take.id)||null;
+    p.activeTakeId=take.id;p.transcript=take.transcript||'';p.transcriptWords=take.transcriptWords||[];
+    if(prior){
+      const shift=takeAnchorBeat(take)-takeAnchorBeat(prior),beatsPerSec=songBpm()/60;let moved=0;
+      for(const e of p.voxEvents){
+        if(String(e.takeId)!==String(prior.id))continue;
+        let start=(Number(e.startBeat)||0)+shift,trimStart=Number(e.trimStartSec)||0;
+        if(start<0){trimStart-=start/beatsPerSec;start=0;}
+        Object.assign(e,{takeId:take.id,sourcePartId:p.id,startBeat:start,trimStartSec:trimStart});moved++;
+      }
+      if(moved)return;
+    }
+    if(!p.voxEvents.some(e=>String(e.takeId)===String(take.id)))p.voxEvents.push(normalizeVoxEvent({takeId:take.id,sourcePartId:p.id,startBeat:takeAnchorBeat(take)},p));
+  }
+  // A new recording replaces what its track had from the beat recording started
+  // through the end of every clip it records over (Baby DAW and Track Master
+  // alike). Older takes stay in the take list; in Track Master this is undoable.
+  function placeRecordedTake(p,take){
+    const start=takeAnchorBeat(take),end=start+(Number(take.duration)||0)*songBpm()/60;
+    let clearTo=end;
+    for(const e of voxTrackEvents(p)){const b=voxEventBounds(e);if(b.start<end-1e-6&&b.end>start+1e-6)clearTo=Math.max(clearTo,b.end);}
+    removeVoxRangeContent({kind:'vocal',part:p,start,end:clearTo});
+    const ev=normalizeVoxEvent({takeId:take.id,sourcePartId:p.id,startBeat:start},p);
+    p.voxEvents.push(ev);p.activeTakeId=take.id;p.transcript='';p.transcriptWords=[];
+    return ev;
+  }
+  // Every clip's take record lives in the clip's own part, so deleting any other
+  // track never takes a clip's audio with it. Several parts may hold a record of
+  // the same take (duplicated tracks, moved or pasted clips); the audio is shared
+  // and its deletion is reference-counted (deleteTake).
+  function ensureTakeRecord(part,takeId,fallback=null){
+    const id=String(takeId);if(part.recordings.some(r=>String(r.id)===id))return;
+    const found=findVocalTake(id)?.take||fallback;if(!found)return;
+    const record=clone(found);delete record.blob;part.recordings.push(record);
+  }
+  function adoptClipTakes(part){for(const e of part.voxEvents||[]){ensureTakeRecord(part,e.takeId);e.sourcePartId=String(part.id);}}
   function normalTransportRepeatEnabled(){
     // v3.3.120 — the visible Lead/Bass Repeat control mirrors the hidden/master
     // CRP loop checkbox, but mobile live editing can briefly leave those two DOM
@@ -817,11 +861,86 @@
     const p=active();if(!p||p.type!=='lead')return;const bars=Array.from({length:p.bars},(_,i)=>i),octaves=[1,2,3,4,5,6],activeBars=leadActiveBars(p),activeOctaves=leadActiveOctaves(p),defaultBars=activeBars.includes(leadBarPage)?[leadBarPage]:(activeBars.length?activeBars:[leadBarPage]),defaultOctaves=activeOctaves.includes(p.gridOctave)?[p.gridOctave]:(activeOctaves.length?activeOctaves:[p.gridOctave]);
     openBdBatchModal({title:'Clear Lead / Bass',help:'Only notes in the checked bars and octave grids are removed.',bars,activeBars,octaves,activeOctaves,defaultBars,defaultOctaves,confirmText:'Clear selected',onConfirm:({bars:selectedBars,octaves:selectedOctaves})=>{const barSet=new Set(selectedBars),octSet=new Set(selectedOctaves),before=p.events.length;p.events=(p.events||[]).filter(e=>!(barSet.has(leadEventBarIndex(p,e))&&octSet.has(leadEventGridOctave(e))));const removed=before-p.events.length;syncLeadEditViews(p,`Cleared ${removed} note${removed===1?'':'s'} from the selected bars / grids.`);}});
   }
-  const vocalDbName='crp-vocal-audio-v1';
+  // ---- Take storage ----
+  // Dry WAVs live in IndexedDB (database crp-vocal-audio-v1, store 'takes', keyed
+  // by take id) and, when signed in, in R2 under the saved project. Next to each
+  // WAV, under 'meta:<take id>', sits the take's metadata, so a take can be found
+  // and attached again even if the project that used it was never saved.
+  const vocalDbName='crp-vocal-audio-v1',TAKE_META_PREFIX='meta:';
   function openVocalDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open(vocalDbName,1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('takes'))req.result.createObjectStore('takes');};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
-  async function vocalDbPut(id,blob){const db=await openVocalDb();return new Promise((resolve,reject)=>{const tx=db.transaction('takes','readwrite');tx.objectStore('takes').put(blob,id);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>{db.close();reject(tx.error);};});}
-  async function vocalDbGet(id){const db=await openVocalDb();return new Promise((resolve,reject)=>{const tx=db.transaction('takes','readonly'),req=tx.objectStore('takes').get(id);req.onsuccess=()=>{db.close();resolve(req.result||null);};req.onerror=()=>{db.close();reject(req.error);};});}
-  async function vocalDbDelete(id){const db=await openVocalDb();return new Promise((resolve,reject)=>{const tx=db.transaction('takes','readwrite');tx.objectStore('takes').delete(id);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>{db.close();reject(tx.error);};});}
+  async function vocalDbTransaction(mode,work){
+    const db=await openVocalDb();
+    return new Promise((resolve,reject)=>{
+      let result;
+      try{
+        const tx=db.transaction('takes',mode);
+        tx.oncomplete=()=>{db.close();resolve(result);};
+        tx.onerror=tx.onabort=()=>{db.close();reject(tx.error||new Error('Could not store the take on this device.'));};
+        const req=work(tx.objectStore('takes'));if(req)req.onsuccess=()=>{result=req.result;};
+      }catch(err){db.close();reject(err);}
+    });
+  }
+  function vocalDbPut(id,blob,meta){return vocalDbTransaction('readwrite',store=>{store.put(blob,id);store.put(meta,TAKE_META_PREFIX+id);});}
+  function vocalDbGet(id){return vocalDbTransaction('readonly',store=>store.get(id)).then(v=>v||null);}
+  function vocalDbDelete(id){return vocalDbTransaction('readwrite',store=>{store.delete(id);store.delete(TAKE_META_PREFIX+id);});}
+  // Every stored take as {id, meta}; meta is null for WAVs stored by older builds.
+  async function vocalDbListTakes(){
+    const db=await openVocalDb();
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction('takes','readonly'),store=tx.objectStore('takes'),keys=store.getAllKeys(),metas=store.getAll(IDBKeyRange.bound(TAKE_META_PREFIX,TAKE_META_PREFIX+'￿'));
+      tx.oncomplete=()=>{
+        db.close();
+        const byId=new Map((metas.result||[]).filter(m=>m?.id).map(m=>[String(m.id),m]));
+        resolve((keys.result||[]).map(String).filter(k=>!k.startsWith(TAKE_META_PREFIX)).map(id=>({id,meta:byId.get(id)||null})));
+      };
+      tx.onerror=()=>{db.close();reject(tx.error);};
+    });
+  }
+  function takeMeta(take,part){
+    return {id:String(take.id),projectId:core.currentProjectId||null,projectName:core.projectName||'',partId:String(part?.id||''),partName:part?.name||'',name:take.name||'Vocal take',duration:Number(take.duration)||0,sampleRate:Number(take.sampleRate)||0,size:Number(take.size)||0,createdAt:take.createdAt||new Date().toISOString(),recordedAtBeat:Number.isFinite(Number(take.recordedAtBeat))?Number(take.recordedAtBeat):null};
+  }
+  // A take the device refused to store (quota, private browsing, …) is kept in
+  // memory: it still plays and uploads, the user is warned, and storing it is
+  // retried until it succeeds.
+  const unstoredTakes=new Map();let takeStoreRetryTimer=null,takeStoreRetryMs=2000,storagePersistRequested=false;
+  async function storeTakeAudio(take,blob,part){
+    const id=String(take.id),meta=takeMeta(take,part);
+    try{await vocalDbPut(id,blob,meta);unstoredTakes.delete(id);updateTakeStorageNote();return true;}
+    catch(err){
+      console.warn('Could not store take on this device',err);
+      unstoredTakes.set(id,{blob,meta});updateTakeStorageNote(err);retryUnstoredTakes();
+      core.status(`${take.name||'The take'} could not be saved on this device yet (${err?.message||'storage error'}). It is kept while this page stays open and saving is being retried.`);
+      return false;
+    }
+  }
+  function retryUnstoredTakes(){
+    if(takeStoreRetryTimer||!unstoredTakes.size)return;
+    takeStoreRetryTimer=setTimeout(async()=>{
+      takeStoreRetryTimer=null;
+      for(const [id,{blob,meta}] of [...unstoredTakes]){try{await vocalDbPut(id,blob,meta);unstoredTakes.delete(id);}catch{}}
+      if(unstoredTakes.size){takeStoreRetryMs=Math.min(60000,takeStoreRetryMs*2);retryUnstoredTakes();}
+      else{takeStoreRetryMs=2000;core.status('Vocal takes are now saved on this device.');}
+      updateTakeStorageNote();
+      const a=active();if(a?.type==='vocal')renderVocalTakes(a);
+    },takeStoreRetryMs);
+  }
+  let takeStorageNoteDefault=null;
+  function updateTakeStorageNote(err=null){
+    const note=$('vocalStorageNote');if(!note)return;
+    if(takeStorageNoteDefault===null)takeStorageNoteDefault=note.textContent;
+    const n=unstoredTakes.size;
+    note.textContent=n?`⚠ ${n} take${n===1?'':'s'} not saved on this device yet${err?.message?` (${err.message})`:''}. Keep this page open while it retries, or download the WAV.`:takeStorageNoteDefault;
+    note.classList.toggle('is-warning',n>0);
+  }
+  window.addEventListener('beforeunload',e=>{if(unstoredTakes.size){e.preventDefault();e.returnValue='';}});
+  function requestPersistentStorage(){
+    if(storagePersistRequested)return;storagePersistRequested=true;
+    try{navigator.storage?.persist?.().catch(()=>{});}catch{}
+  }
+  async function localTakeBlob(id){return unstoredTakes.get(String(id))?.blob||await vocalDbGet(String(id)).catch(()=>null);}
+  // All records of one take across the project's vocal parts (duplicated tracks share takes).
+  function takeRecords(id){return allVocalParts().flatMap(p=>(p.recordings||[]).filter(r=>String(r.id)===String(id)));}
+  function markTakeInCloud(id,projectId){for(const r of takeRecords(id)){r.cloud=true;r.cloudProjectId=projectId;}}
   async function cloudAudioRequest(takeId,projectId,options={}){
     if(!core.loggedIn||!projectId)throw new Error('Sign in and save the project before cloud audio can sync.');
     const r=await fetch(`/api/audio/${encodeURIComponent(takeId)}?projectId=${encodeURIComponent(projectId)}`,{credentials:'same-origin',...options});
@@ -829,19 +948,21 @@
   }
   async function uploadTakeToCloud(take,blob,projectId=core.currentProjectId){
     if(!blob||!core.loggedIn||!projectId)return false;
-    await cloudAudioRequest(take.id,projectId,{method:'PUT',headers:{'Content-Type':'audio/wav'},body:blob});take.cloud=true;take.cloudProjectId=projectId;return true;
+    await cloudAudioRequest(take.id,projectId,{method:'PUT',headers:{'Content-Type':'audio/wav'},body:blob});take.cloud=true;take.cloudProjectId=projectId;markTakeInCloud(take.id,projectId);return true;
   }
   async function getTakeBlob(take,projectId=core.currentProjectId){
-    let blob=await vocalDbGet(take.id).catch(()=>null);if(blob)return blob;
-    if(core.loggedIn&&projectId){try{const r=await cloudAudioRequest(take.id,projectId);blob=await r.blob();await vocalDbPut(take.id,blob);take.cloud=true;take.cloudProjectId=projectId;return blob;}catch(e){console.warn('Cloud take unavailable',e);}}
+    const local=await localTakeBlob(take.id);if(local)return local;
+    if(core.loggedIn&&projectId){try{const r=await cloudAudioRequest(take.id,projectId);const blob=await r.blob();markTakeInCloud(take.id,projectId);take.cloud=true;take.cloudProjectId=projectId;await storeTakeAudio(take,blob,findVocalTake(take.id)?.part);return blob;}catch(e){console.warn('Cloud take unavailable',e);}}
     return null;
   }
   async function deleteTakeCloud(take,projectId=take.cloudProjectId||core.currentProjectId){if(!core.loggedIn||!projectId)return;try{await cloudAudioRequest(take.id,projectId,{method:'DELETE'});}catch(e){console.warn('Could not delete cloud take',e);}}
   async function syncCloudAudio(projectId=core.currentProjectId){
-    if(!core.loggedIn||!projectId)return {uploaded:0,pending:0};let uploaded=0,pending=0,lastError=null;
-    for(const p of parts.filter(x=>x.type==='vocal'))for(const take of p.recordings||[]){
-      if(take.cloud&&take.cloudProjectId===projectId)continue;
-      const blob=await vocalDbGet(take.id).catch(()=>null);if(!blob){pending++;continue;}
+    if(!core.loggedIn||!projectId)return {uploaded:0,pending:0};let uploaded=0,pending=0,lastError=null;const done=new Set();
+    for(const p of allVocalParts())for(const take of p.recordings||[]){
+      const id=String(take.id);
+      if(done.has(id)||(take.cloud&&take.cloudProjectId===projectId))continue;
+      done.add(id);
+      const blob=await localTakeBlob(id);if(!blob){pending++;continue;}
       try{await uploadTakeToCloud(take,blob,projectId);uploaded++;}
       catch(e){pending++;lastError=e;console.warn('Cloud audio sync failed',e);}
     }
@@ -871,7 +992,150 @@
   function fmtTime(sec){sec=Math.max(0,Number(sec)||0);const m=Math.floor(sec/60),s=sec-m*60;return `${String(m).padStart(2,'0')}:${s.toFixed(1).padStart(4,'0')}`;}
   function renderVocalBacking(p){const box=$('vocalBackingParts');if(!box)return;const candidates=parts.filter(x=>x.id!==p.id&&(x.type==='chord'||x.type==='lead'));if(!Array.isArray(p.backingPartIds))p.backingPartIds=[];box.innerHTML='';candidates.forEach(x=>{const lab=document.createElement('label');lab.className='vocal-backing-item';const chk=document.createElement('input');chk.type='checkbox';chk.checked=p.backingPartIds.includes(x.id);chk.onchange=()=>{p.backingPartIds=candidates.filter(c=>box.querySelector(`[data-back-id="${c.id}"]`)?.checked).map(c=>c.id);core.scheduleAutoSave();};chk.dataset.backId=x.id;const span=document.createElement('span');span.textContent=x.name;lab.append(chk,span);box.appendChild(lab);});if(!candidates.length)box.innerHTML='<span class="subtle tiny">Add a Chord/Note or Lead/Bass part for a headphone backing track.</span>';}
   function paintAutotuneSlider(){const s=$('vocalFxAutotune');if(s)s.style.setProperty('--tune-fill',`${Math.max(0,Math.min(100,Number(s.value)||0))}%`);}
-  async function renderVocalTakes(p){const box=$('vocalTakes');if(!box)return;box.innerHTML='';if(!p.recordings.length){box.innerHTML='<div class="vocal-empty">No takes yet. Put on headphones and tap Record.</div>';return;}for(const take of [...p.recordings].reverse()){const row=document.createElement('div');row.className='vocal-take'+(p.activeTakeId===take.id?' active':'');const main=document.createElement('div');main.className='vocal-take-main';main.innerHTML=`<div class="vocal-take-name">${escapeHtml(take.name||'Vocal take')}<span class="cloud-badge ${take.cloud?'':'pending'}">${take.cloud?'☁ Cloud':'Device'}</span></div><div class="vocal-take-meta">${fmtTime(take.duration)} • ${take.sampleRate||48000} Hz WAV • ${new Date(take.createdAt).toLocaleString()}</div>`;const use=document.createElement('button');use.type='button';use.className='take-use';use.textContent=p.activeTakeId===take.id?'Using':'Use';use.onclick=()=>{p.activeTakeId=take.id;p.transcript=take.transcript||'';p.transcriptWords=take.transcriptWords||[];renderVocalTakes(p);if($('vocalTranscript'))$('vocalTranscript').value=p.transcript||'';core.scheduleAutoSave();};const play=document.createElement('button');play.type='button';play.textContent='▶';play.title='Preview take';play.onclick=()=>previewTake(p,take,play);const dl=document.createElement('button');dl.type='button';dl.className='take-download';dl.textContent='↓ WAV';dl.onclick=()=>downloadTake(take);const del=document.createElement('button');del.type='button';del.className='take-delete';del.textContent='×';del.title='Delete take';del.onclick=async()=>{if(!confirm(`Delete “${take.name}”?`))return;stopPreview();await vocalDbDelete(take.id).catch(()=>{});await deleteTakeCloud(take);forgetTakeBuffer(take.id);p.recordings=p.recordings.filter(r=>r.id!==take.id);for(const vp of allVocalParts())vp.voxEvents=(vp.voxEvents||[]).filter(e=>e.takeId!==take.id);if(p.activeTakeId===take.id)p.activeTakeId=p.recordings.at(-1)?.id||null;if(voxSelected&&voxSelected.eventId&&!(parts.find(x=>x.id===voxSelected.partId)?.voxEvents||[]).some(e=>e.id===voxSelected.eventId))voxSelected=null;renderVocalTakes(p);if(voxBoxOpen)renderVoxBox();markPartsDirty();core.scheduleAutoSave();core.flushAutoSaveNow?.();};row.append(main,use,play,dl,del);box.appendChild(row);}}
+  // The take list. A take's button tells what the track plays: "Using" (the
+  // active take, on the timeline), "In mix" (another take still on it) or "Use".
+  async function renderVocalTakes(p){
+    const box=$('vocalTakes');if(!box)return;box.innerHTML='';
+    refreshRecoverTakesUi();scheduleRecoverCheck();
+    if(!p.recordings.length){box.innerHTML='<div class="vocal-empty">No takes yet. Put on headphones and tap Record.</div>';return;}
+    const audible=new Set(voxTrackEvents(p).map(e=>String(e.takeId)));
+    for(const take of [...p.recordings].reverse()){
+      const onTimeline=audible.has(String(take.id)),using=onTimeline&&p.activeTakeId===take.id,unstored=unstoredTakes.has(String(take.id));
+      const row=document.createElement('div');row.className='vocal-take'+(using?' active':'');
+      const main=document.createElement('div');main.className='vocal-take-main';
+      const badge=unstored?'<span class="cloud-badge pending">⚠ Not saved</span>':`<span class="cloud-badge ${take.cloud?'':'pending'}">${take.cloud?'☁ Cloud':'Device'}</span>`;
+      main.innerHTML=`<div class="vocal-take-name">${escapeHtml(take.name||'Vocal take')}${badge}</div><div class="vocal-take-meta">${fmtTime(take.duration)} • ${take.sampleRate||48000} Hz WAV • ${new Date(take.createdAt).toLocaleString()}</div>`;
+      const use=document.createElement('button');use.type='button';use.className='take-use';
+      use.textContent=using?'Using':onTimeline?'In mix':'Use';
+      use.title=using?'This take is playing on this track':onTimeline?'Part of this take still plays on the timeline. Tap to make it the take this track plays.':'Make this the take this track plays';
+      use.onclick=()=>{if(!using)chooseTake(p,take);};
+      const play=document.createElement('button');play.type='button';play.textContent='▶';play.title='Preview take';play.onclick=()=>previewTake(p,take);
+      const dl=document.createElement('button');dl.type='button';dl.className='take-download';dl.textContent='↓ WAV';dl.onclick=()=>downloadTake(take);
+      const del=document.createElement('button');del.type='button';del.className='take-delete';del.textContent='×';del.title='Delete take';del.onclick=()=>deleteTake(p,take);
+      row.append(main,use,play,dl,del);box.appendChild(row);
+    }
+  }
+  function chooseTake(p,take){
+    useTake(p,take);
+    if($('vocalTranscript'))$('vocalTranscript').value=p.transcript||'';
+    renderVocalTakes(p);if(voxBoxOpen)renderVoxBox();markPartsDirty();core.scheduleAutoSave();
+  }
+  // Deleting removes the take and its clips from this track. Its audio is only
+  // deleted when nothing else uses it: no other track of this project (R2 keys
+  // are per project) and, for this device's copy, no other saved project.
+  async function deleteTake(p,take){
+    if(!confirm(`Delete “${take.name}”?`))return;
+    stopPreview();
+    const id=String(take.id);
+    p.recordings=p.recordings.filter(r=>String(r.id)!==id);
+    p.voxEvents=(p.voxEvents||[]).filter(e=>String(e.takeId)!==id);
+    if(p.activeTakeId===take.id)p.activeTakeId=p.recordings.at(-1)?.id||null;
+    voxSelections=voxSelections.filter(s=>parts.some(x=>String(x.id)===String(s.partId)&&(x.voxEvents||[]).some(e=>String(e.id)===String(s.eventId))));voxSelected=voxSelections[0]||null;
+    if(!projectTakeIds().has(id)){
+      forgetTakeBuffer(id);
+      await deleteTakeCloud(take);
+      if(!otherLocalProjectTakes().has(id)){unstoredTakes.delete(id);await vocalDbDelete(id).catch(()=>{});}
+    }
+    renderVocalTakes(p);if(voxBoxOpen)renderVoxBox();markPartsDirty();core.scheduleAutoSave();core.flushAutoSaveNow?.();
+  }
+  function projectTakeIds(){
+    const ids=new Set();
+    for(const p of allVocalParts()){for(const r of p.recordings||[])ids.add(String(r.id));for(const e of p.voxEvents||[])ids.add(String(e.takeId));}
+    return ids;
+  }
+  // take id -> project name, for every other project saved on this device.
+  function otherLocalProjectTakes(){
+    const out=new Map();let projects=[];
+    try{projects=JSON.parse(localStorage.getItem('crp-projects')||'[]');}catch{}
+    for(const project of Array.isArray(projects)?projects:[]){
+      if(!project||String(project.id)===String(core.currentProjectId||''))continue;
+      for(const part of project.parts?.items||[]){
+        if(part?.type!=='vocal')continue;
+        for(const r of part.recordings||[])out.set(String(r.id),project.name||'Untitled Project');
+        for(const e of part.voxEvents||[])out.set(String(e.takeId),project.name||'Untitled Project');
+      }
+    }
+    return out;
+  }
+
+  // ---- Recover takes ----
+  // Takes stored on this device that no part of the current project uses: from a
+  // project that was never saved, a deleted track, or another project. Nothing
+  // here deletes audio; the user can attach any of them to a vocal track.
+  const RECOVER_DISMISSED_KEY='crp-vocal-recover-dismissed-v1';
+  // The banner is offered when a project is opened, not after in-session edits.
+  let recoverCheckTimer=null,unattachedTakes=[],recoverBannerArmed=false;
+  async function findUnattachedTakes(){
+    let stored=[];try{stored=await vocalDbListTakes();}catch{return [];}
+    for(const [id,{meta}] of unstoredTakes)if(!stored.some(t=>t.id===id))stored.push({id,meta});
+    const here=projectTakeIds(),elsewhere=otherLocalProjectTakes();
+    const created=t=>String(t.meta?.createdAt||'');
+    return stored.filter(t=>!here.has(t.id)).map(t=>({...t,otherProject:elsewhere.get(t.id)||null})).sort((a,b)=>created(b).localeCompare(created(a)));
+  }
+  function scheduleRecoverCheck({banner=false}={}){
+    if(banner)recoverBannerArmed=true;
+    clearTimeout(recoverCheckTimer);recoverCheckTimer=setTimeout(async()=>{unattachedTakes=await findUnattachedTakes();refreshRecoverTakesUi();},banner?1200:300);
+  }
+  function dismissedRecoverIds(){try{return new Set(JSON.parse(localStorage.getItem(RECOVER_DISMISSED_KEY)||'[]'));}catch{return new Set();}}
+  function refreshRecoverTakesUi(){
+    const orphaned=unattachedTakes.filter(t=>!t.otherProject),dismissed=dismissedRecoverIds(),fresh=orphaned.filter(t=>!dismissed.has(t.id));
+    // A banner for takes no project uses at all (e.g. an unsaved project was lost).
+    let banner=$('vocalRecoverBanner');
+    if(recoverBannerArmed&&fresh.length&&!voxBoxOpen){
+      const host=$('partManager');
+      if(host&&!banner){
+        banner=document.createElement('div');banner.id='vocalRecoverBanner';banner.className='vocal-panel';banner.setAttribute('role','status');
+        banner.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;padding:10px 12px;';
+        banner.innerHTML='<span class="vocal-recover-text" style="flex:1 1 220px"></span><button type="button" data-recover>Recover takes</button><button type="button" data-dismiss>Not now</button>';
+        banner.querySelector('[data-recover]').onclick=openRecoverTakesDialog;
+        banner.querySelector('[data-dismiss]').onclick=()=>{try{localStorage.setItem(RECOVER_DISMISSED_KEY,JSON.stringify([...dismissedRecoverIds(),...unattachedTakes.filter(t=>!t.otherProject).map(t=>t.id)]));}catch{}recoverBannerArmed=false;refreshRecoverTakesUi();};
+        host.prepend(banner);
+      }
+      if(banner)banner.querySelector('.vocal-recover-text').textContent=`${fresh.length} vocal take${fresh.length===1?' is':'s are'} saved on this device but not in any project.`;
+    }else banner?.remove();
+    // In the Takes panel, a way to attach any take this project does not use.
+    const heading=$('vocalTakes')?.closest('.vocal-panel')?.querySelector('.vocal-panel-heading');
+    if(heading){
+      let btn=$('vocalRecoverTakesBtn');
+      if(!btn){btn=document.createElement('button');btn.type='button';btn.id='vocalRecoverTakesBtn';btn.onclick=openRecoverTakesDialog;heading.appendChild(btn);}
+      btn.hidden=!unattachedTakes.length;btn.textContent=`Recover takes (${unattachedTakes.length})`;
+    }
+  }
+  function closeRecoverTakesDialog(){document.getElementById('vocalRecoverDialog')?.remove();}
+  function openRecoverTakesDialog(){
+    closeRecoverTakesDialog();if(!unattachedTakes.length){core.status('No other takes are stored on this device.');return;}
+    const target=active()?.type==='vocal'?active():allVocalParts()[0]||null;
+    const rows=unattachedTakes.map(t=>{const m=t.meta||{},when=m.createdAt?new Date(m.createdAt).toLocaleString():'unknown date',from=t.otherProject?`In project “${t.otherProject}”`:m.projectName?`Recorded in “${m.projectName}”, not saved in any project`:'Not in any project';return `<label class="studio-export-row"><input type="checkbox" data-recover-take="${escapeHtml(t.id)}" ${t.otherProject?'':'checked'}><span><strong>${escapeHtml(m.name||'Vocal take')}</strong> • ${m.duration?fmtTime(m.duration):'length unknown'}<br><span class="subtle tiny">${escapeHtml(from)} • ${escapeHtml(when)}</span></span></label>`;}).join('');
+    const modal=document.createElement('div');modal.id='vocalRecoverDialog';modal.className='studio-export-modal';
+    modal.innerHTML=`<div class="studio-export-backdrop"></div><div class="studio-export-card"><h2>Recover takes</h2><p class="subtle">These dry takes are stored on this device but not used by this project. Attach the ones you want to ${target?`“${escapeHtml(target.name)}”`:'a new vocal track'}.</p><div class="studio-export-list">${rows}</div><div class="studio-export-actions"><button type="button" data-cancel>Cancel</button><button type="button" class="accent" data-attach>Attach</button></div></div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('.studio-export-backdrop').onclick=closeRecoverTakesDialog;modal.querySelector('[data-cancel]').onclick=closeRecoverTakesDialog;
+    modal.querySelector('[data-attach]').onclick=async()=>{
+      const ids=[...modal.querySelectorAll('[data-recover-take]:checked')].map(x=>x.dataset.recoverTake);
+      if(!ids.length){core.status('Choose at least one take to attach.');return;}
+      closeRecoverTakesDialog();await attachRecoveredTakes(ids.map(id=>unattachedTakes.find(t=>t.id===id)).filter(Boolean));
+    };
+  }
+  async function attachRecoveredTakes(list){
+    let p=active()?.type==='vocal'?active():allVocalParts()[0]||null;
+    if(!p){p=vocalPart(`Vocals ${countType('vocal')+1}`);parts.push(p);}
+    // Oldest first, like recorded takes; the newest becomes the one that plays.
+    for(const t of [...list].reverse()){
+      const m=t.meta||await legacyTakeMeta(t.id);
+      if(!p.recordings.some(r=>String(r.id)===t.id))p.recordings.push({id:t.id,name:m.name||'Recovered take',createdAt:m.createdAt||new Date().toISOString(),duration:Number(m.duration)||0,sampleRate:Number(m.sampleRate)||48000,size:Number(m.size)||0,...(m.recordedAtBeat!=null?{recordedAtBeat:m.recordedAtBeat}:{})});
+    }
+    if(!voxTrackEvents(p).length){const first=p.recordings.find(r=>String(r.id)===list[0].id);if(first)useTake(p,first);}
+    unattachedTakes=unattachedTakes.filter(t=>!list.includes(t));recoverBannerArmed=false;
+    markPartsDirty();selectPart(p.id);if(voxBoxOpen)renderVoxBox();core.scheduleAutoSave();
+    core.status(`${list.length} take${list.length===1?'':'s'} attached to ${p.name}.`);
+  }
+  // WAVs stored by older builds have no metadata: read length and rate from the header.
+  async function legacyTakeMeta(id){
+    try{
+      const blob=await localTakeBlob(id),head=new DataView(await blob.slice(0,44).arrayBuffer()),rate=head.getUint32(24,true),bytesPerSec=head.getUint32(28,true);
+      return {name:'Recovered take',sampleRate:rate,size:blob.size,duration:bytesPerSec?Math.max(0,blob.size-44)/bytesPerSec:0};
+    }catch{return {name:'Recovered take'};}
+  }
   function renderVocalEditor(p=active()){
     if(!p||p.type!=='vocal')return;$('vocalPartTitle').textContent=p.name;if($('vocalTranscript'))$('vocalTranscript').value=p.transcript||'';if($('vocalRepeat'))$('vocalRepeat').checked=p.repeat!==false;$('vocalVolume').value=Math.round(p.volume*100);$('vocalVolumeValue').textContent=`${Math.round(p.volume*100)}%`;renderVocalBacking(p);$('vocalBackingDrums').checked=p.backingDrums!==false;$('vocalBackingVolume').value=Math.round((p.backingVolume??.8)*100);$('vocalBackingVolumeValue').textContent=`${Math.round((p.backingVolume??.8)*100)}%`;$('vocalFxEq').value=p.fx?.eq||'clear';$('vocalFxComp').value=p.fx?.comp||'medium';$('vocalFxReverb').value=String(p.fx?.reverb??.12);$('vocalFxDelay').value=String(p.fx?.delay||0);if($('vocalFxAutotune'))$('vocalFxAutotune').value=String(Math.round(Number(p.fx?.autotune)||0));paintAutotuneSlider();if($('vocalFxAutotuneValue'))$('vocalFxAutotuneValue').textContent=`${Math.round(Number(p.fx?.autotune)||0)}%`;if($('vocalAutotuneKey'))$('vocalAutotuneKey').textContent=vocalAutotuneScale().label;renderVocalTakes(p);updatePartPlaybackButtons();
   }
@@ -914,7 +1178,7 @@
     const fromBeat=Math.max(0,Number(options?.fromBeat)||0);
     const fromVox=!!options?.voxBox;
     try{
-      stopPreview();await ensureMic();window.CRPParts?.stopPlayback?.();
+      requestPersistentStorage();stopPreview();await ensureMic();window.CRPParts?.stopPlayback?.();
       clearTimeout(recordResumeTimer);recordResumeTimer=null;recordingResuming=false;
       recordChunks=[];recordInsertBeat=fromBeat;recordTargetPartId=p.id;recordStartedFromVox=fromVox;recordResumeBeat=fromBeat;recordInitialTrimSec=0;
       micProcessor=micCtx.createScriptProcessor(4096,1,1);micSilentGain=micCtx.createGain();micSilentGain.gain.value=0;micSource.connect(micProcessor);micProcessor.connect(micSilentGain);micSilentGain.connect(micCtx.destination);
@@ -957,19 +1221,20 @@
     const capturedSamples=recordChunks.reduce((n,a)=>n+a.length,0),trimSamples=Math.max(0,Math.min(capturedSamples,Math.round(recordInitialTrimSec*recordSampleRate))),usableSamples=Math.max(0,capturedSamples-trimSamples),duration=usableSamples/Math.max(1,recordSampleRate);
     if($('vocalTimer'))$('vocalTimer').textContent=fmtTime(duration);
     if(duration<.25||usableSamples<Math.max(1,Math.round(recordSampleRate*.25))){core.status('Recording was too short.');recordStartedFromVox=false;recordTargetPartId=null;recordInitialTrimSec=0;recordCaptureStartMicTime=0;updateVoxTransportState();return;}
-    const blob=floatToWav(recordChunks,recordSampleRate,trimSamples),id=uid(),take={id,name:`Take ${p.recordings.length+1}`,createdAt:new Date().toISOString(),duration,sampleRate:recordSampleRate,size:blob.size};
+    const blob=floatToWav(recordChunks,recordSampleRate,trimSamples),id=uid(),take={id,name:`Take ${p.recordings.length+1}`,createdAt:new Date().toISOString(),duration,sampleRate:recordSampleRate,size:blob.size,recordedAtBeat:insertBeat};
+    recordChunks=[];
     try{
-      await vocalDbPut(id,blob);forgetTakeBuffer(id);p.recordings.push(take);p.activeTakeId=id;
-      if(wasVox){
-        voxCheckpoint();
-        p.voxEvents=p.voxEvents||[];
-        const ev=normalizeVoxEvent({id:uid(),takeId:id,sourcePartId:p.id,startBeat:quantizeVoxBeat(insertBeat),trimStartSec:0,trimEndSec:null,volume:1,fx:null},p);
-        p.voxEvents.push(ev);voxSelections=[{partId:p.id,eventId:ev.id}];voxSelected=voxSelections[0];voxTargetPartId=p.id;voxInstrumentSelections=[];voxInstrumentSelection=null;
-      }else if(!(p.voxEvents||[]).length)ensureVoxEventForActiveTake(p,0);
-      p.transcript='';p.transcriptWords=[];markPartsDirty();core.scheduleAutoSave();await renderVocalTakes(p);
+      // The take joins the part even if this device refuses to store it: it is
+      // then kept in memory and storing is retried (storeTakeAudio).
+      p.recordings.push(take);
+      const stored=await storeTakeAudio(take,blob,p);
+      if(wasVox)voxCheckpoint();
+      const ev=placeRecordedTake(p,take);
+      if(wasVox){voxSelections=[{partId:p.id,eventId:ev.id}];voxSelected=voxSelections[0];voxTargetPartId=p.id;voxInstrumentSelections=[];voxInstrumentSelection=null;}
+      markPartsDirty();core.scheduleAutoSave();await renderVocalTakes(p);
       if(voxBoxOpen){renderVoxBox();updateVoxPlayhead(insertBeat,true);voxStatus(`${take.name} recorded onto ${p.name} at beat ${insertBeat.toFixed(2)}.`);}
-      if(core.loggedIn&&core.currentProjectId){try{if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Uploading and transcribing new take…';await uploadTakeToCloud(take,blob,core.currentProjectId);await transcribeTake(p,take,{quiet:true});core.status(`Saved ${take.name} to cloud and transcribed it.`);}catch(te){console.warn('Automatic cloud transcription pending',te);if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent=`Take is safe. ${te.message||'Tap Transcribe active take after saving.'}`;core.status(`Saved ${take.name}. Cloud transcription can be retried with Transcribe active take.`);}}else{if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Take is safe. Save/sign in, then tap Transcribe active take.';core.status(core.loggedIn?`Saved ${take.name} locally. Save the project to enable cloud transcription.`:`Saved ${take.name} locally. Sign in and save to use cloud transcription.`);}
-    }catch(e){console.error(e);core.status('Take was recorded but could not be stored on this device.');}
+      if(core.loggedIn&&core.currentProjectId){try{if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Uploading and transcribing new take…';await uploadTakeToCloud(take,blob,core.currentProjectId);await transcribeTake(p,take,{quiet:true});core.status(`Saved ${take.name} to cloud and transcribed it.`);}catch(te){console.warn('Automatic cloud transcription pending',te);if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent=`Take is safe. ${te.message||'Tap Transcribe active take after saving.'}`;core.status(`Saved ${take.name}. Cloud transcription can be retried with Transcribe active take.`);}}else if(stored){if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Take is safe. Save/sign in, then tap Transcribe active take.';core.status(core.loggedIn?`Saved ${take.name} locally. Save the project to enable cloud transcription.`:`Saved ${take.name} locally. Sign in and save to use cloud transcription.`);}
+    }catch(e){console.error(e);core.status(`${take.name} was recorded, but saving it failed: ${e.message||e}`);}
     finally{recordStartedFromVox=false;recordTargetPartId=null;recordInsertBeat=0;recordResumeBeat=0;recordInitialTrimSec=0;recordCaptureStartMicTime=0;recordingResuming=false;clearTimeout(recordResumeTimer);recordResumeTimer=null;updateVoxTransportState();}
   }
   async function toggleRecordingPause(){
@@ -2042,6 +2307,7 @@
     songStartBeat=Math.max(0,Number(saved?.songStartBeat)||0);songEndBeat=Number.isFinite(Number(saved?.songEndBeat))&&Number(saved.songEndBeat)>songStartBeat?Number(saved.songEndBeat):null;drumArrangementInitialized=Array.isArray(saved?.drumEvents);drumEvents=drumArrangementInitialized?saved.drumEvents.map(normalizeDrumEvent).filter(Boolean):[];
     if(saved?.items?.length){parts=saved.items.map(normalizePart).filter(Boolean);activePartId=parts.some(p=>p.id===saved.activePartId)?saved.activePartId:(parts.find(p=>p.type==='chord')||parts[0]).id;}
     else {const first=chordPart('Chords 1',core.snapshot());parts=[first];activePartId=first.id;}
+    for(const p of allVocalParts())adoptClipTakes(p);
     const projectSongKey=normalizeSongKeyValue(project?.key)||normalizeSongKeyValue(core.snapshot()?.key)||normalizeSongKeyValue(parts.find(p=>p?.type==='chord'&&p.data?.key)?.data?.key);
     if(projectSongKey)syncSongKeyAcrossChordParts(projectSongKey);
     const savedLoadedChordId=String(saved?.loadedChordPartId||'');
@@ -2057,9 +2323,9 @@
     }
     loadedChordPartId=c.id;core.apply(c.data);
     if(activePartId!==c.id)selectPart(activePartId);else{setEditorMode('chord');renderParts();}
-    refreshPartsFingerprintBaseline();renderSongEndEditor();
+    refreshPartsFingerprintBaseline();renderSongEndEditor();scheduleRecoverCheck({banner:true});
   }
-  function newProject(){resetProjectSession();partsUpdatedAt=0;partsFingerprint='';songStartBeat=0;songEndBeat=null;drumEvents=[];drumArrangementInitialized=true;const p=chordPart('Chords 1',core.snapshot());parts=[p];activePartId=p.id;loadedChordPartId=p.id;setEditorMode('chord');renderParts();renderSongEndEditor();}
+  function newProject(){resetProjectSession();partsUpdatedAt=0;partsFingerprint='';songStartBeat=0;songEndBeat=null;drumEvents=[];drumArrangementInitialized=true;const p=chordPart('Chords 1',core.snapshot());parts=[p];activePartId=p.id;loadedChordPartId=p.id;setEditorMode('chord');renderParts();renderSongEndEditor();scheduleRecoverCheck({banner:true});}
 
   function openLyricsOverlay(){
     const overlay=$('srpLyricsOverlay'),frame=$('srpLyricsFrame');if(!overlay||!frame)return;
@@ -2217,7 +2483,7 @@
     window.addEventListener('pointermove',move,{capture:true,passive:false});window.addEventListener('pointerup',up,{capture:true,passive:false});window.addEventListener('pointercancel',cancel,true);return true;
   }
   function voxRangeSegments(range){
-    const out=[];if(!range||range.kind!=='vocal')return out;const beatSec=60/songBpm();for(const event of voxTrackEvents(range.part)){const b=voxEventBounds(event),start=Math.max(range.start,b.start),end=Math.min(range.end,b.end);if(end-start<=.001)continue;const trim0=Math.max(0,Number(event.trimStartSec)||0),seg=clone(event);seg.startBeat=start;seg.trimStartSec=Math.max(0,trim0+(start-b.start)*beatSec);seg.trimEndSec=Math.max(seg.trimStartSec+.001,trim0+(end-b.start)*beatSec);out.push({event:seg,sourcePartId:range.part.id,deltaBeat:start-range.start});}return out;
+    const out=[];if(!range||range.kind!=='vocal')return out;const beatSec=60/songBpm();for(const event of voxTrackEvents(range.part)){const b=voxEventBounds(event),start=Math.max(range.start,b.start),end=Math.min(range.end,b.end);if(end-start<=.001)continue;const trim0=Math.max(0,Number(event.trimStartSec)||0),seg=clone(event);seg.startBeat=start;seg.trimStartSec=Math.max(0,trim0+(start-b.start)*beatSec);seg.trimEndSec=Math.max(seg.trimStartSec+.001,trim0+(end-b.start)*beatSec);out.push({event:seg,take:clone(voxEventTake(event)),sourcePartId:range.part.id,deltaBeat:start-range.start});}return out;
   }
   function removeVoxRangeContent(range){
     if(!range||range.kind!=='vocal')return 0;const part=range.part,beatSec=60/songBpm(),next=[];let touched=0;for(const event of (part.voxEvents||[])){const b=voxEventBounds(event);if(range.end<=b.start+.001||range.start>=b.end-.001){next.push(event);continue;}touched++;const trim0=Math.max(0,Number(event.trimStartSec)||0),trimEnd=trim0+b.dur*beatSec,leftKeep=range.start>b.start+.001,rightKeep=range.end<b.end-.001;if(leftKeep){const left=clone(event);left.trimEndSec=Math.max(trim0+.001,trim0+(range.start-b.start)*beatSec);next.push(left);}if(rightKeep){const right=clone(event);if(leftKeep)right.id=uid();right.startBeat=range.end;right.trimStartSec=Math.max(trim0,trim0+(range.end-b.start)*beatSec);right.trimEndSec=trimEnd;next.push(right);}}
@@ -3125,7 +3391,7 @@
       }else{const targetEnd=quantizeVoxBeat(origEndBeat+dx),newEnd=Math.max(origTrimStart+.03,Math.min(full,origTrimStart+Math.max(.02,targetEnd-origStart)*beatSec));event.trimEndSec=newEnd;const dur=Math.max(.001,(newEnd-origTrimStart)/beatSec);el.style.width=`${Math.max(24,dur*ppb)}px`;liveCrop();voxStatus(`Cropping end • ${origStart.toFixed(2)}–${(origStart+dur).toFixed(2)} beats`);}
     };
     const cleanup=()=>{if(cleaned)return;cleaned=true;if(holdTimer){clearTimeout(holdTimer);holdTimer=0;}window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',up,true);window.removeEventListener('pointercancel',cancel,true);document.removeEventListener('touchmove',blockTouchScroll,true);try{el.releasePointerCapture(pointerId)}catch{}el.classList.remove('is-dragging','is-trimming','is-longpress-grabbed');document.querySelectorAll('.vox-track-row.is-target').forEach(r=>r.classList.remove('is-target'));};
-    const up=ev=>{if(ev.pointerId!==pointerId)return;if(armed){ev.preventDefault();ev.stopPropagation();}const wasArmed=armed;cleanup();el.__voxDragged=moved;if(holdToMove&&wasArmed&&!moved){el.__voxPointerSelected=false;el.__voxSuppressClickUntil=performance.now()+520;}if(!moved)return;if(mode==='move'&&selectedAtStart.length===1&&String(targetPartId)!==String(part.id)){const dest=parts.find(p=>p.type==='vocal'&&String(p.id)===String(targetPartId));if(dest){part.voxEvents=(part.voxEvents||[]).filter(x=>x.id!==event.id);dest.voxEvents=dest.voxEvents||[];dest.voxEvents.push(event);voxSelections=[{partId:dest.id,eventId:event.id}];voxSelected=voxSelections[0];voxTargetPartId=dest.id;}}persistVoxEdits();renderVoxBox();if(mode!=='move')voxStatus('Crop applied. The original dry take remains untouched.');else voxStatus(selectedAtStart.length>1?`${selectedAtStart.length} vocal events moved together.`:'Vocal event moved.');};
+    const up=ev=>{if(ev.pointerId!==pointerId)return;if(armed){ev.preventDefault();ev.stopPropagation();}const wasArmed=armed;cleanup();el.__voxDragged=moved;if(holdToMove&&wasArmed&&!moved){el.__voxPointerSelected=false;el.__voxSuppressClickUntil=performance.now()+520;}if(!moved)return;if(mode==='move'&&selectedAtStart.length===1&&String(targetPartId)!==String(part.id)){const dest=parts.find(p=>p.type==='vocal'&&String(p.id)===String(targetPartId));if(dest){part.voxEvents=(part.voxEvents||[]).filter(x=>x.id!==event.id);dest.voxEvents=dest.voxEvents||[];ensureTakeRecord(dest,event.takeId);event.sourcePartId=String(dest.id);dest.voxEvents.push(event);voxSelections=[{partId:dest.id,eventId:event.id}];voxSelected=voxSelections[0];voxTargetPartId=dest.id;}}persistVoxEdits();renderVoxBox();if(mode!=='move')voxStatus('Crop applied. The original dry take remains untouched.');else voxStatus(selectedAtStart.length>1?`${selectedAtStart.length} vocal events moved together.`:'Vocal event moved.');};
     const cancel=ev=>{if(ev.pointerId!==pointerId)return;cleanup();if(moved)renderVoxBox();};
     window.addEventListener('pointermove',move,{capture:true,passive:false});window.addEventListener('pointerup',up,{capture:true,passive:false});window.addEventListener('pointercancel',cancel,{capture:true,passive:true});
   }
@@ -3179,9 +3445,9 @@
     if(!vocals.length&&!inst.length){if(voxRangeMode)voxStatus('Finish the Select range first.');return;}
     const allStarts=[...vocals.map(x=>Number(x.event.startBeat)||0),...inst.map(x=>Number(x.startBeat)||0)],anchor=Math.min(...allStarts);
     if(vocals.length&&inst.length){
-      const vocalTracks=allVocalParts(),baseTrack=vocalTracks.indexOf(vocals[0].part);voxClipboard={kind:'mixed',focusKeyAtCopy:String(voxInstrumentTrackFocus?.key||''),vocalItems:vocals.map(({part,event})=>({event:clone(event),sourcePartId:part.id,deltaBeat:(Number(event.startBeat)||0)-anchor,trackOffset:vocalTracks.indexOf(part)-baseTrack})),instrumentItems:serializeInstrumentClipboardItems(inst,anchor)};
+      const vocalTracks=allVocalParts(),baseTrack=vocalTracks.indexOf(vocals[0].part);voxClipboard={kind:'mixed',focusKeyAtCopy:String(voxInstrumentTrackFocus?.key||''),vocalItems:vocals.map(({part,event})=>({event:clone(event),take:clone(voxEventTake(event)),sourcePartId:part.id,deltaBeat:(Number(event.startBeat)||0)-anchor,trackOffset:vocalTracks.indexOf(part)-baseTrack})),instrumentItems:serializeInstrumentClipboardItems(inst,anchor)};
     }else if(inst.length){voxClipboard={kind:'instrument-group',focusKeyAtCopy:String(voxInstrumentTrackFocus?.key||''),items:serializeInstrumentClipboardItems(inst,anchor)};}
-    else{const vocalTracks=allVocalParts(),baseTrack=vocalTracks.indexOf(vocals[0].part);voxClipboard={kind:'vocal',items:vocals.map(({part,event})=>({event:clone(event),sourcePartId:part.id,deltaBeat:(Number(event.startBeat)||0)-anchor,trackOffset:vocalTracks.indexOf(part)-baseTrack}))};}
+    else{const vocalTracks=allVocalParts(),baseTrack=vocalTracks.indexOf(vocals[0].part);voxClipboard={kind:'vocal',items:vocals.map(({part,event})=>({event:clone(event),take:clone(voxEventTake(event)),sourcePartId:part.id,deltaBeat:(Number(event.startBeat)||0)-anchor,trackOffset:vocalTracks.indexOf(part)-baseTrack}))};}
     const count=vocals.length+inst.length;
     if(cut){voxCheckpoint();removeVocalSelectionNoCheckpoint(vocals);removeInstrumentSelectionNoCheckpoint(inst);voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${count} event${count===1?'':'s'} cut. The earliest event will paste at the playhead.`);}else{renderVoxInspector();voxStatus(`${count} event${count===1?'':'s'} copied. The earliest event will paste at the playhead.`);}
   }
@@ -3209,7 +3475,7 @@
   }
   function pasteVox(){
     if(!voxClipboard)return;if(voxClipboard.kind==='instrument-group'){pasteInstrument();return;}voxCheckpoint();const newV=[],newI=[],vocalTracks=allVocalParts(),target=voxTargetPart()||vocalTracks[0]||null,base=target?Math.max(0,vocalTracks.indexOf(target)):0;
-    const pasteVocals=items=>{if(!target)return;for(const item of items||[]){const dest=vocalTracks[Math.max(0,Math.min(vocalTracks.length-1,base+(Number(item.trackOffset)||0)))]||target,ev=normalizeVoxEvent({...clone(item.event),id:uid(),sourcePartId:item.event?.sourcePartId||item.sourcePartId,startBeat:Math.max(0,Math.round((voxPlayheadBeat+(Number(item.deltaBeat)||0))*1000)/1000)},dest);dest.voxEvents=dest.voxEvents||[];dest.voxEvents.push(ev);newV.push({partId:dest.id,eventId:ev.id});}};
+    const pasteVocals=items=>{if(!target)return;for(const item of items||[]){const dest=vocalTracks[Math.max(0,Math.min(vocalTracks.length-1,base+(Number(item.trackOffset)||0)))]||target,ev=normalizeVoxEvent({...clone(item.event),id:uid(),sourcePartId:dest.id,startBeat:Math.max(0,Math.round((voxPlayheadBeat+(Number(item.deltaBeat)||0))*1000)/1000)},dest);dest.voxEvents=dest.voxEvents||[];ensureTakeRecord(dest,ev.takeId,item.take);dest.voxEvents.push(ev);newV.push({partId:dest.id,eventId:ev.id});}};
     if(voxClipboard.kind==='vocal'||voxClipboard.kind==='vocal-range')pasteVocals(voxClipboard.items);else if(voxClipboard.kind==='mixed'){pasteVocals(voxClipboard.vocalItems);for(const item of voxClipboard.instrumentItems||[]){const dest=destinationInstrumentPartForClip(item),s=pasteOneInstrumentClip(item,voxPlayheadBeat+(Number(item.deltaBeat)||0),dest);if(s)newI.push(s);}}else{voxUndoStack.pop();updateVoxHistoryButtons();return;}
     voxSelections=newV;voxSelected=newV[0]||null;voxInstrumentSelections=newI;voxInstrumentSelection=newI[0]||null;persistVoxEdits();renderParts();renderVoxBox();const n=newV.length+newI.length;voxStatus(`${n} event${n===1?'':'s'} pasted in order; earliest event starts at beat ${voxPlayheadBeat.toFixed(2)}.`);
   }
@@ -3261,7 +3527,7 @@
   function wireVoxPlayheadDrag(){const grip=$('voxPlayhead')?.querySelector('span');if(!grip||grip.dataset.wired)return;grip.dataset.wired='1';grip.addEventListener('pointerdown',e=>{if(recording&&!recordingPaused){voxStatus('Pause or stop recording before moving the playhead.');return;}e.preventDefault();e.stopPropagation();disableVoxAutoScroll();const sc=$('voxTimelineScroller'),inner=$('voxTimelineInner');if(!sc||!inner)return;try{grip.setPointerCapture(e.pointerId)}catch{};const move=ev=>{ev.preventDefault();const rect=inner.getBoundingClientRect(),beat=quantizeVoxBeat((ev.clientX-rect.left-voxLabelWidth())/voxPpb());updateVoxPlayhead(beat,false);};const up=ev=>{try{grip.releasePointerCapture(ev.pointerId)}catch{};grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',up);grip.removeEventListener('pointercancel',up);voxSeekTo(voxPlayheadBeat,{manual:true});};grip.addEventListener('pointermove',move,{passive:false});grip.addEventListener('pointerup',up);grip.addEventListener('pointercancel',up);});}
 
   function wire(){
-    ensureInitial();setEditorMode(active()?.type||'chord');renderParts();ensureMediaSession();updateMediaMetadata();renderSongEndEditor();
+    ensureInitial();setEditorMode(active()?.type||'chord');renderParts();ensureMediaSession();updateMediaMetadata();renderSongEndEditor();scheduleRecoverCheck({banner:true});
     if($('voxBoxBtn'))$('voxBoxBtn').onclick=()=>openVoxBox({fromVocal:true});
     if($('trackMasterBtn'))$('trackMasterBtn').onclick=openTrackMaster;
     try{
