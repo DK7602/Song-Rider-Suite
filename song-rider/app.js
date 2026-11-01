@@ -9985,10 +9985,45 @@ function renderSheetTitleBar(){
 }
 
 
-// One dictation session at a time; never write into a replaced editor/project.
+// Lyric dictation (Full view). One session at a time, tied to one song and one section.
+// - Audio is cut into phrases at pauses and transcribed in order; text is inserted strictly in
+//   that order, so a failed phrase holds back the ones after it until it is retried.
+// - Leaving the page or locking the screen *stops* the session: the phrase being spoken is
+//   still sent and in-flight results are still inserted (nothing is thrown away).
+// - Re-rendering the Full view hands the session the section's new textarea.
+const DICTATION_STYLE_KEY = "srp-dictation-style-v1";
+const DICTATION_STYLES = [
+  ["hiphop", "Hip-hop/Rap"],
+  ["worship", "Worship/Gospel"],
+  ["country", "Country"],
+  ["pop", "Pop/Rock"],
+  ["rnb", "R&B"],
+  ["general", "General"]
+];
 let fullLyricsDictation = null;
+
+function getDictationStyle(){
+  try{
+    const v = localStorage.getItem(DICTATION_STYLE_KEY);
+    if(DICTATION_STYLES.some(([id]) => id === v)) return v;
+  }catch{}
+  return "hiphop";
+}
+function setDictationStyle(v){
+  if(!DICTATION_STYLES.some(([id]) => id === v)) return;
+  try{ localStorage.setItem(DICTATION_STYLE_KEY, v); }catch(err){ console.warn("Could not remember the dictation style", err); }
+  document.querySelectorAll("select.fullLyricsStyle").forEach(s => { if(s.value !== v) s.value = v; });
+}
+function transcribeLyricsAudio(blob){
+  return suiteCloudApi("/api/lyrics-dictation", {
+    method:"POST",
+    body:blob,
+    headers:{ "Content-Type":"audio/wav", "X-Dictation-Style":getDictationStyle() }
+  });
+}
+// Finish the session: keep listening no longer, but transcribe and insert what was captured.
 function stopFullLyricsDictation(){
-  if(fullLyricsDictation) fullLyricsDictation.cancel();
+  fullLyricsDictation?.stop();
 }
 function spokenLyricsToText(text){
   return String(text || "").replace(/\b(?:new|next)[\s,.-]+bar\b[.,!?;:]?/gi, "\n\n")
@@ -10013,117 +10048,205 @@ function lyricsPcmWav(parts, rate){
   }
   return new Blob([buffer],{type:'audio/wav'});
 }
-function attachFullLyricsMic(ta, card, actions){
+function makeDictationStyleSelect(){
+  const select = document.createElement("select");
+  select.className = "fullLyricsStyle";
+  select.title = "Dictation style (helps spell lyrics for this genre)";
+  select.setAttribute("aria-label", "Dictation style");
+  for(const [id, label] of DICTATION_STYLES){
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = label;
+    select.appendChild(opt);
+  }
+  select.value = getDictationStyle();
+  select.addEventListener("change", () => setDictationStyle(select.value));
+  select.addEventListener("pointerdown", (e) => e.stopPropagation());
+  return select;
+}
+function attachFullLyricsMic(ta, card, actions, sectionIndex){
   const mic=document.createElement('button');mic.type='button';mic.className='pillBtn fullLyricsMic';
   mic.textContent='🎤';mic.title='Speak lyrics into this section';mic.setAttribute('aria-label',mic.title);mic.setAttribute('aria-pressed','false');
   const info=document.createElement('div');info.className='fullLyricsVoiceInfo';info.setAttribute('role','status');info.setAttribute('aria-live','polite');info.hidden=true;
-  card.appendChild(info);actions.appendChild(mic);
-  const tip='Say “new bar” (or “next bar”) to leave a blank line between bars. Tap the mic to stop. Text appears after a pause.';
-  mic.addEventListener('click',async e=>{
+  card.appendChild(info);actions.appendChild(makeDictationStyleSelect());actions.appendChild(mic);
+  mic.addEventListener('click',e=>{
     e.preventDefault();e.stopPropagation();
-    if(fullLyricsDictation?.mic===mic){fullLyricsDictation.stop();return;}
-    stopFullLyricsDictation();info.hidden=false;
-    if(!navigator.mediaDevices?.getUserMedia){info.textContent='Microphone recording is unavailable in this browser.';return;}
-    const project=state.project;
-    let cancelled=false,stopped=false,stream=null,context=null,source=null,processor=null,gain=null;
-    let parts=[],samples=0,hasSpeech=false,quiet=0,chain=Promise.resolve(),pending=0;
-    let cursor=ta.selectionStart??ta.value.length,end=ta.selectionEnd??cursor;
-    let pendingCommand='',hadError=false;
-    const valid=()=>!cancelled&&ta.isConnected&&state.project===project;
-    const cleanup=()=>{
-      if(processor){processor.onaudioprocess=null;processor.disconnect();}
-      source?.disconnect();gain?.disconnect();stream?.getTracks().forEach(t=>t.stop());
-      if(context)context.close().catch(()=>{});
-      ta.removeEventListener('input',manual);
-    };
-    const reset=()=>{mic.textContent='🎤';mic.setAttribute('aria-pressed','false');if(fullLyricsDictation?.mic===mic)fullLyricsDictation=null;if(!hadError){info.hidden=true;info.textContent='';}};
-    const cancel=()=>{cancelled=true;stopped=true;cleanup();reset();};
-    // A touch beginning on lyrics may be a scroll gesture, not a stop request.
-    // Manual edits move the insertion point without ending microphone capture.
-    const manual=e=>{
-      if(e.isTrusted){cursor=ta.selectionStart??ta.value.length;end=ta.selectionEnd??cursor;}
-    };
-    const insert=(text,final=false)=>{
-      if(!valid())return;
-      // Keep a trailing command word until the next segment, so a chunk boundary
-      // between “new” and “bar” cannot turn the command into lyric text.
-      text=pendingCommand+text;pendingCommand='';
-      if(!final&&/\b(?:new|next)\s*[.,!?]?$/i.test(text)){
-        const m=text.match(/\b(?:new|next)\s*[.,!?]?$/i);pendingCommand=m[0].replace(/[.,!?]/g,'').trim()+' ';text=text.slice(0,m.index);
-      }
-      let words=spokenLyricsToText(text);if(!words)return;
-      const before=ta.value.slice(0,cursor),after=ta.value.slice(end);
-      if(before&&!/\s$/.test(before)&&!/^\s/.test(words))words=' '+words;
-      const suffix=after&&!/^\s/.test(after)&&!/\s$/.test(words)?' ':'';
-      ta.value=before+words+suffix+after;cursor=before.length+words.length;end=cursor;
-      ta.setSelectionRange(cursor,cursor);lastLyricsTextarea=ta;ta.dispatchEvent(new Event('input',{bubbles:true}));
-    };
-    const flush=()=>{
-      const audioParts=parts,rate=context?.sampleRate;
-      const speech=hasSpeech;parts=[];samples=0;hasSpeech=false;quiet=0;
-      if(!speech||!audioParts.length||!valid())return;
-      const blob=lyricsPcmWav(audioParts,rate);pending++;
-      chain=chain.then(async()=>{
-        if(!valid())return;
-        info.textContent=(stopped?'Finishing transcription… ':'Listening / transcribing… ')+tip;
-        try{
-          const result=await suiteCloudApi('/api/lyrics-dictation',{method:'POST',body:blob,headers:{'Content-Type':'audio/wav'}});
-          if(valid())insert(String(result.text||''));
-        }catch(err){
-          if(!valid())return;
-          hadError=true;stopped=true;cleanup();
-          info.textContent='Transcription failed: '+err.message+' Your audio is available below.';
-          const url=URL.createObjectURL(blob),link=document.createElement('a');
-          link.href=url;link.download='lyrics-dictation.wav';link.textContent=' Download recording';info.appendChild(link);
-          const retry=document.createElement('button');retry.type='button';retry.textContent='Retry transcription';
-          retry.onclick=async()=>{retry.disabled=true;try{const r=await suiteCloudApi('/api/lyrics-dictation',{method:'POST',body:blob,headers:{'Content-Type':'audio/wav'}});if(valid())insert(String(r.text||''));retry.textContent='Transcribed';URL.revokeObjectURL(url);}catch(e){retry.textContent='Retry: '+e.message;retry.disabled=false;}};
-          info.appendChild(retry);reset();throw err;
-        }finally{pending--;}
-        if(valid()&&!hadError)info.textContent=(stopped?'Voice to text stopped. ':'Listening… ')+tip;
-      }).catch(()=>{});
-    };
-    const stop=()=>{
-      if(stopped)return;stopped=true;flush();cleanup();mic.textContent='…';
-      chain.then(()=>{
-        if(valid()&&pendingCommand){const word=pendingCommand;pendingCommand='';insert(word,true);}
-        reset();
-      });
-    };
-    fullLyricsDictation={mic,cancel,stop};ta.addEventListener('input',manual);
-    info.textContent='Starting microphone… '+tip+' Audio is transcribed by Cloudflare.';
+    if(fullLyricsDictation?.mic===mic&&!fullLyricsDictation.isStopped()){fullLyricsDictation.stop();return;}
+    stopFullLyricsDictation();
+    // iOS Safari only lets audio start inside the tap itself: create/resume before any await.
+    let context=null;
+    try{const Ctx=window.AudioContext||window.webkitAudioContext;context=new Ctx();context.resume?.().catch(()=>{});}
+    catch(err){info.hidden=false;info.textContent='Microphone recording is unavailable in this browser.';return;}
+    startFullLyricsDictation({ta,mic,info,sectionIndex,context});
+  });
+  // A re-render replaced this section while a session was running: continue in the new editor.
+  if(fullLyricsDictation&&fullLyricsDictation.project===state.project&&fullLyricsDictation.sectionIndex===sectionIndex){
+    fullLyricsDictation.rebind(ta,mic,info);
+  }
+}
+function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
+  const tip='Say “new bar” (or “next bar”) to leave a blank line between bars. Tap the mic to stop. Text appears after a pause.';
+  const project=state.project;
+  let stopped=false,stream=null,source=null,processor=null,gain=null;
+  let parts=[],samples=0,hasSpeech=false,quiet=0;
+  let cursor=ta.selectionStart??ta.value.length,end=ta.selectionEnd??cursor;
+  let pendingCommand='',failure=null,pumping=false,held='';
+  const segments=[]; // phrases waiting to be transcribed / inserted, oldest first
+  const session={project,sectionIndex,mic,stop,rebind,isStopped:()=>stopped};
+  fullLyricsDictation=session;
+  info.hidden=false;
+  const live=()=>state.project===project;
+  const setStatus=(text)=>{info.hidden=false;info.textContent=text;};
+  const paintMic=()=>{
+    const active=fullLyricsDictation===session;
+    session.mic.textContent=!active||failure?'🎤':(stopped?'…':'⏹');
+    session.mic.setAttribute('aria-pressed',active&&!stopped?'true':'false');
+  };
+  const manual=e=>{if(e.isTrusted){cursor=ta.selectionStart??ta.value.length;end=ta.selectionEnd??cursor;}};
+  ta.addEventListener('input',manual);
+  function rebind(newTa,newMic,newInfo){
+    ta.removeEventListener('input',manual);
+    newInfo.replaceWith(info);
+    ta=newTa;session.mic=newMic;
+    cursor=Math.min(cursor,ta.value.length);end=Math.min(end,ta.value.length);
+    ta.addEventListener('input',manual);
+    paintMic();
+    if(held){const t=held;held='';insertText(t);}
+  }
+  function insertText(text){
+    if(!live())return;
+    if(!ta.isConnected){held+=text;return;} // re-render in progress; placed on rebind
+    let words=text;
+    const before=ta.value.slice(0,cursor),after=ta.value.slice(end);
+    if(before&&!/\s$/.test(before)&&!/^\s/.test(words))words=' '+words;
+    const suffix=after&&!/^\s/.test(after)&&!/\s$/.test(words)?' ':'';
+    ta.value=before+words+suffix+after;cursor=before.length+words.length;end=cursor;
+    ta.setSelectionRange(cursor,cursor);lastLyricsTextarea=ta;ta.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+  function insert(text,final=false){
+    // Keep a trailing command word until the next phrase, so a phrase boundary between
+    // “new” and “bar” cannot turn the command into lyric text.
+    text=pendingCommand+text;pendingCommand='';
+    if(!final&&/\b(?:new|next)\s*[.,!?]?$/i.test(text)){
+      const m=text.match(/\b(?:new|next)\s*[.,!?]?$/i);pendingCommand=m[0].replace(/[.,!?]/g,'').trim()+' ';text=text.slice(0,m.index);
+    }
+    const words=spokenLyricsToText(text);
+    if(words)insertText(words);
+  }
+  function cleanupCapture(){
+    if(processor){processor.onaudioprocess=null;processor.disconnect();}
+    source?.disconnect();gain?.disconnect();stream?.getTracks().forEach(t=>t.stop());
+    if(context){context.close().catch(()=>{});context=null;}
+  }
+  function finish(){
+    ta.removeEventListener('input',manual);
+    if(fullLyricsDictation===session)fullLyricsDictation=null;
+    paintMic();
+    if(held&&live())showSyncNotice([`Dictated text could not be placed in the song (the Full view was closed): “${held.trim()}”`]);
+    held='';
+    if(!failure){info.hidden=true;info.textContent='';}
+  }
+  function showFailure(seg,err){
+    failure=seg;
+    setStatus('Transcription failed: '+(err?.message||'unknown error')+' Your audio is kept. ');
+    const url=URL.createObjectURL(seg.blob),link=document.createElement('a');
+    link.href=url;link.download='lyrics-dictation.wav';link.textContent='Download recording';
+    const retry=document.createElement('button');retry.type='button';retry.textContent='Retry transcription';
+    retry.addEventListener('click',()=>{
+      retry.disabled=true;failure=null;seg.state='queued';
+      setStatus('Retrying… '+tip);
+      pump();
+    });
+    info.append(link,' ',retry);
+  }
+  async function pump(){
+    if(pumping)return;
+    pumping=true;
     try{
-      // Authenticate and verify AI availability before requesting microphone access.
+      while(segments.length&&live()){
+        const seg=segments[0];
+        if(seg.state==='failed')return; // waits for Retry; later phrases stay behind it
+        if(seg.state==='queued'){
+          seg.state='sending';
+          setStatus((stopped?'Finishing transcription… ':'Listening / transcribing… ')+tip);
+          try{seg.text=String((await transcribeLyricsAudio(seg.blob)).text||'');seg.state='done';}
+          catch(err){
+            seg.state='failed';
+            if(!live())return;
+            // Stop listening, keep every captured phrase in order until this one succeeds.
+            if(!stopped){stopped=true;flush();cleanupCapture();}
+            showFailure(seg,err);
+            paintMic();
+            return;
+          }
+        }
+        if(!live())return;
+        segments.shift();
+        insert(seg.text);
+        if(!stopped)setStatus('Listening… '+tip);
+      }
+    }finally{
+      pumping=false;
+      if(stopped&&!segments.length&&fullLyricsDictation===session){
+        if(pendingCommand&&live()){const word=pendingCommand;pendingCommand='';insert(word,true);}
+        finish();
+      }
+    }
+  }
+  function flush(){
+    const audioParts=parts,rate=context?.sampleRate,speech=hasSpeech;
+    parts=[];samples=0;hasSpeech=false;quiet=0;
+    if(!speech||!audioParts.length||!rate||!live())return;
+    segments.push({blob:lyricsPcmWav(audioParts,rate),state:'queued',text:''});
+    pump();
+  }
+  function stop(){
+    if(stopped)return;
+    stopped=true;flush();cleanupCapture();paintMic();
+    if(!segments.length)pump();
+  }
+  paintMic();
+  setStatus('Starting microphone… '+tip+' Audio is transcribed by Cloudflare.');
+  (async()=>{
+    try{
+      if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone recording is unavailable in this browser.');
+      // Authenticate and check the transcription service before asking for the microphone.
       await suiteCloudApi('/api/lyrics-dictation',{method:'GET'});
-      if(!valid()||stopped)return;
+      if(!live()||stopped){cleanupCapture();return;}
       stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
-      if(!valid()||stopped){stream.getTracks().forEach(t=>t.stop());return;}
-      const Audio=window.AudioContext||window.webkitAudioContext;context=new Audio();await context.resume();
-      if(!valid()||stopped){cleanup();return;}
+      if(!live()||stopped){cleanupCapture();return;}
       source=context.createMediaStreamSource(stream);processor=context.createScriptProcessor(4096,1,1);gain=context.createGain();gain.gain.value=0;
       source.connect(processor);processor.connect(gain);gain.connect(context.destination);
       processor.onaudioprocess=e=>{
-        if(!valid()||stopped)return;
+        if(!live()||stopped)return;
         const data=new Float32Array(e.inputBuffer.getChannelData(0));
         let power=0;for(const x of data)power+=x*x;
         const speech=Math.sqrt(power/data.length)>0.008;
-        // Retain a short pre-roll, then submit only nonoverlapping utterances.
+        // Retain a short pre-roll, then submit only nonoverlapping phrases.
         parts.push(data);samples+=data.length;
         if(speech){hasSpeech=true;quiet=0;}else quiet+=data.length;
-        if(hasSpeech&&((quiet/context.sampleRate>1.2&&samples/context.sampleRate>2)||samples/context.sampleRate>20))flush();
-        else if(!hasSpeech&&samples/context.sampleRate>0.4){parts=parts.slice(-2);samples=parts.reduce((n,p)=>n+p.length,0);}
-        if(pending>8){info.textContent='Transcription is falling behind. Finishing captured audio…';stop();}
+        const rate=e.inputBuffer.sampleRate||context.sampleRate;
+        if(hasSpeech&&((quiet/rate>1.2&&samples/rate>2)||samples/rate>20))flush();
+        else if(!hasSpeech&&samples/rate>0.4){parts=parts.slice(-2);samples=parts.reduce((n,p)=>n+p.length,0);}
+        if(segments.length>8){setStatus('Transcription is falling behind. Finishing captured audio…');stop();}
       };
-      stream.getTracks().forEach(t=>t.addEventListener('ended',()=>{if(!stopped){info.textContent='Microphone disconnected. Finishing captured audio…';stop();}}));
-      mic.textContent='⏹';mic.setAttribute('aria-pressed','true');info.textContent='Listening… '+tip;
-    }catch(err){hadError=true;info.textContent='Could not start voice to text: '+err.message;cancel();}
-  });
+      stream.getTracks().forEach(t=>t.addEventListener('ended',()=>{if(!stopped){setStatus('Microphone disconnected. Finishing captured audio…');stop();}}));
+      if(!stopped)setStatus('Listening… '+tip);
+    }catch(err){
+      failure={};
+      setStatus('Could not start voice to text: '+(err?.message||err));
+      stopped=true;cleanupCapture();finish();
+    }
+  })();
 }
+// Screen lock, app switch or navigation: finish, never discard.
 window.addEventListener("pagehide", stopFullLyricsDictation);
 document.addEventListener("visibilitychange", () => {
   if(document.hidden) stopFullLyricsDictation();
 });
 function renderSheet(){
-  stopFullLyricsDictation();
+  // A Full-view re-render hands a running dictation the new textarea; any other view ends it.
+  if(state.currentSection !== "Full" || state.fullPerfMode) stopFullLyricsDictation();
   cancelChordDragCopy();
   renderSheetTitleBar();
   renderSheetActions();
@@ -10543,7 +10666,7 @@ if(state.currentSection === "Full"){
     });
     actions.appendChild(addBtn);
     actions.appendChild(delBtn);
-    attachFullLyricsMic(ta, card, actions);
+    attachFullLyricsMic(ta, card, actions, idx);
 
     card.appendChild(head);
     card.appendChild(textWrap);
