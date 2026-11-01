@@ -23,6 +23,9 @@ npm test               # API contract tests + browser tests
   - `drums.test.mjs`: Beat Maker drums under the Track Master / Chord Rider transport keep
     playing on the beat through drum-region editing, Preview, pause/resume, Stop → Play, repeats
     with an off-grid song end, live edits and drums switched on mid-song; Stop silences them.
+  - `drums-volume.test.mjs`: songs as older builds left them in the cloud keep their drums when
+    the Drums volume is dragged during playback (phone and desktop), through Mute/Solo/Drums
+    on-off, Chord Rider's drum volume, Beat Maker edits and Chord Rider Undo.
   - `srp.test.mjs`: Song Rider Pro conflicts, deletes, Chord Rider link, full storage, XSS,
     typing cost, idle timers, dictation, paste confirmation.
 
