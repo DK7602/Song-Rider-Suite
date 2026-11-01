@@ -1493,6 +1493,15 @@
     const duration=Math.max(4,musicalVocalDurationBeats(),(Number(beat.bars)||1)*4);
     drumEvents=[normalizeDrumEvent({id:uid(),startBeat:0,durationBeats:duration,pattern:beat})];
   }
+  // Where the playing transport ends, or repeats: the longest part, vocal clip or
+  // drum region that is playing, unless the song end marker says otherwise. Beat
+  // Maker repeats at this same point.
+  function playbackEndBeats(){
+    const scopedDrums=playbackScope?playbackScope.drums===true:true,livePs=enabledPlayable(),liveVs=enabledVocals();
+    ensureLegacyDrumEvent();const liveDrums=scopedDrums?(drumEvents.length?Math.max(0,...drumEvents.map(e=>(Number(e.startBeat)||0)+(Number(e.durationBeats)||0))):Math.max(0,Number(window.CRPBeatMaker?.getDurationBeats?.()||0))):0;
+    const natural=Math.max(...livePs.map(partDurationBeats),...liveVs.map(vocalDurationBeats),liveDrums,4);
+    return effectiveSongEndBeats(natural);
+  }
   function naturalSongDurationBeats(){
     ensureLegacyDrumEvent();const drumEnd=drumEvents.length?Math.max(...drumEvents.map(e=>(Number(e.startBeat)||0)+(Number(e.durationBeats)||0))):0;return Math.max(musicalVocalDurationBeats(),drumEnd,0);
   }
@@ -1617,6 +1626,17 @@
     }
     if(replan)refreshScheduledVocals();
   }
+  function drumsShareClock(){return !!audioCtx&&window.CRPAudio?.context?.()===audioCtx;}
+  // Drums that were not running when Play started (switched off, or no hits yet)
+  // join the playing song, on its beat, once they have something to play.
+  // `beat` is the song position now.
+  function joinDrumsLive(beat,drumGain,drumRange){
+    const bm=window.CRPBeatMaker;
+    if(!bm?.isMainPlaying||bm.isMainPlaying()||!drumsShareClock()||(playbackScope&&playbackScope.drums!==true))return;
+    const lead=.06,startBeat=beat+lead*songBpm()/60,options={...drumRange,startTime:audioCtx.currentTime+lead,context:audioCtx};
+    if(drumEvents.length)bm.startArrangementNow?.(drumEvents,lead,startBeat,drumGain,options);
+    else bm.startMainNow?.(lead,startBeat,drumGain,options);
+  }
   function liveEditRefresh(){
     clearTimeout(liveEditTimer);
     liveEditTimer=setTimeout(()=>{
@@ -1633,14 +1653,18 @@
         if(p.type==='vocal')applyVocalFxLive(p);
       }
       if(playing||starting){
-        window.CRPBeatMaker?.setMainGainScale?.((drumsAudibleInMix()?currentDrumScopeGain():0)*MIX_HEADROOM);
-        window.CRPBeatMaker?.updateArrangement?.(drumEvents,{rangeStart:effectiveSongStartBeat(),rangeEnd:mediaDurationBeats(),canLoop:!playbackScope});
+        // Drums repeat where the transport repeats (what is playing), not at the
+        // end of every part including disabled ones.
+        const drumGain=(drumsAudibleInMix()?currentDrumScopeGain():0)*MIX_HEADROOM,drumRange={rangeStart:effectiveSongStartBeat(),rangeEnd:playbackEndBeats(),canLoop:!playbackScope};
+        window.CRPBeatMaker?.setMainGainScale?.(drumGain);
+        window.CRPBeatMaker?.updateArrangement?.(drumEvents,drumRange);
         // Vocal clips are queued ahead like notes; an edit to them during
         // playback re-plans what is already queued.
         const plan=vocalPlanSignature();if(plan!==scheduledVocalPlan){scheduledVocalPlan=plan;refreshScheduledVocals();}
         const beat=currentCycleBeat();
         if(Number.isFinite(beat)&&audioCtx){playbackClockStartBeat=beat;playbackClockStartAudioTime=audioCtx.currentTime;playbackClockBpm=songBpm();}
-        playbackTotalBeats=mediaDurationBeats();
+        playbackTotalBeats=drumRange.rangeEnd;
+        if(playing&&Number.isFinite(beat))joinDrumsLive(beat,drumGain,drumRange);
       }
       updateMediaMetadata();updateMediaPosition();
     },24);
@@ -2124,15 +2148,10 @@
       if(generation!==playbackGeneration)return;
       pruneDecodedSounds();
 
-      // Keep every playback source on the same musical downbeat. Drums use a
-      // separate AudioContext, so both engines receive the same relative lead-in.
+      // Keep every playback source on the same musical downbeat: the drums start
+      // first (Beat Maker) and the rest of the song starts on their downbeat.
       const leadIn=options?.liveRestart?.035:.16;
-      const computePlaybackTotal=()=>{
-        const livePs=enabledPlayable(),liveVs=enabledVocals();
-        ensureLegacyDrumEvent();const liveDrums=scopedDrums?(drumEvents.length?Math.max(0,...drumEvents.map(e=>(Number(e.startBeat)||0)+(Number(e.durationBeats)||0))):Math.max(0,Number(window.CRPBeatMaker?.getDurationBeats?.()||0))):0;
-        const natural=Math.max(...livePs.map(partDurationBeats),...liveVs.map(vocalDurationBeats),liveDrums,4);
-        return effectiveSongEndBeats(natural);
-      };
+      const computePlaybackTotal=playbackEndBeats;
       let total=computePlaybackTotal();
       playbackTotalBeats=total;
       // Scoped Lead/Vocal preview buttons always begin at beat 1. The normal
@@ -2142,9 +2161,10 @@
       let cursorBeat=Number.isFinite(Number(options?.fromBeat))?Math.max(rangeStart,Number(options.fromBeat)):((!playbackScope&&active()?.type==='chord'&&active()?.enabled&&activePartId===loadedChordPartId)?Math.max(rangeStart,Math.min(core.startBeat(),Math.max(rangeStart,total-0.001))):rangeStart);
       if(cursorBeat>=total-.001)cursorBeat=rangeStart;
       const initialBeat=cursorBeat;
+      let drumStartTime=null;
       if(scopedDrums){
         const drumGain=Math.max(0,Math.min(1,Number(playbackScope?.drumGain??1)))*(drumsAudibleInMix()?1:0)*MIX_HEADROOM;
-        ensureLegacyDrumEvent();if(drumEvents.length)await window.CRPBeatMaker?.startArrangementNow?.(drumEvents,leadIn,initialBeat,drumGain,{rangeStart,rangeEnd:total,canLoop:!playbackScope});else await window.CRPBeatMaker?.startMainNow?.(leadIn,initialBeat,drumGain);
+        ensureLegacyDrumEvent();if(drumEvents.length)drumStartTime=await window.CRPBeatMaker?.startArrangementNow?.(drumEvents,leadIn,initialBeat,drumGain,{rangeStart,rangeEnd:total,canLoop:!playbackScope});else drumStartTime=await window.CRPBeatMaker?.startMainNow?.(leadIn,initialBeat,drumGain);
       }else{
         window.CRPBeatMaker?.stopMainNow?.();
       }
@@ -2154,6 +2174,9 @@
       if(generation!==playbackGeneration||!playing){window.CRPBeatMaker?.stopMainNow?.();return;}
 
       let nextAudioStart=audioCtx.currentTime+leadIn;
+      // Beat Maker plays on this same AudioContext (CRPAudio): begin on the
+      // drums' downbeat rather than a lead-in measured a few milliseconds later.
+      if(drumsShareClock()&&Number.isFinite(drumStartTime)&&drumStartTime>audioCtx.currentTime+.005)nextAudioStart=drumStartTime;
       // Shared musical clock exposed to linked SRP so lyric AutoScroll can quantize
       // to the exact CRP/BD beat grid instead of using an independent timer.
       playbackClockStartAudioTime=nextAudioStart;

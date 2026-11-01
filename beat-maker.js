@@ -37,7 +37,13 @@
   let currentBar = 0;
   let copiedBar = null;
   let previewing = false;
-  let scheduler = null;
+  // Preview and the song's drums run on separate timers: previewing a pattern or
+  // closing the editor must never stop the drums of a playing song.
+  let previewTimer = null;
+  let mainTimer = null;
+  // Bumped by every transport start and stop, so a start still waiting for the
+  // samples is dropped once the song has stopped or started again.
+  let mainGen = 0;
   let previewStep = 0;
   let previewNextTime = 0;
   let mainPlaying = false;
@@ -513,9 +519,18 @@
   function getBpm(){ return clamp(+($('bpmInput')?.value||92),40,240); }
   // Drums share the suite's audio clock and master limiter (window.CRPAudio from app.js).
   function drumOutput(){ return window.CRPAudio ? window.CRPAudio.master() : audioCtx.destination; }
-  function playBuffer(id,time,gain){
+  // Song hits queued ahead but not sounding yet. Stop, Pause, a seek or Preview
+  // cancels them, so drums from the old position do not play on for the look-ahead.
+  const mainQueued=new Set();
+  function playBuffer(id,time,gain,queue=null){
     const buf=buffers.get(id); if(!buf||!audioCtx) return;
     const src=audioCtx.createBufferSource(), g=audioCtx.createGain(); src.buffer=buf; g.gain.value=gain; src.connect(g).connect(drumOutput()); src.start(time);
+    if(queue){src.__at=time;queue.add(src);src.onended=()=>queue.delete(src);}
+  }
+  function cancelQueuedMainHits(){
+    const now=audioCtx?.currentTime||0;
+    for(const src of mainQueued)if(src.__at>now){try{src.stop();}catch{}}
+    mainQueued.clear();
   }
   async function ensureDrums(){
     if(!audioCtx) audioCtx=window.CRPAudio ? window.CRPAudio.context() : new (window.AudioContext||window.webkitAudioContext)();
@@ -551,9 +566,9 @@
   }
   function hit(id,time,gain=1){ playBuffer(id,time,beat.gain*DRUM_OUTPUT_SCALE*gain); }
   async function audition(id,gain=.78){ try{await ensureDrums();hit(id,audioCtx.currentTime+.01,gain)}catch(e){console.error(e);status(`Drum error: ${e.message||e}`);} }
-  function scheduleCanonicalStep(absStep,time,barIndex,gainScale=1,pattern=beat){
+  function scheduleCanonicalStep(absStep,time,barIndex,gainScale=1,pattern=beat,queue=null){
     const pat=normalizeBeat(pattern),step=((absStep%64)+64)%64;
-    DRUMS.forEach(([id])=>{ if(pat.tracks[id][barIndex]?.includes(step)) playBuffer(id,time,pat.gain*DRUM_OUTPUT_SCALE*gainScale); });
+    DRUMS.forEach(([id])=>{ if(pat.tracks[id][barIndex]?.includes(step)) playBuffer(id,time,pat.gain*DRUM_OUTPUT_SCALE*gainScale,queue); });
   }
   function arrangementHitCount(events){
     let n=0;for(const ev of Array.isArray(events)?events:[]){const pat=normalizeBeat(ev?.pattern);DRUMS.forEach(([id])=>{for(let b=0;b<pat.bars;b++)n+=pat.tracks[id][b].length;});}return n;
@@ -563,56 +578,101 @@
     for(const ev of Array.isArray(mainArrangement)?mainArrangement:[]){
       const start=Math.max(0,Number(ev?.startBeat)||0),dur=Math.max(0,Number(ev?.durationBeats)||0),end=start+dur;if(songBeat<start-1e-6||songBeat>=end-1e-6)continue;
       const pat=normalizeBeat(ev?.pattern),offset=Number(ev?.patternOffsetBeats)||0,patternSteps=Math.max(64,Math.max(1,pat.bars)*64),rawStep=Math.round((songBeat-start+offset)*16),localCanonical=((rawStep%patternSteps)+patternSteps)%patternSteps,bar=Math.floor(localCanonical/64),step=localCanonical%64;
-      DRUMS.forEach(([id])=>{ if(pat.tracks[id][bar]?.includes(step)) playBuffer(id,time,pat.gain*DRUM_OUTPUT_SCALE*gainScale); });
+      DRUMS.forEach(([id])=>{ if(pat.tracks[id][bar]?.includes(step)) playBuffer(id,time,pat.gain*DRUM_OUTPUT_SCALE*gainScale,mainQueued); });
     }
   }
   function stepSeconds(){ return (60/getBpm())/16; } // one 64th = quarter/16
-  function startScheduler(kind){
-    if(scheduler) clearInterval(scheduler);
-    // v3.3.54 — drums need enough scheduled headroom to survive UI/layout work.
-    // 100ms was easy to starve when Track Master redrew waveforms or a SoundFont
-    // decoded on mobile. WebAudio still fires these hits sample-accurately once queued.
-    const lookAhead=.55;
-    scheduler=setInterval(()=>{
+  // v3.3.54 — drums need enough scheduled headroom to survive UI/layout work.
+  // 100ms was easy to starve when Track Master redrew waveforms or a SoundFont
+  // decoded on mobile. WebAudio still fires these hits sample-accurately once queued.
+  const LOOKAHEAD=.55;
+  // A song step that is already this late (the page stalled for longer than the
+  // look-ahead) is skipped: scheduling it would fire every missed hit at once.
+  const LATE_STEP=.03;
+  function startPreviewScheduler(){
+    clearInterval(previewTimer);
+    previewTimer=setInterval(()=>{
       if(!audioCtx) return;
-      while((kind==='preview'?previewNextTime:mainNextTime) < audioCtx.currentTime+lookAhead){
-        if(kind==='preview'){
-          const bar=Math.floor(previewStep/64)%beat.bars; scheduleCanonicalStep(previewStep,previewNextTime,bar,1);
-          markPlayingStep(bar,previewStep%64); previewStep++; previewNextTime+=stepSeconds();
-        }else{
-          if(mainArrangement){
-            const rangeStartStep=Math.max(0,Math.round((Number(mainArrangementRangeStart)||0)*16)),rangeEndStep=Number.isFinite(Number(mainArrangementRangeEnd))?Math.max(rangeStartStep+1,Math.round(Number(mainArrangementRangeEnd)*16)):null;
-            if(rangeEndStep!==null&&mainStep>=rangeEndStep&&mainArrangementCanLoop&&$('loopToggle')?.checked)mainStep=rangeStartStep;
-            scheduleArrangementStep(mainStep,mainNextTime,mainGainScale);
-          }else {const bar=Math.floor(mainStep/64)%beat.bars; scheduleCanonicalStep(mainStep,mainNextTime,bar,mainGainScale);}
-          mainStep++; mainNextTime+=stepSeconds();
-        }
+      while(previewNextTime < audioCtx.currentTime+LOOKAHEAD){
+        const bar=Math.floor(previewStep/64)%beat.bars; scheduleCanonicalStep(previewStep,previewNextTime,bar,1);
+        markPlayingStep(bar,previewStep%64); previewStep++; previewNextTime+=stepSeconds();
       }
     },25);
   }
+  function startMainScheduler(){
+    clearInterval(mainTimer);
+    mainTimer=setInterval(()=>{
+      if(!audioCtx) return;
+      while(mainNextTime < audioCtx.currentTime+LOOKAHEAD){
+        if(mainArrangement) repeatAtSongEnd();
+        // While Beat Maker previews a pattern, the song's drums keep counting
+        // silently so they come back on the beat when the preview stops.
+        if(!previewing && mainNextTime>=audioCtx.currentTime-LATE_STEP){
+          if(mainArrangement) scheduleArrangementStep(mainStep,mainNextTime,mainGainScale);
+          else {const bar=Math.floor(mainStep/64)%beat.bars; scheduleCanonicalStep(mainStep,mainNextTime,bar,mainGainScale,beat,mainQueued);}
+        }
+        mainStep++; mainNextTime+=stepSeconds();
+      }
+    },25);
+  }
+  function loopsAt(end){
+    const start=Math.max(0,Number(mainArrangementRangeStart)||0);
+    return !!mainArrangement&&Number.isFinite(end)&&end>start&&mainArrangementCanLoop&&!!$('loopToggle')?.checked;
+  }
+  // Repeat returns to the song start at the exact moment the transport does, also
+  // when the song end is not on the drum grid (vocal clips, dragged end marker).
+  // Rounding it to the grid moved the drums against the song on every pass.
+  function repeatAtSongEnd(){
+    const end=Number(mainArrangementRangeEnd);if(!loopsAt(end)||mainStep/16<end-1e-6)return;
+    const start=Math.max(0,Number(mainArrangementRangeStart)||0),beatSec=stepSeconds()*16,over=mainStep/16-end;
+    // Just crossed the end: time it exactly. The end moved behind the playhead
+    // (edit during playback): repeat now, as the transport does.
+    const endTime=mainNextTime-(over<1/16?over*beatSec:0);
+    placeMainStep(start,endTime);
+  }
+  // The first drum step at or after song beat `pos`, which sounds at `time`; so a
+  // song started between two grid steps (seek, pause/resume) stays on the beat.
+  function placeMainStep(pos,time){
+    const first=Math.ceil(pos*16-1e-6);mainStep=first;mainNextTime=time+(first/16-pos)*stepSeconds()*16;
+  }
+  // Song beat `startBeat` sounds at `startTime` (an AudioContext time) or after
+  // `delaySeconds`. If that moment passed while the samples loaded, join the song
+  // where it is by now. Returns the time `startBeat` (or that later beat) sounds.
+  function placeMainStart(startBeat,delaySeconds,startTime){
+    const beatSec=stepSeconds()*16,earliest=audioCtx.currentTime+.01;
+    let pos=Math.max(0,Number(startBeat)||0),t0=startTime==null?NaN:Number(startTime);
+    if(!Number.isFinite(t0)) t0=audioCtx.currentTime+Math.max(.01,Number(delaySeconds)||.01);
+    else if(t0<earliest){pos+=(earliest-t0)/beatSec;t0=earliest;}
+    const end=Number(mainArrangementRangeEnd),start=Math.max(0,Number(mainArrangementRangeStart)||0);
+    if(pos>=end&&loopsAt(end))pos=start+(pos-start)%(end-start);
+    placeMainStep(pos,t0);
+    return t0;
+  }
+  // A start time is only meaningful on Beat Maker's own clock.
+  function startTimeOn(options){ return options?.context&&options.context===audioCtx ? options.startTime : null; }
   async function startPreview(){
-    try{await ensureDrums(); stopMainDrums(); previewing=true; previewStep=currentBar*64; previewNextTime=audioCtx.currentTime+.04; $('crpPreview').textContent='■ Stop Preview'; startScheduler('preview');}
+    try{await ensureDrums(); previewing=true; cancelQueuedMainHits(); previewStep=currentBar*64; previewNextTime=audioCtx.currentTime+.04; $('crpPreview').textContent='■ Stop Preview'; startPreviewScheduler();}
     catch(e){console.error(e);status(`Drum error: ${e.message||e}`);}
   }
-  function stopPreview(){ previewing=false; if(scheduler){clearInterval(scheduler);scheduler=null;} if($('crpPreview')) $('crpPreview').textContent='▶ Preview'; document.querySelectorAll('.crp-step.playing').forEach(x=>x.classList.remove('playing')); }
+  function stopPreview(){ previewing=false; clearInterval(previewTimer); previewTimer=null; if($('crpPreview')) $('crpPreview').textContent='▶ Preview'; document.querySelectorAll('.crp-step.playing').forEach(x=>x.classList.remove('playing')); }
   function markPlayingStep(bar,step){
     if(!$('crpBeatModal')?.classList.contains('open')||bar!==currentBar) return;
     const stride=RES[beat.resolution]||4; if(step%stride) return;
     requestAnimationFrame(()=>{ document.querySelectorAll('.crp-step.playing').forEach(x=>x.classList.remove('playing')); document.querySelectorAll(`.crp-step[data-canonical="${step}"]`).forEach(x=>x.classList.add('playing')); });
   }
 
-  function startMainDrums(delaySeconds=.01,startBeat=0,gainScale=1){
-    if(!audioCtx||!beat.enabled) return;
+  function startMainDrums(delaySeconds=.01,startBeat=0,gainScale=1,startTime=null){
+    if(!audioCtx||!beat.enabled) return null;
     mainPlaying=true;mainArrangement=null;mainArrangementRangeStart=0;mainArrangementRangeEnd=null;mainArrangementCanLoop=true;
     mainGainScale=Math.max(0,Math.min(1,Number(gainScale)||0));
     // 16 canonical drum steps per quarter-note beat (64 per 4/4 bar).
     // Starting from the same song beat keeps drums aligned when playback begins
     // from Line 2/3/etc. instead of always forcing the drums back to Bar 1.
-    mainStep=Math.max(0,Math.round((Number(startBeat)||0)*16));
-    mainNextTime=audioCtx.currentTime+Math.max(.01,Number(delaySeconds)||.01);
-    startScheduler('main');
+    const t0=placeMainStart(startBeat,delaySeconds,startTime);
+    startMainScheduler();
+    return t0;
   }
-  function stopMainDrums(){ mainPlaying=false; mainArrangement=null; mainArrangementRangeStart=0; mainArrangementRangeEnd=null; mainArrangementCanLoop=true; mainGainScale=1; if(scheduler && !previewing){clearInterval(scheduler);scheduler=null;} }
+  function stopMainDrums(){ mainGen++; cancelQueuedMainHits(); mainPlaying=false; mainArrangement=null; mainArrangementRangeStart=0; mainArrangementRangeEnd=null; mainArrangementCanLoop=true; mainGainScale=1; clearInterval(mainTimer); mainTimer=null; }
 
   // Main-transport drums are started and stopped explicitly by the transport
   // (CRPParts.startPlayback/stopPlayback, or the core's fallback player).
@@ -645,13 +705,19 @@
       return JSON.parse(JSON.stringify(beat));
     },
     editBeatEvent(next,{onCommit=null,onClose=null}={}){
-      stopPreview();stopMainDrums();eventEditPriorBeat=JSON.parse(JSON.stringify(normalizeBeat(beat)));eventEditCommit=typeof onCommit==='function'?onCommit:null;eventEditClose=typeof onClose==='function'?onClose:null;
+      // A playing song keeps its drums: the region's edits reach them through
+      // updateArrangement as they are committed.
+      stopPreview();eventEditPriorBeat=JSON.parse(JSON.stringify(normalizeBeat(beat)));eventEditCommit=typeof onCommit==='function'?onCommit:null;eventEditClose=typeof onClose==='function'?onClose:null;
       beat=normalizeBeat(next);currentBar=0;updateMainControls();renderEditor();$('crpBeatModal')?.classList.add('open');
       return JSON.parse(JSON.stringify(beat));
     },
+    // Resolves to the AudioContext time at which startBeat sounds (null if the
+    // drums did not start). options.startTime (with options.context, the caller's
+    // AudioContext) joins a song that is already playing at an exact moment.
     async startArrangementNow(events,delaySeconds=.01,startBeat=0,gainScale=1,options={}){
-      const list=(Array.isArray(events)?events:[]).filter(e=>Number(e?.durationBeats)>0);if(!beat.enabled||!list.length||arrangementHitCount(list)===0)return;
-      stopPreview();try{await ensureDrums();mainPlaying=true;mainArrangement=JSON.parse(JSON.stringify(list));mainArrangementRangeStart=Math.max(0,Number(options?.rangeStart)||0);mainArrangementRangeEnd=Number.isFinite(Number(options?.rangeEnd))?Math.max(mainArrangementRangeStart+.03,Number(options.rangeEnd)):null;mainArrangementCanLoop=options?.canLoop!==false;mainGainScale=Math.max(0,Math.min(1,Number(gainScale)||0));mainStep=Math.max(0,Math.round((Number(startBeat)||0)*16));mainNextTime=audioCtx.currentTime+Math.max(.01,Number(delaySeconds)||.01);startScheduler('main');}catch(e){console.error(e);}
+      const list=(Array.isArray(events)?events:[]).filter(e=>Number(e?.durationBeats)>0);if(!beat.enabled||!list.length||arrangementHitCount(list)===0)return null;
+      const gen=++mainGen;
+      stopPreview();try{await ensureDrums();if(gen!==mainGen)return null;mainPlaying=true;mainArrangement=JSON.parse(JSON.stringify(list));mainArrangementRangeStart=Math.max(0,Number(options?.rangeStart)||0);mainArrangementRangeEnd=Number.isFinite(Number(options?.rangeEnd))?Math.max(mainArrangementRangeStart+.03,Number(options.rangeEnd)):null;mainArrangementCanLoop=options?.canLoop!==false;mainGainScale=Math.max(0,Math.min(1,Number(gainScale)||0));const t0=placeMainStart(startBeat,delaySeconds,startTimeOn(options));startMainScheduler();return t0;}catch(e){console.error(e);return null;}
     },
     updateArrangement(events,options={}){
       if(!mainArrangement)return false;const list=(Array.isArray(events)?events:[]).filter(e=>Number(e?.durationBeats)>0);mainArrangement=JSON.parse(JSON.stringify(list));if(Number.isFinite(Number(options?.rangeStart)))mainArrangementRangeStart=Math.max(0,Number(options.rangeStart));if(Number.isFinite(Number(options?.rangeEnd)))mainArrangementRangeEnd=Math.max(mainArrangementRangeStart+.03,Number(options.rangeEnd));if(options?.canLoop!==undefined)mainArrangementCanLoop=options.canLoop!==false;return true;
@@ -665,10 +731,11 @@
     persist(){
       return persistBeatIntoProject();
     },
-    async startMainNow(delaySeconds=.01,startBeat=0,gainScale=1){
-      if(!beat.enabled || countHits()===0) return;
+    async startMainNow(delaySeconds=.01,startBeat=0,gainScale=1,options={}){
+      if(!beat.enabled || countHits()===0) return null;
+      const gen=++mainGen;
       stopPreview();
-      try{await ensureDrums();startMainDrums(delaySeconds,startBeat,gainScale);}catch(e){console.error(e);}
+      try{await ensureDrums();if(gen!==mainGen)return null;return startMainDrums(delaySeconds,startBeat,gainScale,startTimeOn(options));}catch(e){console.error(e);return null;}
     },
     getDurationBeats(){ return beat.enabled&&countHits()>0 ? Math.max(4,(Number(beat.bars)||1)*4) : 0; },
     setMainGainScale(scale){ mainGainScale=Math.max(0,Math.min(1,Number(scale)||0)); return mainGainScale; },

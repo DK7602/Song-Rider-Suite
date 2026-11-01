@@ -20,6 +20,9 @@ npm test               # API contract tests + browser tests
   - `parts.test.mjs`: Baby DAW / Track Master takes, take recovery, recording not touching the
     mix, chord placement, repeats, audio-graph cleanup, offline WAV export (uses a fake mic and
     a synthetic SoundFont, so no network is needed).
+  - `drums.test.mjs`: Beat Maker drums under the Track Master / Chord Rider transport keep
+    playing on the beat through drum-region editing, Preview, pause/resume, Stop → Play, repeats
+    with an off-grid song end, live edits and drums switched on mid-song; Stop silences them.
   - `srp.test.mjs`: Song Rider Pro conflicts, deletes, Chord Rider link, full storage, XSS,
     typing cost, idle timers, dictation, paste confirmation.
 
