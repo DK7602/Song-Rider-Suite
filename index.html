@@ -38,6 +38,8 @@
   <link rel="stylesheet" href="skins.css?v=3.3.128-BLOOD-LIGHT-STATE" />
 </head>
 <body>
+  <div id="saveProblemBanner" class="save-problem-banner" role="alert" hidden><span data-save-problem-text></span><button id="saveRetryBtn" type="button">Retry</button></div>
+  <div id="syncNotice" class="sync-notice" role="status" hidden><span data-sync-notice-text></span><button id="syncNoticeClose" type="button" aria-label="Dismiss message">×</button></div>
   <header class="app-header suite-master-header"><img src="assets/suite-header-new.webp?v=3.3.12" alt="Song Rider Suite — Ride the progression. See it. Hear it. Build it."></header>
 
   <nav id="workspaceModeSwitch" class="workspace-mode-switch" aria-label="Workspace mode">
@@ -292,7 +294,11 @@
         <button id="babyChordSetupToggleBtn" class="baby-chord-setup-toggle" type="button" aria-expanded="true" hidden>Hide Setup</button>
       </div>
 
-      <p class="drag-tip"><span class="line-help line-help-drag">Tap a card to hear it. Long-press/drag any card within a line or between lines. Empty lines are allowed.</span></p>
+      <div class="edit-history-row">
+        <button id="undoBtn" class="history-btn" type="button" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
+        <button id="redoBtn" class="history-btn" type="button" title="Redo (Ctrl+Shift+Z)" disabled>↷ Redo</button>
+        <p class="drag-tip"><span class="line-help line-help-drag">Tap a card to hear it. Long-press/drag any card within a line or between lines. Empty lines are allowed.</span></p>
+      </div>
 
       <div id="progression" class="progression" aria-label="Chord and note progression"></div>
       <div id="mobileLineIndicator" class="mobile-line-indicator" hidden aria-live="polite"></div>
