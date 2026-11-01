@@ -27,9 +27,10 @@ Skins live in `skins.js` / `skins.css`; the shared header/shell styles are `suit
   sample sets in `assets/instruments/<id>/` (a `manifest.json` per set, listed in `index.json`), voices
   derived from them (EQ, amp, palm mute, layered brass) and synthesized voices. Every sound is levelled
   to the piano. If a set can't load, the General MIDI SoundFont is used instead. The recordings are free
-  libraries (CC0, CC BY, University of Iowa free-use); their credits are in
+  libraries (CC0, CC BY, MIT, University of Iowa free-use); their credits are in
   [`docs/SOUND-CREDITS.md`](docs/SOUND-CREDITS.md) and, for users, `sound-credits.html` (linked from the
-  sound picker). CC BY sets require that attribution to stay reachable.
+  sound picker). CC BY and MIT sets require that attribution to stay reachable. Each note's tuning
+  correction (cents) is stored in its manifest (`tune`).
 
 ## Deploying
 

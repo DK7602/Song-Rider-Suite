@@ -27,7 +27,7 @@
 // this engine serves.
 (() => {
   'use strict';
-  const VERSION = '1.2.0';
+  const VERSION = '1.3.0';
   const preset = (typeof window !== 'undefined' && window.CRP_INSTRUMENTS_CONFIG) || {};
   const config = { basePath: String(preset.basePath || 'assets/instruments/'), disabled: !!preset.disabled };
 
@@ -199,7 +199,7 @@
   function rhodesChain(ctx) {
     const input = gainNode(ctx, 1.6), shaper = ctx.createWaveShaper();
     shaper.curve = softClipCurve(1.2, .04); shaper.oversample = '2x';
-    const nodes = series([input, shaper, gainNode(ctx, .7), biquad(ctx, 'lowshelf', 180, null, 2), biquad(ctx, 'lowpass', 7500, -3)]);
+    const nodes = series([input, biquad(ctx, 'highpass', 20, .5), shaper, gainNode(ctx, .7), biquad(ctx, 'lowshelf', 180, null, 2), biquad(ctx, 'lowpass', 7500, -3)]);
     return { input, output: nodes[nodes.length - 1] };
   }
 
@@ -210,10 +210,19 @@
     muted: eqChain([['lowshelf', 160, null, 3], ['lowpass', 1800, -2]]),
     overdrive: ampChain('overdrive'),
     distortion: ampChain('distortion'),
-    epChorus: modChain(null, { rate: .7, base: .006, depth: .0012, dry: .85, wet: .35 }),
+    // (20 Hz high-pass first: removes any slow DC drift an FM voice can leave on very low notes.) A light chorus:
+    // a deep one on a fundamental-heavy tone sweeps a notch through it, which sounds seasick on a (mono) phone.
+    epChorus: modChain(eqChain([['highpass', 20, .5]]), { rate: .6, base: .008, depth: .0006, dry: .9, wet: .22 }),
     strings: modChain(eqChain([['highpass', 140, -3], ['peaking', 2400, .8, 2.5], ['highshelf', 7000, null, -3]]), { rate: .45, base: .009, depth: .0018, dry: .75, wet: .45 }),
     rotary: modChain(null, { rate: .78, base: .0032, depth: .0011, dry: .6, wet: .55, trem: .14 }),
     rhodes: rhodesChain,
+    // Lead drive: a gentle soft clip, then thin out the low end and add presence.
+    lead: ctx => {
+      const input = gainNode(ctx, 1.4), shaper = ctx.createWaveShaper(); shaper.curve = softClipCurve(1.4, .05); shaper.oversample = '2x';
+      const nodes = series([input, shaper, gainNode(ctx, .72), biquad(ctx, 'highpass', 110, -3), biquad(ctx, 'peaking', 2600, .9, 2)]);
+      return { input, output: nodes[nodes.length - 1] };
+    },
+    juno: modChain(eqChain([['highpass', 80, -3], ['highshelf', 6000, null, -4]]), { rate: .48, base: .0072, depth: .0026, dry: .62, wet: .62 }),
     clav: eqChain([['highpass', 150, -3], ['peaking', 1450, 1.1, 4], ['peaking', 3600, 1.6, 3]]),
   };
 
@@ -229,15 +238,16 @@
     param.setTargetAtTime(clamp(sustain, 20, nyq), t + attack, tau);
   }
   const SYNTHS = {
-    // GM Lead 2 (sawtooth): two detuned saws + a quiet square for body, resonant low-pass with a snappy envelope.
+    // GM Lead 2 (sawtooth): a bright, cutting lead. Two tightly detuned saws plus a saw an octave up, a resonant
+    // low-pass that snaps open and stays bright, vibrato, and a little drive on the player (chain 'lead').
     saw_lead: {
-      levelDb: -11.4, peak: .2, maxVoices: 10, velAmp: .3, amp: { attack: .006, decay: .35, sustain: .78, release: .2 },
-      vib: { rate: 5.5, depth: 7, delay: .35, fade: .5 },
+      levelDb: -16.2, peak: .2, maxVoices: 10, velAmp: .3, chain: 'lead', amp: { attack: .003, decay: .2, sustain: .9, release: .12 },
+      vib: { rate: 5.8, depth: 10, delay: .3, fade: .35 },
       build(a) {
-        const { f, vel, t, nyq } = a, x = a.osc('sawtooth', 1, -7), y = a.osc('sawtooth', 1, 7), s = a.osc('square', 1);
-        const sg = a.gain(.3), lp = a.filter('lowpass', 1000, 2.5);
-        s.connect(sg); x.connect(lp); y.connect(lp); sg.connect(lp);
-        filterEnv(lp.frequency, t, f * 1.6 + 380, f * 9 + 2400 + 3000 * vel, .012, f * 4.2 + 1200, .3, nyq);
+        const { f, vel, t, nyq } = a, x = a.osc('sawtooth', 1, -5), y = a.osc('sawtooth', 1, 5), o = a.osc('sawtooth', 2);
+        const og = a.gain(.28), lp = a.filter('lowpass', 2000, 6);
+        o.connect(og); x.connect(lp); y.connect(lp); og.connect(lp);
+        filterEnv(lp.frequency, t, f * 3 + 900, f * 16 + 6000 + 2000 * vel, .004, f * 8 + 3200, .15, nyq);
         return lp;
       },
     },
@@ -254,17 +264,17 @@
         return lp;
       },
     },
-    // Poly synth pad: brighter saw/square stack with a filter sweep that opens and settles.
+    // Poly synth (80s Juno-style pad): saw + square + a sub-octave saw through a gentle, darker low-pass that
+    // swells open, soft attack, long release and a wide stereo chorus on the player (chain 'juno'). No vibrato.
     poly_pad: {
-      levelDb: -13.1, peak: .2, maxVoices: 12, amp: { attack: .08, decay: .9, sustain: .85, release: .75 },
-      vib: { rate: 5, depth: 4, delay: .5, fade: .8, spread: .1 },
+      levelDb: -9.6, peak: .22, maxVoices: 12, chain: 'juno', amp: { attack: .14, decay: 1.4, sustain: .82, release: 1.2 },
       build(a) {
-        const { f, t, nyq } = a, x = a.osc('sawtooth', 1, -8), y = a.osc('sawtooth', 1, 8), q = a.osc('square', 1, 3);
-        const qg = a.gain(.4), lp = a.filter('lowpass', 800, 4);
-        q.connect(qg); x.connect(lp); y.connect(lp); qg.connect(lp);
-        lp.frequency.setValueAtTime(clamp(f * 1.1 + 280, 20, nyq), t);
-        lp.frequency.setTargetAtTime(clamp(f * 8 + 2600, 20, nyq), t, .33);
-        lp.frequency.setTargetAtTime(clamp(f * 4 + 1500, 20, nyq), t + .95, 1.1);
+        const { f, t, nyq } = a, x = a.osc('sawtooth', 1, -4), q = a.osc('square', 1, 5), sub = a.osc('sawtooth', .5);
+        const qg = a.gain(.6), sg = a.gain(.25), lp = a.filter('lowpass', 800, .9);
+        q.connect(qg); sub.connect(sg); x.connect(lp); qg.connect(lp); sg.connect(lp);
+        lp.frequency.setValueAtTime(clamp(f + 300, 20, nyq), t);
+        lp.frequency.setTargetAtTime(clamp(f * 2.2 + 900, 20, nyq), t, .3);
+        lp.frequency.setTargetAtTime(clamp(f * 1.8 + 800, 20, nyq), t + 1, 1.5);
         return lp;
       },
     },
@@ -337,13 +347,14 @@
         return mix;
       },
     },
-    // DX-style FM electric piano: one carrier, a 1:1 modulator for the body and a 14:1 modulator for the
-    // tine attack (index decays fast); both indexes follow velocity and soften up the keyboard.
+    // DX-style FM electric piano: one carrier, a 1:1 modulator for the body (exactly in tune, so no slow beating)
+    // and a 14:1 modulator for the tine attack (index decays fast), both from fmWave() so the note carries no DC
+    // offset; both indexes follow velocity and soften up the keyboard. The player's chorus gives it the shimmer.
     dx_ep: {
       levelDb: -9.2, peak: .3, maxVoices: 16, chain: 'epChorus', velAmp: .4,
       amp: { attack: .0015, decay: .42, sustain: .45, decay2At: .5, decay2: 2.4, sustain2: 0, keyscale: true, release: .3 },
       build(a) {
-        const { f, vel, t, midi } = a, c = a.osc('sine', 1), m1 = a.osc('sine', 1, 3), m2 = a.osc('sine', 14);
+        const { f, vel, t, midi } = a, c = a.osc('sine', 1), m1 = a.osc(a.fmWave(1), 1), m2 = a.osc(a.fmWave(14), 14);
         const i1 = a.gain(0), i2 = a.gain(0), ks = Math.pow(2, -(midi - 60) / 24);
         m1.connect(i1); i1.connect(c.frequency); m2.connect(i2); i2.connect(c.frequency);
         const I1 = .55 + 1.1 * vel, I2 = (.35 + .9 * vel) * clamp(1.2 - (midi - 60) / 36, .25, 1), fm1 = f * m1._ratio, fm2 = f * 14;
@@ -359,7 +370,7 @@
       amp: { attack: .002, decay: .4, sustain: .55, decay2At: .45, decay2: 2.6, sustain2: 0, keyscale: true, release: .3 },
       build(a) {
         const { f, vel, t, midi } = a, ks = Math.pow(2, -(midi - 60) / 24);
-        const c = a.osc('sine', 1), m = a.osc('sine', 1), bell = a.osc('sine', 6.27);
+        const c = a.osc('sine', 1), m = a.osc(a.fmWave(1), 1), bell = a.osc('sine', 6.27);
         const im = a.gain(0), bg = a.gain(0), mix = a.gain(1);
         m.connect(im); im.connect(c.frequency); bell.connect(bg); c.connect(mix); bg.connect(mix);
         const I = .12 + 1.7 * vel * vel, B = (.06 + .22 * vel) * clamp(1.15 - (midi - 60) / 48, .3, 1);
@@ -769,6 +780,15 @@
       noise() { const s = ctx.createBufferSource(); s.buffer = R.noise(); s.loop = true; s._offset = Math.random() * 1.5; v.sources.push(s); return s; },
       oneShotNoise(at, seconds) { const s = ctx.createBufferSource(); s.buffer = R.noise(); s.start(at, Math.random() * 1.5); s.stop(at + seconds); v.nodes.push(s); return s; },
       wave: name => R.wave(name),
+      // FM modulator wave. The browser frequency-modulates (it integrates the modulator into the carrier's
+      // phase), and a modulator that starts or fades leaves the carrier's phase shifted, which with a 1:1 pair
+      // puts a DC offset of up to ~60% on the note (a thump at each note, then a drifting offset). A cosine
+      // started half a sample early integrates to pure phase modulation, as on a DX7: no offset.
+      fmWave(ratio = 1) {
+        const th = -Math.PI * f * ratio / ctx.sampleRate, re = new Float32Array(2), im = new Float32Array(2);
+        re[1] = Math.cos(th); im[1] = Math.sin(th);
+        return ctx.createPeriodicWave(re, im);
+      },
     };
     d.build(api).connect(v.env);
     if (n.glideFrom != null && model.glide) {

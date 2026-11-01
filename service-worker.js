@@ -1,7 +1,7 @@
-const CACHE = 'song-rider-suite-v3.4.13';
+const CACHE = 'song-rider-suite-v3.4.14';
 // Recorded instrument audio (assets/instruments/<id>/*.mp3) never changes under the same name, so it lives in
 // its own cache that survives app updates and is served from there first. Bump this to drop the old audio.
-const INSTRUMENT_CACHE = 'srs-instruments-v1';
+const INSTRUMENT_CACHE = 'srs-instruments-v2';
 // Precached so the whole suite opens offline. Everything else is cached the first time it loads.
 const ASSETS = [
   './','./index.html','./manifest.webmanifest','./app.js',

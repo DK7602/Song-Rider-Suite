@@ -164,6 +164,29 @@ const PAGE_LIB = `(() => {
     const f = yin(x, sr, Math.round(at * sr)), want = 440 * 2 ** ((midi - 69) / 12);
     return { f, want, cents: 1200 * Math.log2(f / want) };
   }
+  // One note through the engine; median pitch (cents vs the key) over several moments of the note.
+  async function pitchMedian(id, midi, ats = [.15, .3, .45, .6]) {
+    const sr = 48000, ctx = new OfflineAudioContext(1, sr * 1.4, sr), inst = await window.CRPInstruments.load(ctx, id, ctx.destination);
+    inst.play(midi, 0, { duration: 1.3, gain: .95 });
+    const x = (await ctx.startRendering()).getChannelData(0), want = 440 * 2 ** ((midi - 69) / 12);
+    const c = ats.map(at => 1200 * Math.log2(yin(x, sr, Math.round(at * sr), want / 1.5, want * 1.5) / want)).sort((a, b) => a - b);
+    return c[c.length >> 1];
+  }
+  // A held note through the player (and its chain): largest DC offset relative to the level, in 200 ms blocks
+  // after the attack (long enough to hold several periods of an organ's 16' tone); the level curve (dB per
+  // 50 ms) for shape checks; and a brightness measure (RMS frequency: sqrt(E[dx^2] / E[x^2]) * sr / 2pi).
+  async function dcAndShape(id, midi) {
+    const sr = 44100, ctx = new OfflineAudioContext(1, sr * 2.5, sr), inst = await window.CRPInstruments.load(ctx, id, ctx.destination);
+    inst.play(midi, 0, { duration: 2.2, gain: .95 });
+    const x = (await ctx.startRendering()).getChannelData(0), end = Math.round(2.2 * sr), lv = []; let dc = 0;
+    for (let s = 0, B = Math.round(.05 * sr); s + B <= end; s += B) { let q = 0; for (let i = s; i < s + B; i++) q += x[i] * x[i]; lv.push(10 * Math.log10(q / B + 1e-24)); }
+    for (let s = Math.round(.05 * sr), B = Math.round(.2 * sr); s + B <= end; s += B) {
+      let m = 0, q = 0; for (let i = s; i < s + B; i++) { m += x[i]; q += x[i] * x[i]; }
+      const rms = Math.sqrt(q / B); if (rms > 1e-5) dc = Math.max(dc, Math.abs(m / B) / rms);
+    }
+    let ex = 0, ed = 0; for (let i = Math.round(.3 * sr); i < Math.round(1.3 * sr); i++) { ex += x[i] * x[i]; const d = x[i] - x[i - 1]; ed += d * d; }
+    return { dc, lv, centroid: Math.sqrt(ed / ex) * sr / (2 * Math.PI) };
+  }
   // Renders notes with one voice tapped onto its own channel; checks how that voice ends.
   async function voiceEnd(id, plan) {
     const sr = 48000, ctx = new OfflineAudioContext(2, Math.ceil(sr * plan.seconds), sr), merge = ctx.createChannelMerger(2);
@@ -183,7 +206,7 @@ const PAGE_LIB = `(() => {
     let nan = 0; for (let i = 0; i < m.length; i++) if (!Number.isFinite(m[i]) || !Number.isFinite(y[i])) nan++;
     return { peak, endSec: last / sr, tailRel: lastMs / Math.max(1e-9, peak), jumpRel: jump / Math.max(1e-9, peak), nan };
   }
-  window.__inst = { phrase, levels, pitch, voiceEnd, reachable, name, oscillators: () => oscillators };
+  window.__inst = { phrase, levels, pitch, pitchMedian, dcAndShape, voiceEnd, reachable, name, oscillators: () => oscillators };
 })();`;
 
 let browser;
@@ -291,9 +314,51 @@ try {
       const at = (id === 'funky_worm' || id === 'whistle') ? .06 : (id === 'synth_strings_1' || id === 'pad_2_warm') ? .7 : .25;
       const r = await page.evaluate(([id, midi, at]) => window.__inst.pitch(id, midi, at), [id, midi, at]);
       // The whistle sounds an octave above the written note, like a real whistle.
-      const cents = id === 'drawbar_organ' ? r.cents + 1200 : id === 'whistle' ? r.cents - 1200 : r.cents;
+      // The poly synth's sub-octave oscillator makes its waveform repeat at half the key's frequency too.
+      const cents = (id === 'drawbar_organ' || (id === 'pad_3_polysynth' && r.cents < -600)) ? r.cents + 1200 : id === 'whistle' ? r.cents - 1200 : r.cents;
       if (!(Math.abs(cents) < 20)) bad.push(`${id} midi ${midi}: ${r.f.toFixed(1)} Hz vs ${r.want.toFixed(1)} Hz (${cents.toFixed(0)} cents)`);
     }
+    assert.deepEqual(bad, []);
+  }));
+
+  if (EXTRA) await test('recorded notes play in tune (guitars on Am7 Fmaj7 Dm7 E7, and notes that were off before)', () => withPage(async page => {
+    // Chord Rider's guitar voicings of Am7, Fmaj7, Dm7 and E7, on every guitar; then notes whose recordings were
+    // 7-20 cents off before their manifest tuning corrections (bass, Electric Grand, Rhodes, flute).
+    const chordNotes = [40, 45, 47, 50, 52, 53, 55, 56, 57, 59, 60, 64, 65, 69, 74];
+    const cases = [
+      ...['electric_guitar_clean', 'acoustic_guitar_steel', 'acoustic_guitar_nylon'].flatMap(id => chordNotes.map(m => [id, m])),
+      ['electric_bass_finger', 29], ['electric_bass_finger', 38], ['electric_bass_finger', 41], ['electric_grand_piano', 27], ['electric_grand_piano', 60],
+      ['electric_piano_1', 40], ['electric_piano_1', 50], ['flute', 81], ['flute', 84],
+    ];
+    const bad = [];
+    for (const [id, m] of cases) {
+      const c = await page.evaluate(([id, m]) => window.__inst.pitchMedian(id, m), [id, m]);
+      // Guitars within 4 cents; drifting (bass) or vibrato (flute) notes within 6 (they were 7-20 off before).
+      const tol = /guitar/.test(id) ? 4 : 6;
+      if (!(Math.abs(c) <= tol)) bad.push(`${id} midi ${m}: ${c.toFixed(1)} cents`);
+    }
+    assert.deepEqual(bad, []);
+  }));
+
+  await test('synthesized voices carry no DC offset; Saw Synth and Poly Synth are clearly different', () => withPage(async page => {
+    // A DC offset thumps at every note and drifts (it was up to 74% of the level on the FM electric piano).
+    const bad = [];
+    for (const id of SYNTH) for (const m of [41, 60, 84]) {
+      const r = await page.evaluate(([id, m]) => window.__inst.dcAndShape(id, m), [id, m]);
+      if (!(r.dc < .12)) bad.push(`${id} midi ${m}: DC ${(100 * r.dc).toFixed(0)}% of the level`);
+    }
+    // The FM electric piano decays smoothly (no slow swirl from a detuned modulator or a deep chorus).
+    for (const m of [48, 60, 72]) {
+      const { lv } = await page.evaluate(m => window.__inst.dcAndShape('electric_piano_2', m), m);
+      const rises = lv.slice(4).reduce((n, v, i, a) => n + (i && v > a[i - 1] + .6 ? 1 : 0), 0);
+      if (rises > 2) bad.push(`electric_piano_2 midi ${m}: level rises ${rises} times while it should decay`);
+    }
+    // Saw Synth: instant and bright. Poly Synth: fades in, darker.
+    const saw = await page.evaluate(() => window.__inst.dcAndShape('lead_2_sawtooth', 60)), poly = await page.evaluate(() => window.__inst.dcAndShape('pad_3_polysynth', 60));
+    const reach = lv => lv.findIndex(v => v > Math.max(...lv) - 3) * 50;
+    if (!(reach(saw.lv) <= 50)) bad.push(`saw synth takes ${reach(saw.lv)} ms to reach its level`);
+    if (!(reach(poly.lv) >= 100)) bad.push(`poly synth reaches its level in ${reach(poly.lv)} ms (should fade in)`);
+    if (!(saw.centroid > poly.centroid * 1.4)) bad.push(`saw (${saw.centroid.toFixed(0)} Hz) is not clearly brighter than poly (${poly.centroid.toFixed(0)} Hz)`);
     assert.deepEqual(bad, []);
   }));
 

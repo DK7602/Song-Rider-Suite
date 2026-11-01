@@ -17,7 +17,8 @@
   (credits under "Sound credits" in the sound picker):
   - Piano (Salamander Grand, a Yamaha C5) and Electric Grand (Yamaha CP-80)
   - Electric Piano (a 1977 Rhodes) and Bass
-  - Acoustic (Martin HD-28), Acoustic Nylon and Electric (a Fender, recorded clean)
+  - Acoustic (Martin HD-28), Acoustic Nylon (from the Fluid R3 sound bank) and Electric (a Fender, recorded
+    clean)
   - Sax, Alto Sax, Trumpet, Trombone, Horn, Tuba and Flute; the winds and brass hold notes for as long
     as you hold them
   - Vibraphone and Marimba
@@ -29,6 +30,15 @@
 - **Every instrument plays at the same loudness**, so switching sounds no longer jumps in volume. Levels
   are matched on the average of how loud a sound is on full-range speakers and on a phone speaker, so
   mellow sounds (vibraphone, electric pianos, pads) aren't lost on a phone and don't boom in the car.
+- **Every recorded note is in tune** to within a few cents. 80 recordings were slightly off (the electric
+  guitar's open A string was 10 cents sharp, the bass's low notes up to 14, the Electric Grand's lowest
+  note 19), which made chords like Am7 or Fmaj7 beat.
+- **Acoustic Nylon replaced.** The first recording had low rumble, hiss and a muffled tone; the new one
+  is clean and clear.
+- **Vintage E-Piano fixed.** Every note carried a drifting offset that thumped and made the volume pump,
+  and its tone swirled; it now rings and decays cleanly.
+- **Poly Synth and Saw Synth no longer sound alike.** Saw Synth is a bright, cutting lead; Poly Synth is
+  a warm, wide 80s pad that swells in.
 - **Funky Worm and G-Funk Whistle are clearly audible on phones.** The worm has a brighter, Moog-style
   tone a phone speaker can play, the whistle sounds an octave above the written note like a real
   whistle, and both sit 2 dB above the other sounds as lead sounds.
