@@ -14,8 +14,11 @@ const ASSETS = [
   './song-rider/song-rider-pro-wordmark-hq.webp','./song-rider/song-rider-pro-wordmark-blood.webp','./song-rider/horse-parked.png','./song-rider/Horserunsleft.gif','./song-rider/Horserunsright.gif',
   './song-rider/pdf.mjs','./song-rider/pdf.worker.mjs','./song-rider/lame.min.js'
 ];
+// Cloudflare serves /x/index.html as a redirect to /x/. Browsers refuse a redirected
+// response for a page navigation, so store a plain copy instead.
+function plain(res){return res&&res.redirected?new Response(res.body,{status:res.status,statusText:res.statusText,headers:res.headers}):res;}
 async function cacheAvailable(cache,url){
-  try{const req=new Request(new URL(url,self.registration.scope).href,{cache:'reload'});const res=await fetch(req);if(res?.ok)await cache.put(req,res.clone());}catch{}
+  try{const req=new Request(new URL(url,self.registration.scope).href,{cache:'reload'});const res=await fetch(req);if(res?.ok)await cache.put(req,plain(res));}catch{}
 }
 self.addEventListener('install',event=>event.waitUntil((async()=>{const cache=await caches.open(CACHE);await Promise.allSettled(ASSETS.map(url=>cacheAvailable(cache,url)));await self.skipWaiting();})()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith('song-rider-suite-')&&k!==CACHE).map(k=>caches.delete(k)));await self.clients.claim();})()));
@@ -31,9 +34,10 @@ self.addEventListener('fetch',event=>{
       if(res?.ok)await cache.put(event.request,res.clone()).catch(()=>{});
       return res;
     }catch{
-      const hit=await cache.match(event.request,{ignoreSearch:true});if(hit)return hit;
+      const dir=url.pathname.endsWith('/index.html')?url.origin+url.pathname.slice(0,-'index.html'.length):null;
+      const hit=await cache.match(event.request,{ignoreSearch:true})||(dir&&await cache.match(dir,{ignoreSearch:true}));if(hit)return plain(hit);
       if(event.request.mode==='navigate'){
-        const rootIndex=new Request(new URL('./index.html',self.registration.scope).href),fallback=await cache.match(rootIndex,{ignoreSearch:true});if(fallback)return fallback;
+        const rootIndex=new Request(new URL('./index.html',self.registration.scope).href),fallback=await cache.match(rootIndex,{ignoreSearch:true});if(fallback)return plain(fallback);
       }
       return Response.error();
     }

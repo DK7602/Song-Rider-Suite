@@ -81,6 +81,28 @@ await test('every skin renders both apps without errors or overflow (phone + des
   assert.deepEqual(problems, []);
 });
 
+await test('after one online visit, both apps open offline (service worker)', async () => {
+  const ctx = await browser.newContext({ ...VIEWPORTS.phone });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(BASE + '/index.html');
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  // Wait until the install step has precached Song Rider's page.
+  await page.waitForFunction(async () => {
+    for (const k of await caches.keys()) if (await (await caches.open(k)).match('/song-rider/index.html')) return true;
+    return false;
+  }, null, { timeout: 30000 });
+  await ctx.setOffline(true);
+  await page.reload();
+  assert.ok(await page.locator('#songRiderModeBtn').isVisible(), 'Chord Rider did not render offline');
+  // The suite navigates to /song-rider/index.html, which the server answers with a redirect.
+  await page.goto(BASE + '/song-rider/index.html?crpMode=1');
+  assert.match(await page.title(), /Song Rider Pro/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 await browser.close();
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);
