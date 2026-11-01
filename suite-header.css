@@ -24,8 +24,6 @@
   filter:drop-shadow(0 4px 4px rgba(0,0,0,.72))!important;
   z-index:2!important;
 }
-.app-header .brand-left{left:7px!important;}
-.app-header .brand-right{right:7px!important;}
 .app-header .brand-copy{
   position:relative!important;
   left:auto!important;
