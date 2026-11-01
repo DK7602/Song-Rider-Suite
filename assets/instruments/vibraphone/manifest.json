@@ -11,81 +11,92 @@
    "file": "F3.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 247401
   },
   {
    "midi": 57,
    "file": "A3.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 60,
    "file": "C4.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 64,
    "file": "E4.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 67,
    "file": "G4.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 71,
    "file": "B4.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 74,
    "file": "D5.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 77,
    "file": "F5.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 81,
    "file": "A5.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 84,
    "file": "C6.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 204624
   },
   {
    "midi": 88,
    "file": "E6.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 234612
   }
  ],
  "release": 0.6,
  "sustained": false,
- "gain": 0.28,
- "notes": "Vibraphone with soft mallets, no motor tremolo, bars left ringing, velocity layer 2 of 2, stereo. 11 notes F3-E6 every 3-4 semitones (the full 3-octave range). Natural decay trimmed to 6 s; the release time models the damper pedal (0.4-0.8 s sounds natural). The engine can add a slow amplitude tremolo (~5 Hz) for a motor-on sound."
+ "notes": "Vibraphone with soft mallets, no motor tremolo, bars left ringing, velocity layer 2 of 2, stereo. 11 notes F3-E6 every 3-4 semitones (the full 3-octave range). Natural decay trimmed to 6 s; the release time models the damper pedal (0.4-0.8 s sounds natural). The engine can add a slow amplitude tremolo (~5 Hz) for a motor-on sound.",
+ "sampleRate": 44100
 }

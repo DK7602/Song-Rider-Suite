@@ -22,12 +22,12 @@
 // Levels: every engine instrument is calibrated to the suite's reference level (the old SoundFont
 // piano through its bus gain: -27.9 dBFS gated RMS for REFERENCE, a chord + melody, measured before
 // the master). A sample set levels itself when it loads by rendering REFERENCE once offline (the
-// manifest "gain" trims on top); derived, layered and synthesized voices carry measured trims (see
+// manifest "trim" adjusts on top); derived, layered and synthesized voices carry measured trims (see
 // LEVEL_DB). The caller applies CRPInstruments.busGain (1) instead of its SoundFont table for sounds
 // this engine serves.
 (() => {
   'use strict';
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.0';
   const preset = (typeof window !== 'undefined' && window.CRP_INSTRUMENTS_CONFIG) || {};
   const config = { basePath: String(preset.basePath || 'assets/instruments/'), disabled: !!preset.disabled };
 
@@ -474,20 +474,33 @@
     });
   }
   // First audible sample (-50 dB below the peak), minus 1 ms: mp3 encoders pad the start with silence.
-  function leadingSilence(buffer) {
+  // `from` (seconds) skips decoder padding first, so padded and unpadded decodes start on the same sample.
+  function leadingSilence(buffer, from = 0) {
     const sr = buffer.sampleRate, n = buffer.length, chans = [];
     for (let c = 0; c < buffer.numberOfChannels; c++) chans.push(buffer.getChannelData(c));
     let peak = 0;
     for (const d of chans) for (let i = 0; i < n; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a; }
-    const thr = Math.max(1e-4, peak * .003), lim = Math.min(n, Math.round(.25 * sr));
-    for (let i = 0; i < lim; i++) for (const d of chans) if (Math.abs(d[i]) > thr) return Math.max(0, i / sr - .001);
-    return 0;
+    const thr = Math.max(1e-4, peak * .003), i0 = Math.round(from * sr), lim = Math.min(n, i0 + Math.round(.25 * sr));
+    for (let i = i0; i < lim; i++) for (const d of chans) if (Math.abs(d[i]) > thr) return Math.max(from, i / sr - .001);
+    return from;
   }
-  function prepSample(s, buffer) {
+  // MP3 decoders that ignore the LAME gapless header (Safari) return the encoder + decoder delay
+  // (576 + 529 samples at 44.1 kHz) as extra audio at the start, which would shift every loop point.
+  // A manifest that lists each file's true length (`frames` at `sampleRate`) lets us detect that.
+  const MP3_DELAY_S = 1105 / 44100;
+  function decoderPadding(s, buffer, rate) {
+    const frames = Number(s.frames);
+    if (!(frames > 0)) return 0;
+    const extra = buffer.duration - frames / rate;
+    return extra > .004 ? Math.min(extra, MP3_DELAY_S) : 0;
+  }
+  function prepSample(s, buffer, rate = 44100) {
     const dur = buffer.duration, secs = v => { const n = Number(v); return v == null || v === '' || !Number.isFinite(n) || n < 0 ? null : n; };
+    const pad = decoderPadding(s, buffer, rate);
     let ls = secs(s.loopStart), le = secs(s.loopEnd);
+    if (ls != null && le != null) { ls += pad; le += pad; }
     if (!(ls != null && le != null && le - ls > .01 && le <= dur + 1e-6)) ls = le = null;
-    const offset = clamp((Number(s.offset ?? s.start) || 0) + leadingSilence(buffer), 0, Math.max(0, dur - .05));
+    const offset = clamp((Number(s.offset ?? s.start) || 0) + leadingSilence(buffer, pad), 0, Math.max(0, dur - .05));
     const gain = Number(s.gain);
     return {
       midi: Number(s.midi), vel: clamp(Number(s.vel ?? s.velocity ?? 100) || 100, 1, 127), buffer, offset,
@@ -569,9 +582,11 @@
   function buildSet(id, man, samples) {
     samples.sort((a, b) => a.midi - b.midi || a.vel - b.vel);
     const num = (v, d, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? clamp(n, lo, hi) : d; };
+    // The set levels itself (calibrateSet), so a manifest's own loudness estimate ("gain") is not
+    // applied; "trim" (linear) is a deliberate adjustment on top of the self-levelling.
     const set = {
       id, name: String(man.name || id), samples, sustained: !!man.sustained,
-      release: num(man.release, .5, .02, 8), attack: num(man.attack, .004, .001, .5), gain: num(man.gain, 1, .01, 20),
+      release: num(man.release, .5, .02, 8), attack: num(man.attack, .004, .001, .5), gain: num(man.trim, 1, .01, 20),
       license: man.license || '', attribution: man.attribution || '', source: man.source || '',
     };
     set.norm = autoNorm(set, isBassId(id));
@@ -594,7 +609,7 @@
       const loaded = await Promise.allSettled(list.map(async s => {
         const r = await fetch(new URL(String(s.file), dir).href);
         if (!r.ok) throw new Error(`${id}/${s.file}: HTTP ${r.status}`);
-        return prepSample(s, await decode(ctx, await r.arrayBuffer()));
+        return prepSample(s, await decode(ctx, await r.arrayBuffer()), Number(man.sampleRate) || 44100);
       }));
       const samples = loaded.filter(x => x.status === 'fulfilled').map(x => x.value);
       if (!samples.length) throw loaded.find(x => x.status === 'rejected')?.reason || new Error(`${id}: no samples decoded`);

@@ -11,88 +11,100 @@
    "file": "Cs3.mp3",
    "vel": 90,
    "loopStart": 3.271474,
-   "loopEnd": 5.190907
+   "loopEnd": 5.190907,
+   "frames": 242550
   },
   {
    "midi": 52,
    "file": "E3.mp3",
    "vel": 90,
    "loopStart": 2.452585,
-   "loopEnd": 4.67941
+   "loopEnd": 4.67941,
+   "frames": 220178
   },
   {
    "midi": 55,
    "file": "G3.mp3",
    "vel": 90,
    "loopStart": 1.761134,
-   "loopEnd": 4.159161
+   "loopEnd": 4.159161,
+   "frames": 197145
   },
   {
    "midi": 58,
    "file": "As3.mp3",
    "vel": 90,
    "loopStart": 2.936803,
-   "loopEnd": 5.189252
+   "loopEnd": 5.189252,
+   "frames": 242550
   },
   {
    "midi": 61,
    "file": "Cs4.mp3",
    "vel": 90,
    "loopStart": 2.892404,
-   "loopEnd": 5.190544
+   "loopEnd": 5.190544,
+   "frames": 242550
   },
   {
    "midi": 64,
    "file": "E4.mp3",
    "vel": 90,
    "loopStart": 2.707642,
-   "loopEnd": 5.189297
+   "loopEnd": 5.189297,
+   "frames": 242550
   },
   {
    "midi": 67,
    "file": "G4.mp3",
    "vel": 90,
    "loopStart": 4.166803,
-   "loopEnd": 5.189841
+   "loopEnd": 5.189841,
+   "frames": 242550
   },
   {
    "midi": 70,
    "file": "As4.mp3",
    "vel": 90,
    "loopStart": 2.522948,
-   "loopEnd": 4.990363
+   "loopEnd": 4.990363,
+   "frames": 234076
   },
   {
    "midi": 73,
    "file": "Cs5.mp3",
    "vel": 90,
    "loopStart": 2.705442,
-   "loopEnd": 5.189342
+   "loopEnd": 5.189342,
+   "frames": 242550
   },
   {
    "midi": 76,
    "file": "E5.mp3",
    "vel": 90,
    "loopStart": 2.762358,
-   "loopEnd": 5.189773
+   "loopEnd": 5.189773,
+   "frames": 242550
   },
   {
    "midi": 79,
    "file": "G5.mp3",
    "vel": 90,
    "loopStart": 3.283923,
-   "loopEnd": 5.189751
+   "loopEnd": 5.189751,
+   "frames": 242550
   },
   {
    "midi": 80,
    "file": "Gs5.mp3",
    "vel": 90,
    "loopStart": 3.048299,
-   "loopEnd": 5.190159
+   "loopEnd": 5.190159,
+   "frames": 242550
   }
  ],
  "release": 0.15,
  "sustained": true,
- "gain": 0.42,
- "notes": "Alto saxophone, straight tone, forte layer, clean condenser mic, mono. 12 notes C#3-G#5 every minor third (one whole step at the top); A#3 uses round-robin 2 because round-robin 1 has no loopable stretch. Every file has a seamless sustain loop. Vibrato is not baked in: the engine can add 5-6 Hz pitch vibrato (10-20 cents) after ~0.3 s. Recommended release 0.15 s."
+ "notes": "Alto saxophone, straight tone, forte layer, clean condenser mic, mono. 12 notes C#3-G#5 every minor third (one whole step at the top); A#3 uses round-robin 2 because round-robin 1 has no loopable stretch. Every file has a seamless sustain loop. Vibrato is not baked in: the engine can add 5-6 Hz pitch vibrato (10-20 cents) after ~0.3 s. Recommended release 0.15 s.",
+ "sampleRate": 44100
 }

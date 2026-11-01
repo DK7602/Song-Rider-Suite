@@ -11,81 +11,92 @@
    "file": "As1.mp3",
    "vel": 80,
    "loopStart": 0.977982,
-   "loopEnd": 2.968776
+   "loopEnd": 2.968776,
+   "frames": 182574
   },
   {
    "midi": 37,
    "file": "Cs2.mp3",
    "vel": 80,
    "loopStart": 1.364467,
-   "loopEnd": 3.586712
+   "loopEnd": 3.586712,
+   "frames": 197146
   },
   {
    "midi": 39,
    "file": "Ds2.mp3",
    "vel": 80,
    "loopStart": 3.961565,
-   "loopEnd": 5.170159
+   "loopEnd": 5.170159,
+   "frames": 264600
   },
   {
    "midi": 41,
    "file": "F2.mp3",
    "vel": 80,
    "loopStart": 3.318526,
-   "loopEnd": 5.689773
+   "loopEnd": 5.689773,
+   "frames": 264600
   },
   {
    "midi": 46,
    "file": "As2.mp3",
    "vel": 80,
    "loopStart": 3.364195,
-   "loopEnd": 5.689615
+   "loopEnd": 5.689615,
+   "frames": 264600
   },
   {
    "midi": 50,
    "file": "D3.mp3",
    "vel": 80,
    "loopStart": 3.437029,
-   "loopEnd": 5.691361
+   "loopEnd": 5.691361,
+   "frames": 264600
   },
   {
    "midi": 53,
    "file": "F3.mp3",
    "vel": 80,
    "loopStart": 3.243832,
-   "loopEnd": 5.689274
+   "loopEnd": 5.689274,
+   "frames": 264600
   },
   {
    "midi": 60,
    "file": "C4.mp3",
    "vel": 80,
    "loopStart": 3.205442,
-   "loopEnd": 5.689864
+   "loopEnd": 5.689864,
+   "frames": 264600
   },
   {
    "midi": 61,
    "file": "Cs4.mp3",
    "vel": 80,
    "loopStart": 3.424694,
-   "loopEnd": 5.690385
+   "loopEnd": 5.690385,
+   "frames": 264600
   },
   {
    "midi": 63,
    "file": "Ds4.mp3",
    "vel": 80,
    "loopStart": 3.391451,
-   "loopEnd": 5.689569
+   "loopEnd": 5.689569,
+   "frames": 264600
   },
   {
    "midi": 65,
    "file": "F4.mp3",
    "vel": 80,
    "loopStart": 4.195805,
-   "loopEnd": 5.69059
+   "loopEnd": 5.69059,
+   "frames": 264600
   }
  ],
  "release": 0.2,
  "sustained": true,
- "gain": 1.01,
- "notes": "Tenor trombone, straight sustain, middle VSCO-2 CE layer (mf), mono. 11 notes A#1 (pedal) - F4; spacing is 2-4 semitones except one 7-semitone gap F3-C4 (G3-B3 are pitch-shifted up to 3.5 semitones). Seamless sustain loops in every file. Recommended release 0.2 s."
+ "notes": "Tenor trombone, straight sustain, middle VSCO-2 CE layer (mf), mono. 11 notes A#1 (pedal) - F4; spacing is 2-4 semitones except one 7-semitone gap F3-C4 (G3-B3 are pitch-shifted up to 3.5 semitones). Seamless sustain loops in every file. Recommended release 0.2 s.",
+ "sampleRate": 44100
 }

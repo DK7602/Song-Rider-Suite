@@ -11,67 +11,76 @@
    "file": "F1.mp3",
    "vel": 80,
    "loopStart": 1.060499,
-   "loopEnd": 2.299478
+   "loopEnd": 2.299478,
+   "frames": 173758
   },
   {
    "midi": 34,
    "file": "As1.mp3",
    "vel": 80,
    "loopStart": 4.11712,
-   "loopEnd": 5.676893
+   "loopEnd": 5.676893,
+   "frames": 264600
   },
   {
    "midi": 39,
    "file": "Ds2.mp3",
    "vel": 80,
    "loopStart": 4.098912,
-   "loopEnd": 5.359093
+   "loopEnd": 5.359093,
+   "frames": 264600
   },
   {
    "midi": 41,
    "file": "F2.mp3",
    "vel": 80,
    "loopStart": 3.366349,
-   "loopEnd": 4.168753
+   "loopEnd": 4.168753,
+   "frames": 264600
   },
   {
    "midi": 46,
    "file": "As2.mp3",
    "vel": 80,
    "loopStart": 3.554966,
-   "loopEnd": 5.690748
+   "loopEnd": 5.690748,
+   "frames": 264600
   },
   {
    "midi": 50,
    "file": "D3.mp3",
    "vel": 80,
    "loopStart": 3.786281,
-   "loopEnd": 5.689138
+   "loopEnd": 5.689138,
+   "frames": 264600
   },
   {
    "midi": 53,
    "file": "F3.mp3",
    "vel": 80,
    "loopStart": 3.630181,
-   "loopEnd": 5.689683
+   "loopEnd": 5.689683,
+   "frames": 264600
   },
   {
    "midi": 58,
    "file": "As3.mp3",
    "vel": 80,
    "loopStart": 3.19966,
-   "loopEnd": 5.689138
+   "loopEnd": 5.689138,
+   "frames": 264600
   },
   {
    "midi": 62,
    "file": "D4.mp3",
    "vel": 80,
    "loopStart": 3.708073,
-   "loopEnd": 5.690204
+   "loopEnd": 5.690204,
+   "frames": 264600
   }
  ],
  "release": 0.25,
  "sustained": true,
- "gain": 0.54,
- "notes": "Tuba, straight sustain, middle VSCO-2 CE layer (mf) with the soft layer used for the two extreme notes (F1, D4) that have no mf sample. Mono (Mid mic). 9 notes F1-D4 every 3-5 semitones. Every file has a sustain loop (F1 is a soft, slightly breathy note: its loop uses a longer equal-power crossfade). Recommended release 0.25 s."
+ "notes": "Tuba, straight sustain, middle VSCO-2 CE layer (mf) with the soft layer used for the two extreme notes (F1, D4) that have no mf sample. Mono (Mid mic). 9 notes F1-D4 every 3-5 semitones. Every file has a sustain loop (F1 is a soft, slightly breathy note: its loop uses a longer equal-power crossfade). Recommended release 0.25 s.",
+ "sampleRate": 44100
 }

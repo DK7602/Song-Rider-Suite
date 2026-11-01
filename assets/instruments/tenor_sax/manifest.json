@@ -11,165 +11,188 @@
    "file": "Gs2.mp3",
    "vel": 80,
    "loopStart": 2.205805,
-   "loopEnd": 4.690748
+   "loopEnd": 4.690748,
+   "frames": 220500
   },
   {
    "midi": 46,
    "file": "As2.mp3",
    "vel": 80,
    "loopStart": 2.191905,
-   "loopEnd": 4.689002
+   "loopEnd": 4.689002,
+   "frames": 220500
   },
   {
    "midi": 48,
    "file": "C3.mp3",
    "vel": 80,
    "loopStart": 2.327528,
-   "loopEnd": 4.68966
+   "loopEnd": 4.68966,
+   "frames": 220500
   },
   {
    "midi": 50,
    "file": "D3.mp3",
    "vel": 80,
    "loopStart": 2.190612,
-   "loopEnd": 4.690181
+   "loopEnd": 4.690181,
+   "frames": 220500
   },
   {
    "midi": 52,
    "file": "E3.mp3",
    "vel": 80,
    "loopStart": 2.188776,
-   "loopEnd": 4.688662
+   "loopEnd": 4.688662,
+   "frames": 220500
   },
   {
    "midi": 54,
    "file": "Fs3.mp3",
    "vel": 80,
    "loopStart": 2.311587,
-   "loopEnd": 4.690023
+   "loopEnd": 4.690023,
+   "frames": 220500
   },
   {
    "midi": 56,
    "file": "Gs3.mp3",
    "vel": 80,
    "loopStart": 2.281837,
-   "loopEnd": 4.690023
+   "loopEnd": 4.690023,
+   "frames": 220500
   },
   {
    "midi": 58,
    "file": "As3.mp3",
    "vel": 80,
    "loopStart": 2.457687,
-   "loopEnd": 4.688685
+   "loopEnd": 4.688685,
+   "frames": 220500
   },
   {
    "midi": 60,
    "file": "C4.mp3",
    "vel": 80,
    "loopStart": 2.225692,
-   "loopEnd": 4.69068
+   "loopEnd": 4.69068,
+   "frames": 220500
   },
   {
    "midi": 62,
    "file": "D4.mp3",
    "vel": 80,
    "loopStart": 2.395011,
-   "loopEnd": 4.690431
+   "loopEnd": 4.690431,
+   "frames": 220500
   },
   {
    "midi": 64,
    "file": "E4.mp3",
    "vel": 80,
    "loopStart": 2.193333,
-   "loopEnd": 4.689909
+   "loopEnd": 4.689909,
+   "frames": 220500
   },
   {
    "midi": 66,
    "file": "Fs4.mp3",
    "vel": 80,
    "loopStart": 2.193878,
-   "loopEnd": 4.691224
+   "loopEnd": 4.691224,
+   "frames": 220500
   },
   {
    "midi": 68,
    "file": "Gs4.mp3",
    "vel": 80,
    "loopStart": 2.192494,
-   "loopEnd": 4.689524
+   "loopEnd": 4.689524,
+   "frames": 220500
   },
   {
    "midi": 70,
    "file": "As4.mp3",
    "vel": 80,
    "loopStart": 2.345102,
-   "loopEnd": 4.68966
+   "loopEnd": 4.68966,
+   "frames": 220500
   },
   {
    "midi": 72,
    "file": "C5.mp3",
    "vel": 80,
    "loopStart": 2.283832,
-   "loopEnd": 4.690136
+   "loopEnd": 4.690136,
+   "frames": 220500
   },
   {
    "midi": 74,
    "file": "D5.mp3",
    "vel": 80,
    "loopStart": 2.378118,
-   "loopEnd": 4.690272
+   "loopEnd": 4.690272,
+   "frames": 220500
   },
   {
    "midi": 76,
    "file": "E5.mp3",
    "vel": 80,
    "loopStart": 2.54102,
-   "loopEnd": 4.690204
+   "loopEnd": 4.690204,
+   "frames": 220500
   },
   {
    "midi": 78,
    "file": "Fs5.mp3",
    "vel": 80,
    "loopStart": 3.784104,
-   "loopEnd": 4.690272
+   "loopEnd": 4.690272,
+   "frames": 220500
   },
   {
    "midi": 80,
    "file": "Gs5.mp3",
    "vel": 80,
    "loopStart": 2.257868,
-   "loopEnd": 4.689683
+   "loopEnd": 4.689683,
+   "frames": 220500
   },
   {
    "midi": 82,
    "file": "As5.mp3",
    "vel": 80,
    "loopStart": 3.588345,
-   "loopEnd": 4.689751
+   "loopEnd": 4.689751,
+   "frames": 220500
   },
   {
    "midi": 84,
    "file": "C6.mp3",
    "vel": 80,
    "loopStart": 2.406463,
-   "loopEnd": 4.690317
+   "loopEnd": 4.690317,
+   "frames": 220500
   },
   {
    "midi": 86,
    "file": "D6.mp3",
    "vel": 80,
    "loopStart": 2.770907,
-   "loopEnd": 4.689751
+   "loopEnd": 4.689751,
+   "frames": 220500
   },
   {
    "midi": 88,
    "file": "E6.mp3",
    "vel": 80,
    "loopStart": 1.287506,
-   "loopEnd": 2.359955
+   "loopEnd": 2.359955,
+   "frames": 220500
   }
  ],
  "release": 0.15,
  "sustained": true,
- "gain": 0.51,
- "notes": "Tenor saxophone, straight tone (no vibrato), middle VCSL layer (mf), mono. Whole-tone sampled: G#2-E6 (top notes are altissimo). Every file has a seamless sustain loop (C4 needed a slight level-drift correction). Add delayed vibrato (5-6 Hz, ~15 cents) in the engine for a jazzier sound. Recommended release 0.12-0.18 s."
+ "notes": "Tenor saxophone, straight tone (no vibrato), middle VCSL layer (mf), mono. Whole-tone sampled: G#2-E6 (top notes are altissimo). Every file has a seamless sustain loop (C4 needed a slight level-drift correction). Add delayed vibrato (5-6 Hz, ~15 cents) in the engine for a jazzier sound. Recommended release 0.12-0.18 s.",
+ "sampleRate": 44100
 }

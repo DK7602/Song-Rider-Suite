@@ -8,427 +8,247 @@
  "samples": [
   {
    "midi": 21,
-   "file": "A0_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 24,
-   "file": "C1_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 27,
-   "file": "Ds1_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 30,
-   "file": "Fs1_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 33,
-   "file": "A1_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 36,
-   "file": "C2_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 39,
-   "file": "Ds2_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 42,
-   "file": "Fs2_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 45,
-   "file": "A2_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 48,
-   "file": "C3_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 51,
-   "file": "Ds3_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 54,
-   "file": "Fs3_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 57,
-   "file": "A3_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 60,
-   "file": "C4_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 63,
-   "file": "Ds4_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 66,
-   "file": "Fs4_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 69,
-   "file": "A4_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 72,
-   "file": "C5_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 75,
-   "file": "Ds5_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 78,
-   "file": "Fs5_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 81,
-   "file": "A5_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 84,
-   "file": "C6_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 87,
-   "file": "Ds6_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 90,
-   "file": "Fs6_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 93,
-   "file": "A6_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 96,
-   "file": "C7_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 99,
-   "file": "Ds7_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 102,
-   "file": "Fs7_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 105,
-   "file": "A7_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 108,
-   "file": "C8_soft.mp3",
-   "vel": 48,
-   "loopStart": null,
-   "loopEnd": null
-  },
-  {
-   "midi": 21,
    "file": "A0_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 24,
    "file": "C1_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 27,
    "file": "Ds1_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 30,
    "file": "Fs1_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 33,
    "file": "A1_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 36,
    "file": "C2_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 39,
    "file": "Ds2_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 42,
    "file": "Fs2_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 45,
    "file": "A2_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 48,
    "file": "C3_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 264600
   },
   {
    "midi": 51,
    "file": "Ds3_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 242550
   },
   {
    "midi": 54,
    "file": "Fs3_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 242550
   },
   {
    "midi": 57,
    "file": "A3_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 242550
   },
   {
    "midi": 60,
    "file": "C4_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 242550
   },
   {
    "midi": 63,
    "file": "Ds4_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 198450
   },
   {
    "midi": 66,
    "file": "Fs4_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 198450
   },
   {
    "midi": 69,
    "file": "A4_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 198450
   },
   {
    "midi": 72,
    "file": "C5_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 198450
   },
   {
    "midi": 75,
    "file": "Ds5_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 158760
   },
   {
    "midi": 78,
    "file": "Fs5_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 158760
   },
   {
    "midi": 81,
    "file": "A5_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 158760
   },
   {
    "midi": 84,
    "file": "C6_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 158760
   },
   {
    "midi": 87,
    "file": "Ds6_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 123479
   },
   {
    "midi": 90,
    "file": "Fs6_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 123479
   },
   {
    "midi": 93,
    "file": "A6_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 123479
   },
   {
    "midi": 96,
    "file": "C7_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 123479
   },
   {
    "midi": 99,
    "file": "Ds7_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 88200
   },
   {
    "midi": 102,
    "file": "Fs7_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 88200
   },
   {
    "midi": 105,
    "file": "A7_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 88200
   },
   {
    "midi": 108,
    "file": "C8_loud.mp3",
    "vel": 96,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 88200
   }
  ],
  "release": 0.5,
  "sustained": false,
- "gain": 1.0,
- "notes": "Yamaha C5, AB stereo pair. 30 notes A0-C8 sampled every minor third, two velocity layers: vel 48 = Salamander layer v6 (soft, darker), vel 96 = layer v12 (medium-loud). Both layers are loudness-matched to each other and across the range, so the engine should apply its own velocity gain and use the layer only for timbre (suggested split at velocity ~72, or crossfade 56-88). Per-note tuning corrections from the Retuned SFZ shipped with V3 were applied. Natural decay, trimmed to 6 s (bass) .. 2 s (top octave) with a fade; for longer held notes let the release envelope take over. Same samples work for bright_acoustic_piano with a high-shelf boost. Recommended release 0.4-0.6 s (dampers)."
+ "notes": "Yamaha C5, AB stereo pair. 30 notes A0-C8 sampled every minor third, Salamander layer v12 (medium-loud), loudness-matched across the range. (The soft v6 layer was dropped: the suite always plays at velocity 88-96, so it was never heard.) Per-note tuning corrections from the Retuned SFZ shipped with V3 were applied. Natural decay, trimmed to 6 s (bass) .. 2 s (top octave) with a fade; for longer held notes let the release envelope take over. Same samples work for bright_acoustic_piano with a high-shelf boost. Recommended release 0.4-0.6 s (dampers).",
+ "sampleRate": 44100
 }

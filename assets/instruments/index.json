@@ -1,15 +1,17 @@
 {
  "version": 1,
  "generated": "2026-11-01",
- "format": "Each folder <id>/ holds manifest.json plus MP3 samples (44.1 kHz, LAME VBR V2; the stereo piano uses V3 to stay under 4 MB). Mono unless the manifest name says stereo (piano and vibraphone are stereo). Decoders that honour the LAME gapless header (Chrome, Firefox, ffmpeg) return sample-accurate audio, so loopStart/loopEnd (seconds) line up exactly; a decoder that ignores the header would add about 25 ms of leading silence.",
+ "format": "Each folder <id>/ holds manifest.json plus MP3 samples (44.1 kHz, LAME VBR V2; the stereo piano uses V3). Mono unless the manifest name says stereo (piano and vibraphone are stereo). Decoders that honour the LAME gapless header (Chrome, Firefox, ffmpeg) return sample-accurate audio, so loopStart/loopEnd (seconds) line up exactly; a decoder that ignores the header would add about 25 ms of leading silence.",
  "manifestFields": {
   "samples[].midi": "MIDI note the file sounds at (A440 equal temperament, verified within +-20 cents; piano keeps its natural stretch tuning)",
-  "samples[].vel": "velocity layer the file represents; only the piano has two layers (48 soft, 96 loud)",
+  "samples[].vel": "velocity layer the file represents (every set has a single layer)",
   "samples[].loopStart/loopEnd": "seamless sustain loop in seconds (crossfade already baked in, audio after loopEnd continues the loop so stopping the loop on note-off is click-free); null for one-shots",
   "release": "recommended release time in seconds",
   "sustained": "true for winds/brass: hold the loop while the key is down",
-  "gain": "linear gain that matches this set's perceived loudness to the piano (piano = 1.0; K-weighted loudness of the first second, sustained sets 0.3-2 s)",
-  "notes": "per-set details for the engine"
+  "notes": "per-set details for the engine",
+  "samples[].frames": "true length of the decoded file in sample frames at sampleRate (gapless decode); the engine uses it to undo the start padding of MP3 decoders that ignore the LAME gapless header (Safari), so loop points stay exact",
+  "sampleRate": "sample rate of the files",
+  "trim": "optional linear level adjustment on top of the engine's own levelling (the engine renders a reference phrase with each set when it loads and levels it to the piano)"
  },
  "delivered": [
   "acoustic_grand_piano",

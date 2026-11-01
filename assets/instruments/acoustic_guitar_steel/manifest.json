@@ -11,109 +11,124 @@
    "file": "E2.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 176400
   },
   {
    "midi": 43,
    "file": "G2.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 176334
   },
   {
    "midi": 46,
    "file": "As2.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 176400
   },
   {
    "midi": 49,
    "file": "Cs3.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 174952
   },
   {
    "midi": 52,
    "file": "E3.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 175549
   },
   {
    "midi": 55,
    "file": "G3.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 176378
   },
   {
    "midi": 58,
    "file": "As3.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 175331
   },
   {
    "midi": 61,
    "file": "Cs4.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 175253
   },
   {
    "midi": 64,
    "file": "E4.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 174966
   },
   {
    "midi": 68,
    "file": "Gs4.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 153338
   },
   {
    "midi": 71,
    "file": "B4.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 112455
   },
   {
    "midi": 74,
    "file": "D5.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 130536
   },
   {
    "midi": 77,
    "file": "F5.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 131375
   },
   {
    "midi": 80,
    "file": "Gs5.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 131224
   },
   {
    "midi": 83,
    "file": "B5.mp3",
    "vel": 80,
    "loopStart": null,
-   "loopEnd": null
+   "loopEnd": null,
+   "frames": 75852
   }
  ],
  "release": 0.3,
  "sustained": false,
- "gain": 1.25,
- "notes": "2017 Martin HD-28 Vintage Series, single plucked notes, one layer, 15 notes E2-B5 every minor third. The source files are shortened to their sustain loop (0.7-4.7 s); tails were continued through the author's loop with a matched exponential decay up to 3-4 s, so files are one-shots. Recommended release 0.25-0.35 s; for strums stagger string onsets by 8-15 ms."
+ "notes": "2017 Martin HD-28 Vintage Series, single plucked notes, one layer, 15 notes E2-B5 every minor third. The source files are shortened to their sustain loop (0.7-4.7 s); tails were continued through the author's loop with a matched exponential decay up to 3-4 s, so files are one-shots. Recommended release 0.25-0.35 s; for strums stagger string onsets by 8-15 ms.",
+ "sampleRate": 44100
 }

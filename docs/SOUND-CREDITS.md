@@ -2,8 +2,8 @@
 
 Song Rider Suite's recorded instruments (`assets/instruments/<id>/`) are built from the free sample
 libraries below. Every set was checked against the license published by its original author. Two
-licenses (CC BY 3.0 and CC BY 4.0) require visible attribution, so this list, or a link to it, should be
-reachable from the app (for example from an About or Credits screen).
+licenses (CC BY 3.0 and CC BY 4.0) require visible attribution; the app links to this list from the
+"Sound credits" link under the instrument picker in Chord Rider (`sound-credits.html`).
 
 The same processing was applied to every set unless an entry says otherwise:
 
@@ -46,12 +46,11 @@ The same processing was applied to every set unless an entry says otherwise:
   FreePats mirrors it at <https://freepats.zenvoid.org/Piano/acoustic-grand-piano.html>.
 - **Attribution line:** "Salamander Grand Piano V3 by Alexander Holm, licensed under CC BY 3.0."
 - **Changes:**
-  - Kept 30 notes, A0-C8 every minor third, from two of the 16 velocity layers: v6 (soft) and v12
-    (medium-loud).
+  - Kept 30 notes, A0-C8 every minor third, from velocity layer v12 (medium-loud) of the 16.
   - Applied the Retuned-SFZ corrections. F#7 (+27 cents) and C8 (+61 cents) were still sharp afterwards and
     were retuned to A440.
   - Trimmed the decay to 6 s in the bass and 2 s at the top, with a fade.
-  - Loudness-matched both layers to each other and across the range.
+  - Loudness-matched the notes across the range.
   - Normalized and encoded to stereo MP3.
 
 ## electric_grand_piano: Yamaha CP80 Electric Grand
