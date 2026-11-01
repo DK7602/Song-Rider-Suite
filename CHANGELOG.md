@@ -26,7 +26,12 @@
 - **New synthesized sounds:** Vintage E-Piano (FM), Synth (string ensemble), Warm Synth Pad, Poly Synth,
   Saw Synth, Synth Brass, Clavinet, Funk Organ (drawbar organ with a rotating-speaker shimmer), and the
   Funky Worm and G-Funk Whistle, which now glide between notes.
-- **Every instrument plays at the same loudness**, so switching sounds no longer jumps in volume.
+- **Every instrument plays at the same loudness**, so switching sounds no longer jumps in volume. Levels
+  are matched on the average of how loud a sound is on full-range speakers and on a phone speaker, so
+  mellow sounds (vibraphone, electric pianos, pads) aren't lost on a phone and don't boom in the car.
+- **Funky Worm and G-Funk Whistle are clearly audible on phones.** The worm has a brighter, Moog-style
+  tone a phone speaker can play, the whistle sounds an octave above the written note like a real
+  whistle, and both sit 2 dB above the other sounds as lead sounds.
 - Used everywhere instruments play: Chord Rider, Baby DAW, Track Master and WAV exports.
 - The sounds are served by the app itself and kept on the device after first use, so they load faster
   and work offline. The old General MIDI sounds remain as an automatic backup.

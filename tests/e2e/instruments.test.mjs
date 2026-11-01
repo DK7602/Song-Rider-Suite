@@ -138,7 +138,9 @@ const PAGE_LIB = `(() => {
     const blk = Math.round(.4 * sr), hop = Math.round(.1 * sr), blocks = [];
     for (let s = 0; s + blk <= n; s += hop) { let e = 0; for (let i = s; i < s + blk; i++) e += mono[i] * mono[i]; blocks.push(e / blk); }
     const abs = blocks.filter(e => e > 1e-7), mean = abs.reduce((a, b) => a + b, 0) / Math.max(1, abs.length), rel = abs.filter(e => e > mean * .1);
-    return { rmsDb: db(Math.sqrt(sum / n)), gatedDb: db(Math.sqrt(rel.reduce((a, b) => a + b, 0) / Math.max(1, rel.length))), peakDb: db(peak), nan };
+    // The engine matches sounds on the mean of full-range and phone-speaker loudness (instruments.js).
+    const I = window.CRPInstruments, phoneDb = I.gatedDb(I.phoneWeighted(mono, sr), sr);
+    return { rmsDb: db(Math.sqrt(sum / n)), gatedDb: db(Math.sqrt(rel.reduce((a, b) => a + b, 0) / Math.max(1, rel.length))), phoneDb, balancedDb: I.balancedDb(mono, sr), peakDb: db(peak), nan };
   }
   // YIN f0 estimate on a mono segment.
   function yin(x, sr, start, fmin = 40, fmax = 2500) {
@@ -228,6 +230,7 @@ for (const id of EXTRA_IDS) EXPECT_KIND[id] = 'sample';
 // Sustained (looped) sets and a note inside each one's range.
 const LOOPED = EXTRA ? { trumpet: 67, trombone: 53, french_horn: 60, tuba: 41, flute: 76, tenor_sax: 55, alto_sax: 63 } : { trumpet: 67 };
 const GUITAR_TAB = new Set(GUITAR);
+const LEAD_DB = { funky_worm: 2, whistle: 2 };
 const BETWEEN = { acoustic_grand_piano: 62, electric_grand_piano: 61, electric_piano_1: 63, electric_bass_finger: 40, acoustic_guitar_steel: 52, acoustic_guitar_nylon: 57, electric_guitar_clean: 55, tenor_sax: 58, alto_sax: 65, trumpet: 70, trombone: 52, french_horn: 63, tuba: 43, flute: 79, vibraphone: 66, marimba: 71 };
 // Real recordings loop near their end (about 3-5.7 s in), so they are held for 12 s to cross several loop wraps.
 const loopPlan = (id, plan) => LOOPED[id] ? (EXTRA ? { seconds: 14, notes: [[LOOPED[id], .1, 12]] } : { ...plan, notes: [[LOOPED[id], .1, 5]] }) : plan;
@@ -245,14 +248,16 @@ try {
       rows.push(r);
     }
     const piano = rows.find(r => r.id === 'acoustic_grand_piano'), problems = [];
-    if (process.env.PRINT_LEVELS) for (const r of rows) console.log(`       ${r.id.padEnd(22)} ${r.kind.padEnd(9)} gated ${r.gatedDb.toFixed(1)} dBFS (${(r.gatedDb - piano.gatedDb >= 0 ? '+' : '') + (r.gatedDb - piano.gatedDb).toFixed(1)})  rms ${(r.rmsDb - piano.rmsDb >= 0 ? '+' : '') + (r.rmsDb - piano.rmsDb).toFixed(1)}  peak ${r.peakDb.toFixed(1)}`);
+    const rel = (r, k) => (r[k] - piano[k] >= 0 ? '+' : '') + (r[k] - piano[k]).toFixed(1);
+    if (process.env.PRINT_LEVELS) for (const r of rows) console.log(`       ${r.id.padEnd(22)} ${r.kind.padEnd(9)} balanced ${rel(r, 'balancedDb').padStart(5)}  full ${rel(r, 'gatedDb').padStart(5)}  phone ${rel(r, 'phoneDb').padStart(5)}  peak ${r.peakDb.toFixed(1)}`);
     for (const r of rows) {
       const want = EXPECT_KIND[r.id] || 'soundfont';
       if (r.kind !== want) problems.push(`${r.id}: served as ${r.kind}, expected ${want}`);
       if (r.nan) problems.push(`${r.id}: ${r.nan} non-finite samples`);
       if (!(r.gatedDb > -60)) problems.push(`${r.id}: silent (${r.gatedDb.toFixed(1)} dBFS)`);
       if (want === 'soundfont') continue;
-      const d = r.gatedDb - piano.gatedDb, tol = GENERATED_BASED.has(r.id) && !EXTRA ? 4 : 1.5;
+      // Lead sounds are set 2 dB above the match (instruments.js SYNTHS[..].leadDb).
+      const d = r.balancedDb - piano.balancedDb - (LEAD_DB[r.id] || 0), tol = GENERATED_BASED.has(r.id) && !EXTRA ? 4 : 1.5;
       if (Math.abs(d) > tol) problems.push(`${r.id}: ${d.toFixed(1)} dB from the piano (allowed +-${tol})`);
     }
     assert.ok(Math.abs(piano.gatedDb - -27.9) < 1, `piano reference level ${piano.gatedDb.toFixed(1)} dBFS (expected -27.9)`);
@@ -285,7 +290,8 @@ try {
       // sounds an octave below the key, so its waveform repeats at half the key's frequency.
       const at = (id === 'funky_worm' || id === 'whistle') ? .06 : (id === 'synth_strings_1' || id === 'pad_2_warm') ? .7 : .25;
       const r = await page.evaluate(([id, midi, at]) => window.__inst.pitch(id, midi, at), [id, midi, at]);
-      const cents = id === 'drawbar_organ' ? r.cents + 1200 : r.cents;
+      // The whistle sounds an octave above the written note, like a real whistle.
+      const cents = id === 'drawbar_organ' ? r.cents + 1200 : id === 'whistle' ? r.cents - 1200 : r.cents;
       if (!(Math.abs(cents) < 20)) bad.push(`${id} midi ${midi}: ${r.f.toFixed(1)} Hz vs ${r.want.toFixed(1)} Hz (${cents.toFixed(0)} cents)`);
     }
     assert.deepEqual(bad, []);

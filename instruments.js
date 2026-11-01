@@ -21,13 +21,13 @@
 //
 // Levels: every engine instrument is calibrated to the suite's reference level (the old SoundFont
 // piano through its bus gain: -27.9 dBFS gated RMS for REFERENCE, a chord + melody, measured before
-// the master). A sample set levels itself when it loads by rendering REFERENCE once offline (the
+// the master), on the mean of its full-range and phone-speaker loudness (balancedDb). A sample set levels itself when it loads by rendering REFERENCE once offline (the
 // manifest "trim" adjusts on top); derived, layered and synthesized voices carry measured trims (see
 // LEVEL_DB). The caller applies CRPInstruments.busGain (1) instead of its SoundFont table for sounds
 // this engine serves.
 (() => {
   'use strict';
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
   const preset = (typeof window !== 'undefined' && window.CRP_INSTRUMENTS_CONFIG) || {};
   const config = { basePath: String(preset.basePath || 'assets/instruments/'), disabled: !!preset.disabled };
 
@@ -231,7 +231,7 @@
   const SYNTHS = {
     // GM Lead 2 (sawtooth): two detuned saws + a quiet square for body, resonant low-pass with a snappy envelope.
     saw_lead: {
-      levelDb: -10.9, peak: .2, maxVoices: 10, velAmp: .3, amp: { attack: .006, decay: .35, sustain: .78, release: .2 },
+      levelDb: -11.4, peak: .2, maxVoices: 10, velAmp: .3, amp: { attack: .006, decay: .35, sustain: .78, release: .2 },
       vib: { rate: 5.5, depth: 7, delay: .35, fade: .5 },
       build(a) {
         const { f, vel, t, nyq } = a, x = a.osc('sawtooth', 1, -7), y = a.osc('sawtooth', 1, 7), s = a.osc('square', 1);
@@ -243,7 +243,7 @@
     },
     // Warm pad: slow detuned saws + a triangle for a round fundamental, soft low-pass that opens with the attack.
     warm_pad: {
-      levelDb: -10.9, peak: .32, maxVoices: 12, amp: { attack: .75, curve: 'exp', release: 1.4 },
+      levelDb: -9.3, peak: .32, maxVoices: 12, amp: { attack: .75, curve: 'exp', release: 1.4 },
       vib: { rate: 4.6, depth: 5, delay: .3, fade: 1.2, spread: .12 },
       build(a) {
         const { f, t } = a, x = a.osc('sawtooth', 1, -6), y = a.osc('sawtooth', 1, 6), tri = a.osc('triangle', 1);
@@ -256,7 +256,7 @@
     },
     // Poly synth pad: brighter saw/square stack with a filter sweep that opens and settles.
     poly_pad: {
-      levelDb: -12.4, peak: .2, maxVoices: 12, amp: { attack: .08, decay: .9, sustain: .85, release: .75 },
+      levelDb: -13.1, peak: .2, maxVoices: 12, amp: { attack: .08, decay: .9, sustain: .85, release: .75 },
       vib: { rate: 5, depth: 4, delay: .5, fade: .8, spread: .1 },
       build(a) {
         const { f, t, nyq } = a, x = a.osc('sawtooth', 1, -8), y = a.osc('sawtooth', 1, 8), q = a.osc('square', 1, 3);
@@ -270,7 +270,7 @@
     },
     // String ensemble: three detuned saws, each with its own vibrato rate, slow attack, string-machine EQ + chorus.
     strings: {
-      levelDb: -11.4, peak: .2, maxVoices: 12, chain: 'strings', amp: { attack: .34, curve: 'exp', release: .95 },
+      levelDb: -11.9, peak: .2, maxVoices: 12, chain: 'strings', amp: { attack: .34, curve: 'exp', release: .95 },
       vib: { rate: 5.4, depth: 7, delay: .18, fade: .6, spread: .18 },
       build(a) {
         const { f, t, nyq } = a, lp = a.filter('lowpass', 1000, -2);
@@ -282,7 +282,7 @@
     },
     // Synth brass: saws through a brassy filter envelope with a small upward pitch blip on the attack.
     synth_brass: {
-      levelDb: -11.8, peak: .24, maxVoices: 10, velAmp: .25, amp: { attack: .03, decay: .45, sustain: .72, release: .26 },
+      levelDb: -12.5, peak: .24, maxVoices: 10, velAmp: .25, amp: { attack: .03, decay: .45, sustain: .72, release: .26 },
       vib: { rate: 5.2, depth: 6, delay: .4, fade: .5 }, blip: { cents: -30, time: .045 },
       build(a) {
         const { f, vel, t, nyq } = a, x = a.osc('sawtooth', 1, -6), y = a.osc('sawtooth', 1, 6), s = a.osc('square', 1);
@@ -292,25 +292,29 @@
         return lp;
       },
     },
-    // G-funk "worm" lead: smooth sine with a little filtered saw, portamento between consecutive notes,
-    // delayed wide vibrato. (The suite's worm filter-wobble fx runs after it.)
+    // G-funk "worm" lead (Moog style): saw + square through a resonant low-pass that tracks the pitch, over a
+    // sine for a round body; portamento between consecutive notes, delayed wide vibrato. The overtones up to
+    // about the 6th harmonic are what a phone speaker can play (a near-pure sine is inaudible on one below
+    // ~500 Hz). The suite's worm filter-wobble fx runs after it.
     worm: {
-      levelDb: -24.8, peak: .5, maxVoices: 6, amp: { attack: .014, sustain: 1, release: .14 }, glide: { time: .085, gap: .14 },
+      levelDb: -21.1, leadDb: 2, peak: .5, maxVoices: 6, amp: { attack: .014, sustain: 1, release: .14 }, glide: { time: .085, gap: .14 },
       vib: { rate: 5.6, depth: 24, delay: .14, fade: .32 },
       build(a) {
-        const { f } = a, s = a.osc('sine', 1), w = a.osc('sawtooth', 1, 4);
-        const wg = a.gain(.28), lp = a.filter('lowpass', Math.min(9000, f * 3.5 + 600), -3), mix = a.gain(1);
-        w.connect(wg); wg.connect(lp); s.connect(mix); lp.connect(mix);
+        const { f, nyq } = a, w = a.osc('sawtooth', 1, 3), q = a.osc('square', 1, -3), s = a.osc('sine', 1);
+        const wg = a.gain(.65), qg = a.gain(.32), sg = a.gain(.35), lp = a.filter('lowpass', clamp(f * 5 + 900, 20, Math.min(9000, nyq)), 2.4), mix = a.gain(1);
+        w.connect(wg); q.connect(qg); wg.connect(lp); qg.connect(lp); s.connect(sg); sg.connect(mix); lp.connect(mix);
         return mix;
       },
     },
-    // G-funk whistle: pure sine with a breath of band-passed noise (a little "chiff" on the attack),
-    // glide between consecutive notes and a delayed vibrato.
+    // G-funk whistle: pure sine with a breath of band-passed noise (a little "chiff" on the attack), glide
+    // between consecutive notes and a delayed vibrato. It sounds an octave above the written note, like a
+    // real whistle (about 500-3000 Hz): written at C4, a whistle would sit below any whistler's range and
+    // below what a phone speaker can play.
     whistle: {
-      levelDb: -20.1, peak: .5, maxVoices: 6, amp: { attack: .04, sustain: 1, release: .1 }, glide: { time: .07, gap: .14 },
+      levelDb: -21.8, leadDb: 2, peak: .5, maxVoices: 6, octave: 1, amp: { attack: .04, sustain: 1, release: .1 }, glide: { time: .07, gap: .14 },
       vib: { rate: 6.1, depth: 20, delay: .16, fade: .3 },
       build(a) {
-        const { f, t } = a, s = a.osc('sine', 1), h = a.osc('sine', 2), hg = a.gain(.03);
+        const { f, t } = a, s = a.osc('sine', 1), h = a.osc('sine', 2), hg = a.gain(.06);
         const nz = a.noise(), bp = a.filter('bandpass', clamp(f * 2, 1600, 9000), 2.2), ng = a.gain(0), mix = a.gain(1);
         h.connect(hg); nz.connect(bp); bp.connect(ng);
         ng.gain.setValueAtTime(.16, t); ng.gain.setTargetAtTime(.05, t + .02, .05);
@@ -321,7 +325,7 @@
     // Drawbar organ: all drawbars on one additive oscillator, third-harmonic percussion, key click,
     // slow rotary-style chorus/tremolo on the player.
     organ: {
-      levelDb: -9.7, peak: .32, maxVoices: 14, chain: 'rotary', amp: { attack: .004, sustain: 1, release: .05 },
+      levelDb: -9.3, peak: .32, maxVoices: 14, chain: 'rotary', amp: { attack: .004, sustain: 1, release: .05 },
       build(a) {
         const { t } = a, m = a.osc(a.wave('drawbar'), .5), p = a.osc('sine', 3), pg = a.gain(0);
         p.connect(pg);
@@ -336,7 +340,7 @@
     // DX-style FM electric piano: one carrier, a 1:1 modulator for the body and a 14:1 modulator for the
     // tine attack (index decays fast); both indexes follow velocity and soften up the keyboard.
     dx_ep: {
-      levelDb: -10.2, peak: .3, maxVoices: 16, chain: 'epChorus', velAmp: .4,
+      levelDb: -9.2, peak: .3, maxVoices: 16, chain: 'epChorus', velAmp: .4,
       amp: { attack: .0015, decay: .42, sustain: .45, decay2At: .5, decay2: 2.4, sustain2: 0, keyscale: true, release: .3 },
       build(a) {
         const { f, vel, t, midi } = a, c = a.osc('sine', 1), m1 = a.osc('sine', 1, 3), m2 = a.osc('sine', 14);
@@ -351,7 +355,7 @@
     // Rhodes-style electric piano (used when no sample set is delivered): sine carrier with a 1:1
     // modulator whose index grows with velocity (bark), plus a fast-decaying tine "bell" partial.
     rhodes: {
-      levelDb: -16.6, peak: .32, maxVoices: 16, chain: 'rhodes', velAmp: .45,
+      levelDb: -14.3, peak: .32, maxVoices: 16, chain: 'rhodes', velAmp: .45,
       amp: { attack: .002, decay: .4, sustain: .55, decay2At: .45, decay2: 2.6, sustain2: 0, keyscale: true, release: .3 },
       build(a) {
         const { f, vel, t, midi } = a, ks = Math.pow(2, -(midi - 60) / 24);
@@ -367,7 +371,7 @@
     // Clavinet (used when no sample set is delivered): narrow pulse + saw through a resonant low-pass
     // that snaps shut, fast decay, thin "quacky" pickup EQ.
     clav: {
-      levelDb: -9.6, peak: .3, maxVoices: 12, chain: 'clav', velAmp: .35,
+      levelDb: -11.0, peak: .3, maxVoices: 12, chain: 'clav', velAmp: .35,
       amp: { attack: .0015, decay: .55, sustain: 0, keyscale: true, release: .07 },
       build(a) {
         const { f, vel, t, nyq } = a, p = a.osc(a.wave('pulse22'), 1), s = a.osc('sawtooth', 1, 5);
@@ -415,23 +419,23 @@
   };
   // Processing applied to sample voices of derived sounds (voice-level part; the chain is player-level).
   const SAMPLE_FX = {
-    bright: { chain: 'bright', levelDb: -.1 },
-    egrand: { chain: 'egrand', attack: .003, levelDb: .5 },
+    bright: { chain: 'bright', levelDb: -.3 },
+    egrand: { chain: 'egrand', attack: .003, levelDb: -.1 },
     jazz: { chain: 'jazz', attack: .014, levelDb: -.1 },
-    muted: { chain: 'muted', attack: .003, release: .05, maxLen: .6, palm: true, levelDb: 4.8 },
-    overdrive: { chain: 'overdrive', levelDb: -21.9 },
-    distortion: { chain: 'distortion', levelDb: -18.4 },
+    muted: { chain: 'muted', attack: .003, release: .05, maxLen: .6, palm: true, levelDb: 5.9 },
+    overdrive: { chain: 'overdrive', levelDb: -23.4 },
+    distortion: { chain: 'distortion', levelDb: -21.6 },
   };
   // Level trims (dB), measured so each sound matches the piano reference (see the header):
-  //   SYNTHS[..].levelDb      synthesized voices (absolute)
+  //   SYNTHS[..].levelDb      synthesized voices (absolute); SYNTHS[..].leadDb puts a lead above the match
   //   SAMPLE_FX[..].levelDb   derived voices, relative to the (self-levelled) set they are made from
   //   LAYER_LEVEL_DB          a stacked section, relative to its (self-levelled) sets
   //   ALIAS_LEVEL_DB          a sound played through another one's model (+ the suite's fx)
   //   LEVEL_DB[id]            optional taste trim for a delivered set of that id, on top of its
   //                           self-levelling (PRINT_LEVELS=1 node tests/e2e/instruments.test.mjs).
   const LEVEL_DB = {};
-  const LAYER_LEVEL_DB = 2.6;
-  const ALIAS_LEVEL_DB = { wah_wah_guitar: -3.2 };
+  const LAYER_LEVEL_DB = 1.2;
+  const ALIAS_LEVEL_DB = { wah_wah_guitar: -2.6 };
   // Layer mix for a stacked brass section: weight, detune (cents) and onset offset (s) per set.
   const BRASS_LAYERS = [{ weight: .55, cents: 4, delay: 0 }, { weight: .5, cents: -5, delay: .009 }, { weight: .45, cents: 0, delay: .016 }];
 
@@ -530,9 +534,10 @@
     return s.loopEnd != null ? ms : ms * (i1 - i0) / want; // unlooped samples are silent after their end
   }
   // The level reference: a chord, then a short melody (bass sounds an octave lower). Every engine sound
-  // is levelled so this phrase measures REFERENCE.gatedDb (gated RMS, see gatedDb()) before the master.
+  // is levelled so this phrase measures REFERENCE.balancedDb (see balancedDb()) before the master: the
+  // piano then measures REFERENCE.gatedDb (gated RMS) on a full-range system, as it did before.
   const REFERENCE = {
-    gatedDb: -27.9,
+    gatedDb: -27.9, balancedDb: -30.7,
     chord: [60, 64, 67], melody: [64, 67, 69, 72, 67, 64, 62, 60], bassShift: -12,
     chordAt: .3, chordDur: 1.6, chordGain: .95, melodyAt: 2.5, step: .3, noteDur: .28, noteGain: .92, seconds: 5.6,
   };
@@ -549,6 +554,21 @@
     const abs = blocks.filter(e => e > 1e-7), mean = abs.reduce((a, b) => a + b, 0) / Math.max(1, abs.length), rel = abs.filter(e => e > mean * .1);
     return 10 * Math.log10(Math.max(1e-12, rel.reduce((a, b) => a + b, 0) / Math.max(1, rel.length)));
   }
+  // A small phone speaker plays almost nothing below ~500 Hz: two 2nd-order high-passes at 500 Hz (24 dB/oct).
+  function phoneWeighted(x, sr) {
+    const w = 2 * Math.PI * 500 / sr, al = Math.sin(w) / (2 * Math.SQRT1_2), c = Math.cos(w), a0 = 1 + al;
+    const b0 = (1 + c) / 2 / a0, b1 = -(1 + c) / a0, b2 = b0, a1 = -2 * c / a0, a2 = (1 - al) / a0;
+    let y = x;
+    for (let pass = 0; pass < 2; pass++) {
+      const out = new Float32Array(y.length); let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+      for (let i = 0; i < y.length; i++) { const v = y[i], o = b0 * v + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; out[i] = o; x2 = x1; x1 = v; y2 = y1; y1 = o; }
+      y = out;
+    }
+    return y;
+  }
+  // The level every sound is matched on: the mean of its gated level on a full-range system and through a
+  // phone speaker, so mellow, fundamental-heavy sounds are not lost on phones nor boom on big speakers.
+  const balancedDb = (x, sr) => (gatedDb(x, sr) + gatedDb(phoneWeighted(x, sr), sr)) / 2;
   // Self-levelling, part 1 (fallback): a quick estimate of the phrase's power from the samples it uses.
   function autoNorm(set, bass) {
     const R = REFERENCE, sh = bass ? R.bassShift : 0, note = (m, t1) => {
@@ -575,8 +595,8 @@
         const p = c.startRendering(); if (p && typeof p.then === 'function') p.then(resolve, reject);
       });
       player.disconnect();
-      const level = gatedDb(buf.getChannelData(0), sr);
-      if (Number.isFinite(level) && level > -100) set.norm = clamp(dbToGain(REFERENCE.gatedDb - level), .02, 60);
+      const level = balancedDb(buf.getChannelData(0), sr);
+      if (Number.isFinite(level) && level > -100) set.norm = clamp(dbToGain(REFERENCE.balancedDb - level), .02, 60);
     } catch (e) { console.warn(`[instruments] could not level ${set.id}; using an estimate`, e); }
   }
   function buildSet(id, man, samples) {
@@ -654,7 +674,8 @@
     return {
       id, kind: 'synth', from: name, synth: d, voice: synthVoice, chain: CHAINS[d.chain] || null,
       attack: d.amp.attack, release: d.amp.release, maxLen: null, glide: d.glide || null,
-      maxVoices: d.maxVoices || 12, retrigger: Math.max(.06, Math.min(.3, d.amp.attack)), level: dbToGain(d.levelDb ?? 0),
+      // leadDb: lead sounds sit a little above the level every other sound is matched to.
+      maxVoices: d.maxVoices || 12, retrigger: Math.max(.06, Math.min(.3, d.amp.attack)), level: dbToGain((d.levelDb ?? 0) + (d.leadDb || 0)),
     };
   }
   async function resolve(id, ctx) {
@@ -732,9 +753,9 @@
     return c;
   }
   function synthVoice(ctx, P, model, n, v) {
-    const d = model.synth, R = resources(ctx), f = mtof(n.midi), t = n.when, nyq = ctx.sampleRate * .45, pitched = [];
+    const d = model.synth, R = resources(ctx), shift = 12 * (d.octave || 0), f = mtof(n.midi + shift), t = n.when, nyq = ctx.sampleRate * .45, pitched = [];
     const api = {
-      f, t, nyq, midi: n.midi, vel: n.vel / 127, ctx,
+      f, t, nyq, midi: n.midi + shift, vel: n.vel / 127, ctx,
       osc(type, ratio = 1, cents = 0) {
         const o = ctx.createOscillator();
         if (typeof type === 'string') o.type = type; else o.setPeriodicWave(type);
@@ -751,7 +772,7 @@
     };
     d.build(api).connect(v.env);
     if (n.glideFrom != null && model.glide) {
-      const from = mtof(n.glideFrom);
+      const from = mtof(n.glideFrom + shift);
       for (const o of pitched) {
         o.frequency.setValueAtTime(clamp(from * o._ratio, 1, nyq), t);
         o.frequency.exponentialRampToValueAtTime(clamp(f * o._ratio, 1, nyq), t + model.glide.time);
@@ -932,7 +953,7 @@
   }
   window.CRPInstruments = {
     version: VERSION, busGain: 1,
-    load, provides, describe, configure, toMidi, gatedDb,
+    load, provides, describe, configure, toMidi, gatedDb, phoneWeighted, balancedDb,
     reference: REFERENCE, ids: Object.keys(DEFS),
     get basePath() { return baseUrl(); },
     get disabled() { return config.disabled; },
