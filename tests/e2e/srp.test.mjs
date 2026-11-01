@@ -1,7 +1,7 @@
 // Song Rider Pro end-to-end checks in a real browser against a local `wrangler dev`:
 //   wrangler d1 execute song-rider-suite-test-db --local --config tests/wrangler.test.jsonc --file migrations/0001_init.sql
 //   wrangler dev --config tests/wrangler.test.jsonc --port 8787 &
-//   BASE_URL=http://127.0.0.1:8787 node tests/e2e/srp.test.mjs
+//   BASE_URL=http://127.0.0.1:8787 node tests/e2e/srp.test.mjs      (ONLY=<part of a test name> runs a subset)
 // Uses the test invite code (INVITE_CODE, default "test-invite"). Prints ok/FAIL per check and exits
 // non-zero if any check fails. Workers AI is not available locally, so dictation is stubbed in-page.
 import assert from 'node:assert/strict';
@@ -22,6 +22,7 @@ const uniq = () => Math.random().toString(36).slice(2, 10);
 let passes = 0, failures = 0;
 
 async function test(name, fn) {
+  if (process.env.ONLY && !name.includes(process.env.ONLY)) return; // e.g. ONLY=dictation
   try { await fn(); passes++; console.log(`  ok   ${name}`); }
   catch (e) { failures++; console.log(`  FAIL ${name}\n       ${String(e && e.message || e).split('\n').join('\n       ')}`); }
 }
@@ -388,7 +389,7 @@ await test('dictation: ordered insert with retry, stop (not cancel) on hide, sty
   await ctx.close();
 });
 
-await test('typing is cheap: no whole-library work per keystroke, few cloud requests', async () => {
+await test('typing cost does not grow with the library; few cloud requests while typing', async () => {
   const user = await newUser();
   const songs = Array.from({ length: 60 }, (_, i) => ({
     id: `seed-${i}`, name: `Seed ${String(i).padStart(2, '0')}`, createdAt: 1000 + i, updatedAt: 1000 + i, notesUpdatedAt: 1000 + i,
@@ -398,25 +399,35 @@ await test('typing is cheap: no whole-library work per keystroke, few cloud requ
   }));
   const { ctx, page } = await device(browser, user);
   await page.goto(`${BASE}/song-rider/manifest.webmanifest`);
-  await page.evaluate(async (songs) => {
-    const id = (await (await fetch('/api/auth/me')).json()).user.id;
-    localStorage.setItem('songrider_v25_projects::' + id, JSON.stringify(songs));
-    localStorage.setItem('songrider_v25_currentProjectId::' + id, 'seed-0');
-  }, songs);
+  const uid = await page.evaluate(async () => (await (await fetch('/api/auth/me')).json()).user.id);
+  const seed = (list) => page.evaluate(({ uid, list }) => {
+    localStorage.setItem('songrider_v25_projects::' + uid, JSON.stringify(list));
+    localStorage.setItem('songrider_v25_currentProjectId::' + uid, 'seed-0');
+  }, { uid, list });
+  const keystrokeMedian = () => page.evaluate(async () => {
+    const ta = document.querySelector('textarea.fullSectionText'), t = [];
+    ta.focus();
+    for (let i = 0; i < 40; i++) { ta.value += 'x'; const t0 = performance.now(); ta.dispatchEvent(new Event('input', { bubbles: true })); t.push(performance.now() - t0); await new Promise((r) => setTimeout(r, 15)); }
+    return t.sort((a, b) => a - b)[20];
+  });
+  // one song: the per-keystroke cost of the song itself
+  await seed(songs.slice(0, 1));
   await open(page);
-  await sleep(6000); // first sync pushes the 60 local songs
+  await sleep(3000);
+  const one = await keystrokeMedian();
+  // sixty songs
+  await seed(songs);
+  await open(page);
+  await sleep(6000); // first sync pushes the local songs
+  const sixty = await keystrokeMedian();
+  await sleep(2500);
   let requests = 0;
   page.on('request', (r) => { if (r.url().includes('/api/srp/projects')) requests++; });
   await page.locator('textarea.fullSectionText').first().click();
-  const median = await page.evaluate(async () => {
-    const ta = document.querySelector('textarea.fullSectionText'), t = [];
-    for (let i = 0; i < 30; i++) { ta.value += 'x'; const t0 = performance.now(); ta.dispatchEvent(new Event('input', { bubbles: true })); t.push(performance.now() - t0); await new Promise((r) => setTimeout(r, 15)); }
-    return t.sort((a, b) => a - b)[15];
-  });
   for (let b = 0; b < 4; b++) { await page.keyboard.type(' abcdefghi', { delay: 50 }); await sleep(900); }
   await sleep(2500);
-  console.log(`       (keystroke handler median ${median.toFixed(1)} ms, ${requests} project API requests for 40 keystrokes)`);
-  assert.ok(median < 25, `keystroke handler took ${median.toFixed(1)} ms`);
+  console.log(`       (keystroke handler median: 1 song ${one.toFixed(1)} ms, 60 songs ${sixty.toFixed(1)} ms; ${requests} project API requests for 40 keystrokes)`);
+  assert.ok(sixty < one * 1.5 + 4, `keystrokes got slower with a bigger library (${one.toFixed(1)} -> ${sixty.toFixed(1)} ms)`);
   assert.ok(requests <= 20, `${requests} project API requests while typing`);
   noErrors(page);
   await ctx.close();
