@@ -28,27 +28,32 @@
   }
 
 
-  // v3.3.37 — repair duplicated chord-card identities. v3.3.35/36's Track Master
-  // blank-card insertion could append the same new card twice to the final row.
-  // Because both entries shared one voxId, they rendered as stacked/phantom blocks
-  // and required repeated Delete presses. Keep exactly one stored card per voxId.
-  function dedupeChordRows(data){
-    if(!data)return false;
-    if(!Array.isArray(data.rows)||!data.rows.length){data.rows=[[]];return false;}
-    const seenIds=new Set(),seenRefs=new Set();let changed=false;
-    data.rows=data.rows.map(raw=>{
-      const out=[];
-      for(const card of Array.isArray(raw)?raw:[]){
-        if(!card||typeof card!=='object'){out.push(card);continue;}
-        const id=String(card.voxId||'');
-        if(seenRefs.has(card)||(id&&seenIds.has(id))){changed=true;continue;}
-        seenRefs.add(card);if(id)seenIds.add(id);out.push(card);
-      }
-      return out;
-    });
-    if(!data.rows.length)data.rows=[[]];
-    return changed;
+  // Every chord card in a part needs its own voxId: Track Master selection, moves
+  // and placement carry-over all address cards by it. Repeated ids come from
+  // older builds (the v3.3.35/36 blank-card bug appended one card twice; track
+  // duplication and cross-track moves copied ids) and from CRP's Duplicate Line,
+  // which deep-copies cards. A repeated card gets a fresh id instead of being
+  // dropped. Only at load (dropPhantoms) is an exact positioned copy of an
+  // earlier card treated as the old phantom and removed. A CRP copy also loses
+  // the copied Track Master start (dropCopiedPlacement), so it lands after its
+  // original instead of on top of it.
+  function uniquifyCardIds(data,{dropPhantoms=false,dropCopiedPlacement=false}={}){
+    if(!data)return;
+    if(!Array.isArray(data.rows)||!data.rows.length){data.rows=[[]];return;}
+    const seen=new Map();
+    data.rows=data.rows.map(raw=>(Array.isArray(raw)?raw:[]).filter(card=>{
+      if(!card||typeof card!=='object'||!card.voxId)return true;
+      const id=String(card.voxId),json=JSON.stringify(card);
+      if(!seen.has(id)){seen.set(id,json);return true;}
+      if(dropPhantoms&&seen.get(id)===json&&hasTrackMasterStart(card))return false;
+      card.voxId=uid();
+      if(dropCopiedPlacement)delete card.voxStartBeat;
+      seen.set(card.voxId,JSON.stringify(card));
+      return true;
+    }));
   }
+  function hasTrackMasterStart(card){const s=card?.voxStartBeat;return s!=null&&Number.isFinite(Number(s))&&Number(s)>=0;}
+  function migrateChordData(data){uniquifyCardIds(data,{dropPhantoms:true});normalizeChordDurations(data);return data;}
 
 
   // v3.3.59 — repair the dual chord-duration representation used by CRP MIDI
@@ -111,9 +116,7 @@
   function markPartsDirty(){ partsUpdatedAt=Date.now(); return partsUpdatedAt; }
 
   function chordPart(name='Chords 1', data=null){
-    const d=data?clone(data):core.snapshot();
-    if(!d.rows?.length)d.rows=[[]];
-    dedupeChordRows(d);normalizeChordDurations(d);
+    const d=migrateChordData(data?clone(data):core.snapshot());
     return {id:uid(),type:'chord',name,enabled:true,muted:false,solo:false,voxSetupEstablished:false,volume:.85,data:d};
   }
   function leadPart(name='Lead 1'){
@@ -142,7 +145,7 @@
   function normalizePart(p,i){
     if(!p||!p.type)return null;
     const base={id:p.id||uid(),name:p.name||`${p.type==='chord'?'Chords':p.type==='lead'?'Lead':'Vocals'} ${i+1}`,enabled:p.enabled!==false,muted:p.muted===true,solo:p.solo===true,voxSetupEstablished:p.voxSetupEstablished===true,volume:Number.isFinite(+p.volume)?Math.max(0,Math.min(1,+p.volume)):.85};
-    if(p.type==='chord'){const data=clone(p.data||core.snapshot());dedupeChordRows(data);normalizeChordDurations(data);return {...base,type:'chord',data};}
+    if(p.type==='chord')return {...base,type:'chord',data:migrateChordData(clone(p.data||core.snapshot()))};
     if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,sustain:p.sustain===true,instrument:['piano','guitar','misc'].includes(p.instrument)?p.instrument:'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(256,+p.bars||4)),barsMode:p.barsMode==='song'?'song':'fixed',events:normalizeLeadEvents(p.events)};
     const voxEvents=Array.isArray(p.voxEvents)?p.voxEvents.map(e=>normalizeVoxEvent(e,p)).filter(Boolean):[];
     return {...base,type:'vocal',repeat:p.repeat!==false,transcript:String(p.transcript||''),transcriptWords:Array.isArray(p.transcriptWords)?p.transcriptWords:[],recordings:Array.isArray(p.recordings)?p.recordings.map(r=>({...r,blob:null})):[],activeTakeId:p.activeTakeId||null,voxEvents,backingPartIds:Array.isArray(p.backingPartIds)?p.backingPartIds:[],backingDrums:p.backingDrums!==false,backingVolume:Number.isFinite(+p.backingVolume)?Math.max(0,Math.min(1,+p.backingVolume)):.8,fx:{eq:p.fx?.eq||'clear',comp:p.fx?.comp||'medium',reverb:Number(p.fx?.reverb??.12),delay:Number(p.fx?.delay||0),autotune:Math.max(0,Math.min(100,Number(p.fx?.autotune)||0))}};
@@ -244,24 +247,65 @@
     return key;
   }
   function currentSongKey(){return normalizeSongKeyValue(core.snapshot()?.key)||normalizeSongKeyValue(parts.find(p=>p?.type==='chord'&&p.data?.key)?.data?.key);}
+  // CRP's editor state mirrors the loaded chord part; this pulls CRP edits back
+  // into the part. While Track Master is open the part data is the editing
+  // authority (its inline editors, drags and trims hold live card references),
+  // so nothing is pulled until it closes.
   function syncLoadedChord(){
     const p=loadedChord();
-    if(!p)return;
-    // v3.3.35 — while Track Master / Vox Box is open, the timeline's part data is
-    // the editing authority. Autosave calls capture(), and capture() historically
-    // replaced p.data with a fresh core.snapshot(). That invalidated the live card
-    // object references held by inline editors / drag / trim / delete. The exact
-    // symptom was: the typed chord auditioned, but the visible block stayed blank,
-    // and the same block could no longer be deleted, moved, or resized reliably.
-    // Capture the core -> part snapshot before opening Vox Box instead; while Vox is
-    // open, keep the existing part/card identities stable.
-    if(voxBoxOpen)return;
-    p.data=core.snapshot();
-    syncSongKeyAcrossChordParts(p.data.key);
+    if(!p||voxBoxOpen)return false;
+    adoptCoreSnapshot(p);
+    return true;
   }
-  function syncActiveChord(){
-    const p=active();
-    if(p?.type==='chord'&&p.id===loadedChordPartId){p.data=core.snapshot();syncSongKeyAcrossChordParts(p.data.key);}
+  function syncActiveChord(){if(active()?.id===loadedChordPartId)syncLoadedChord();}
+  function adoptCoreSnapshot(p){
+    const next=core.snapshot();
+    uniquifyCardIds(next,{dropCopiedPlacement:true});
+    carryTrackMasterPlacement(p.data,next);
+    normalizeChordDurations(next);
+    p.data=next;
+    syncSongKeyAcrossChordParts(next.key);
+  }
+  // CRP strips Track Master's absolute starts (voxStartBeat) from its own rows on
+  // MIDI-view Play, Save and resize, because the MIDI view is sequential. Those
+  // starts belong to Track Master, so they are restored from the part, matched by
+  // voxId, unless the CRP edit genuinely conflicts with them: the card was moved
+  // within the sequence, or a card CRP added/resized/shifted now overlaps it
+  // where it did not before.
+  function carryTrackMasterPlacement(oldData,next){
+    const prior=new Map();
+    chordItemsFor(oldData).forEach((it,index)=>{if(it.card?.voxId)prior.set(String(it.card.voxId),{start:it.startBeat,end:it.startBeat+it.dur,placed:hasTrackMasterStart(it.card),index});});
+    const cards=(next.rows||[]).flat().filter(c=>c&&typeof c==='object'),old=c=>c.voxId?prior.get(String(c.voxId)):null;
+    const restored=new Set();
+    for(const card of cards){const o=old(card);if(o?.placed&&!hasTrackMasterStart(card)){card.voxStartBeat=o.start;restored.add(card);}}
+    if(!restored.size)return;
+    const kept=cardsKeepingOrder(cards.filter(c=>old(c)),c=>old(c).index);
+    for(const card of restored)if(!kept.has(card)){delete card.voxStartBeat;restored.delete(card);}
+    const overlaps=(a0,a1,b0,b1)=>a0<b1-1e-6&&b0<a1-1e-6;
+    for(let pass=0;pass<=cards.length&&restored.size;pass++){
+      const items=chordItemsFor(next);
+      const edited=items.filter(it=>{const o=old(it.card);return !o||Math.abs(o.start-it.startBeat)>1e-6||Math.abs(o.end-(it.startBeat+it.dur))>1e-6;});
+      let dropped=false;
+      for(const it of items){
+        if(!restored.has(it.card))continue;
+        const mine=old(it.card),end=it.startBeat+it.dur;
+        const clash=edited.some(e=>{if(e.card===it.card||!overlaps(e.startBeat,e.startBeat+e.dur,it.startBeat,end))return false;const theirs=old(e.card);return !theirs||!overlaps(theirs.start,theirs.end,mine.start,mine.end);});
+        if(clash){delete it.card.voxStartBeat;restored.delete(it.card);dropped=true;}
+      }
+      if(!dropped)return;
+    }
+  }
+  // The cards that kept their relative order (a longest increasing run of their
+  // previous indexes); anything outside it was moved within the sequence.
+  function cardsKeepingOrder(cards,indexOf){
+    const tails=[],prev=new Array(cards.length);
+    cards.forEach((card,i)=>{
+      const v=indexOf(card);let lo=0,hi=tails.length;
+      while(lo<hi){const mid=(lo+hi)>>1;if(indexOf(cards[tails[mid]])<v)lo=mid+1;else hi=mid;}
+      prev[i]=lo>0?tails[lo-1]:-1;tails[lo]=i;
+    });
+    const out=new Set();for(let i=tails.length?tails[tails.length-1]:-1;i>=0;i=prev[i])out.add(cards[i]);
+    return out;
   }
 
   function refreshBabySetupToggle(){
@@ -1347,22 +1391,10 @@
     queueTempoRestartIfNeeded();
     if(active()?.type==='lead')renderLeadHarmony();
   }
-  // v3.3.63 — dedicated CRP MIDI timeline commit. MIDI is sequential, so a
-  // completed MIDI resize removes old Track Master absolute starts instead of
-  // rewriting them. chordFlatItems() then derives every start from the CURRENT
-  // duration sequence on every playback/export/save pass. This removes the stale
-  // first-edit timeline that could survive later resizes.
+  // CRP MIDI-view commit (Play, Save, resize). Durations come from the MIDI view;
+  // Track Master placements survive unless an edit conflicts with them.
   function syncMidiTimelineFromCore(){
-    const p=loadedChord();if(!p)return false;
-    p.data=core.snapshot();
-    dedupeChordRows(p.data);normalizeChordDurations(p.data);
-    for(const row of p.data?.rows||[])for(const card of Array.isArray(row)?row:[]){
-      if(!card||typeof card!=='object')continue;
-      const drawn=Number(card.durationBeats),exact=Number(card.voxDurationBeats);
-      const dur=Number.isFinite(drawn)&&drawn>0?Math.max(.03,drawn):(Number.isFinite(exact)&&exact>0?Math.max(.03,exact):Math.max(.03,Number(core.cardDurationBeats?.(card,p.data?.beats||core.beats))||Number(core.beats)||4));
-      card.durationBeats=dur;card.voxDurationBeats=dur;delete card.voxStartBeat;
-    }
-    syncSongKeyAcrossChordParts(p.data.key);
+    if(!syncLoadedChord())return false;
     markPartsDirty();playbackTotalBeats=mediaDurationBeats();
     return true;
   }
@@ -1889,8 +1921,7 @@
     // id, use those rows for the chord part CRP is about to restore. This prevents
     // an older Baby DAW copy from resetting freshly saved MIDI durations on refresh.
     if(!savedLoadedChordId&&Array.isArray(project?.rows)&&project.rows.length){
-      c.data={...(c.data||core.snapshot()),rows:clone(project.rows)};
-      dedupeChordRows(c.data);normalizeChordDurations(c.data);
+      c.data=migrateChordData({...(c.data||core.snapshot()),rows:clone(project.rows)});
     }
     loadedChordPartId=c.id;core.apply(c.data);
     if(activePartId!==c.id)selectPart(activePartId);else{setEditorMode('chord');renderParts();}
@@ -2419,7 +2450,8 @@
   }
   function leadEventStartBeat(part,event){const stepBeats=4/Math.max(8,Number(part?.resolution)||16),exact=Number(event?.voxStartBeat);return Number.isFinite(exact)&&exact>=0?exact:(Number(event?.step)||0)*stepBeats;}
   function leadEventDurationBeats(part,event){const stepBeats=4/Math.max(8,Number(part?.resolution)||16),exact=Number(event?.voxDurationBeats);return Number.isFinite(exact)&&exact>0?exact:Math.max(stepBeats,leadDurationSteps(event)*stepBeats);}
-  function chordEventDurationBeats(part,card){
+  function chordEventDurationBeats(part,card){return chordCardBeats(part?.data,card);}
+  function chordCardBeats(data,card){
     // Track Master can use unsnapped/free durations, so preserve an exact
     // voxDurationBeats when it agrees with durationBeats. A disagreement is the
     // legacy CRP MIDI bug: the visible/drawn duration changed while the timeline
@@ -2428,11 +2460,13 @@
     const drawn=Number(card?.durationBeats),exact=Number(card?.voxDurationBeats);
     if(Number.isFinite(drawn)&&drawn>0&&Number.isFinite(exact)&&exact>0)return Math.abs(drawn-exact)<=1e-9?exact:drawn;
     if(Number.isFinite(exact)&&exact>0)return exact;
-    return Number.isFinite(drawn)&&drawn>0?(core.cardDurationBeats?.(card,part?.data?.beats||core.beats)||drawn):(core.beats||4);
+    return Number.isFinite(drawn)&&drawn>0?(core.cardDurationBeats?.(card,data?.beats||core.beats)||drawn):(core.beats||4);
   }
-  function chordFlatItems(part){
-    dedupeChordRows(part?.data);
-    const out=[];let cursor=0,flatIndex=0;for(let ri=0;ri<(part.data?.rows||[]).length;ri++){const row=part.data.rows[ri]||[];for(let ci=0;ci<row.length;ci++){const card=row[ci],dur=chordEventDurationBeats(part,card),raw=Number(card?.voxStartBeat),startBeat=Number.isFinite(raw)&&raw>=0?raw:cursor;out.push({card,rowIndex:ri,cardIndex:ci,flatIndex,startBeat,dur});cursor=Math.max(cursor,startBeat+dur);flatIndex++;}}return out;
+  function chordFlatItems(part){return chordItemsFor(part?.data);}
+  function chordItemsFor(data){
+    const out=[],rows=data?.rows||[];let cursor=0,flatIndex=0;
+    for(let ri=0;ri<rows.length;ri++){const row=rows[ri]||[];for(let ci=0;ci<row.length;ci++){const card=row[ci],dur=chordCardBeats(data,card),startBeat=hasTrackMasterStart(card)?Number(card.voxStartBeat):cursor;out.push({card,rowIndex:ri,cardIndex:ci,flatIndex,startBeat,dur});cursor=Math.max(cursor,startBeat+dur);flatIndex++;}}
+    return out;
   }
   function removeChordCardFromPart(part,card){
     if(!part?.data?.rows)return false;const id=String(card?.voxId||'');
@@ -2598,7 +2632,18 @@
     markPartsDirty();renderParts();renderVoxBox();core.scheduleAutoSave();core.flushAutoSaveNow?.();
     voxStatus(`${deletedType==='vocal'?'Vocal track':'Track'} deleted from Track Master and Baby DAW.`);
   }
-  function duplicateVoxTrack(part){if(!part)return;closeVoxTrackContextMenu();voxCheckpoint();let copy;if(part.type==='chord'){copy=normalizePart({...clone(part),id:uid(),name:`${part.name} Copy`},parts.length);}else if(part.type==='lead'){copy=normalizePart({...clone(part),id:uid(),name:`${part.name} Copy`,events:(part.events||[]).map(e=>({...clone(e),voxId:uid()}))},parts.length);}else{copy={...part,id:uid(),name:`${part.name} Copy`,recordings:(part.recordings||[]).map(r=>({...r})),voxEvents:(part.voxEvents||[]).map(e=>({...clone(e),id:uid()}))};copy.voxEvents.forEach(e=>e.sourcePartId=copy.id);}parts.splice(Math.max(0,parts.indexOf(part)+1),0,copy);persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${copy.name} duplicated.`);}
+  // A duplicate is a new track: every card, note and clip gets a fresh identity.
+  // A vocal copy shares the original's take audio (same take ids), which take
+  // deletion reference-counts.
+  function duplicateVoxTrack(part){
+    if(!part)return;closeVoxTrackContextMenu();voxCheckpoint();
+    const src=clone(part),id=uid();
+    if(part.type==='chord')for(const card of (src.data?.rows||[]).flat())if(card&&typeof card==='object')card.voxId=uid();
+    if(part.type==='lead')src.events=(src.events||[]).map(e=>({...e,voxId:uid()}));
+    if(part.type==='vocal')src.voxEvents=(src.voxEvents||[]).map(e=>({...e,id:uid(),sourcePartId:id}));
+    const copy=normalizePart({...src,id,name:`${part.name} Copy`},parts.length);
+    parts.splice(Math.max(0,parts.indexOf(part)+1),0,copy);persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${copy.name} duplicated.`);
+  }
   function ensureVoxTrackDialog(){
     let modal=document.getElementById('voxTrackDialog');if(modal)return modal;modal=document.createElement('div');modal.id='voxTrackDialog';modal.className='vox-track-dialog';modal.hidden=true;modal.innerHTML=`<div class="vox-track-dialog-backdrop"></div><div class="vox-track-dialog-card" role="dialog" aria-modal="true" aria-label="Add track"><h3>Add Track</h3><label>Name<input id="voxNewTrackName" type="text"></label><label>Type<select id="voxNewTrackType"><option value="chord">Chord / Note</option><option value="lead">Lead / Bass</option><option value="vocal">Vocal</option></select></label><label class="vox-new-mode-row">Chord/Note<select id="voxNewTrackMode"><option value="chord">Chord</option><option value="note">Note</option></select></label><label class="vox-new-inst-row">Instrument<select id="voxNewTrackInstrument"><option value="piano">Piano</option><option value="guitar">Guitar</option><option value="misc">Misc</option></select></label><label class="vox-new-inst-row">Sound<select id="voxNewTrackSound"></select></label><div class="vox-track-dialog-actions"><button type="button" data-cancel>Cancel</button><button type="button" data-add class="accent">Add Track</button></div></div>`;document.body.appendChild(modal);modal.querySelector('[data-cancel]').onclick=()=>modal.hidden=true;modal.querySelector('.vox-track-dialog-backdrop').onclick=()=>modal.hidden=true;const type=modal.querySelector('#voxNewTrackType'),inst=modal.querySelector('#voxNewTrackInstrument'),sound=modal.querySelector('#voxNewTrackSound');const fillSounds=()=>{const opts=core.sounds[inst.value]||core.sounds.piano;sound.innerHTML=opts.map(([v,l])=>`<option value="${escapeHtml(v)}">${escapeHtml(l)}</option>`).join('');};const refresh=()=>{const vocal=type.value==='vocal';modal.querySelector('.vox-new-mode-row').hidden=type.value!=='chord';modal.querySelectorAll('.vox-new-inst-row').forEach(x=>x.hidden=vocal);fillSounds();};type.onchange=refresh;inst.onchange=fillSounds;modal._refresh=refresh;modal.querySelector('[data-add]').onclick=()=>{const t=type.value,name=modal.querySelector('#voxNewTrackName').value.trim();voxCheckpoint();let p;if(t==='chord'){const snap=core.snapshot();p=chordPart(name||`Chords ${countType('chord')+1}`,{...snap,rows:[[]],key:normalizeSongKeyValue(snap.key)});p.data.mode=modal.querySelector('#voxNewTrackMode').value;p.data.instrument=inst.value;p.data.sound=sound.value;p.voxSetupEstablished=true;}else if(t==='lead'){p=leadPart(name||`Lead ${countType('lead')+1}`);p.instrument=inst.value;p.sound=sound.value;p.voxSetupEstablished=true;}else p=vocalPart(name||`Vocals ${countType('vocal')+1}`);parts.push(p);modal.hidden=true;persistVoxEdits();renderParts();renderVoxBox();voxStatus(`${p.name} added.`);};refresh();return modal;
   }
@@ -2824,8 +2869,10 @@
           if(dst.type==='chord'&&dst!==src){
             const clip={kind:'lead',sourcePartId:src.id,event:clone(item.event)},made=pasteOneInstrumentClip(clip,targetBeat,dst);if(made){removeInstrumentSelectionNoCheckpoint([item]);movedSelections.push(made);voxInstrumentTrackFocus={kind:'chord',name:dst.name,key:`part:${dst.id}`,explicitTarget:true};}
           }else{
-            if(dst!==src)src.events=(src.events||[]).filter(x=>x!==item.event&&String(x.voxId||'')!==String(item.event.voxId||''));
-            const dstStepBeats=4/Math.max(8,Number(dst.resolution)||16),newEvent=item.event;if(!newEvent.voxId)newEvent.voxId=uid();
+            const newEvent=item.event;
+            // A note moving to another track gets a fresh identity there.
+            if(dst!==src){src.events=(src.events||[]).filter(x=>x!==newEvent&&String(x.voxId||'')!==String(newEvent.voxId||''));newEvent.voxId=uid();}
+            const dstStepBeats=4/Math.max(8,Number(dst.resolution)||16);if(!newEvent.voxId)newEvent.voxId=uid();
             newEvent.voxStartBeat=targetBeat;newEvent.voxDurationBeats=dur;newEvent.step=Math.max(0,Math.round(targetBeat/dstStepBeats));newEvent.durationSteps=Math.max(1,Math.round(dur/dstStepBeats));
             dst.events=normalizeLeadEvents(dst===src?(dst.events||[]):[...(dst.events||[]),newEvent]);const stored=(dst.events||[]).find(x=>String(x.voxId||'')===String(newEvent.voxId||''))||newEvent;
             movedSelections.push({kind:'lead',key:`lead:${dst.id}:${stored.voxId}`,part:dst,event:stored,startBeat:leadEventStartBeat(dst,stored),dur:leadEventDurationBeats(dst,stored)});
@@ -2836,7 +2883,7 @@
           if(dst.type==='lead'&&dst!==src){
             const clip={kind:'chord',sourcePartId:src.id,card:clone(card)},made=pasteOneInstrumentClip(clip,targetBeat,dst);if(made){removeInstrumentSelectionNoCheckpoint([item]);movedSelections.push(made);voxInstrumentTrackFocus={kind:'lead',name:dst.name,key:`part:${dst.id}`,explicitTarget:true};}
           }else{
-            if(dst!==src){removeChordCardFromPart(src,card);insertChordCardIntoPart(dst,card,targetBeat);voxInstrumentTrackFocus={kind:'chord',name:dst.name,key:`part:${dst.id}`,explicitTarget:true};}
+            if(dst!==src){removeChordCardFromPart(src,card);card.voxId=uid();insertChordCardIntoPart(dst,card,targetBeat);voxInstrumentTrackFocus={kind:'chord',name:dst.name,key:`part:${dst.id}`,explicitTarget:true};}
             else{card.voxStartBeat=targetBeat;if(!Number.isFinite(Number(card.voxDurationBeats)))card.voxDurationBeats=Math.max(.001,Number(item.dur)||chordEventDurationBeats(src,card));card.durationBeats=card.voxDurationBeats;}
             movedSelections.push({kind:'chord',key:`chord:${dst.id}:${card.voxId}`,part:dst,card,startBeat:targetBeat,dur:chordEventDurationBeats(dst,card)});
           }
