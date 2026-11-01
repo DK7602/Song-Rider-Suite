@@ -196,6 +196,19 @@ async function api(request, env, url) {
     try { const r = await env.DB.prepare('SELECT 1 ok').first(); return json({ ok: r?.ok === 1, app: 'Song Rider Suite', database: 'connected', speech: !!env.AI, mediaStorage: !!env.AUDIO }); }
     catch (e) { console.error('Health check failed', e); return json({ ok: false, error: 'Database unavailable.' }, 500); }
   }
+  // TEMPORARY diagnostic (remove after verifying dictation on the deployed preview): runs the
+  // exact dictation call on a 1.5 s server-made 16 kHz mono WAV and reports the outcome.
+  if (path === '/api/lyrics-dictation/selftest' && method === 'GET') {
+    if (!env.AI) return json({ ok: false, error: 'no AI binding' }, 503);
+    const rate = 16000, n = rate * 1.5, bytes = new Uint8Array(44 + n * 2), dv = new DataView(bytes.buffer), w = (o, t) => { for (let i = 0; i < t.length; i++) bytes[o + i] = t.charCodeAt(i); };
+    w(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w(36, 'data'); dv.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) dv.setInt16(44 + i * 2, Math.round(Math.sin(2 * Math.PI * 220 * i / rate) * 3000 * (i % 8000 < 4000 ? 1 : 0)), true);
+    const t0 = Date.now();
+    try {
+      const result = await env.AI.run(TURBO_MODEL, { audio: bytesToBase64(bytes), language: 'en', task: 'transcribe', vad_filter: true, condition_on_previous_text: false, beam_size: 8, initial_prompt: dictationPrompt(request, url) });
+      return json({ ok: true, ms: Date.now() - t0, text: String(result?.text || result?.transcription_info?.text || ''), keys: Object.keys(result || {}) });
+    } catch (e) { return json({ ok: false, ms: Date.now() - t0, error: String(e?.message || e).slice(0, 300) }, 502); }
+  }
   if (path === '/api/auth/me' && method === 'GET') { const u = await userFor(request, env); return json({ ok: true, user: u }); }
 
   if (path === '/api/auth/register' && method === 'POST') {
