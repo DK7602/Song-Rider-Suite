@@ -514,8 +514,19 @@
       if(first){m=String(first.value||'').trim().match(/^([A-Ga-g])([#b]?)(.*)$/);if(m){root=m[1].toUpperCase()+m[2];const q=(m[3]||'').toLowerCase();minor=q.startsWith('m')&&!q.startsWith('maj');}}
     }
     let i=root==null?null:HARMONY_NOTE_INDEX[root];if(!Number.isFinite(i))return null;
-    if(data?.instrument==='guitar'&&Number(data?.capo))i=(i+Number(data.capo)+120)%12;
-    return {rootIndex:i,minor};
+    let prefer=root;
+    if(data?.instrument==='guitar'&&Number(data?.capo)){i=(i+Number(data.capo)+120)%12;prefer=root.includes('b')?'flat':root.includes('#')?'sharp':null;}
+    return {rootIndex:i,minor,prefer};
+  }
+  // Note names follow the song's key, like Chord Rider: Bb major shows Bb and Eb, not A# and D#.
+  function keyTonicLabel(key){
+    try{if(core.keyTonicName)return core.keyTonicName(key.rootIndex,key.minor,key.prefer||null);}catch{}
+    return NOTE_NAMES[key.rootIndex];
+  }
+  function keyNoteName(pc,key){
+    const p=((Number(pc)%12)+12)%12;
+    if(key&&core.spellInKey){try{const n=core.spellInKey(p,{root:keyTonicLabel(key),minor:key.minor});if(n)return n;}catch{}}
+    return NOTE_NAMES[p];
   }
   function vocalAutotuneScale(){
     const chord=loadedChord()||parts.find(x=>x.type==='chord')||null;
@@ -525,7 +536,7 @@
     if(!key)return {allowedPcs:[],label:'Song key: set a key/chord first'};
     const ints=key.minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
     const allowedPcs=ints.map(i=>(key.rootIndex+i)%12);
-    return {allowedPcs,label:`Song key: ${NOTE_NAMES[key.rootIndex]} ${key.minor?'minor':'major'}`};
+    return {allowedPcs,label:`Song key: ${keyTonicLabel(key)} ${key.minor?'minor':'major'}`};
   }
   // The Auto-Tune worklet delays both its dry and tuned paths by the same number
   // of samples; vocal clips are started that much early (see startVocalSource).
@@ -584,7 +595,7 @@
       const start=rootPcs[0]??chordTonePcs[0];
       notePcs=[...chordTonePcs].sort((a,b)=>((a-start+12)%12)-((b-start+12)%12));
     }
-    return {chordName:chord?.name||'Chords',chordLabels,notePcs:uniquePitchClasses(notePcs),chordTonePcs:uniquePitchClasses(chordTonePcs),rootPcs:uniquePitchClasses(rootPcs)};
+    return {key,chordName:chord?.name||'Chords',chordLabels,notePcs:uniquePitchClasses(notePcs),chordTonePcs:uniquePitchClasses(chordTonePcs),rootPcs:uniquePitchClasses(rootPcs)};
   }
   window.addEventListener('scale-rider-change',()=>{try{renderLeadHarmony()}catch{}});
   function renderLeadHarmony(){
@@ -607,7 +618,7 @@
       for(const name of ctx.chordLabels){const chip=document.createElement('span');chip.className='lead-harmony-chip chord';chip.textContent=name;chip.title=`${ctx.chordName} • Bar ${leadBarPage+1}`;chordsBox.appendChild(chip);}
     }
     if(!ctx.notePcs.length){const e=document.createElement('span');e.className='lead-harmony-empty';e.textContent='—';notesBox.appendChild(e);}else{
-      for(const pc of ctx.notePcs){const chip=document.createElement('span');chip.className='lead-harmony-chip note';if(ctx.chordTonePcs.includes(pc))chip.classList.add('chord-tone');if(ctx.rootPcs.includes(pc))chip.classList.add('root-tone');chip.textContent=NOTE_NAMES[pc];chip.title=ctx.rootPcs.includes(pc)?'Chord root':ctx.chordTonePcs.includes(pc)?'Chord tone':'In-key note';notesBox.appendChild(chip);}
+      for(const pc of ctx.notePcs){const chip=document.createElement('span');chip.className='lead-harmony-chip note';if(ctx.chordTonePcs.includes(pc))chip.classList.add('chord-tone');if(ctx.rootPcs.includes(pc))chip.classList.add('root-tone');chip.textContent=keyNoteName(pc,ctx.key);chip.title=ctx.rootPcs.includes(pc)?'Chord root':ctx.chordTonePcs.includes(pc)?'Chord tone':'In-key note';notesBox.appendChild(chip);}
     }
   }
   function leadExactEventEndBeat(p){
@@ -3138,7 +3149,7 @@
     const cb=$('voxChordsUsed'),nb=$('voxNotesFit');if(!cb||!nb)return;const focusId=String(voxInstrumentTrackFocus?.key||'').startsWith('part:')?String(voxInstrumentTrackFocus.key).slice(5):'',part=parts.find(p=>p.type==='chord'&&String(p.id)===focusId)||loadedChord()||parts.find(p=>p.type==='chord');if(!part){cb.textContent='—';nb.textContent='—';return;}
     const barStart=Math.floor(Math.max(0,voxPlayheadBeat)/4)*4,barEnd=barStart+4,items=chordFlatItems(part).filter(x=>x.startBeat<barEnd&&x.startBeat+x.dur>barStart),cards=items.map(x=>x.card),chords=[];for(const c of cards.filter(c=>c?.type==='chord')){const lab=harmonyDisplayCard(c,part.data);if(lab&&!chords.includes(lab))chords.push(lab);}const tone=[],roots=[];for(const c of cards.filter(c=>c?.type==='chord')){const root=harmonyPitchClass(harmonyDisplayCard(c,part.data));if(root!=null&&!roots.includes(root))roots.push(root);for(const n of core.notesFor(c,part.data)||[]){const pc=harmonyPitchClass(n);if(pc!=null&&!tone.includes(pc))tone.push(pc);}}
     const allCards=(part.data?.rows||[]).flat().filter(Boolean),key=harmonyKey(part.data,allCards);let pcs=[];if(key){const ints=key.minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];pcs=ints.map(i=>(key.rootIndex+i)%12);for(const pc of tone)if(!pcs.includes(pc))pcs.push(pc);}else pcs=[...tone];
-    cb.innerHTML='';nb.innerHTML='';if(!chords.length)cb.textContent='—';else for(const x of chords){const chip=document.createElement('span');chip.className='vox-harmony-chip chord';chip.textContent=x;cb.appendChild(chip);}if(!pcs.length)nb.textContent='—';else for(const pc of pcs){const chip=document.createElement('span');chip.className='vox-harmony-chip note'+(tone.includes(pc)?' chord-tone':'')+(roots.includes(pc)?' root-tone':'');chip.textContent=NOTE_NAMES[pc];nb.appendChild(chip);}
+    cb.innerHTML='';nb.innerHTML='';if(!chords.length)cb.textContent='—';else for(const x of chords){const chip=document.createElement('span');chip.className='vox-harmony-chip chord';chip.textContent=x;cb.appendChild(chip);}if(!pcs.length)nb.textContent='—';else for(const pc of pcs){const chip=document.createElement('span');chip.className='vox-harmony-chip note'+(tone.includes(pc)?' chord-tone':'')+(roots.includes(pc)?' root-tone':'');chip.textContent=keyNoteName(pc,key);nb.appendChild(chip);}
   }
   function closeVoxTrackContextMenu(){document.getElementById('voxTrackContextMenu')?.remove();}
   function deleteVoxTrack(part){
