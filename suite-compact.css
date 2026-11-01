@@ -1,0 +1,68 @@
+/* Song Rider Suite — compact phone shell.
+   Shared by index.html (Chord Rider / Baby DAW) and song-rider/index.html, and loaded
+   LAST on both. On a phone the suite banner, three large mode cards, the Track Master
+   bar and the app wordmark used to fill about half of the first screen. Here they
+   become a slim banner, a one-row tab bar, a small Track Master button and a small
+   wordmark, so the workspace starts in the top third of the screen.
+
+   Only shared shell selectors are used. The older shell sheets (branding-shell,
+   suite-shell-lock, skins) size these pieces with !important at up to three-class
+   specificity, so every rule here is scoped with :root[data-skin][data-skin-choice]
+   (both attributes are set by the inline head script on both pages) and wins by
+   specificity rather than by load order alone. Desktop is untouched. */
+@media (max-width:600px){
+  /* Slim banner: artwork skins scale the header image; text skins shrink the title. */
+  :root[data-skin][data-skin-choice] .suite-master-header{
+    min-height:0!important;height:auto!important;padding:3px 8px!important;
+    display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
+  }
+  :root[data-skin][data-skin-choice] .suite-master-header>img{
+    width:auto!important;max-width:100%!important;height:34px!important;object-fit:contain!important;margin:0 auto!important;
+  }
+  :root[data-skin][data-skin-choice] .suite-master-header::before{font-size:1.15rem!important;letter-spacing:.05em!important;}
+  :root[data-skin][data-skin-choice] .suite-master-header::after{display:none!important;}
+
+  /* Mode cards become a row of three 44px tabs with an icon (where the skin has one) and a name. */
+  :root[data-skin][data-skin-choice] .workspace-mode-switch{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important;padding:6px 8px!important;
+  }
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn{
+    aspect-ratio:auto!important;height:44px!important;min-height:44px!important;
+    display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;
+    gap:6px!important;padding:0 6px!important;border-radius:11px!important;overflow:hidden!important;
+  }
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn :is(.mode-art,.baby-exact-art){display:none!important;}
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .srs-theme-mode-icon{
+    flex:0 0 26px!important;width:26px!important;height:26px!important;padding:4px!important;border-radius:8px!important;
+  }
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .mode-copy{
+    display:flex!important;position:static!important;flex:0 1 auto!important;min-width:0!important;
+    align-items:center!important;justify-content:center!important;text-align:center!important;
+  }
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .mode-copy strong{
+    font-size:.82rem!important;line-height:1.1!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+  }
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .mode-copy small{display:none!important;}
+
+  /* Track Master: a slim full-width button. */
+  :root[data-skin][data-skin-choice] .track-master-nav-row{margin:0!important;padding:0 8px 6px!important;}
+  :root[data-skin][data-skin-choice] .track-master-nav-row .track-master-gold-btn{
+    min-height:36px!important;height:36px!important;padding:0 12px!important;border-radius:10px!important;font-size:.74rem!important;
+  }
+
+  /* App wordmarks: Chord Rider Pro (root page) and Song Rider Pro (SRP). */
+  /* Vertical spacing only: light skins draw the title as a full-bleed band with side margins. */
+  :root[data-skin][data-skin-choice] .workspace-chord-rider .crp-pro-titlebar{margin-bottom:10px!important;padding-bottom:8px!important;}
+  :root[data-skin][data-skin-choice] .workspace-chord-rider .crp-pro-titlebar .crp-pro-wordmark-img{
+    width:auto!important;max-width:100%!important;height:30px!important;
+  }
+  :root[data-skin][data-skin-choice] .workspace-chord-rider .crp-pro-titlebar .crp-controls-toggle{height:34px!important;min-height:34px!important;max-height:34px!important;}
+  :root[data-skin][data-skin-choice] body header .panel .panelTop .left .srp-exact-wordmark{
+    width:auto!important;max-width:100%!important;height:30px!important;max-height:30px!important;
+  }
+}
+@media (max-width:360px){
+  /* Very narrow phones: the tab names need the icon's room. */
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .srs-theme-mode-icon{display:none!important;}
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .mode-copy strong{font-size:.78rem!important;}
+}

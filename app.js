@@ -133,9 +133,9 @@
     instrument: normalizeInstrument(savedInstrument),
     mode: localStorage.getItem('crp-last-mode') === 'note' ? 'note' : 'chord',
     sound:'', octave:0, capo:0, neck:'open', transpose:false,
-    instrumentBus:null, instrumentLimiter:null, instrumentFxChain:null,
+    instrumentBus:null, instrumentFxChain:null,
     rows:[[]], selectedRow:0, playing:false, timer:null,
-    audioCtx:null, player:null, playerName:'', currentProjectId:null, drag:null, lineDrag:null,
+    audioCtx:null, player:null, playerName:'', currentProjectId:null, draftId:null, drag:null, lineDrag:null,
     autoScroll:localStorage.getItem('crp-auto-scroll')==='1',
     sustain:localStorage.getItem('crp-sustain')==='1',
     cardView:localStorage.getItem('crp-card-view')==='midi'?'midi':'diagram'
@@ -160,13 +160,67 @@
     else q=q.replace(/^minor/i,'m').replace(/^min/i,'m').replace(/^major/i,'maj');
     return q;
   }
+  // Accepts slash chords ("G/B", "D/F#", "Am7/G"): `base` is the chord without
+  // the bass note, `bass` the note played underneath. The display keeps the
+  // user's own spelling.
   function parseChord(raw) {
     raw=String(raw).trim().replace(/♭/g,'b').replace(/♯/g,'#');
-    const m=raw.match(/^([A-Ga-g])([#b]?)(.*)$/); if(!m)return null;
+    const slash=raw.match(/^(.+?)\/([A-Ga-g][#b]?)$/);
+    const m=(slash?slash[1]:raw).match(/^([A-Ga-g])([#b]?)(.*)$/); if(!m)return null;
     const root=m[1].toUpperCase()+m[2]; if(!(root in NOTE_INDEX))return null;
     const q=normalizeChordQuality(m[3]);
     if(!(q in QUALITY))return null;
-    return {root,quality:q,display:root+q};
+    const bass=slash?slash[2][0].toUpperCase()+slash[2].slice(1):null;
+    if(bass&&!(bass in NOTE_INDEX))return null;
+    const base=root+q;
+    return {root,quality:q,bass,base,display:bass?`${base}/${bass}`:base};
+  }
+  function baseChordName(name){return parseChord(name)?.base||name;}
+
+  // --- Note spelling --------------------------------------------------------
+  // Pitch math uses pitch classes (0-11); names are for display only. Keys are
+  // spelled the way they are written (Bb major, never A# major), chords we suggest
+  // follow the key signature, and nothing the user typed is ever respelled.
+  const FLAT_NOTES=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+  const LETTERS=['C','D','E','F','G','A','B'],NATURAL_PC={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+  const MAJOR_TONICS=['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'],MINOR_TONICS=['C','C#','D','Eb','E','F','F#','G','G#','A','Bb','B'];
+  // Enharmonic tonics that are also normal key signatures (chosen when the user writes them).
+  const MAJOR_ALT_TONICS={1:'C#',6:'Gb',11:'Cb'},MINOR_ALT_TONICS={3:'D#',8:'Ab',10:'A#'};
+  // Scale degree used to spell each semitone above a tonic (b2, 2, b3, 3, 4, #4, 5, b6, 6, b7, 7).
+  const INTERVAL_DEGREE=[1,2,2,3,3,4,4,5,6,6,7,7];
+  // keyTonicName(pc, minor, prefer): prefer is the tonic the user typed, or 'flat'/'sharp'.
+  function keyTonicName(rootPc,minor,prefer=null){
+    const pcn=((rootPc%12)+12)%12,def=(minor?MINOR_TONICS:MAJOR_TONICS)[pcn],alt=(minor?MINOR_ALT_TONICS:MAJOR_ALT_TONICS)[pcn];
+    if(!alt)return def;
+    if(prefer===def||prefer===alt)return prefer;
+    if(prefer==='flat')return [def,alt].find(n=>n.includes('b'))||def;
+    if(prefer==='sharp')return [def,alt].find(n=>n.includes('#'))||def;
+    return def;
+  }
+  function keyTonic(key){return keyTonicName(NOTE_INDEX[key.root],key.minor,key.root);}
+  function spellDegree(tonic,degree,pitch){
+    const start=LETTERS.indexOf(String(tonic)[0]);if(start<0)return null;
+    const letter=LETTERS[(start+degree-1)%7],diff=((pitch-NATURAL_PC[letter]+18)%12)-6;
+    return diff===0?letter:diff===1?letter+'#':diff===-1?letter+'b':null; // null: would need a double accidental
+  }
+  function keyPrefersFlats(key){
+    const t=keyTonic(key);
+    return t.includes('b')||(!t.includes('#')&&(key.minor?['D','G','C','F'].includes(t):t==='F'));
+  }
+  // Spell a pitch class relative to a tonic name (diatonic notes by scale degree).
+  function spellFromTonic(tonic,pitch,flats=tonic.includes('b')){
+    const p=((pitch%12)+12)%12,iv=(p-NOTE_INDEX[tonic]+12)%12;
+    return spellDegree(tonic,INTERVAL_DEGREE[iv],p)||(flats?FLAT_NOTES:NOTES)[p];
+  }
+  function spellInKey(pitch,key){return spellFromTonic(keyTonic(key),pitch,keyPrefersFlats(key));}
+  // Chord tones spelled from the chord root (Bb chord = Bb D F, never A# D F).
+  const CHORD_TONE_DEGREE={0:1,1:2,2:2,3:3,4:3,5:4,6:5,7:5,8:5,9:6,10:7,11:7,13:2,14:2,15:2,17:4,18:4};
+  function chordToneNames(name){
+    const c=parseChord(name);if(!c)return new Map();
+    const rootPc=NOTE_INDEX[c.root],flats=c.root.includes('b')||(c.root.length===1&&keyPrefersFlats(enteredKey()||{root:'C',minor:false})),names=new Map();
+    for(const iv of QUALITY[c.quality]){const p=(rootPc+iv)%12;names.set(p,spellDegree(c.root,CHORD_TONE_DEGREE[iv]??1,p)||(flats?FLAT_NOTES:NOTES)[p]);}
+    if(c.bass)names.set(NOTE_INDEX[c.bass],c.bass);
+    return names;
   }
   function normalizeChordSequence(chords){
     const raw=Array.isArray(chords)?chords:[],values=[],invalid=[];
@@ -175,11 +229,22 @@
   }
   function parseNote(raw){const r=parseRoot(raw);return r&&r in NOTE_INDEX?r:null;}
   function tokens(text){return text.split(/[\s,|]+/).map(x=>x.trim()).filter(Boolean);}
-  function transposeRoot(root,semi){const n=NOTE_INDEX[root];return n==null?root:NOTES[(n+semi+120)%12];}
-  function transposeChord(name,semi){const c=parseChord(name);return c?transposeRoot(c.root,semi)+c.quality:name;}
-  function chordNotes(name,baseOct=4){const c=parseChord(name);if(!c)return[];return QUALITY[c.quality].map(iv=>{const n=NOTE_INDEX[c.root]+iv;return NOTES[n%12]+(baseOct+Math.floor(n/12));});}
+  // Transposed names keep the source's accidental style (Bb up 2 = C, D/F# up 2 = E/G#).
+  function transposeRoot(root,semi){
+    const n=NOTE_INDEX[root];if(n==null)return root;
+    const flats=root.includes('b')||(root.length===1&&keyPrefersFlats(enteredKey()||{root:'C',minor:false}));
+    return (flats?FLAT_NOTES:NOTES)[(n+semi+120)%12];
+  }
+  function transposeChord(name,semi){const c=parseChord(name);return c?transposeRoot(c.root,semi)+c.quality+(c.bass?'/'+transposeRoot(c.bass,semi):''):name;}
+  function chordNotes(name,baseOct=4){
+    const c=parseChord(name);if(!c)return[];
+    const notes=QUALITY[c.quality].map(iv=>{const n=NOTE_INDEX[c.root]+iv;return NOTES[n%12]+(baseOct+Math.floor(n/12));});
+    if(c.bass)notes.unshift(NOTES[NOTE_INDEX[c.bass]]+(baseOct-1));
+    return notes;
+  }
   function midiOf(note){const m=String(note).match(/^([A-G])([#b]?)(-?\d+)$/);return m?(Number(m[3])+1)*12+NOTE_INDEX[m[1]+m[2]]:null;}
   function noteAtMidi(m){return NOTES[(m%12+12)%12]+(Math.floor(m/12)-1);}
+  function clampBpm(value){const n=Math.round(Number(value));return Number.isFinite(n)&&n>0?Math.max(40,Math.min(240,n)):92;}
   const MIDI_BEAT_PX=44; // wider beat spacing gives phone drags much finer duration control
   function cardDurationBeats(card,fallback=+$('beatsSelect')?.value||4){
     const n=Number(card?.durationBeats);
@@ -232,10 +297,13 @@
   // Canonical piano voicing: always spell chords upward from the root.
   // This is the single source used by playback, on-screen diagrams and PDF export.
   // Example: F = F-A-C (never silently C-F-A); extended chords continue upward.
+  // A slash chord adds its bass note in the octave below the chord.
   function canonicalPianoMidis(name,octaveShift=0){
     const c=parseChord(name);if(!c)return[];
     const rootPc=NOTE_INDEX[c.root],baseOct=4+octaveShift;
-    return QUALITY[c.quality].map(iv=>midiOf(NOTES[(rootPc+iv)%12]+(baseOct+Math.floor((rootPc+iv)/12))));
+    const midis=QUALITY[c.quality].map(iv=>midiOf(NOTES[(rootPc+iv)%12]+(baseOct+Math.floor((rootPc+iv)/12))));
+    if(c.bass)midis.unshift(midiOf(NOTES[NOTE_INDEX[c.bass]]+(baseOct-1)));
+    return midis;
   }
   function projectPianoVoicings(){
     const map=new Map();
@@ -303,28 +371,33 @@
   function inferKeyFromCards(cards){
     if(!cards.length)return null;
     const first=cards[0];
+    // Name the detected key in the same accidental style the user typed (Bb, not A#).
+    let flatCount=0,sharpCount=0;
+    for(const card of cards){const r=card.type==='chord'?parseChord(card.value)?.root:card.value;if(/b$/.test(r||''))flatCount++;else if(/#$/.test(r||''))sharpCount++;}
+    const style=flatCount>sharpCount?'flat':sharpCount>flatCount?'sharp':null;
     let best=null;
     for(let rootIndex=0;rootIndex<12;rootIndex++){
       for(const minor of [false,true]){
         const ints=minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
         const triQ=minor?['m','dim','','m','m','','']:['','m','m','','','m','dim'];
         const sevQ=minor?['m7','m7b5','maj7','m7','m7','maj7','7']:['maj7','m7','m7','maj7','7','m7','m7b5'];
-        const scaleRoots=new Set(ints.map(i=>NOTES[(rootIndex+i)%12]));
+        // Compare pitch classes, not names, so Bb and A# count as the same chord.
+        const scalePcs=new Set(ints.map(i=>(rootIndex+i)%12));
         const family=new Set();
         ints.forEach((iv,j)=>{
-          const r=NOTES[(rootIndex+iv)%12];
-          family.add(r+triQ[j]);
-          family.add(r+sevQ[j]);
+          const r=(rootIndex+iv)%12;
+          family.add(r+':'+triQ[j]);
+          family.add(r+':'+sevQ[j]);
         });
         let score=0;
         for(const card of cards){
           if(card.type==='note'){
-            score+=scaleRoots.has(card.value)?3:-5;
+            score+=scalePcs.has(NOTE_INDEX[card.value])?3:-5;
             continue;
           }
           const c=parseChord(card.value);if(!c)continue;
-          if(family.has(c.display))score+=6;
-          else if(scaleRoots.has(NOTES[NOTE_INDEX[c.root]]))score+=1;
+          if(family.has(NOTE_INDEX[c.root]+':'+c.quality))score+=6;
+          else if(scalePcs.has(NOTE_INDEX[c.root]))score+=1;
           else score-=6;
         }
         const tonic=NOTES[rootIndex];
@@ -341,7 +414,7 @@
         if(!best||score>best.score)best={root:tonic,minor,score};
       }
     }
-    return best?{root:best.root,minor:best.minor}:null;
+    return best?{root:keyTonicName(NOTE_INDEX[best.root],best.minor,style),minor:best.minor}:null;
   }
   function cardsFromEntry(){
     return tokens($('chordInput')?.value||'').map(x=>{
@@ -377,12 +450,13 @@
 
   function fitItems(){
     const k=activeKey(),r=NOTE_INDEX[k.root],ints=k.minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
-    if(state.mode==='note')return ints.map(i=>NOTES[(r+i)%12]);
+    const names=ints.map(i=>spellInKey(r+i,k));
+    if(state.mode==='note')return names;
     const triQ=k.minor?['m','dim','','m','m','','']:['','m','m','','','m','dim'];
     const sevQ=k.minor?['m7','m7b5','maj7','m7','m7','maj7','7']:['maj7','m7','m7','maj7','7','m7','m7b5'];
-    const tri=ints.map((i,j)=>NOTES[(r+i)%12]+triQ[j]);
-    const sev=ints.map((i,j)=>NOTES[(r+i)%12]+sevQ[j]);
-    const tonic=NOTES[r],fifth=NOTES[(r+7)%12];
+    const tri=names.map((n,j)=>n+triQ[j]);
+    const sev=names.map((n,j)=>n+sevQ[j]);
+    const tonic=names[0],fifth=names[4];
     const extra=k.minor?[tonic+'m9',tonic+'madd9',tonic+'m6',tonic+'sus2',fifth+'7',fifth+'9']:[tonic+'maj9',tonic+'add9',tonic+'6',tonic+'sus2',tonic+'sus4',fifth+'9'];
     return [...new Set([...tri,...sev,...extra])];
   }
@@ -402,23 +476,45 @@
     return LONG_SUSTAIN_SOUNDS.has(sound)?Math.max(.78,seconds*1.38+.18):Math.max(.45,seconds*1.08);
   }
 
+  // One audio clock for the suite. Everything that makes sound (chords here, drums in
+  // beat-maker.js, Baby DAW parts when parts.js opts in) connects to CRPAudio.master(),
+  // which runs through a peak limiter and a gentle safety clip before the speakers.
+  const CRPAudio=(()=>{
+    let ctx=null,input=null;
+    function context(){
+      if(!ctx)ctx=new (window.AudioContext||window.webkitAudioContext)();
+      if(ctx.state==='suspended')ctx.resume().catch(()=>{});
+      return ctx;
+    }
+    function safetyClipCurve(){
+      // Unity gain up to 0.8, then a smooth knee that never exceeds full scale.
+      const n=2048,curve=new Float32Array(n);
+      for(let i=0;i<n;i++){const x=i/(n-1)*2-1,a=Math.abs(x);curve[i]=Math.sign(x)*(a<=.8?a:.8+.2*Math.tanh((a-.8)/.2));}
+      return curve;
+    }
+    function master(){
+      if(input)return input;
+      const c=context();
+      input=c.createGain();
+      const limiter=c.createDynamicsCompressor();
+      limiter.threshold.value=-3;limiter.knee.value=0;limiter.ratio.value=20;limiter.attack.value=.003;limiter.release.value=.12;
+      const clip=c.createWaveShaper();clip.curve=safetyClipCurve();clip.oversample='2x';
+      input.connect(limiter);limiter.connect(clip);clip.connect(c.destination);
+      return input;
+    }
+    return {context,master};
+  })();
+  window.CRPAudio=CRPAudio;
+
   function instrumentOutputGain(){return soundOutputGain(state.sound);}
   function ensureInstrumentBus(){
-    if(state.instrumentBus&&state.instrumentLimiter&&state.instrumentFxChain)return;
+    if(state.instrumentBus&&state.instrumentFxChain)return;
     const bus=state.audioCtx.createGain();
-    const limiter=state.audioCtx.createDynamicsCompressor();
-    limiter.threshold.value=-3;
-    limiter.knee.value=0;
-    limiter.ratio.value=20;
-    limiter.attack.value=.003;
-    limiter.release.value=.12;
-    limiter.connect(state.audioCtx.destination);
-    const fx=createInstrumentFxChain(state.audioCtx,limiter);bus.connect(fx.input);
-    state.instrumentBus=bus;state.instrumentLimiter=limiter;state.instrumentFxChain=fx;
+    const fx=createInstrumentFxChain(state.audioCtx,CRPAudio.master());bus.connect(fx.input);
+    state.instrumentBus=bus;state.instrumentFxChain=fx;
   }
   function ensureAudio(){
-    if(!state.audioCtx)state.audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-    if(state.audioCtx.state==='suspended')state.audioCtx.resume();
+    state.audioCtx=CRPAudio.context();
     ensureInstrumentBus();
     state.instrumentFxChain?.setSound(state.sound);
     const now=state.audioCtx.currentTime,target=instrumentOutputGain();
@@ -437,6 +533,9 @@
       const frets=guitarShapeForCard(card),opens=[40,45,50,55,59,64];
       notes=frets.map((f,i)=>f==null?null:opens[i]+f+state.capo+state.octave*12).filter(x=>x!=null);
       if(!notes.length)notes=chordNotes(val,3+state.octave).map(midiOf).filter(x=>x!=null);
+      // Slash chord: the guitar plays the base shape with the bass note underneath.
+      const bass=parseChord(val)?.bass;
+      if(bass&&notes.length){const low=Math.min(...notes),drop=(low-NOTE_INDEX[bass]+120)%12;if(drop)notes.push(low-drop);}
     }else notes=pianoMidisForCard(card);
     if(isBassSound(state.sound))notes=notes.slice(0,card.type==='note'?1:3).map(m=>m-12);
     return [...new Set(notes.map(Number).filter(Number.isFinite))].sort((a,b)=>a-b);
@@ -461,12 +560,13 @@
 
   function pianoSvg(card){
     const val=displayedValue(card),mids=pianoMidisForCard(card),targets=new Set(mids);
+    const names=card.type==='chord'?chordToneNames(val):new Map([[NOTE_INDEX[val],val]]),label=m=>names.get(((m%12)+12)%12)||NOTES[((m%12)+12)%12];
     let start=Math.min(...mids)-2,end=Math.max(...mids)+3;const black=m=>NOTES[(m%12+12)%12].includes('#');
     while(black(start))start--;while(black(end-1))end++;while(end-start<10){start--;if(black(start))start--;if(end-start>=10)break;end++;if(black(end-1))end++;}
     const whites=[];for(let m=start;m<end;m++)if(!black(m))whites.push(m);
     const ww=46,w=whites.length*ww,h=164,xmap=new Map();let ws='',bs='';
-    whites.forEach((m,i)=>{const x=i*ww,pc=NOTES[m%12],hit=targets.has(m);xmap.set(m,x);ws+=`<rect x="${x}" y="18" width="${ww}" height="132" rx="2" fill="${hit?'#e9c46a':'#f6f2e7'}" stroke="#171717" stroke-width="2"/>`;if(hit)ws+=`<text x="${x+ww/2}" y="136" text-anchor="middle" font-size="16" font-weight="800" fill="#161616">${pc}</text>`;});
-    for(let m=start;m<end;m++){if(!black(m))continue;const px=xmap.get(m-1);if(px==null)continue;const hit=targets.has(m),pc=NOTES[m%12],bx=px+ww-14;bs+=`<rect x="${bx}" y="18" width="28" height="82" rx="2" fill="${hit?'#f4a261':'#1a1a1a'}" stroke="#080808" stroke-width="1.5"/>`;if(hit)bs+=`<text x="${bx+14}" y="78" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">${pc}</text>`;}
+    whites.forEach((m,i)=>{const x=i*ww,pc=label(m),hit=targets.has(m);xmap.set(m,x);ws+=`<rect x="${x}" y="18" width="${ww}" height="132" rx="2" fill="${hit?'#e9c46a':'#f6f2e7'}" stroke="#171717" stroke-width="2"/>`;if(hit)ws+=`<text x="${x+ww/2}" y="136" text-anchor="middle" font-size="16" font-weight="800" fill="#161616">${pc}</text>`;});
+    for(let m=start;m<end;m++){if(!black(m))continue;const px=xmap.get(m-1);if(px==null)continue;const hit=targets.has(m),pc=label(m),bx=px+ww-14;bs+=`<rect x="${bx}" y="18" width="28" height="82" rx="2" fill="${hit?'#f4a261':'#1a1a1a'}" stroke="#080808" stroke-width="1.5"/>`;if(hit)bs+=`<text x="${bx+14}" y="78" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">${pc}</text>`;}
     return `<svg viewBox="0 0 ${w} ${h}"><text x="4" y="12" fill="#9aa3ad" font-size="11">Octave ${state.octave>0?'+':''}${state.octave}</text>${ws}${bs}</svg>`;
   }
 
@@ -571,7 +671,9 @@
     if(GUITAR_SHAPES[name])return GUITAR_SHAPES[name].slice();
     return barreShape(name);
   }
+  // Slash chords show the diagram of their base chord; the bass note is named in the subtitle.
   function guitarShapeForName(name){
+    name=baseChordName(name);
     switch(state.neck){
       case'triad':return triadShape(name,false);
       case'barre':return barreShape(name);
@@ -591,10 +693,11 @@
     const shape=shapeValue(card),shown=displayedValue(card),W=360,H=245,L=55,T=36,sg=48,fg=35,nf=5,tuning=['E','A','D','G','B','E'];let frets,start=1;
     if(card.type==='note'){const p=guitarNotePosition(shape);start=Math.max(1,p?.f>4?p.f-1:1);frets=Array(6).fill(null);if(p)frets[p.s]=p.f;}
     else{frets=guitarShapeForName(shape);const pos=frets.filter(f=>f>0);start=frets.includes(0)?1:(pos.length?Math.max(1,Math.min(...pos)):1);}
+    const toneNames=card.type==='chord'?chordToneNames(shown):null;
     let svg=`<svg viewBox="0 0 ${W} ${H}"><text x="10" y="18" fill="#9aa3ad" font-size="12">${state.capo?`Capo ${state.capo}${state.transpose?' • transpose view':''}`:`Fret ${start}`}</text>`;
     for(let s=0;s<6;s++){const x=L+s*sg;svg+=`<line x1="${x}" y1="${T}" x2="${x}" y2="${T+nf*fg}" stroke="#d8dde4" stroke-width="${1+s*.12}"/><text x="${x}" y="${T+nf*fg+24}" text-anchor="middle" fill="#8f99a5" font-size="12">${tuning[s]}</text>`;}
     for(let f=0;f<=nf;f++){const y=T+f*fg;svg+=`<line x1="${L}" y1="${y}" x2="${L+5*sg}" y2="${y}" stroke="${f===0?'#f3f4f6':'#737d89'}" stroke-width="${f===0?4:1.4}"/>`;}
-    frets.forEach((f,s)=>{const x=L+s*sg;if(f==null){if(card.type==='chord')svg+=`<text x="${x}" y="29" text-anchor="middle" fill="#e76f51" font-size="15">×</text>`;return;}if(f===0){svg+=`<circle cx="${x}" cy="24" r="8" fill="none" stroke="#e9c46a" stroke-width="2"/>`;return;}let rel=f-start;if(rel<0||rel>=nf)rel=Math.max(0,Math.min(nf-1,f%nf));const y=T+(rel+.5)*fg,pc=card.type==='note'?shown:NOTES[([40,45,50,55,59,64][s]+f)%12];svg+=`<circle cx="${x}" cy="${y}" r="14" fill="#e9c46a" stroke="#201b0e" stroke-width="2"/><text x="${x}" y="${y+4.5}" text-anchor="middle" fill="#16120a" font-size="11" font-weight="900">${pc}</text>`;});
+    frets.forEach((f,s)=>{const x=L+s*sg;if(f==null){if(card.type==='chord')svg+=`<text x="${x}" y="29" text-anchor="middle" fill="#e76f51" font-size="15">×</text>`;return;}if(f===0){svg+=`<circle cx="${x}" cy="24" r="8" fill="none" stroke="#e9c46a" stroke-width="2"/>`;return;}let rel=f-start;if(rel<0||rel>=nf)rel=Math.max(0,Math.min(nf-1,f%nf));const y=T+(rel+.5)*fg,pc=card.type==='note'?shown:(toneNames.get(([40,45,50,55,59,64][s]+f)%12)||NOTES[([40,45,50,55,59,64][s]+f)%12]);svg+=`<circle cx="${x}" cy="${y}" r="14" fill="#e9c46a" stroke="#201b0e" stroke-width="2"/><text x="${x}" y="${y+4.5}" text-anchor="middle" fill="#16120a" font-size="11" font-weight="900">${pc}</text>`;});
     return svg+'</svg>';
   }
 
@@ -602,9 +705,10 @@
     if(state.instrument!=='guitar')return'';
     const labels={open:'Open / Easy',triad:'Triad',barre:'Barre Chord',power:'Power Chord',shell:'Shell Voicing',inversion:'1st Inversion',color:'Color / Extended'};
     const shape=shapeValue(card),sound=displayedValue(card),kind=card.type==='chord'?labels[state.neck]||labels.open:'';
-    if(!state.capo)return kind;
+    const bass=card.type==='chord'?parseChord(sound)?.bass:null,bassText=bass?`bass note ${bass}`:'';
+    if(!state.capo)return [kind,bassText].filter(Boolean).join(' • ');
     const capoText=state.transpose?`${card.value} shape → sounds ${sound}`:(shape===card.value?`Capo ${state.capo}`:`Play ${shape} shape → sounds ${card.value}`);
-    return [kind,capoText].filter(Boolean).join(' • ');
+    return [kind,bassText,capoText].filter(Boolean).join(' • ');
   }
 
   function isMidiRollActive(){return state.cardView==='midi'&&document.body.classList.contains('workspace-chord-rider');}
@@ -659,59 +763,61 @@
       wrap.prepend(lead);wrap.append(tail);
     }
 
-    let settleTimer=null,carouselTeleporting=false;
-    const instantCarouselJump=target=>{
-      if(!target)return;
-      carouselTeleporting=true;
-      const oldBehavior=wrap.style.scrollBehavior,oldSnap=wrap.style.scrollSnapType;
-      // The edge clone and its real line look identical. Temporarily disabling
-      // smooth scrolling + snapping makes the wrap-around jump invisible.
-      wrap.style.scrollBehavior='auto';
-      wrap.style.scrollSnapType='none';
-      wrap.scrollLeft=lineScrollLeft(wrap,target);
-      void wrap.offsetWidth;
-      requestAnimationFrame(()=>{
-        wrap.style.scrollBehavior=oldBehavior;
-        wrap.style.scrollSnapType=oldSnap;
-        requestAnimationFrame(()=>{carouselTeleporting=false;});
-      });
-    };
-    const settle=()=>{
-      if(carouselTeleporting)return;
-      const items=[...wrap.querySelectorAll(':scope > .progression-line')];if(!items.length)return;
-      const wr=wrap.getBoundingClientRect(),cx=wr.left+wr.width/2;
-      let nearest=items[0],dist=Infinity;
-      items.forEach(el=>{const r=el.getBoundingClientRect(),d=Math.abs((r.left+r.width/2)-cx);if(d<dist){dist=d;nearest=el;}});
-      if(nearest.classList.contains('carousel-clone')){
-        const ri=+nearest.dataset.cloneTarget||0;
-        const target=wrap.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"]`);
-        instantCarouselJump(target);
-        setCarouselSelectedRow(ri);
-      }else setCarouselSelectedRow(+nearest.dataset.row||0);
-    };
+    requestAnimationFrame(()=>scrollMobileLineTo(state.selectedRow,false));
+    updateMobileLineIndicator(state.selectedRow);
+  }
+  // The carousel's scroll/touch listeners live on the #progression container, which
+  // survives re-renders, so they are attached once (renderRows only rebuilds lines).
+  let carouselSettleTimer=null,carouselTeleporting=false;
+  function instantCarouselJump(wrap,target){
+    if(!target)return;
+    carouselTeleporting=true;
+    const oldBehavior=wrap.style.scrollBehavior,oldSnap=wrap.style.scrollSnapType;
+    // The edge clone and its real line look identical. Temporarily disabling
+    // smooth scrolling + snapping makes the wrap-around jump invisible.
+    wrap.style.scrollBehavior='auto';
+    wrap.style.scrollSnapType='none';
+    wrap.scrollLeft=lineScrollLeft(wrap,target);
+    void wrap.offsetWidth;
+    requestAnimationFrame(()=>{
+      wrap.style.scrollBehavior=oldBehavior;
+      wrap.style.scrollSnapType=oldSnap;
+      requestAnimationFrame(()=>{carouselTeleporting=false;});
+    });
+  }
+  function settleCarousel(wrap){
+    if(carouselTeleporting||!wrap.classList.contains('mobile-carousel'))return;
+    const items=[...wrap.querySelectorAll(':scope > .progression-line')];if(!items.length)return;
+    const wr=wrap.getBoundingClientRect(),cx=wr.left+wr.width/2;
+    let nearest=items[0],dist=Infinity;
+    items.forEach(el=>{const r=el.getBoundingClientRect(),d=Math.abs((r.left+r.width/2)-cx);if(d<dist){dist=d;nearest=el;}});
+    if(nearest.classList.contains('carousel-clone')){
+      const ri=+nearest.dataset.cloneTarget||0;
+      instantCarouselJump(wrap,wrap.querySelector(`.progression-line:not(.carousel-clone)[data-row="${ri}"]`));
+      setCarouselSelectedRow(ri);
+    }else setCarouselSelectedRow(+nearest.dataset.row||0);
+  }
+  function initCarouselListeners(){
+    const wrap=$('progression');if(!wrap)return;
     wrap.addEventListener('scroll',()=>{
-      if(carouselTeleporting)return;
-      clearTimeout(settleTimer);settleTimer=setTimeout(settle,90);
+      if(carouselTeleporting||!wrap.classList.contains('mobile-carousel'))return;
+      clearTimeout(carouselSettleTimer);carouselSettleTimer=setTimeout(()=>settleCarousel(wrap),90);
     },{passive:true});
-
     // A deliberate horizontal swipe takes control away from playback-follow mode.
     let tx=null,ty=null;
-    wrap.addEventListener('touchstart',e=>{if(!e.touches?.length)return;tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+    wrap.addEventListener('touchstart',e=>{if(!e.touches?.length||!wrap.classList.contains('mobile-carousel'))return;tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
     wrap.addEventListener('touchmove',e=>{
       if(tx==null||!e.touches?.length)return;
       const dx=e.touches[0].clientX-tx,dy=e.touches[0].clientY-ty;
       if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)){tx=ty=null;if(state.autoScroll)disableAutoScrollForManualScroll();}
     },{passive:true});
     wrap.addEventListener('touchend',()=>{tx=ty=null;},{passive:true});
-
-    requestAnimationFrame(()=>scrollMobileLineTo(state.selectedRow,false));
-    updateMobileLineIndicator(state.selectedRow);
   }
 
   function moveDragged(toRow,toIndex){
     if(state.autoScroll){state.drag=null;$('status').textContent='Turn Auto Scroll off to reorder cards.';return;}
     if(!state.drag)return;const {row:fr,index:fi}=state.drag,card=state.rows[fr][fi];if(!card)return;
-    state.rows[fr].splice(fi,1);if(fr===toRow&&fi<toIndex)toIndex--;state.rows[toRow].splice(Math.max(0,toIndex),0,card);state.selectedRow=toRow;state.drag=null;$('status').textContent='';renderRows();syncBuildInput();scheduleAutoSave();
+    recordUndo();state.rows[fr].splice(fi,1);if(fr===toRow&&fi<toIndex)toIndex--;state.rows[toRow].splice(Math.max(0,toIndex),0,card);state.selectedRow=toRow;state.drag=null;$('status').textContent='';renderRows();syncBuildInput();scheduleAutoSave();
   }
   function clearLineDropMarkers(){
     document.querySelectorAll('.progression-line').forEach(el=>el.classList.remove('line-moving','line-drop-before','line-drop-after'));
@@ -720,6 +826,7 @@
     if(from<0||from>=state.rows.length)return;
     insertionIndex=Math.max(0,Math.min(state.rows.length,insertionIndex));
     const selected=state.rows[state.selectedRow];
+    recordUndo();
     const [moved]=state.rows.splice(from,1);
     if(from<insertionIndex)insertionIndex--;
     insertionIndex=Math.max(0,Math.min(state.rows.length,insertionIndex));
@@ -789,6 +896,7 @@
         const dx=clientX-startX+dragScrollDelta;
         const next=Math.max(.25,Math.min(64,Math.round((startDur+dx/MIDI_BEAT_PX)*4)/4));
         if(next===lastDur)return;
+        if(!moved)recordUndo();
         moved=true;lastDur=next;setCardDurationBeats(card,next);
         reflowMidiTimingFrom();
         grid.style.gridTemplateColumns=midiGridColumns(row);
@@ -864,9 +972,9 @@
       const dur=document.createElement('span');dur.className='crp-midi-duration-label';dur.textContent=`${formatBeatDuration(cardDurationBeats(card))}b`;dur.title=`${formatBeatDuration(cardDurationBeats(card))} beats`;
       top.append(name,dur);
       const actions=document.createElement('span');actions.className='crp-midi-step-actions';
-      const repeat=document.createElement('button');repeat.type='button';repeat.className='crp-midi-repeat';repeat.textContent='⧉';repeat.title='Repeat this chord/note';repeat.onclick=e=>{e.stopPropagation();const left=wrap.scrollLeft,copy=JSON.parse(JSON.stringify(card));row.splice(ci+1,0,copy);renderRows();syncBuildInput();renderFits();restoreMidiScroll(ri,left+Math.min(cardColumnWidth(card),90),wrap.scrollTop);scheduleAutoSave();$('status').textContent=`${displayedValue(card)} repeated.`;};
-      const reset=document.createElement('button');reset.type='button';reset.className='crp-midi-reset';reset.textContent='↺';reset.title='Reset the MIDI notes to the automatic chord/note fill';reset.hidden=!Array.isArray(card.midiNotes);reset.onclick=e=>{e.stopPropagation();const left=wrap.scrollLeft,top=wrap.scrollTop;delete card.midiNotes;renderRows();restoreMidiScroll(ri,left,top);scheduleAutoSave();$('status').textContent=`${displayedValue(card)} MIDI notes reset to automatic.`;};
-      const remove=document.createElement('button');remove.type='button';remove.className='crp-midi-remove';remove.textContent='×';remove.title='Remove chord/note';remove.onclick=e=>{e.stopPropagation();const left=wrap.scrollLeft,top=wrap.scrollTop;row.splice(ci,1);renderRows();restoreMidiScroll(ri,left,top);syncBuildInput();renderFits();scheduleAutoSave();};
+      const repeat=document.createElement('button');repeat.type='button';repeat.className='crp-midi-repeat';repeat.textContent='⧉';repeat.title='Repeat this chord/note';repeat.onclick=e=>{e.stopPropagation();recordUndo();const left=wrap.scrollLeft,copy=JSON.parse(JSON.stringify(card));row.splice(ci+1,0,copy);renderRows();syncBuildInput();renderFits();restoreMidiScroll(ri,left+Math.min(cardColumnWidth(card),90),wrap.scrollTop);scheduleAutoSave();$('status').textContent=`${displayedValue(card)} repeated.`;};
+      const reset=document.createElement('button');reset.type='button';reset.className='crp-midi-reset';reset.textContent='↺';reset.title='Reset the MIDI notes to the automatic chord/note fill';reset.hidden=!Array.isArray(card.midiNotes);reset.onclick=e=>{e.stopPropagation();recordUndo();const left=wrap.scrollLeft,top=wrap.scrollTop;delete card.midiNotes;renderRows();restoreMidiScroll(ri,left,top);scheduleAutoSave();$('status').textContent=`${displayedValue(card)} MIDI notes reset to automatic.`;};
+      const remove=document.createElement('button');remove.type='button';remove.className='crp-midi-remove';remove.textContent='×';remove.title='Remove chord/note';remove.onclick=e=>{e.stopPropagation();recordUndo();const left=wrap.scrollLeft,top=wrap.scrollTop;row.splice(ci,1);renderRows();restoreMidiScroll(ri,left,top);syncBuildInput();renderFits();scheduleAutoSave();};
       actions.append(repeat,reset,remove);head.append(top,actions);
       const drag=document.createElement('span');drag.className='crp-midi-duration-handle';drag.title='Drag to change chord/note duration';drag.setAttribute('aria-label','Drag duration');head.appendChild(drag);
       bindMidiDurationDrag(drag,{card,row,ri,ci,grid,wrap,label:dur});
@@ -878,7 +986,7 @@
       const label=document.createElement('div');label.className='crp-midi-note'+(NOTES[(midi%12+12)%12].includes('#')?' black-key':'');label.textContent=noteAtMidi(midi);grid.appendChild(label);
       row.forEach((card,ci)=>{
         const cell=document.createElement('button');cell.type='button';cell.className='crp-midi-cell'+(NOTES[(midi%12+12)%12].includes('#')?' black-key':'')+(onByCard[ci].has(midi)?' on':'');cell.dataset.cardIndex=String(ci);cell.dataset.midi=String(midi);cell.title=`${noteAtMidi(midi)} • ${displayedValue(card)} • ${formatBeatDuration(cardDurationBeats(card))} beats`;
-        cell.onclick=e=>{e.stopPropagation();state.selectedRow=ri;syncBuildInput();const notes=new Set(midiNotesForCard(card));if(notes.has(midi))notes.delete(midi);else notes.add(midi);card.midiNotes=[...notes].sort((a,b)=>a-b);cell.classList.toggle('on',notes.has(midi));const head=grid.querySelector(`.crp-midi-step[data-card-index="${ci}"]`),reset=head?.querySelector('.crp-midi-reset');if(reset)reset.hidden=false;auditionMidiNote(midi);scheduleAutoSave();};
+        cell.onclick=e=>{e.stopPropagation();recordUndo();state.selectedRow=ri;syncBuildInput();const notes=new Set(midiNotesForCard(card));if(notes.has(midi))notes.delete(midi);else notes.add(midi);card.midiNotes=[...notes].sort((a,b)=>a-b);cell.classList.toggle('on',notes.has(midi));const head=grid.querySelector(`.crp-midi-step[data-card-index="${ci}"]`),reset=head?.querySelector('.crp-midi-reset');if(reset)reset.hidden=false;auditionMidiNote(midi);scheduleAutoSave();};
         grid.appendChild(cell);
       });
     }
@@ -971,6 +1079,7 @@
       badge.addEventListener('click',e=>{if(suppressBadgeClick){e.preventDefault();e.stopPropagation();suppressBadgeClick=false;}});
       line.querySelector('.duplicate-line').onclick=e=>{
         e.stopPropagation();
+        recordUndo();
         lockAutoSongKey();
         const copy=JSON.parse(JSON.stringify(row));
         state.rows.splice(ri+1,0,copy);
@@ -982,7 +1091,7 @@
         $('status').textContent=`Line ${ri+1} duplicated.`;
         if(isMobileCarousel())requestAnimationFrame(()=>scrollMobileLineTo(ri+1,true));
       };
-      line.querySelector('.delete-line').onclick=e=>{e.stopPropagation();if(state.rows.length===1){state.rows[0]=[];state.selectedRow=0;}else{state.rows.splice(ri,1);if(state.selectedRow>ri)state.selectedRow--;else if(state.selectedRow===ri)state.selectedRow=Math.min(ri,state.rows.length-1);}renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
+      line.querySelector('.delete-line').onclick=e=>{e.stopPropagation();recordUndo();if(state.rows.length===1){state.rows[0]=[];state.selectedRow=0;}else{state.rows.splice(ri,1);if(state.selectedRow>ri)state.selectedRow--;else if(state.selectedRow===ri)state.selectedRow=Math.min(ri,state.rows.length-1);}renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
       line.onclick=e=>{if(!e.target.closest('.chord-card')){state.selectedRow=ri;realCarouselLines().forEach(x=>x.classList.toggle('selected',+x.dataset.row===ri));syncBuildInput();updateMobileLineIndicator(ri);}};
       line.addEventListener('dragover',e=>{if(state.autoScroll)return;e.preventDefault();line.classList.add('drop-target');});
       line.addEventListener('dragleave',()=>line.classList.remove('drop-target'));
@@ -996,11 +1105,22 @@
       row.forEach((card,ci)=>{
         const el=document.createElement('div');el.className='chord-card'+(card.type==='note'?' note-card':'');el.draggable=!state.autoScroll;
         const shown=displayedValue(card),sub=subtitle(card),hint=state.autoScroll?'Tap to play • Auto Scroll locks reordering':'Tap to play • hold & drag to move';
-        const visual=`<div class="diagram">${state.instrument==='guitar'?guitarSvg(card):pianoSvg(card)}</div>`;
+        const visual=`<div class="diagram" aria-hidden="true">${state.instrument==='guitar'?guitarSvg(card):pianoSvg(card)}</div>`;
         const explicitDur=Number.isFinite(+card.durationBeats)&&+card.durationBeats>0?cardDurationBeats(card):null,durBadge=explicitDur?`<div class="card-duration">${formatBeatDuration(explicitDur)} beat${explicitDur===1?'':'s'}</div>`:'';
-        el.innerHTML=`<div class="card-top"><span class="chord-name">${shown}</span><button class="remove">×</button></div>${sub?`<div class="card-subtitle">${sub}</div>`:''}${durBadge}${visual}<div class="hint">${hint}</div>`;
-        el.querySelector('.remove').onclick=e=>{e.stopPropagation();row.splice(ci,1);renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
-        el.onclick=e=>{e.stopPropagation();state.selectedRow=ri;if(!e.target.closest('.remove')){const bpm=Math.max(40,Math.min(240,+$('bpmInput').value||92)),stepSeconds=60/bpm*cardDurationBeats(card);playCard(card,state.sustain?sustainedNoteSeconds(stepSeconds,state.sound):Math.max(.35,stepSeconds*.92));}};
+        el.innerHTML=`<div class="card-top"><span class="chord-name">${esc(shown)}</span><button class="remove" type="button" aria-label="Remove ${esc(shown)}">×</button></div>${sub?`<div class="card-subtitle">${esc(sub)}</div>`:''}${durBadge}${visual}<div class="hint" aria-hidden="true">${hint}</div>`;
+        // Keyboard: Tab to a card, Enter/Space plays it, Delete removes it, arrows move between cards.
+        el.tabIndex=0;el.setAttribute('role','group');
+        el.setAttribute('aria-label',`${card.type==='note'?'Note':'Chord'} ${shown}, line ${ri+1}, card ${ci+1} of ${row.length}. Enter to play, Delete to remove.`);
+        const removeCard=()=>{recordUndo();row.splice(ci,1);renderRows();syncBuildInput();renderFits();scheduleAutoSave();focusCard(ri,Math.min(ci,row.length-1));};
+        const playThis=()=>{state.selectedRow=ri;const stepSeconds=60/clampBpm($('bpmInput').value)*cardDurationBeats(card);playCard(card,state.sustain?sustainedNoteSeconds(stepSeconds,state.sound):Math.max(.35,stepSeconds*.92));};
+        el.querySelector('.remove').onclick=e=>{e.stopPropagation();removeCard();};
+        el.onclick=e=>{e.stopPropagation();if(!e.target.closest('.remove'))playThis();};
+        el.addEventListener('keydown',e=>{
+          if(e.target!==el)return;
+          if(e.key==='Enter'||e.key===' '){e.preventDefault();playThis();}
+          else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();removeCard();}
+          else if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();focusCard(ri,ci+(e.key==='ArrowRight'?1:-1));}
+        });
         el.addEventListener('dragstart',e=>{if(state.autoScroll){e.preventDefault();$('status').textContent='Turn Auto Scroll off to reorder cards.';return;}state.drag={row:ri,index:ci};e.dataTransfer.effectAllowed='move';el.classList.add('dragging');});
         el.addEventListener('dragend',()=>{el.classList.remove('dragging');state.drag=null;});
         el.addEventListener('dragover',e=>{if(!state.autoScroll)e.preventDefault();});
@@ -1016,6 +1136,10 @@
     setupMobileCarousel(wrap);applyProgressionEditLock();
   }
 
+  function focusCard(ri,ci){
+    const cards=document.querySelectorAll(`#progression .progression-line:not(.carousel-clone)[data-row="${ri}"] .chord-card`);
+    cards[Math.max(0,Math.min(cards.length-1,ci))]?.focus();
+  }
   function appendFitValue(v,type=state.mode){
     const targetType=type==='note'?'note':'chord';
     const parsed=targetType==='note'?parseNote(v):parseChord(v)?.display;
@@ -1023,6 +1147,7 @@
     // Treat whatever is currently typed in the Build field as the source of truth
     // before appending a chip. This preserves manually typed chords/notes and
     // prevents stale row state from wiping or duplicating the entry.
+    recordUndo();
     const bad=commitBuildInput();
     selectedRow().push({type:targetType,value:parsed});
     $('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';
@@ -1031,7 +1156,7 @@
   }
   function renderFits(){
     $('fitHeading').textContent=state.mode==='chord'?'Chords that fit':'Notes that fit';const k=activeKey();
-    $('keyHint').innerHTML=`<span>Based on the</span><span>${k.root}${k.minor?' minor':' major'}</span><span>chord family</span>`;
+    $('keyHint').innerHTML=`<span>Based on the</span><span>${esc(keyTonic(k))}${k.minor?' minor':' major'}</span><span>chord family</span>`;
     const w=$('compatibleChords');w.innerHTML='';fitItems().forEach(v=>{const b=document.createElement('button');b.className='chip';b.textContent=v;b.onclick=()=>appendFitValue(v,state.mode);w.appendChild(b);});
     // Scale Rider loads after app.js, so this optional hook keeps its active
     // scale row in sync when Chord/Note mode changes without coupling startup.
@@ -1099,6 +1224,40 @@
     b.setAttribute('aria-pressed',String(midi));
     b.setAttribute('title',midi?'Switch back to chord diagrams':'Open the editable horizontal MIDI table');
   }
+
+  // Undo/redo for the chord editor: whole-editor snapshots (lines, song key, drum
+  // beat), 50 steps deep, cleared whenever a project is loaded. Call recordUndo()
+  // right before any edit you want to be undoable.
+  const UNDO_LIMIT=50;
+  const undoHistory={
+    undo:[],redo:[],
+    snapshot(){return JSON.stringify({rows:state.rows,selectedRow:state.selectedRow,key:$('keyInput')?.value||'',autoKey:$('keyInput')?.dataset.autoKey||'1',beat:window.CRPBeatMaker?.getBeat?.()||null});},
+    record(){const s=this.snapshot();if(this.undo[this.undo.length-1]!==s){this.undo.push(s);if(this.undo.length>UNDO_LIMIT)this.undo.shift();}this.redo=[];updateUndoButtons();},
+    reset(){this.undo=[];this.redo=[];updateUndoButtons();}
+  };
+  function recordUndo(){undoHistory.record();}
+  function updateUndoButtons(){
+    const u=$('undoBtn'),r=$('redoBtn');
+    if(u)u.disabled=!undoHistory.undo.length;
+    if(r)r.disabled=!undoHistory.redo.length;
+    window.CRPBeatMaker?.refreshUndoButton?.(undoHistory.undo.length>0);
+  }
+  function restoreUndoSnapshot(json){
+    const s=JSON.parse(json);
+    state.rows=Array.isArray(s.rows)&&s.rows.length?s.rows:[[]];
+    state.selectedRow=Math.max(0,Math.min(state.rows.length-1,Number(s.selectedRow)||0));
+    const key=$('keyInput');if(key){key.value=s.key||'';key.dataset.autoKey=s.autoKey||'1';}
+    const beat=window.CRPBeatMaker?.getBeat?.();
+    if(s.beat&&JSON.stringify(beat)!==JSON.stringify(s.beat))window.CRPBeatMaker?.setBeat?.(s.beat);
+    renderAll();syncBuildInput();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();
+  }
+  function stepHistory(from,to,message){
+    if(!from.length)return false;
+    to.push(undoHistory.snapshot());restoreUndoSnapshot(from.pop());updateUndoButtons();
+    $('status').textContent=message;return true;
+  }
+  function undoEdit(){return stepHistory(undoHistory.undo,undoHistory.redo,'Undone.');}
+  function redoEdit(){return stepHistory(undoHistory.redo,undoHistory.undo,'Redone.');}
 
   function renderAll(){
     renderSound();document.querySelectorAll('#instrumentTabs .seg').forEach(b=>b.classList.toggle('active',b.dataset.instrument===state.instrument));document.querySelectorAll('#modeTabs .seg').forEach(b=>b.classList.toggle('active',b.dataset.mode===state.mode));
@@ -1197,6 +1356,7 @@
     }
 
     state.playing=true;setRiderBonesRiding(true);$('playAllBtn').textContent='■ Stop';await ensureAudio();
+    window.CRPBeatMaker?.startMainNow?.(.01,state.rows.slice(0,startRow).flat().reduce((n,c)=>n+cardDurationBeats(c),0));
     let nextStepAt=performance.now();
     const step=async()=>{
       if(!state.playing)return;
@@ -1233,9 +1393,29 @@
     };
     step();
   }
-  function stopProgression(){if(window.CRPParts?.handlesPlayback&&window.CRPParts?.isPlaying?.())return window.CRPParts.stopPlayback();state.playing=false;clearTimeout(state.timer);state.timer=null;setRiderBonesRiding(false);$('playAllBtn').textContent='▶ Play';clearPlaybackHighlights();}
+  function stopProgression(){if(window.CRPParts?.handlesPlayback&&window.CRPParts?.isPlaying?.())return window.CRPParts.stopPlayback();state.playing=false;clearTimeout(state.timer);state.timer=null;window.CRPBeatMaker?.stopMainNow?.();setRiderBonesRiding(false);$('playAllBtn').textContent='▶ Play';clearPlaybackHighlights();if(pendingEditorReload)setTimeout(reloadOpenProject,0);}
 
-  let accountUser=null, cloudProjects=null, cloudSyncState='idle';
+  // ---------------------------------------------------------------------------
+  // Song storage, drafts and cloud sync (contract: docs/SYNC.md)
+  // ---------------------------------------------------------------------------
+  // `crp-projects` is this device's working set. Song Rider Pro reads it and writes
+  // BPM/key/capo straight into it, so its format must not change. Sync bookkeeping
+  // lives beside it:
+  //   crp-sync-meta-v1         {id:{rev,fp,legacy?}} server rev + content fingerprint at the last sync
+  //   crp-local-deletes-v1     {id:deletedAt} deletes the server has not confirmed yet
+  //   crp-local-owner-v1       account id that owns the working set ('' = made while signed out)
+  //   crp-account-stash-v1:ID  another account's working set, parked until it signs in again
+  //   crp-unsaved-draft-v1     the never-saved song in the editor, so a killed tab loses nothing
+  // A song needs uploading ("dirty") when its fingerprint differs from the one recorded
+  // at the last sync. That also catches edits Song Rider Pro wrote into crp-projects.
+  const PROJECTS_KEY='crp-projects',ACTIVE_PROJECT_KEY='crp-active-project-id';
+  const SYNC_META_KEY='crp-sync-meta-v1',LOCAL_DELETES_KEY='crp-local-deletes-v1',LEGACY_PENDING_KEY='crp-cloud-pending-v1';
+  const LOCAL_OWNER_KEY='crp-local-owner-v1',ACCOUNT_STASH_PREFIX='crp-account-stash-v1:',DRAFT_KEY='crp-unsaved-draft-v1';
+  const WORKING_SET_KEYS=[PROJECTS_KEY,SYNC_META_KEY,LOCAL_DELETES_KEY,LEGACY_PENDING_KEY,ACTIVE_PROJECT_KEY,DRAFT_KEY];
+  const TRANSPORT_FIELDS=['bpm','capo','octave','transpose','key'];
+  const CLOUD_POLL_MS=5*60*1000;
+
+  let accountUser=null, cloudSyncState='idle';
   function accountDisplayName(){return accountUser?.display_name||accountUser?.email||'Account';}
   function setAccountCollapsed(collapsed){
     const panel=$('accountPanel');
@@ -1247,7 +1427,7 @@
   function updateAccountSummary(){
     const btn=$('accountSummaryBtn');
     if(!btn||!accountUser)return;
-    const stateText=cloudSyncState==='ready'?'Synced':cloudSyncState==='error'?'Local backup':'Syncing…';
+    const stateText=cloudSyncState==='ready'?'Synced':cloudSyncState==='error'?'Not synced':'Syncing…';
     btn.innerHTML=`<span>☁ ${esc(accountDisplayName())}</span><span class="cloud-state">${stateText} ▾</span>`;
   }
 
@@ -1260,18 +1440,99 @@
     if(persist){try{localStorage.setItem(PANEL_COLLAPSE_KEYS[kind],on?'1':'0')}catch{}}
   }
   function restoreDataPanelCollapse(){setDataPanelCollapsed('projects',readPanelCollapsed('projects'),{persist:false});setDataPanelCollapsed('notes',readPanelCollapsed('notes'),{persist:false});}
-  function localProjects(){try{return JSON.parse(localStorage.getItem('crp-projects')||'[]')}catch{return[]}}
-  function saveLocalProjects(p){localStorage.setItem('crp-projects',JSON.stringify(p))}
-  const CLOUD_PENDING_KEY='crp-cloud-pending-v1';
-  function readCloudPending(){try{return JSON.parse(localStorage.getItem(CLOUD_PENDING_KEY)||'{}')||{}}catch{return{}}}
-  function cloudPending(id){return !!readCloudPending()[String(id||'')]}
-  function setCloudPending(id,on=true){const key=String(id||'');if(!key)return;const map=readCloudPending();if(on)map[key]=Date.now();else delete map[key];try{localStorage.setItem(CLOUD_PENDING_KEY,JSON.stringify(map))}catch{}}
-  function pendingCloudProjectIds(){return Object.keys(readCloudPending());}
-  async function api(path,options={}){const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.error||`Request failed (${r.status})`);return d;}
-  let allowUnsavedUnloadOnce=false,unsavedProjectTouched=false;
-  function unsavedProjectHasWork(){
-    if(IS_PLAYBACK_BRIDGE||state.currentProjectId)return false;
-    if(unsavedProjectTouched)return true;
+
+  // --- Local store ------------------------------------------------------------
+  // Reads never throw. Writes throw on failure (usually a full disk) so callers can
+  // show the "Not saved" banner instead of pretending the song is safe.
+  function readStored(key,fallback){try{const raw=localStorage.getItem(key);if(raw==null)return fallback;const v=JSON.parse(raw);return v??fallback;}catch{return fallback;}}
+  function writeStored(key,value){localStorage.setItem(key,JSON.stringify(value));}
+  function readStoredMap(key){const v=readStored(key,{});return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}
+  function localProjects(){const v=readStored(PROJECTS_KEY,[]);return Array.isArray(v)?v.filter(p=>p&&typeof p==='object'):[];}
+  function saveLocalProjects(ps){writeStored(PROJECTS_KEY,ps);}
+  function findLocal(id){return id==null?null:localProjects().find(p=>sameProjectId(p.id,id))||null;}
+  function upsertLocal(p){const ps=localProjects(),i=ps.findIndex(x=>sameProjectId(x.id,p.id));if(i>=0)ps[i]=p;else ps.unshift(p);saveLocalProjects(ps);}
+  function removeLocal(id){saveLocalProjects(localProjects().filter(p=>!sameProjectId(p.id,id)));}
+  function readSyncMeta(){return readStoredMap(SYNC_META_KEY);}
+  function writeSyncMeta(m){writeStored(SYNC_META_KEY,m);}
+  function readLocalDeletes(){return readStoredMap(LOCAL_DELETES_KEY);}
+  function writeLocalDeletes(d){writeStored(LOCAL_DELETES_KEY,d);}
+  // Older builds kept a "pending upload" map; treat those songs as having unsent edits.
+  function readLegacyPending(){return readStoredMap(LEGACY_PENDING_KEY);}
+  function clearLegacyPending(id){const m=readLegacyPending();if(!(id in m))return;delete m[id];try{writeStored(LEGACY_PENDING_KEY,m)}catch{}}
+  function newProjectId(){return crypto.randomUUID?crypto.randomUUID():`p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;}
+  function defaultProjectName(){return `Chord Project ${new Date().toLocaleDateString()}`;}
+
+  // Content fingerprint: key order and bookkeeping fields (times, server rev) are ignored.
+  function stableJson(value,skip){
+    if(Array.isArray(value))return '['+value.map(v=>stableJson(v)).join(',')+']';
+    if(value&&typeof value==='object'){
+      const keys=Object.keys(value).filter(k=>value[k]!==undefined&&typeof value[k]!=='function'&&!(skip&&skip.has(k))).sort();
+      return '{'+keys.map(k=>JSON.stringify(k)+':'+stableJson(value[k])).join(',')+'}';
+    }
+    const s=JSON.stringify(value);return s===undefined?'null':s;
+  }
+  function hashString(s){
+    let h1=0xdeadbeef,h2=0x41c6ce57;
+    for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);h1=Math.imul(h1^c,2654435761);h2=Math.imul(h2^c,1597334677);}
+    h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);
+    h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
+    return (h2>>>0).toString(36)+(h1>>>0).toString(36);
+  }
+  const FINGERPRINT_SKIP=new Set(['updatedAt','createdAt','rev','beatMakerUpdatedAt']);
+  const CONTENT_SKIP=new Set([...FINGERPRINT_SKIP,...TRANSPORT_FIELDS]);
+  function projectFingerprint(p){return p?hashString(stableJson(p,FINGERPRINT_SKIP)):'';}
+  // Same, but ignoring BPM/key/capo/octave/transpose, which Song Rider Pro shares live.
+  function contentFingerprint(p){return p?hashString(stableJson(p,CONTENT_SKIP)):'';}
+  function isDirty(p,m,legacyPending=readLegacyPending()){
+    if(!m)return true;
+    return !!legacyPending[String(p.id)]||m.fp!==projectFingerprint(p);
+  }
+
+  // --- "Not saved" banner and sync notices ------------------------------------
+  const saveProblems={};
+  let syncNotices=[];
+  function renderSaveProblem(){
+    const bar=$('saveProblemBanner');if(!bar)return;
+    const text=saveProblems.local?`Not saved — ${saveProblems.local}`:saveProblems.cloud?`Not saved to cloud — ${saveProblems.cloud}`:'';
+    bar.hidden=!text;
+    const label=bar.querySelector('[data-save-problem-text]');if(label)label.textContent=text;
+  }
+  function setSaveProblem(channel,message){if(saveProblems[channel]===message)return;saveProblems[channel]=message;renderSaveProblem();}
+  function clearSaveProblem(channel){if(!(channel in saveProblems))return;delete saveProblems[channel];renderSaveProblem();}
+  function localSaveReason(e){
+    const text=`${e?.name||''} ${e?.message||e||''}`;
+    return /quota|exceeded/i.test(text)?'this device is out of storage space. Delete or export old songs, then tap Retry.':`this device could not store the song (${e?.message||e}).`;
+  }
+  function cloudSaveReason(e){
+    if(e?.status===401)return 'you are signed out. Log in again and your songs will upload.';
+    if(!navigator.onLine||e instanceof TypeError)return 'you are offline. Your songs are kept on this device and will upload when you reconnect.';
+    return `${e?.message||'the server did not answer'}. Your songs are kept on this device; tap Retry.`;
+  }
+  function showSyncNotice(text){
+    syncNotices=[...syncNotices.filter(t=>t!==text),text].slice(-3);
+    const el=$('syncNotice');if(!el){$('status').textContent=text;return;}
+    el.querySelector('[data-sync-notice-text]').textContent=syncNotices.join(' ');
+    el.hidden=false;
+  }
+  function dismissSyncNotice(){syncNotices=[];const el=$('syncNotice');if(el)el.hidden=true;}
+
+  async function api(path,options={}){
+    const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});
+    let d={};try{d=await r.json()}catch{}
+    if(!r.ok){const err=new Error(d.error||`Request failed (${r.status})`);err.status=r.status;err.code=d.code;err.data=d;throw err;}
+    return d;
+  }
+
+  // --- Editor <-> storage -----------------------------------------------------
+  // editorBase remembers the stored version the editor was loaded from or last wrote,
+  // so a change made by another tab or by Song Rider Pro is noticed, not overwritten.
+  let editorBase={fp:'',contentFp:'',transport:null},pendingEditorReload=false;
+  function noteEditorBase(p){editorBase=p?{fp:projectFingerprint(p),contentFp:contentFingerprint(p),transport:Object.fromEntries(TRANSPORT_FIELDS.map(k=>[k,p[k]]))}:{fp:'',contentFp:'',transport:null};}
+  // Write a song this tab changed itself (rename, archive) without tripping that check.
+  function writeProjectHere(p){upsertLocal(p);if(sameProjectId(p.id,state.currentProjectId))noteEditorBase(p);}
+
+  let unsavedProjectTouched=false;
+  function editorHasContent(){
     if(($('projectName')?.value||'').trim()||($('chordInput')?.value||'').trim()||($('keyInput')?.value||'').trim()||($('notesEditor')?.textContent||'').trim())return true;
     if((state.rows||[]).some(row=>Array.isArray(row)&&row.length))return true;
     try{
@@ -1289,6 +1550,346 @@
     }catch{}
     return false;
   }
+  function unsavedProjectHasWork(){
+    if(IS_PLAYBACK_BRIDGE||state.currentProjectId)return false;
+    return unsavedProjectTouched||editorHasContent();
+  }
+
+  // Never-saved work goes to a draft slot holding the same full capture Save uses
+  // (chords, Baby DAW parts, vocal take metadata, beat), so it survives a killed tab.
+  function readDraft(){const d=readStored(DRAFT_KEY,null);return d?.project&&typeof d.project==='object'?d:null;}
+  function clearDraft(){try{localStorage.removeItem(DRAFT_KEY)}catch{}state.draftId=null;}
+  function persistDraft(){
+    if(!editorHasContent()){
+      // The user emptied their draft: drop it. Never drop a draft this tab did not open.
+      const d=readDraft();if(d&&state.draftId&&sameProjectId(d.project.id,state.draftId))clearDraft();
+      return;
+    }
+    if(!state.draftId)state.draftId=newProjectId();
+    const p=capture(state.draftId,($('projectName').value||'').trim().slice(0,160));
+    const prior=readDraft();
+    if(prior&&projectFingerprint(prior.project)===projectFingerprint(p))return;
+    writeStored(DRAFT_KEY,{project:p,savedAt:Date.now()});
+  }
+  function persistOpenProject(){
+    const id=state.currentProjectId,stored=findLocal(id);
+    if(!stored&&readLocalDeletes()[String(id)]){detachDeletedEditor();return;}
+    const name=($('projectName').value.trim()||stored?.name||defaultProjectName()).slice(0,160);
+    const p=capture(id,name);
+    if(stored){
+      const storedFp=projectFingerprint(stored);
+      if(editorBase.fp&&storedFp!==editorBase.fp){
+        // Someone else changed this song since the editor last saw it. Changes to
+        // the song itself are real work, so both versions are kept. BPM/key/capo
+        // (shared live with Song Rider Pro) merge per field: the editor only wins
+        // the fields it changed itself.
+        if(contentFingerprint(stored)!==editorBase.contentFp){keepEditorAsConflictCopy(stored,p,'in another tab');return;}
+        let tookTheirs=false;
+        for(const k of TRANSPORT_FIELDS)if(stableJson(p[k])===stableJson(editorBase.transport?.[k])&&stableJson(stored[k])!==stableJson(p[k])){p[k]=stored[k];tookTheirs=true;}
+        if(tookTheirs)applyTransportFrom(p);
+      }
+      if(storedFp===projectFingerprint(p)){noteEditorBase(stored);return;}
+    }
+    upsertLocal(p);noteEditorBase(p);
+  }
+  // Writes the editor to this device right now. Returns false (and shows the
+  // "Not saved" banner) when the browser refuses the write.
+  function persistEditorLocally(){
+    if(IS_PLAYBACK_BRIDGE)return true;
+    try{
+      if(state.currentProjectId)persistOpenProject();else persistDraft();
+      clearSaveProblem('local');return true;
+    }catch(e){console.error('Local save failed',e);setSaveProblem('local',localSaveReason(e));return false;}
+  }
+  function conflictCopyName(name){
+    const stamp=new Date().toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    return `${String(name||'Untitled Project').slice(0,110)} (conflict copy ${stamp})`;
+  }
+  function asConflictCopy(p){const copy=JSON.parse(JSON.stringify(p));copy.id=newProjectId();copy.name=conflictCopyName(p.name);copy.updatedAt=Date.now();delete copy.rev;delete copy.createdAt;return copy;}
+  function keepEditorAsConflictCopy(theirs,mine,where){
+    const copy=asConflictCopy(mine);
+    upsertLocal(copy);
+    loadProjectIntoEditor(theirs);
+    showSyncNotice(`“${theirs.name}” was changed ${where}. Both versions are kept: “${theirs.name}” has those changes, and your edits are saved as “${copy.name}”.`);
+  }
+  // The open song was deleted elsewhere: keep what is on screen as an unsaved draft.
+  function detachDeletedEditor(){
+    state.currentProjectId=null;state.draftId=newProjectId();unsavedProjectTouched=true;noteEditorBase(null);
+    try{localStorage.removeItem(ACTIVE_PROJECT_KEY)}catch{}
+    try{persistDraft();}catch{}
+    renderProjects();
+    showSyncNotice('The song you had open was deleted somewhere else. What is on screen is kept as an unsaved draft — tap Save to keep it.');
+  }
+
+  // --- Cloud sync ---------------------------------------------------------------
+  function localOwner(){try{return localStorage.getItem(LOCAL_OWNER_KEY)}catch{return null}} // null: written by an older build
+  function setLocalOwner(id){localStorage.setItem(LOCAL_OWNER_KEY,String(id||''));}
+  function canUpload(){return !!accountUser&&!IS_PLAYBACK_BRIDGE&&localOwner()===String(accountUser.id);}
+  let syncRun=null,syncAgain=null,lastPullAt=0,cloudPollTimer=null,cloudPullTimer=null;
+  function requestCloudPush(){if(canUpload())syncWithCloud({pull:false}).catch(()=>{});}
+  // One sync runs at a time; requests made meanwhile fold into one follow-up pass.
+  function syncWithCloud({pull=true}={}){
+    if(!canUpload())return Promise.resolve(null);
+    if(syncRun){syncAgain={pull:pull||!!syncAgain?.pull};return syncRun;}
+    syncRun=(async()=>{
+      const result={pulled:0,pushed:0,conflicts:0};
+      try{
+        cloudSyncState='syncing';updateAccountSummary();
+        for(let next={pull};next;next=syncAgain){
+          syncAgain=null;
+          if(next.pull){
+            const d=await api('/api/projects');
+            if(!canUpload())break;
+            lastPullAt=Date.now();
+            persistEditorLocally(); // anything typed during the request counts as a local edit
+            result.pulled+=mergeCloudSnapshot(d.projects||[],d.deleted||[]);
+          }
+          const r=await pushLocalChanges();result.pushed+=r.pushed;result.conflicts+=r.conflicts;
+        }
+        cloudSyncState='ready';clearSaveProblem('cloud');
+        return result;
+      }catch(e){
+        cloudSyncState='error';setSaveProblem('cloud',cloudSaveReason(e));throw e;
+      }finally{syncRun=null;syncAgain=null;updateAccountSummary();renderProjects();}
+    })();
+    return syncRun;
+  }
+  async function pushLocalChanges(){
+    let pushed=0,conflicts=0;const owner=String(accountUser?.id||'');
+    // Deletes go first so a deleted song can never be re-uploaded.
+    for(const id of Object.keys(readLocalDeletes())){
+      if(localOwner()!==owner)return {pushed,conflicts};
+      await api('/api/projects/'+encodeURIComponent(id),{method:'DELETE'});
+      const d=readLocalDeletes();delete d[id];writeLocalDeletes(d);
+    }
+    const tried=new Set();
+    while(canUpload()&&localOwner()===owner){
+      const meta=readSyncMeta(),legacy=readLegacyPending();
+      const next=localProjects().find(p=>!tried.has(String(p.id))&&isDirty(p,meta[String(p.id)],legacy));
+      if(!next)break;
+      tried.add(String(next.id));
+      const outcome=await pushProject(next,meta[String(next.id)]);
+      if(outcome==='pushed')pushed++;else if(outcome==='conflict')conflicts++;
+    }
+    return {pushed,conflicts};
+  }
+  async function pushProject(local,m){
+    const id=String(local.id),sent=JSON.parse(JSON.stringify(local)),sentFp=projectFingerprint(sent);
+    delete sent.rev;
+    const baseRev=m&&!m.legacy?Number(m.rev)||0:0;
+    try{
+      const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:sent,baseRev})});
+      const rev=Number(d.rev??d.project?.rev)||0;
+      settlePushed(id,sentFp,d.project||sent,rev);
+      clearLegacyPending(id);
+      if(sameProjectId(id,state.currentProjectId))Promise.resolve(window.CRPParts?.syncCloudAudio?.(id)).catch(e=>console.warn('Cloud audio sync failed',e));
+      return 'pushed';
+    }catch(e){
+      if(e.status!==409)throw e;
+      return resolvePushConflict(id,sent,e.data||{});
+    }
+  }
+  function settlePushed(id,sentFp,saved,rev){
+    const meta=readSyncMeta(),current=findLocal(id);
+    if(current&&projectFingerprint(current)===sentFp){
+      // Store the server's copy (it may normalise the name) so both sides fingerprint the same.
+      const merged={...current,...saved,rev},wasBase=sameProjectId(id,state.currentProjectId)&&editorBase.fp===sentFp;
+      upsertLocal(merged);if(wasBase)noteEditorBase(merged);
+      meta[id]={rev,fp:projectFingerprint(merged)};
+    }else meta[id]={rev,fp:sentFp}; // edited again during the upload: stays dirty against the new rev
+    writeSyncMeta(meta);
+  }
+  function resolvePushConflict(id,sent,data){
+    if(data.code==='id_taken'){reIdProject(id);return 'retry';} // the id belongs to another account
+    const meta=readSyncMeta(),local=findLocal(id)||sent;
+    if(data.code==='deleted'){
+      delete meta[id];writeSyncMeta(meta);
+      if(Number(local.updatedAt||0)>Number(data.deletedAt||0)){
+        reIdProject(id);
+        showSyncNotice(`“${local.name}” was deleted on another device, but this device had newer changes, so it is kept as a separate song.`);
+      }else dropLocalProject(id,`“${local.name}” was deleted on another device.`);
+      return 'conflict';
+    }
+    const server=data.project;
+    if(!server){const err=new Error(data.error||'This song changed on another device.');err.status=409;throw err;}
+    const rev=Number(server.rev??server.updatedAt)||0;
+    if(sameProjectId(id,state.currentProjectId))persistEditorLocally();
+    const mine=findLocal(id)||local;
+    if(projectFingerprint(server)===projectFingerprint(mine)){
+      upsertLocal({...mine,...server});meta[id]={rev,fp:projectFingerprint(server)};writeSyncMeta(meta);return 'pushed';
+    }
+    // Keep both: the other device's version stays under the song's id; ours becomes a copy.
+    const copy=asConflictCopy(mine);
+    upsertLocal(copy);upsertLocal(server);
+    meta[id]={rev,fp:projectFingerprint(server)};writeSyncMeta(meta);
+    if(sameProjectId(id,state.currentProjectId))reloadOpenProject({quiet:true});
+    showSyncNotice(`“${server.name}” was changed on another device. Both versions are kept: “${server.name}” has the other device's changes, and your changes are saved as “${copy.name}”.`);
+    return 'conflict';
+  }
+  function reIdProject(oldId){
+    const ps=localProjects(),i=ps.findIndex(p=>sameProjectId(p.id,oldId));if(i<0)return null;
+    const newId=newProjectId(),p={...ps[i],id:newId,updatedAt:Date.now()};delete p.rev;delete p.createdAt;
+    ps[i]=p;saveLocalProjects(ps);
+    const meta=readSyncMeta();delete meta[oldId];writeSyncMeta(meta);
+    if(sameProjectId(state.currentProjectId,oldId)){state.currentProjectId=newId;try{localStorage.setItem(ACTIVE_PROJECT_KEY,newId)}catch{}noteEditorBase(p);}
+    moveSrpLink(oldId,newId);
+    return p;
+  }
+  function moveSrpLink(oldId,newId){
+    try{const links=srpLinks();if(links[oldId]){links[newId]={...links[oldId],crpProjectId:newId};delete links[oldId];setSrpLinks(links);}}catch{}
+    try{const s=readStored(SRP_LINK_SESSION_KEY,null);if(s&&String(s.crpProjectId||'')===String(oldId)){s.crpProjectId=newId;writeStored(SRP_LINK_SESSION_KEY,s);}}catch{}
+  }
+  function dropLocalProject(id,message){
+    removeLocal(id);
+    const meta=readSyncMeta();delete meta[id];writeSyncMeta(meta);
+    if(sameProjectId(state.currentProjectId,id))resetEditorToBlank();
+    showSyncNotice(message);
+  }
+  // Fold a server listing into the working set. Never discards unsent local work.
+  function mergeCloudSnapshot(remote,deleted){
+    const meta=readSyncMeta(),deletes=readLocalDeletes(),legacy=readLegacyPending(),openId=String(state.currentProjectId||'');
+    const byId=new Map(localProjects().map(p=>[String(p.id),p]));
+    const tombs=new Map((deleted||[]).map(t=>[String(t.id),Number(t.deletedAt)||0]));
+    const notices=[],keepAsCopy=[];let changed=0,openAction=null;
+    for(const [id,deletedAt] of tombs){
+      delete deletes[id];
+      const local=byId.get(id);
+      if(local){
+        if(isDirty(local,meta[id],legacy)&&Number(local.updatedAt||0)>deletedAt){
+          keepAsCopy.push(id);notices.push(`“${local.name}” was deleted on another device, but this device had newer changes, so it is kept as a separate song.`);
+        }else{byId.delete(id);changed++;notices.push(`“${local.name}” was deleted on another device.`);if(id===openId)openAction='deleted';}
+      }
+      delete meta[id];
+    }
+    const remoteIds=new Set();
+    for(const server of remote||[]){
+      const id=String(server?.id||'');if(!id||tombs.has(id))continue;
+      remoteIds.add(id);
+      if(deletes[id])continue; // deleted here; the DELETE is on its way
+      const rev=Number(server.rev??server.updatedAt)||0,serverFp=projectFingerprint(server),local=byId.get(id),m=meta[id];
+      if(!local){byId.set(id,server);meta[id]={rev,fp:serverFp};changed++;continue;}
+      if(!m||m.legacy){
+        // First sync of a song this device already had from an older build.
+        meta[id]={rev,fp:serverFp};
+        if(projectFingerprint(local)===serverFp)continue;
+        if(legacy[id]||Number(local.updatedAt||0)>Number(server.updatedAt||0))continue; // local is newer: it uploads against this rev
+        byId.set(id,server);changed++;if(id===openId)openAction=openAction||'reload';
+        continue;
+      }
+      if(isDirty(local,m,legacy))continue; // unsent local edits: the upload merges or makes a conflict copy
+      if(rev!==Number(m.rev)||serverFp!==m.fp){byId.set(id,server);meta[id]={rev,fp:serverFp};changed++;if(id===openId)openAction=openAction||'reload';}
+    }
+    // Songs the server lost without a delete record are uploaded again.
+    for(const id of byId.keys()){const m=meta[id];if(!remoteIds.has(id)&&m&&!m.legacy&&Number(m.rev)>0)meta[id]={rev:0,fp:''};}
+    saveLocalProjects([...byId.values()]);writeSyncMeta(meta);writeLocalDeletes(deletes);
+    keepAsCopy.forEach(reIdProject);
+    if(openAction==='deleted')resetEditorToBlank();
+    else if(openAction==='reload')reloadOpenProject();
+    notices.forEach(showSyncNotice);
+    return changed;
+  }
+  function reloadOpenProject({quiet=false}={}){
+    const p=findLocal(state.currentProjectId);if(!p)return;
+    if(window.CRPParts?.isPlaying?.()||state.playing){pendingEditorReload=true;return;}
+    pendingEditorReload=false;
+    loadProjectIntoEditor(p);
+    if(!quiet)$('status').textContent=`“${p.name}” was updated with changes made somewhere else.`;
+  }
+  function scheduleCloudPull(delay=400){
+    clearTimeout(cloudPullTimer);
+    if(!canUpload()||document.visibilityState==='hidden')return;
+    cloudPullTimer=setTimeout(()=>{if(Date.now()-lastPullAt>4000)syncWithCloud({pull:true}).catch(()=>{});},delay);
+  }
+  // Pulls happen on focus/visibility/online; this slow poll only runs while visible.
+  function startCloudPolling(){
+    clearInterval(cloudPollTimer);cloudPollTimer=null;
+    if(!accountUser)return;
+    cloudPollTimer=setInterval(()=>{if(document.visibilityState==='visible'&&Date.now()-lastPullAt>CLOUD_POLL_MS-2000)syncWithCloud({pull:true}).catch(()=>{});},CLOUD_POLL_MS);
+  }
+  async function syncNow(){
+    if(!accountUser){$('authMessage').textContent='Log in to sync projects.';return;}
+    const btn=$('syncNowBtn');if(btn){btn.disabled=true;btn.textContent='↻ Syncing…';}
+    $('authMessage').textContent='Syncing this device with your cloud account…';
+    try{
+      clearTimeout(autoSaveTimer);autoSaveTimer=null;persistEditorLocally();
+      const result=await syncWithCloud({pull:true});
+      if(!result){$('authMessage').textContent='Sync is paused for this device (see the message at the top).';return;}
+      $('authMessage').textContent=`Sync complete${result.pushed?` • uploaded ${result.pushed}`:''}${result.pulled?` • downloaded ${result.pulled}`:''}${result.conflicts?` • ${result.conflicts} kept as copies`:''}.`;
+      $('status').textContent='Cloud sync complete.';
+    }catch(e){$('authMessage').textContent=`Sync failed: ${e.message}`;}
+    finally{if(btn){btn.disabled=false;btn.textContent='↻ Sync Now';}}
+  }
+
+  // --- Account ownership of the local working set -------------------------------
+  // The songs on this device belong to one account. Signing in as someone else parks
+  // them under a per-account key and restores that account's own songs instead, so
+  // one person's songs are never uploaded into another person's account.
+  function adoptWorkingSetFor(user){
+    const uid=String(user.id),owner=localOwner();
+    if(owner===uid)return 'same';
+    if(owner===null){
+      // Songs from an older build: they become this account's, but songs the server
+      // does not know stay on this device until they are edited (as before).
+      const meta=readSyncMeta();
+      for(const p of localProjects()){const id=String(p.id);if(!meta[id])meta[id]={rev:0,fp:projectFingerprint(p),legacy:true};}
+      writeSyncMeta(meta);setLocalOwner(uid);return 'claimed';
+    }
+    if(owner===''){setLocalOwner(uid);return 'claimed';} // made on this device while signed out
+    stashWorkingSet(owner);restoreWorkingSet(uid);setLocalOwner(uid);
+    return 'switched';
+  }
+  function stashWorkingSet(owner){
+    const stash={savedAt:Date.now()};
+    for(const k of WORKING_SET_KEYS){const v=localStorage.getItem(k);if(v!=null)stash[k]=v;}
+    localStorage.setItem(ACCOUNT_STASH_PREFIX+owner,JSON.stringify(stash)); // throws when full: nothing is removed then
+    for(const k of WORKING_SET_KEYS)localStorage.removeItem(k);
+  }
+  function restoreWorkingSet(uid){
+    const stash=readStored(ACCOUNT_STASH_PREFIX+uid,null);if(!stash)return false;
+    for(const k of WORKING_SET_KEYS)if(typeof stash[k]==='string')localStorage.setItem(k,stash[k]);
+    localStorage.removeItem(ACCOUNT_STASH_PREFIX+uid);
+    return true;
+  }
+  let sessionOwner=null;
+  async function onSignedIn(user){
+    accountUser=user;
+    persistEditorLocally();
+    try{
+      if(adoptWorkingSetFor(user)==='switched')openWorkingSetEditor();
+    }catch(e){
+      console.error('Could not switch the local working set',e);
+      setSaveProblem('cloud','this device still holds songs from another account and has no room to set them aside, so nothing was uploaded.');
+    }
+    sessionOwner=localOwner();
+    showAccount();startCloudPolling();
+    try{await syncWithCloud({pull:true});}catch{}
+  }
+  function openWorkingSetEditor(){
+    clearTimeout(autoSaveTimer);autoSaveTimer=null;state.currentProjectId=null;state.draftId=null;
+    const p=findLocal(localStorage.getItem(ACTIVE_PROJECT_KEY));
+    if(p)loadProjectIntoEditor(p);else if(!restoreDraft({quiet:true}))resetEditorToBlank();
+  }
+
+  // --- Autosave ----------------------------------------------------------------
+  let autoSaveTimer=null;
+  function scheduleAutoSave(){
+    // The hidden SRP playback bridge is strictly read-only.
+    if(IS_PLAYBACK_BRIDGE)return;
+    window.CRPParts?.syncActiveChord?.();
+    window.CRPParts?.liveEditRefresh?.();
+    publishSrpHandoff();
+    if(!state.currentProjectId)unsavedProjectTouched=true;
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer=setTimeout(runAutoSave,state.currentProjectId?850:600);
+  }
+  function runAutoSave(){
+    clearTimeout(autoSaveTimer);autoSaveTimer=null;
+    if(IS_PLAYBACK_BRIDGE)return;
+    if(persistEditorLocally()&&state.currentProjectId)requestCloudPush();
+  }
+  function flushAutoSaveNow(){runAutoSave();}
+
+  // --- Unsaved-work dialog (in-app navigation) ---------------------------------
   function ensureUnsavedProjectDialog(){
     let modal=document.getElementById('unsavedProjectExitDialog');if(modal)return modal;
     modal=document.createElement('div');modal.id='unsavedProjectExitDialog';modal.className='unsaved-project-dialog';modal.hidden=true;
@@ -1296,7 +1897,8 @@
     document.body.appendChild(modal);
     const close=()=>{modal.hidden=true;modal._continue=null;};
     modal.querySelector('[data-cancel]').onclick=close;modal.querySelector('.unsaved-project-backdrop').onclick=close;
-    modal.querySelector('[data-continue]').onclick=()=>{const fn=modal._continue;close();fn?.();};
+    // "Continue Without Saving" discards the unsaved work (editor and draft slot).
+    modal.querySelector('[data-continue]').onclick=()=>{const fn=modal._continue;close();clearDraft();resetEditorToBlank();fn?.();};
     modal.querySelector('[data-save]').onclick=async()=>{
       const saveBtn=modal.querySelector('[data-save]'),buttons=[...modal.querySelectorAll('button')],name=modal.querySelector('#unsavedProjectNameInput')?.value.trim();if(name&&$('projectName'))$('projectName').value=name;
       buttons.forEach(b=>b.disabled=true);saveBtn.textContent='Saving…';
@@ -1309,50 +1911,43 @@
     if(!unsavedProjectHasWork()){continueFn?.();return;}
     const modal=ensureUnsavedProjectDialog(),input=modal.querySelector('#unsavedProjectNameInput');modal._continue=continueFn;modal.hidden=false;if(input){input.value=($('projectName')?.value||'').trim();requestAnimationFrame(()=>input.focus());}
   }
-  function performNewProject(){
+  // Clear the editor without touching storage (used by New, deletes and account switches).
+  function resetEditorToBlank(){
     if(state.playing)stopProgression();
-    closeExportMenu?.();
-
-    // Flush any pending edits on the current saved project before leaving it.
-    flushAutoSaveNow();
-
-    // Start a fresh project instead of adding another line to the current one.
-    state.currentProjectId=null;
-    try{localStorage.removeItem('crp-active-project-id');}catch{}
-    state.rows=[[]];
-    state.selectedRow=0;
-    state.capo=0;
-    state.neck='open';
-    state.transpose=false;
-
-    $('projectName').value='';
-    $('chordInput').value='';
-    $('keyInput').value='';
-    $('keyInput').dataset.autoKey='1';
-    $('bpmInput').value=92;
-    $('beatsSelect').value=4;
-    $('loopToggle').checked=true;
-    $('notesEditor').innerHTML='';
-    $('capoSelect').value='0';
-    $('neckSelect').value='open';
-
+    clearTimeout(autoSaveTimer);autoSaveTimer=null;
+    state.currentProjectId=null;state.draftId=null;
+    try{localStorage.removeItem(ACTIVE_PROJECT_KEY);}catch{}
+    state.rows=[[]];state.selectedRow=0;state.capo=0;state.neck='open';state.transpose=false;
+    $('projectName').value='';$('chordInput').value='';$('keyInput').value='';$('keyInput').dataset.autoKey='1';
+    $('bpmInput').value=92;$('beatsSelect').value=4;$('loopToggle').checked=true;$('notesEditor').innerHTML='';
+    $('capoSelect').value='0';$('neckSelect').value='open';
     // A new project always starts with a blank beat.
     window.CRPBeatMaker?.loadProject?.(null);
     window.ScaleRider?.newProject?.();
-
-    renderAll();
-    syncBuildInput();
-    renderFits();
+    renderAll();syncBuildInput();renderFits();
     window.CRPParts?.newProject?.();
-    unsavedProjectTouched=false;
+    unsavedProjectTouched=false;noteEditorBase(null);undoHistory.reset();renderProjects();
+  }
+  function performNewProject(){
+    closeExportMenu?.();
+    flushAutoSaveNow();clearDraft();resetEditorToBlank();
     $('status').textContent='New blank project.';
     $('projectName').focus();
   }
-
   function newProject(){requestProjectExit(performNewProject);}
+  function restoreDraft({quiet=false}={}){
+    const d=readDraft();if(!d)return false;
+    loadProjectIntoEditor(d.project,{asDraft:true});
+    unsavedProjectTouched=true;
+    if(!quiet){
+      const when=new Date(Number(d.savedAt)||Date.now()).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+      showSyncNotice(`Restored the unsaved song you were working on (last change ${when}). Tap Save to keep it in Projects.`);
+    }
+    return true;
+  }
 
   function capture(id,name){
-    const existing=id?localProjects().find(x=>x.id===id):null;
+    const draft=readDraft(),existing=id?(findLocal(id)||(draft?.project&&sameProjectId(draft.project.id,id)?draft.project:null)):null;
     const liveBeat=window.CRPBeatMaker?.getBeat?.();
     // v3.3.63 — capture Baby DAW first, then make the project's top-level rows
     // mirror the exact loaded chord part that Baby DAW will restore. Previously
@@ -1367,154 +1962,11 @@
       if(Array.isArray(loaded?.data?.rows))canonicalRows=loaded.data.rows;
     }
     const rowsCopy=JSON.parse(JSON.stringify(canonicalRows||[[]]));
-    return{id:id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())),name,updatedAt:Date.now(),archived:!!existing?.archived,instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:rowsCopy,bpm:+$('bpmInput').value||92,beats:+$('beatsSelect').value||4,loop:$('loopToggle').checked,notes:$('notesEditor').innerHTML,key:$('keyInput').value.trim(),beatMaker:liveBeat||existing?.beatMaker,beatMakerUpdatedAt:window.CRPBeatMaker?.getUpdatedAt?.()||existing?.beatMakerUpdatedAt||0,parts:partsPayload,scaleRider:window.ScaleRider?.capture?.()||null};
-  }
-  function upsertLocal(p){const ps=localProjects(),i=ps.findIndex(x=>x.id===p.id);if(i>=0)ps[i]=p;else ps.unshift(p);saveLocalProjects(ps);}
-  let cloudRefreshPromise=null,cloudPollTimer=null,cloudFocusTimer=null;
-  function replaceCloudProject(p){if(!p)return;const i=cloudProjects?.findIndex(x=>sameProjectId(x.id,p.id))??-1;if(i>=0)cloudProjects[i]=p;else{cloudProjects=cloudProjects||[];cloudProjects.unshift(p);}upsertLocal(p);}
-  async function pushPendingCloudProjects(){
-    if(!accountUser)return 0;let pushed=0;
-    for(const id of pendingCloudProjectIds()){
-      const local=localProjects().find(p=>sameProjectId(p.id,id));if(!local){setCloudPending(id,false);continue;}
-      try{const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:local})});const committed=d.project||local;replaceCloudProject(committed);setCloudPending(id,false);if(sameProjectId(id,state.currentProjectId))await window.CRPParts?.syncCloudAudio?.(id);pushed++;}
-      catch(e){cloudSyncState='error';updateAccountSummary();throw e;}
-    }
-    return pushed;
-  }
-  async function refreshCloudProjects({rehydrateActive=false,pushPending=true,quiet=false}={}){
-    if(!accountUser){cloudProjects=null;cloudSyncState='idle';renderProjects();return {pulled:0,pushed:0};}
-    if(cloudRefreshPromise)return cloudRefreshPromise;
-    cloudRefreshPromise=(async()=>{
-      cloudSyncState='syncing';updateAccountSummary();
-      try{
-        const d=await api('/api/projects'),incoming=d.projects||[],locals=localProjects(),localById=new Map(locals.map(p=>[String(p?.id||''),p]));
-        let pulled=0,activeShouldReload=false;
-        const merged=incoming.map(remote=>{
-          const id=String(remote?.id||''),local=localById.get(id);
-          if(local&&cloudPending(id))return local;
-          if(local){const changed=Number(local.updatedAt||0)!==Number(remote.updatedAt||0);if(changed){pulled++;if(sameProjectId(id,state.currentProjectId))activeShouldReload=true;}}
-          return remote;
-        });
-        const remoteIds=new Set(incoming.map(p=>String(p?.id||'')));
-        // Keep local-only backups visible while signed in. Only explicitly pending
-        // projects are uploaded; this avoids silently moving another account's old
-        // local backup into the current cloud account.
-        for(const local of locals)if(!remoteIds.has(String(local?.id||'')))merged.push(local);
-        cloudProjects=merged;for(const p of incoming){if(!cloudPending(p.id))upsertLocal(p);}renderProjects();
-        let pushed=0;if(pushPending)pushed=await pushPendingCloudProjects();
-        cloudSyncState='ready';updateAccountSummary();renderProjects();
-        if(rehydrateActive&&activeShouldReload&&state.currentProjectId&&!cloudPending(state.currentProjectId)&&!autoSaveRunning&&!autoSaveTimer&&!window.CRPParts?.isPlaying?.()){performLoadProject(state.currentProjectId);}
-        return {pulled,pushed};
-      }catch(e){cloudSyncState='error';updateAccountSummary();if(!quiet)$('status').textContent=`Cloud sync unavailable — using local backup: ${e.message}`;renderProjects();throw e;}
-      finally{cloudRefreshPromise=null;}
-    })();
-    return cloudRefreshPromise;
-  }
-  function startCloudPolling(){
-    clearInterval(cloudPollTimer);cloudPollTimer=null;
-    if(!accountUser)return;
-    cloudPollTimer=setInterval(()=>{if(document.visibilityState!=='visible'||autoSaveRunning||autoSaveTimer)return;refreshCloudProjects({rehydrateActive:true,pushPending:true,quiet:true}).catch(()=>{});},60000);
-  }
-  function scheduleFocusCloudRefresh(){clearTimeout(cloudFocusTimer);if(!accountUser||document.visibilityState==='hidden')return;cloudFocusTimer=setTimeout(()=>{if(!autoSaveRunning&&!autoSaveTimer)refreshCloudProjects({rehydrateActive:true,pushPending:true,quiet:true}).catch(()=>{});},450);}
-  async function syncNow(){
-    if(!accountUser){$('authMessage').textContent='Log in to sync projects.';return;}
-    const btn=$('syncNowBtn');if(btn){btn.disabled=true;btn.textContent='↻ Syncing…';}
-    $('authMessage').textContent='Syncing this device with your cloud account…';cloudSyncState='syncing';updateAccountSummary();
-    try{
-      if(autoSaveTimer){clearTimeout(autoSaveTimer);autoSaveTimer=null;await runAutoSave();}
-      for(let i=0;autoSaveRunning&&i<240;i++)await new Promise(r=>setTimeout(r,25));
-      if(cloudRefreshPromise){try{await cloudRefreshPromise}catch{}}
-      const result=await refreshCloudProjects({rehydrateActive:true,pushPending:true,quiet:false});
-      $('authMessage').textContent=`Sync complete${result?.pushed?` • uploaded ${result.pushed}`:''}${result?.pulled?` • downloaded ${result.pulled}`:''}.`;
-      $('status').textContent='Cloud sync complete.';
-    }catch(e){$('authMessage').textContent=`Sync failed: ${e.message}`;}
-    finally{if(btn){btn.disabled=false;btn.textContent='↻ Sync Now';}}
-  }
-  let autoSaveTimer=null, autoSaveRunning=false, autoSaveQueued=false;
-
-  function updateCloudSnapshot(p){
-    if(!cloudProjects)return;
-    const i=cloudProjects.findIndex(x=>x.id===p.id);
-    if(i>=0)cloudProjects[i]=p;
-    else cloudProjects.unshift(p);
-  }
-
-  function scheduleAutoSave(){
-    // The hidden SRP playback bridge is strictly read-only. It must never persist its
-    // in-memory playback copy over the real Baby DAW project.
-    if(IS_PLAYBACK_BRIDGE)return;
-    window.CRPParts?.syncActiveChord?.();
-    window.CRPParts?.liveEditRefresh?.();
-    publishSrpHandoff();
-    // Brand-new/unnamed projects wait for the first manual Save, but remember that
-    // the user changed something so navigation can protect the work.
-    if(!state.currentProjectId){unsavedProjectTouched=true;return;}
-    clearTimeout(autoSaveTimer);
-    autoSaveTimer=setTimeout(()=>runAutoSave(),850);
-  }
-
-  function flushAutoSaveNow(){
-    clearTimeout(autoSaveTimer);
-    autoSaveTimer=null;
-    if(state.currentProjectId)runAutoSave();
-  }
-
-  async function runAutoSave(){
-    if(IS_PLAYBACK_BRIDGE){clearTimeout(autoSaveTimer);autoSaveTimer=null;autoSaveQueued=false;return;}
-    clearTimeout(autoSaveTimer);
-    autoSaveTimer=null;
-    if(!state.currentProjectId)return;
-
-    if(autoSaveRunning){
-      autoSaveQueued=true;
-      return;
-    }
-
-    autoSaveRunning=true;
-    const projectId=state.currentProjectId;
-    const existing=localProjects().find(x=>x.id===projectId);
-    const name=$('projectName').value.trim()||existing?.name||`Chord Project ${new Date().toLocaleDateString()}`;
-    const p=capture(projectId,name);
-
-    // This is a real captured local edit. Mark it pending before touching local storage so
-    // a cloud refresh can never pull an older server copy over an unsent edit.
-    setCloudPending(projectId,true);
-    // Local save happens synchronously first, so edits are protected even if cloud is unavailable.
-    upsertLocal(p);
-    publishSrpHandoff();
-    updateCloudSnapshot(p);
-    renderProjects();
-
-    if(accountUser){
-      try{
-        const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
-        const committed=d.project||p;upsertLocal(committed);updateCloudSnapshot(committed);setCloudPending(projectId,false);
-        await window.CRPParts?.syncCloudAudio?.(projectId);
-        cloudSyncState='ready';
-        updateAccountSummary();
-      }catch(e){
-        cloudSyncState='error';
-        updateAccountSummary();
-        $('status').textContent=`Autosaved locally; cloud sync failed: ${e.message}`;
-      }
-    }
-
-    autoSaveRunning=false;
-    if(autoSaveQueued){
-      autoSaveQueued=false;
-      // If the same saved project changed while the cloud request was in flight,
-      // immediately write the newest snapshot.
-      if(state.currentProjectId===projectId)runAutoSave();
-    }
+    return{id:id||newProjectId(),name,updatedAt:Date.now(),archived:!!existing?.archived,instrument:state.instrument,mode:state.mode,sound:state.sound,octave:state.octave,capo:state.capo,neck:state.neck,transpose:state.transpose,rows:rowsCopy,bpm:clampBpm($('bpmInput').value),beats:+$('beatsSelect').value||4,loop:$('loopToggle').checked,notes:$('notesEditor').innerHTML,key:$('keyInput').value.trim(),beatMaker:liveBeat||existing?.beatMaker,beatMakerUpdatedAt:window.CRPBeatMaker?.getUpdatedAt?.()||existing?.beatMakerUpdatedAt||0,parts:partsPayload,scaleRider:window.ScaleRider?.capture?.()||null};
   }
 
   async function saveProject(){
     clearTimeout(autoSaveTimer);autoSaveTimer=null;
-    // A manual Save is the commit point. If an older autosave request is still in
-    // flight, let it finish first so it cannot land after this newer MIDI pattern
-    // and resurrect stale durations in cloud storage.
-    for(let waits=0;autoSaveRunning&&waits<200;waits++)await new Promise(resolve=>setTimeout(resolve,25));
-    autoSaveQueued=false;
     if(state.cardView==='midi'){
       reflowMidiTimingFrom();
       window.CRPParts?.syncMidiTimelineFromCore?.();
@@ -1522,22 +1974,24 @@
     // If navigation temporarily lost the in-memory id, recover the exact saved project
     // instead of creating a duplicate with a new UUID.
     if(!state.currentProjectId){
-      try{
-        const storedId=String(localStorage.getItem('crp-active-project-id')||'').trim();
-        if(storedId && localProjects().some(x=>String(x?.id||'')===storedId)) state.currentProjectId=storedId;
-      }catch{}
+      const storedId=String(localStorage.getItem(ACTIVE_PROJECT_KEY)||'').trim();
+      if(storedId&&findLocal(storedId))state.currentProjectId=storedId;
     }
-    const name=$('projectName').value.trim()||`Chord Project ${new Date().toLocaleDateString()}`,p=capture(state.currentProjectId,name);
-    state.currentProjectId=p.id;unsavedProjectTouched=false;try{localStorage.setItem('crp-active-project-id',String(p.id));}catch{}$('projectName').value=name;setCloudPending(p.id,true);upsertLocal(p);publishSrpHandoff();
-    if(accountUser){
-      try{
-        const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
-        upsertLocal(d.project);updateCloudSnapshot(d.project);setCloudPending(p.id,false);
-        await window.CRPParts?.syncCloudAudio?.(p.id);
-        await refreshCloudProjects({rehydrateActive:false,pushPending:true});
-        $('status').textContent=`Saved “${name}” and vocal audio to cloud.`;
-      }catch(e){$('status').textContent=`Saved locally; cloud sync failed: ${e.message}`;}
-    }else{$('status').textContent=`Saved “${name}” on this device.`;renderProjects();}
+    const name=($('projectName').value.trim()||defaultProjectName()).slice(0,160);
+    $('projectName').value=name;
+    const firstSave=!state.currentProjectId;
+    if(firstSave){state.currentProjectId=state.draftId||newProjectId();noteEditorBase(null);}
+    if(!persistEditorLocally()){
+      if(firstSave)state.currentProjectId=null;
+      $('status').textContent='Not saved — see the message at the top of the page.';return;
+    }
+    try{localStorage.setItem(ACTIVE_PROJECT_KEY,String(state.currentProjectId));}catch{}
+    if(firstSave)clearDraft();
+    unsavedProjectTouched=false;publishSrpHandoff();renderProjects();
+    if(!canUpload()){$('status').textContent=`Saved “${name}” on this device.`;return;}
+    $('status').textContent=`Saved “${name}” on this device. Uploading…`;
+    try{await syncWithCloud({pull:false});$('status').textContent=`Saved “${name}” to your cloud account.`;}
+    catch(e){$('status').textContent=`Saved “${name}” on this device; cloud upload failed (${e.message}).`;}
   }
   let projectBrowserMode='projects';
 
@@ -1545,147 +1999,171 @@
     const aa=String(a??'').trim(),bb=String(b??'').trim();
     return !!aa&&!!bb&&aa===bb;
   }
-  function projectSource(){return (accountUser&&cloudProjects)?cloudProjects:localProjects();}
 
   function restoreActiveProjectFromStorage(){
     try{
       if(state.currentProjectId)return true;
-      const id=String(localStorage.getItem('crp-active-project-id')||'').trim();
+      const id=String(localStorage.getItem(ACTIVE_PROJECT_KEY)||'').trim();
       if(!id)return false;
-      const p=localProjects().find(x=>String(x?.id||'')===id);
-      if(!p){localStorage.removeItem('crp-active-project-id');return false;}
-      loadProject(p.id);
+      if(!findLocal(id)){localStorage.removeItem(ACTIVE_PROJECT_KEY);return false;}
+      loadProject(id);
       return true;
     }catch(err){console.error('Could not restore active CRP project',err);return false;}
   }
 
   function setProjectBrowserMode(mode){
     projectBrowserMode=mode==='archive'?'archive':'projects';
-    $('projectsTabBtn')?.classList.toggle('active',projectBrowserMode==='projects');
-    $('archiveTabBtn')?.classList.toggle('active',projectBrowserMode==='archive');
-    $('projectsTabBtn')?.setAttribute('aria-selected',String(projectBrowserMode==='projects'));
-    $('archiveTabBtn')?.setAttribute('aria-selected',String(projectBrowserMode==='archive'));
     renderProjects();
     const win=document.querySelector('.project-browser-window');
     if(win)win.scrollTop=0;
   }
 
-  async function setProjectArchived(project,archived){
-    const p={...project,archived:!!archived,updatedAt:Date.now()};
-    setCloudPending(p.id,true);
-    upsertLocal(p);
-    publishSrpHandoff();
-    updateCloudSnapshot(p);
-    renderProjects();
-
-    if(accountUser){
-      try{
-        const d=await api('/api/projects',{method:'POST',body:JSON.stringify({project:p})});
-        if(d?.project){upsertLocal(d.project);updateCloudSnapshot(d.project);}
-        setCloudPending(p.id,false);
-        cloudSyncState='ready';
-        updateAccountSummary();
-        renderProjects();
-      }catch(err){
-        cloudSyncState='error';
-        updateAccountSummary();
-        $('status').textContent=`${archived?'Archived':'Restored'} locally; cloud sync failed: ${err.message}`;
-      }
-    }
-
-    $('status').textContent=archived
-      ? `“${p.name}” moved to Archive.`
-      : `“${p.name}” restored to Projects.`;
+  function setProjectArchived(project,archived){
+    const cur=findLocal(project.id);if(!cur)return;
+    const p={...cur,archived:!!archived,updatedAt:Date.now()};
+    try{writeProjectHere(p);clearSaveProblem('local');}catch(e){setSaveProblem('local',localSaveReason(e));return;}
+    renderProjects();requestCloudPush();
+    $('status').textContent=archived?`“${p.name}” moved to Archive.`:`“${p.name}” restored to Projects.`;
   }
-  function performLoadProject(id){if(state.currentProjectId&&!sameProjectId(state.currentProjectId,id))flushAutoSaveNow();let p=projectSource().find(x=>sameProjectId(x.id,id))||localProjects().find(x=>sameProjectId(x.id,id));if(!p)return;p=recoverNavigationSnapshot(p);upsertLocal(p);const __srpSession=readSrpLinkSession();const shared=(__srpSession&&String(__srpSession.crpProjectId||'')===String(id))?readSharedSrpMeta(id):null;if(shared){p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};upsertLocal(p);updateCloudSnapshot(p);}state.currentProjectId=id;unsavedProjectTouched=false;try{localStorage.setItem('crp-active-project-id',String(id));}catch{}state.instrument=normalizeInstrument(p.instrument);state.mode=p.mode||'chord';state.sound=(SOUNDS[state.instrument]||SOUNDS.piano).some(x=>x[0]===p.sound)?p.sound:SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;state.rows=p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))];if(!state.rows.length)state.rows=[[]];state.selectedRow=0;$('projectName').value=p.name;$('bpmInput').value=p.bpm||92;$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';renderAll();syncBuildInput();autoPopulateKeyFromEntry();window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);window.ScaleRider?.loadProject?.(p);
-    // v3.3.49 — opening a project is also a browser selection action.
-    // Repaint immediately so the active project is highlighted and pinned to the top.
+  // Older builds left an emergency copy per song when switching to Song Rider Pro.
+  // Use it once if it is newer than the stored song, then remove it.
+  const CRP_NAV_SNAPSHOT_PREFIX='crp-nav-snapshot-v1:';
+  function adoptLegacyNavSnapshot(project){
+    const key=CRP_NAV_SNAPSHOT_PREFIX+String(project.id);
+    try{
+      const snap=readStored(key,null);if(!snap)return project;
+      localStorage.removeItem(key);
+      if(String(snap.id||'')!==String(project.id)||Number(snap.updatedAt||0)<=Number(project.updatedAt||0))return project;
+      const merged={...project,...snap};upsertLocal(merged);return merged;
+    }catch{return project;}
+  }
+  function loadProjectIntoEditor(p,{asDraft=false}={}){
+    if(!asDraft)p=adoptLegacyNavSnapshot(p);
+    const stored=p;
+    // A linked Song Rider Pro session owns the live BPM/capo/octave/key for its song.
+    const session=asDraft?null:readSrpLinkSession();
+    const shared=(session&&String(session.crpProjectId||'')===String(p.id))?readSharedSrpMeta(p.id):null;
+    if(shared)p={...p,bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')};
+    clearTimeout(autoSaveTimer);autoSaveTimer=null;
+    state.currentProjectId=asDraft?null:p.id;state.draftId=asDraft?p.id:null;unsavedProjectTouched=false;
+    if(!asDraft){try{localStorage.setItem(ACTIVE_PROJECT_KEY,String(p.id));}catch{}}
+    state.instrument=normalizeInstrument(p.instrument);state.mode=p.mode||'chord';state.sound=(SOUNDS[state.instrument]||SOUNDS.piano).some(x=>x[0]===p.sound)?p.sound:SOUNDS[state.instrument][0][0];state.octave=p.octave||0;state.capo=p.capo||0;state.neck=['open','triad','barre','power','shell','inversion','color'].includes(p.neck)?p.neck:'open';state.transpose=!!p.transpose;
+    state.rows=JSON.parse(JSON.stringify(p.rows||[(p.chords||[]).map(v=>({type:'chord',value:v}))]));if(!state.rows.length)state.rows=[[]];state.selectedRow=0;
+    $('projectName').value=p.name||'';$('bpmInput').value=clampBpm(p.bpm);$('beatsSelect').value=p.beats||4;$('loopToggle').checked=p.loop!==false;$('notesEditor').innerHTML=p.notes||'';$('capoSelect').value=state.capo;$('neckSelect').value=state.neck;$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';
+    renderAll();syncBuildInput();autoPopulateKeyFromEntry();
+    window.CRPBeatMaker?.loadProject?.(p);window.CRPParts?.loadProject?.(p);window.ScaleRider?.loadProject?.(p);
+    noteEditorBase(asDraft?null:stored);undoHistory.reset();
     renderProjects();
+    if(shared&&TRANSPORT_FIELDS.some(k=>String(shared[k]??stored[k]??'')!==String(stored[k]??'')))scheduleAutoSave();
+  }
+  function performLoadProject(id){
+    if(state.currentProjectId&&!sameProjectId(state.currentProjectId,id))flushAutoSaveNow();
+    const p=findLocal(id);if(!p)return;
+    loadProjectIntoEditor(p);
+    // v3.3.49 — opening a project pins it to the top of the browser.
     requestAnimationFrame(()=>{const win=document.querySelector('.project-browser-window');if(win)win.scrollTop=0;});
   }
   function loadProject(id){if(sameProjectId(state.currentProjectId,id)){performLoadProject(id);return;}requestProjectExit(()=>performLoadProject(id));}
+  // Another tab (or Song Rider Pro) wrote crp-projects.
+  function onProjectsChangedElsewhere(){
+    if(sessionOwner!==null&&localOwner()!==sessionOwner){location.reload();return;} // account switched in another tab
+    renderProjects();
+    const id=state.currentProjectId;if(!id)return;
+    const stored=findLocal(id);
+    if(!stored){if(readLocalDeletes()[String(id)])detachDeletedEditor();return;}
+    if(projectFingerprint(stored)===editorBase.fp)return;
+    if(autoSaveTimer)return; // the pending autosave reconciles both versions
+    if(contentFingerprint(stored)===editorBase.contentFp){applyTransportFrom(stored);noteEditorBase(stored);return;}
+    reloadOpenProject();
+  }
+  function applyTransportFrom(p){
+    if(document.activeElement!==$('bpmInput'))$('bpmInput').value=clampBpm(p.bpm);
+    state.capo=Number(p.capo)||0;state.octave=Number(p.octave)||0;state.transpose=!!p.transpose;
+    $('capoSelect').value=String(state.capo);
+    if(document.activeElement!==$('keyInput')){$('keyInput').value=p.key||'';$('keyInput').dataset.autoKey=p.key?'0':'1';}
+    renderAll();window.CRPParts?.syncCoreLive?.();
+  }
 
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
-  async function renameProjectRecord(p){
+  function renameProjectRecord(p){
     if(!p)return;
     const n=prompt('New project name:',p.name);
     if(!n?.trim())return;
-    const name=n.trim(),locals=localProjects(),i=locals.findIndex(x=>sameProjectId(x.id,p.id));
-    setCloudPending(p.id,true);
-    if(i>=0){locals[i].name=name;locals[i].updatedAt=Date.now();saveLocalProjects(locals);p={...p,...locals[i]};}
-    if(cloudProjects){const ci=cloudProjects.findIndex(x=>sameProjectId(x.id,p.id));if(ci>=0)cloudProjects[ci]={...cloudProjects[ci],name,updatedAt:Date.now()};}
-    if(sameProjectId(state.currentProjectId,p.id))$('projectName').value=name;
-    if(accountUser){
-      try{await api('/api/projects/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({name})});setCloudPending(p.id,false);await refreshCloudProjects({rehydrateActive:false,pushPending:true});}
-      catch(err){$('status').textContent='Rename saved locally; cloud sync failed.';renderProjects();}
-    }else renderProjects();
+    const name=n.trim().slice(0,160);
+    if(sameProjectId(state.currentProjectId,p.id)){$('projectName').value=name;flushAutoSaveNow();}
+    else{
+      const cur=findLocal(p.id);if(!cur)return;
+      try{writeProjectHere({...cur,name,updatedAt:Date.now()});clearSaveProblem('local');}catch(e){setSaveProblem('local',localSaveReason(e));return;}
+      requestCloudPush();
+    }
+    renderProjects();$('status').textContent=`Renamed to “${name}”.`;
   }
   function renameLoadedProject(){
     const id=state.currentProjectId;
     if(!id){$('status').textContent='Open or save a project before renaming it.';return;}
-    const p=projectSource().find(x=>sameProjectId(x.id,id))||localProjects().find(x=>sameProjectId(x.id,id));
+    const p=findLocal(id);
     if(!p){$('status').textContent='Loaded project could not be found.';return;}
     renameProjectRecord(p);
   }
+  function deleteProjectRecord(p){
+    if(!confirm(`Delete “${p.name}”?`))return;
+    const id=String(p.id);
+    try{
+      removeLocal(id);
+      const meta=readSyncMeta(),known=!!meta[id];delete meta[id];writeSyncMeta(meta);
+      // Remember the delete until the server confirms it, so a pull cannot bring it back.
+      if(known||accountUser||localOwner()===null){const d=readLocalDeletes();d[id]=Date.now();writeLocalDeletes(d);}
+      clearLegacyPending(id);clearSaveProblem('local');
+    }catch(e){setSaveProblem('local',localSaveReason(e));return;}
+    if(sameProjectId(state.currentProjectId,id))resetEditorToBlank();
+    renderProjects();$('status').textContent=`Deleted “${p.name}”.`;
+    requestCloudPush();
+  }
   function renderProjects(){
-    const w=$('projectList');
-    const all=[...projectSource()].sort((a,b)=>{
+    const w=$('projectList');if(!w)return;
+    const all=localProjects().sort((a,b)=>{
       const ac=sameProjectId(state.currentProjectId,a?.id),bc=sameProjectId(state.currentProjectId,b?.id);
       if(ac!==bc)return ac?-1:1;
       return (b.updatedAt||0)-(a.updatedAt||0);
     });
     const active=all.filter(p=>!p.archived), archived=all.filter(p=>!!p.archived);
     const ps=projectBrowserMode==='archive'?archived:active;
+    const meta=accountUser?readSyncMeta():null,legacy=accountUser?readLegacyPending():null;
 
     $('projectStorageLabel').textContent=accountUser?'Synced to your cloud account':'Saved on this device';
     if($('projectsCount'))$('projectsCount').textContent=String(active.length);
     if($('archiveCount'))$('archiveCount').textContent=String(archived.length);
-
     $('projectsTabBtn')?.classList.toggle('active',projectBrowserMode==='projects');
     $('archiveTabBtn')?.classList.toggle('active',projectBrowserMode==='archive');
     $('projectsTabBtn')?.setAttribute('aria-selected',String(projectBrowserMode==='projects'));
     $('archiveTabBtn')?.setAttribute('aria-selected',String(projectBrowserMode==='archive'));
 
     w.innerHTML=ps.length?'':`<div class="project-empty subtle">${projectBrowserMode==='archive'?'No archived projects yet.':'No active projects yet.'}</div>`;
-
     ps.forEach(p=>{
       const e=document.createElement('div');
       e.className='project-item'+(sameProjectId(state.currentProjectId,p.id)?' current':'');
       const count=p.rows?p.rows.flat().length:(p.chords||[]).length;
+      const m=meta?.[String(p.id)],syncLabel=!meta?'':(m?.legacy&&!isDirty(p,m,legacy)?' • on this device only':(isDirty(p,m,legacy)?' • not uploaded yet':''));
       const moveLabel=projectBrowserMode==='archive'?'Restore':'Archive';
-      e.innerHTML=`<div class="name">${esc(p.name)}</div><div class="meta">${count} cards</div><button class="open">Open</button><button class="rename">Rename</button><button class="archive-toggle">${moveLabel}</button><button class="delete">Delete</button>`;
-
+      e.innerHTML=`<div class="name">${esc(p.name)}</div><div class="meta">${count} cards${syncLabel}</div><button class="open" type="button">Open</button><button class="rename" type="button">Rename</button><button class="archive-toggle" type="button">${moveLabel}</button><button class="delete" type="button">Delete</button>`;
       e.querySelector('.open').onclick=()=>loadProject(p.id);
-
       e.querySelector('.rename').onclick=()=>renameProjectRecord(p);
-
       e.querySelector('.archive-toggle').onclick=()=>setProjectArchived(p,projectBrowserMode!=='archive');
-
-      e.querySelector('.delete').onclick=async()=>{
-        if(!confirm(`Delete “${p.name}”?`))return;
-        if(sameProjectId(state.currentProjectId,p.id)){
-          clearTimeout(autoSaveTimer);autoSaveTimer=null;state.currentProjectId=null;
-        }
-        saveLocalProjects(localProjects().filter(x=>x.id!==p.id));
-        if(cloudProjects)cloudProjects=cloudProjects.filter(x=>x.id!==p.id);
-        if(accountUser){
-          try{
-            await api('/api/projects/'+encodeURIComponent(p.id),{method:'DELETE'});
-            await refreshCloudProjects();
-          }catch(err){
-            $('status').textContent='Deleted locally; cloud delete failed.';
-            renderProjects();
-          }
-        }else renderProjects();
-      };
+      e.querySelector('.delete').onclick=()=>deleteProjectRecord(p);
       w.appendChild(e);
     });
   }
-  function showAccount(){const logged=!!accountUser;const panel=$('accountPanel');panel?.classList.toggle('is-logged-in',logged);$('accountSummaryBtn').hidden=!logged;$('authForms').hidden=logged;$('accountTools').hidden=!logged;$('logoutBtn').hidden=!logged;$('accountStatus').textContent=logged?`Signed in as ${accountDisplayName()}`:'Not signed in — local projects still work.';$('projectStorageLabel').textContent=logged?'Synced to your cloud account':'Saved on this device';if(logged){updateAccountSummary();setAccountCollapsed(true);}else{setAccountCollapsed(false);cloudSyncState='idle';}renderProjects();try{window.dispatchEvent(new CustomEvent('srs-auth-changed',{detail:{loggedIn:logged}}));}catch{}}
-  async function checkAccount(){try{const d=await api('/api/auth/me');accountUser=d.user||null;}catch{accountUser=null;}showAccount();startCloudPolling();if(accountUser){try{await refreshCloudProjects({rehydrateActive:true,pushPending:true})}catch{}}}
-  async function login(){try{const d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:$('loginEmail').value,password:$('loginPassword').value})});accountUser=d.user;$('loginPassword').value='';$('authMessage').textContent='Logged in. Syncing projects…';showAccount();startCloudPolling();await refreshCloudProjects({rehydrateActive:true,pushPending:true});$('authMessage').textContent='Cloud sync ready.';}catch(e){$('authMessage').textContent=e.message;}}
-  async function register(){try{const d=await api('/api/auth/register',{method:'POST',body:JSON.stringify({displayName:$('registerName').value,email:$('registerEmail').value,password:$('registerPassword').value,inviteCode:$('inviteCode').value})});accountUser=d.user;$('registerPassword').value=$('inviteCode').value='';$('authMessage').textContent='Account created. Your projects can now sync.';showAccount();startCloudPolling();await refreshCloudProjects({rehydrateActive:true,pushPending:true});}catch(e){$('authMessage').textContent=e.message;}}
-  async function logout(){try{await api('/api/auth/logout',{method:'POST',body:'{}'});}catch{}accountUser=null;cloudProjects=null;cloudSyncState='idle';startCloudPolling();showAccount();setAccountCollapsed(false);$('authMessage').textContent='Logged out. Local backup is still available.';}
+  function showAccount(){const logged=!!accountUser;const panel=$('accountPanel');panel?.classList.toggle('is-logged-in',logged);$('accountSummaryBtn').hidden=!logged;$('authForms').hidden=logged;$('accountTools').hidden=!logged;$('logoutBtn').hidden=!logged;$('accountStatus').textContent=logged?`Signed in as ${accountDisplayName()}`:'Not signed in — local projects still work.';$('projectStorageLabel').textContent=logged?'Synced to your cloud account':'Saved on this device';if(logged){updateAccountSummary();setAccountCollapsed(true);}else{setAccountCollapsed(false);cloudSyncState='idle';clearSaveProblem('cloud');}renderProjects();try{window.dispatchEvent(new CustomEvent('srs-auth-changed',{detail:{loggedIn:logged}}));}catch{}}
+  async function checkAccount(){let user=null;try{user=(await api('/api/auth/me')).user||null;}catch{}if(user)await onSignedIn(user);else{accountUser=null;showAccount();}}
+  async function login(){try{const d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:$('loginEmail').value,password:$('loginPassword').value})});$('loginPassword').value='';$('authMessage').textContent='Logged in. Syncing projects…';await onSignedIn(d.user);$('authMessage').textContent=cloudSyncState==='error'?'Logged in, but cloud sync is not available right now.':'Cloud sync ready.';}catch(e){$('authMessage').textContent=e.message;}}
+  async function register(){try{const d=await api('/api/auth/register',{method:'POST',body:JSON.stringify({displayName:$('registerName').value,email:$('registerEmail').value,password:$('registerPassword').value,inviteCode:$('inviteCode').value})});$('registerPassword').value=$('inviteCode').value='';$('authMessage').textContent='Account created. Your projects can now sync.';await onSignedIn(d.user);}catch(e){$('authMessage').textContent=e.message;}}
+  async function logout(){
+    flushAutoSaveNow();
+    try{await syncWithCloud({pull:false});}catch{} // best effort: upload before signing out
+    try{await api('/api/auth/logout',{method:'POST',body:'{}'});}catch{}
+    accountUser=null;cloudSyncState='idle';startCloudPolling();showAccount();setAccountCollapsed(false);
+    $('authMessage').textContent='Logged out. Your songs stay on this device.';
+  }
   async function changePassword(){const currentPassword=prompt('Current password:');if(currentPassword===null)return;const newPassword=prompt('New password (8+ characters):');if(newPassword===null)return;try{await api('/api/auth/password',{method:'POST',body:JSON.stringify({currentPassword,newPassword})});$('authMessage').textContent='Password changed successfully.';}catch(e){$('authMessage').textContent=e.message;}}
 
 
@@ -1812,8 +2290,21 @@
     const imgs=[...root.querySelectorAll('img')];
     await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=img.onerror=resolve;})));
   }
+  // PDF/PNG export libraries are only fetched the first time someone exports.
+  const exportScripts={};
+  function loadExportScript(src,ready){
+    if(ready())return Promise.resolve();
+    return exportScripts[src]||(exportScripts[src]=new Promise((resolve,reject)=>{
+      const el=document.createElement('script');el.src=src;el.async=true;
+      el.onload=()=>ready()?resolve():reject(new Error('Export tools did not load.'));
+      el.onerror=()=>{delete exportScripts[src];el.remove();reject(new Error('Export tools did not load. Check your connection and try again.'));};
+      document.head.appendChild(el);
+    }));
+  }
+  const loadHtml2canvas=()=>loadExportScript('vendor/html2canvas.min.js?v=1.4.1',()=>typeof window.html2canvas==='function');
+  const loadJsPdf=()=>loadExportScript('vendor/jspdf.umd.min.js?v=2.5.1',()=>!!window.jspdf?.jsPDF);
   async function captureExportSheet(forPdf=false,selection={}){
-    if(typeof html2canvas!=='function')throw new Error('Export tools did not load. Check your connection and try again.');
+    await loadHtml2canvas();
     const sheet=buildExportSheet(selection);sheet.classList.toggle('pdf-print',forPdf);await waitForExportImages(sheet);
     await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
     const bounds=sheet.getBoundingClientRect();
@@ -1845,7 +2336,7 @@
   async function exportPdf(selection={}){
     $('status').textContent='Creating PDF song blueprint…';
     try{
-      if(!window.jspdf?.jsPDF)throw new Error('PDF tools did not load. Check your connection and try again.');
+      await loadJsPdf();
       const {canvas,breaks}=await captureExportSheet(true,selection),{jsPDF}=window.jspdf;
       const pdf=new jsPDF({orientation:'portrait',unit:'pt',format:'letter',compress:true});
       const pageW=pdf.internal.pageSize.getWidth(),pageH=pdf.internal.pageSize.getHeight(),margin=18,drawW=pageW-margin*2,drawH=pageH-margin*2;
@@ -1860,7 +2351,8 @@
 
   function init(){
     for(let i=0;i<=12;i++){const o=document.createElement('option');o.value=i;o.textContent=i?'Capo '+i:'None';$('capoSelect').appendChild(o);}
-    $('buildBtn').onclick=()=>{const bad=commitBuildInput();$('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';syncBuildInput();autoPopulateKeyFromEntry();renderAll();scheduleAutoSave();};
+    initCarouselListeners();
+    $('buildBtn').onclick=()=>{recordUndo();const bad=commitBuildInput();$('status').textContent=bad.length?`Skipped unrecognized: ${bad.join(', ')}`:'';syncBuildInput();autoPopulateKeyFromEntry();renderAll();scheduleAutoSave();};
     $('chordInput').oninput=()=>autoPopulateKeyFromEntry();
     $('chordInput').onkeydown=e=>{if(e.key==='Enter')$('buildBtn').click();};
     $('keyInput').oninput=()=>{const key=$('keyInput');key.dataset.autoKey='0';const raw=key.value.trim();scheduleAutoSave();if(!raw){key.dataset.autoKey='1';autoPopulateKeyFromEntry();return;}if(!enteredKey()){$('keyHint').textContent='Enter a key like F, F#m, Bb, or C minor';return;}renderFits();};
@@ -1871,7 +2363,7 @@
     $('sustainBtn').onclick=()=>{state.sustain=!state.sustain;localStorage.setItem('crp-sustain',state.sustain?'1':'0');updateSustainButton();window.CRPParts?.syncCoreLive?.();};
     updateSustainButton();
     $('capoSelect').onchange=e=>{state.capo=+e.target.value;if(state.currentProjectId)writeSharedSrpMeta(state.currentProjectId,{pitchMode:'capo'});publishLiveSrpMeta('crp');writeHardSync('crp','capo');renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();};$('neckSelect').onchange=e=>{state.neck=e.target.value;renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();};$('transposeBtn').onclick=()=>{state.transpose=!state.transpose;publishLiveSrpMeta('crp');renderAll();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();publishSrpHandoff();};
-    $('addLineBtn').onclick=()=>{lockAutoSongKey();state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
+    $('addLineBtn').onclick=()=>{recordUndo();lockAutoSongKey();state.rows.push([]);state.selectedRow=state.rows.length-1;renderRows();syncBuildInput();renderFits();scheduleAutoSave();};
     $('autoScrollBtn').onclick=()=>setAutoScroll(!state.autoScroll);
     $('midiViewBtn').onclick=()=>{state.cardView=state.cardView==='midi'?'diagram':'midi';localStorage.setItem('crp-card-view',state.cardView);updateCardViewButton();renderRows();};
     updateAutoScrollButton();updateCardViewButton();
@@ -1908,7 +2400,7 @@
         if(state.playing&&state.autoScroll)disableAutoScrollForManualScroll();
       },{passive:true});
     }
-    // Full-project autosave: only active after the project has been manually saved once.
+    // Autosave: saved songs autosave into Projects; never-saved work autosaves to the draft slot.
     // BPM is intentionally excluded from input-time autosave. scheduleAutoSave() publishes the
     // SRP handoff immediately, so including BPM here leaked partial mobile keystrokes ("4", "12")
     // into the sync bus before the user finished typing. BPM commits on change/blur below.
@@ -1926,11 +2418,26 @@
       node.value=String(bpm);
       publishLiveSrpMeta('crp');writeHardSync('crp');publishSrpHandoff();scheduleAutoSave();
     };
+    // A tempo above 240 can never become valid by typing more digits, so cap it at once
+    // (both BPM fields); values below 40 may still be on their way to "120" and are
+    // clamped when the edit is committed.
+    document.addEventListener('input',e=>{if(e.target?.matches?.('#bpmInput,#voxBpmInput')&&Number(e.target.value)>240)e.target.value='240';},true);
     $('bpmInput')?.addEventListener('change',commitCrpBpm);
     $('bpmInput')?.addEventListener('blur',commitCrpBpm);
     $('bpmInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitCrpBpm();e.currentTarget.blur();}});
     $('notesEditor')?.addEventListener('input',scheduleAutoSave);
-    window.addEventListener('beforeunload',e=>{if(allowUnsavedUnloadOnce){allowUnsavedUnloadOnce=false;return;}if(!unsavedProjectHasWork())return;e.preventDefault();e.returnValue='';});
+    $('undoBtn')?.addEventListener('click',undoEdit);
+    $('redoBtn')?.addEventListener('click',redoEdit);
+    document.addEventListener('keydown',e=>{
+      if(!(e.ctrlKey||e.metaKey)||e.altKey)return;
+      const k=String(e.key||'').toLowerCase();if(k!=='z'&&k!=='y')return;
+      if(e.target?.closest?.('input,textarea,select,[contenteditable="true"]'))return; // keep native text undo
+      if($('voxBoxPage')&&!$('voxBoxPage').hidden)return; // Track Master has its own undo
+      if((k==='y'||e.shiftKey)?redoEdit():undoEdit())e.preventDefault();
+    });
+    updateUndoButtons();
+    $('saveRetryBtn')?.addEventListener('click',()=>{persistEditorLocally();syncWithCloud({pull:true}).catch(()=>{});});
+    $('syncNoticeClose')?.addEventListener('click',dismissSyncNotice);
 
     $('projectsTabBtn').onclick=()=>setProjectBrowserMode('projects');
     $('archiveTabBtn').onclick=()=>setProjectBrowserMode('archive');
@@ -1943,31 +2450,29 @@
     document.querySelectorAll('.notes-toolbar [data-cmd]').forEach(b=>b.onclick=()=>{document.execCommand(b.dataset.cmd,false,null);scheduleAutoSave();});$('clearNotesBtn').onclick=()=>{if(confirm('Clear notes?')){$('notesEditor').innerHTML='';scheduleAutoSave();}};
     $('keyInput').dataset.autoKey=$('keyInput').value.trim()?'0':'1';
     renderProjects();renderAll();syncBuildInput();autoPopulateKeyFromEntry();setRiderBonesRiding(false);initWorkspaceMode();
-    // Restore the exact project the user was working on before switching to SRP/Baby DAW.
-    restoreActiveProjectFromStorage();
-    // parts.js loads after app.js because it depends on CRPCore. The first restore above can
-    // therefore restore the core project before CRPParts exists. Restore once more after the
-    // parts module announces it is ready; otherwise it starts with only Chords 1 and a trip to
-    // SRP can snapshot that one-part placeholder over the real Baby DAW arrangement.
-    window.addEventListener('crp-parts-ready',()=>{
-      // parts.js starts after the core project was restored. Force-load the SAME saved
-      // project now that CRPParts exists; restoreActiveProjectFromStorage() intentionally
-      // short-circuits when currentProjectId is already set, which was leaving Baby DAW
-      // at its one-part placeholder on every return from SRP.
-      const id=state.currentProjectId||String(localStorage.getItem('crp-active-project-id')||'');
-      if(id) loadProject(id);
-    },{once:true});
-    // beat-maker.js loads after both app.js and parts.js. The first project restore can therefore
-    // happen before CRPBeatMaker exists. Re-load the same active project once the beat bridge is
-    // ready so the persisted drum pattern is restored instead of a fresh blank sequencer.
-    window.addEventListener('crp-beat-ready',()=>{
-      const id=state.currentProjectId||String(localStorage.getItem('crp-active-project-id')||'');
-      if(id) loadProject(id);
-    },{once:true});
+    // A fresh device starts its working set as signed-out work (see adoptWorkingSetFor).
+    if(localOwner()===null&&!localProjects().length){try{setLocalOwner('');}catch{}}
+    sessionOwner=localOwner();
+    // Restore the project the user was working on, or their never-saved draft.
+    if(!restoreActiveProjectFromStorage()&&!IS_PLAYBACK_BRIDGE)restoreDraft();
+    // parts.js and beat-maker.js load after app.js, so the restore above ran before they
+    // existed. Load the same song into each module once it announces it is ready;
+    // otherwise Baby DAW starts with only Chords 1 and the drums start blank.
+    const reloadEditorIntoModules=()=>{
+      if(state.currentProjectId){const p=findLocal(state.currentProjectId);if(p)loadProjectIntoEditor(p);}
+      else if(state.draftId){const d=readDraft();if(d&&sameProjectId(d.project.id,state.draftId)){loadProjectIntoEditor(d.project,{asDraft:true});unsavedProjectTouched=true;}}
+    };
+    window.addEventListener('crp-parts-ready',reloadEditorIntoModules,{once:true});
+    window.addEventListener('crp-beat-ready',reloadEditorIntoModules,{once:true});
     setTimeout(applyLinkedMetaFromSrpHandoff,0);
-    // The hidden SRP playback bridge is read-only. Never let it fetch cloud projects: a stale
-    // cloud payload can overwrite the richer Baby DAW snapshot that was just saved before SRP navigation.
-    if(!IS_PLAYBACK_BRIDGE){checkAccount();window.addEventListener('focus',scheduleFocusCloudRefresh);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')scheduleFocusCloudRefresh();});}
+    // The hidden SRP playback bridge is read-only: it never syncs or listens for edits.
+    if(!IS_PLAYBACK_BRIDGE){
+      checkAccount();
+      window.addEventListener('focus',()=>scheduleCloudPull());
+      window.addEventListener('online',()=>scheduleCloudPull(150));
+      document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')scheduleCloudPull();});
+      window.addEventListener('storage',e=>{if(e.key===PROJECTS_KEY||e.key===LOCAL_OWNER_KEY||e.key===null)onProjectsChangedElsewhere();});
+    }
     if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js?v=3.3.129-CRP-COMPACT-STARTUP').catch(()=>{});
   }
 
@@ -2173,50 +2678,14 @@
       return true;
     }catch{return false}
   }
-  // v2.9.5: emergency project snapshot used across workspace navigation.
-  // It is written synchronously before leaving CRP/Baby DAW so newly-added parts
-  // cannot be lost to an older project payload during the SRP handoff.
-  const CRP_NAV_SNAPSHOT_PREFIX='crp-nav-snapshot-v1:';
-  function writeNavigationSnapshot(){
-    // Never let the hidden SRP playback iframe write a navigation snapshot. Its pagehide
-    // used to be able to replace the real Baby DAW snapshot when SRP was closed.
-    if(IS_PLAYBACK_BRIDGE)return null;
-    if(!state.currentProjectId)return null;
-    try{
-      window.CRPParts?.syncActiveChord?.();
-      const existing=localProjects().find(x=>String(x?.id||'')===String(state.currentProjectId));
-      const nm=$('projectName').value.trim()||existing?.name||`Chord Project ${new Date().toLocaleDateString()}`;
-      const snap=capture(state.currentProjectId,nm);
-      setCloudPending(state.currentProjectId,true);
-      upsertLocal(snap);
-      localStorage.setItem(CRP_NAV_SNAPSHOT_PREFIX+String(state.currentProjectId),JSON.stringify(snap));
-      localStorage.setItem('crp-active-project-id',String(state.currentProjectId));
-      return snap;
-    }catch(err){console.warn('Could not write navigation snapshot',err);return null;}
-  }
-  function recoverNavigationSnapshot(project){
-    if(!project?.id)return project;
-    // A navigation snapshot is an emergency LOCAL recovery layer, not a second
-    // cloud authority. Once the account has a clean (non-pending) cloud project,
-    // never let an older phone/PC navigation snapshot replace that downloaded copy.
-    if(accountUser&&!cloudPending(project.id)){try{localStorage.removeItem(CRP_NAV_SNAPSHOT_PREFIX+String(project.id));}catch{}return project;}
-    try{
-      const raw=localStorage.getItem(CRP_NAV_SNAPSHOT_PREFIX+String(project.id));
-      if(!raw)return project;
-      const snap=JSON.parse(raw);
-      if(!snap||String(snap.id||'')!==String(project.id))return project;
-      const projectParts=project.parts?.items?.length||0,snapParts=snap.parts?.items?.length||0;
-      // Prefer the navigation snapshot when it contains newer/more complete Baby DAW data.
-      if(snapParts>projectParts || Number(snap.updatedAt||0)>=Number(project.updatedAt||0))return {...project,...snap};
-    }catch(err){console.warn('Could not recover navigation snapshot',err);}
-    return project;
-  }
+
 
   function performOpenSongRiderWorkspace(){
     try{
-      // Persist the exact active project snapshot before leaving CRP.
-      // This prevents SRP from seeing stale data and lets CRP restore the same project on return.
-      writeNavigationSnapshot();
+      // Persist the open project before leaving CRP so SRP reads current data and CRP
+      // restores it on return. (Unsaved work only reaches this point after the user
+      // chose "Continue Without Saving", so it is not written back to the draft slot.)
+      if(state.currentProjectId)flushAutoSaveNow();
       publishLiveSrpMeta('crp');
       writeHardSync('crp');
       const payload=srpPayload();
@@ -2238,7 +2707,6 @@
       }else{
         appRoot=path.slice(0,path.lastIndexOf('/')+1);
       }
-      allowUnsavedUnloadOnce=true;
       location.href=new URL(appRoot+'song-rider/index.html?crpMode=1',location.origin).href;
     }
   }
@@ -2370,24 +2838,10 @@
       state.transpose=transpose;
       if($('keyInput')){$('keyInput').value=key;$('keyInput').dataset.autoKey=key?'0':'1';}
 
-      // Update every CRP representation, not only localStorage. This is essential when signed in,
-      // because projectSource() may be the in-memory cloudProjects array.
-      const projects=localProjects();
-      const i=projects.findIndex(x=>String(x?.id||'')===activeId);
-      let merged=null;
-      if(i>=0){
-        merged={...projects[i],bpm,capo,octave,transpose,key:key||projects[i].key||'',updatedAt:Date.now()};
-        projects[i]=merged;saveLocalProjects(projects);
-      }
-      if(merged)updateCloudSnapshot(merged);
-
       renderAll();syncBuildInput();window.CRPParts?.syncCoreLive?.();
       const changed=before.bpm!==bpm||before.capo!==capo||before.octave!==octave||before.transpose!==transpose||String(before.key)!==key;
-      if(changed && state.currentProjectId===activeId && !IS_PLAYBACK_BRIDGE){
-        // Persist the SRP-originated values through the normal CRP autosave/cloud path.
-        clearTimeout(autoSaveTimer);
-        autoSaveTimer=setTimeout(()=>runAutoSave(),120);
-      }
+      // Persist the SRP-originated values through the normal autosave/cloud path.
+      if(changed&&state.currentProjectId===activeId)scheduleAutoSave();
       return true;
     }catch(err){console.warn('Could not apply linked SRP metadata',err);return false}
   }
@@ -2399,7 +2853,11 @@
   window.addEventListener('focus',()=>setTimeout(applyLinkedMetaFromSrpHandoff,0));
   window.addEventListener('storage',e=>{if(e.key===SRP_HARD_SYNC_KEY||e.key===SRP_LINK_SESSION_KEY||String(e.key||'').startsWith(SRP_CANONICAL_PREFIX)||e.key===SRS_TRANSPORT_KEY)setTimeout(applyHardSync,0);});
   window.addEventListener('pageshow',()=>setTimeout(applyHardSync,0));
-  if(!IS_PLAYBACK_BRIDGE)window.addEventListener('pagehide',()=>{try{flushAutoSaveNow();writeNavigationSnapshot();window.CRPBeatMaker?.persist?.();}catch{}});
+  // Phones can kill a hidden tab without warning: write the editor to this device now.
+  if(!IS_PLAYBACK_BRIDGE){
+    window.addEventListener('pagehide',()=>flushAutoSaveNow());
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushAutoSaveNow();});
+  }
   window.addEventListener('focus',()=>setTimeout(applyHardSync,0));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSync,0);});
   setInterval(applyHardSync,250);
@@ -2454,7 +2912,9 @@
   window.CRPCore={
     snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,cardDurationBeats,soundPreset,soundOutputGain,isBassSound,loadSoundfontInstrument,createInstrumentFxChain,normalizeInstrument,
     scheduleAutoSave,flushAutoSaveNow,renderAll,syncBuildInput,publishSrpHandoff,loadProjectById:loadProject,
-    get beats(){return +$('beatsSelect').value||4},get bpm(){return +$('bpmInput').value||92},get loop(){return $('loopToggle').checked},
+    recordUndo,undo:undoEdit,redo:redoEdit,get canUndo(){return undoHistory.undo.length>0;},
+    keyTonicName,spellInKey,
+    get beats(){return +$('beatsSelect').value||4},get bpm(){return clampBpm($('bpmInput').value)},get loop(){return $('loopToggle').checked},
     get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
     startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).flat().reduce((n,c)=>n+storedCardDurationBeats(c),0);},
     get autoScroll(){return !!state.autoScroll;},get sustain(){return !!state.sustain;},
@@ -2473,7 +2933,7 @@
       if(isMobileCarousel()){scrollMobileLineTo(ri,true);setTimeout(()=>{if(state.autoScroll)card.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});},180);}
       else card.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
     },
-    setPlaying(on){state.playing=!!on;setRiderBonesRiding(!!on);$('playAllBtn').textContent=on?'■ Stop':'▶ Play';if(!on)clearPlaybackHighlights();},
+    setPlaying(on){state.playing=!!on;setRiderBonesRiding(!!on);$('playAllBtn').textContent=on?'■ Stop':'▶ Play';if(!on){clearPlaybackHighlights();if(pendingEditorReload)setTimeout(reloadOpenProject,0);}},
     status(msg){$('status').textContent=msg||'';},
     setBabyDawSetupHidden(hidden){setWorkspaceSetupHidden('baby-daw',!!hidden);},
     refreshSetupVisibility(){applySetupVisibility();},
@@ -2489,6 +2949,7 @@
     addProgressionLine(chords,{root=null,minor=false}={}){
       const checked=normalizeChordSequence(chords);if(!checked.valid){$('status').textContent=checked.invalid.length?`Scale Rider chord not supported: ${checked.invalid.join(', ')}`:'No progression chords to add.';return false;}
       const vals=checked.values;
+      recordUndo();
       lockAutoSongKey();
       // Reuse a genuinely empty selected line instead of always appending a new one.
       // This keeps a brand-new project on Line 1 when Scale Rider supplies the

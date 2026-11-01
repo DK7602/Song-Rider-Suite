@@ -1,8 +1,8 @@
 (() => {
   'use strict';
 
-  const STORAGE_KEY = 'crp-projects';
-  const DRAFT_KEY = 'crp-beat-draft-v1';
+  // Older builds kept an unsaved beat here; the core's draft slot now holds it.
+  const LEGACY_DRAFT_KEY = 'crp-beat-draft-v1';
   const VERSION = 3;
   const DRUM_OUTPUT_SCALE = .18;
   const SCRIPT_URL = document.currentScript?.src || new URL('beat-maker.js', window.location.href).href;
@@ -51,7 +51,6 @@
   let eventEditCommit = null;
   let eventEditClose = null;
   let eventEditPriorBeat = null;
-  let activeProjectId = null;
   let beat = freshBeat();
   let beatUpdatedAt=0;
 
@@ -91,23 +90,10 @@
     return b;
   }
   function clamp(n,a,b){ return Math.max(a,Math.min(b,n)); }
-  function readProjects(){ try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch{return []} }
-  function writeProjects(ps){ localStorage.setItem(STORAGE_KEY, JSON.stringify(ps)); }
-  function projectName(){ return ($('projectName')?.value || '').trim(); }
-  function inferActiveProject(){
-    const ps = readProjects();
-    if(activeProjectId){ const p=ps.find(x=>x.id===activeProjectId); if(p) return p; }
-    const name = projectName();
-    if(name){
-      const matches = ps.filter(p=>p.name===name).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
-      if(matches[0]) { activeProjectId=matches[0].id; return matches[0]; }
-    }
-    // With no active project ID and no project name, this is a genuinely blank/new
-    // project. Never borrow the most recently saved project's drums.
-    return null;
-  }
+  // The beat lives in memory; the core loads it per project id (loadProject) and
+  // saves it as part of the project capture (getBeat), so this module never reads
+  // or writes crp-projects itself.
   function loadBeatFromProject(p){
-    activeProjectId = p?.id || null;
     beatUpdatedAt = Number(p?.beatMakerUpdatedAt||p?.updatedAt||0)||0;
     beat = normalizeBeat(p?.beatMaker);
     currentBar = clamp(currentBar,0,beat.bars-1);
@@ -128,25 +114,16 @@
     // Keep Baby DAW Beat Maker and Track Master drum rail in lockstep.
     // Track Master owns region placement; Beat Maker owns the primary region pattern.
     try{window.CRPParts?.syncBeatMakerMaster?.(normalizeBeat(beat));}catch(e){console.warn('Could not sync Beat Maker to Track Master',e);}
-    const ps = readProjects();
-    let p = activeProjectId ? ps.find(x=>x.id===activeProjectId) : null;
-    if(!p){
-      const name = projectName();
-      p = ps.filter(x=>x.name===name).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0] || null;
-    }
-    if(!p){
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({beat:normalizeBeat(beat),updatedAt:beatUpdatedAt}));
-      // The core save will include the live beat when this draft gets its first project ID.
-      window.CRPCore?.scheduleAutoSave?.();
-      return false;
-    }
-    activeProjectId = p.id;
-    const idx = ps.findIndex(x=>x.id===p.id);
-    ps[idx] = {...p, beatMaker: normalizeBeat(beat), beatMakerUpdatedAt:beatUpdatedAt, updatedAt: now};
-    writeProjects(ps);
-    localStorage.removeItem(DRAFT_KEY);
-    // Keep the authoritative project payload/cloud snapshot in lockstep with the drum editor.
+    // The core autosave captures getBeat() into the open project (or the unsaved draft).
     window.CRPCore?.scheduleAutoSave?.();
+    return true;
+  }
+  // Big pattern changes are undoable through the core's undo history. While a
+  // Track Master drum region is being edited the history belongs to the song, so
+  // ask before replacing the region instead.
+  function beforeBigChange(question){
+    if(typeof eventEditCommit==='function') return window.confirm(question);
+    window.CRPCore?.recordUndo?.();
     return true;
   }
   function countHits(){
@@ -174,7 +151,7 @@
           <label class="crp-beat-tool">Bars <select id="crpBarsSelect">${Array.from({length:16},(_,i)=>`<option>${i+1}</option>`).join('')}</select></label>
           <label class="crp-beat-tool">Grid <select id="crpResolution"><option value="8">1/8</option><option value="16">1/16</option><option value="32">1/32</option><option value="64">1/64</option></select></label>
           <label class="crp-beat-tool crp-volume-tool">Volume <input id="crpBeatVolume" type="range" min="0" max="100" step="1" value="42"><span id="crpBeatVolumeValue">42%</span></label>
-          <button id="crpBeatClose" type="button">✕</button>
+          <button id="crpBeatClose" type="button" aria-label="Close Beat Maker">✕</button>
         </div>
         <div class="crp-beat-body">
           <div id="crpBarTabs" class="crp-bar-tabs"></div>
@@ -204,6 +181,7 @@
           <button id="crpPasteBar" type="button">Paste</button>
           <button id="crpDuplicateBar" type="button">Duplicate</button>
           <button id="crpClearBar" class="crp-danger" type="button">Clear</button>
+          <button id="crpBeatUndo" type="button" title="Undo the last beat change" disabled>↶ Undo</button>
           <span id="crpBeatStatus" class="crp-beat-status"></span>
           <span class="spacer"></span>
           <button id="crpBeatSave" class="accent" type="button">OK / Save Beat</button>
@@ -232,38 +210,10 @@
     $('crpClearBar').addEventListener('click', clearBar);
     $('crpRandomizeBeat').addEventListener('click', randomizeBeat);
     $('crpFillLastBar').addEventListener('click', fillLastBar);
+    $('crpBeatUndo').addEventListener('click', ()=>window.CRPCore?.undo?.());
     document.addEventListener('keydown', e=>{ if(e.key==='Escape' && modal.classList.contains('open')) closeEditor(); });
 
-    hookProjectUi();
     updateMainControls();
-  }
-
-  function hookProjectUi(){
-    const saveBtn=$('saveProjectBtn');
-    if(saveBtn) saveBtn.addEventListener('click', ()=>setTimeout(()=>{
-      const p=inferActiveProject(); if(p) activeProjectId=p.id;
-      persistBeatIntoProject(); updateMainControls();
-    },0));
-
-    const list=$('projectList');
-    if(list) list.addEventListener('click', e=>{
-      const open=e.target.closest('.open'); if(!open) return;
-      const item=open.closest('.project-item');
-      const name=item?.querySelector('.name')?.textContent?.trim();
-      setTimeout(()=>{
-        const ps=readProjects();
-        const p=ps.filter(x=>!name || x.name===name).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];
-        if(p) loadBeatFromProject(p);
-      },0);
-    });
-
-    const play=$('playAllBtn');
-    if(play) play.addEventListener('click', ()=>{
-      setTimeout(()=>{
-        const starting = /Stop/i.test(play.textContent||'');
-        if(starting) startMainDrumsWhenChordStarts(); else stopMainDrums();
-      },0);
-    });
   }
 
   function updateVolumeControls(){
@@ -290,11 +240,8 @@
     }
   }
   function openEditor(){
-    const p=inferActiveProject();
-    if(p && p.id!==activeProjectId) loadBeatFromProject(p);
-    // No saved project: keep the current in-memory beat. A brand-new project is
-    // reset explicitly by loadProject(null), so stale draft drums cannot leak in.
     renderEditor(); $('crpBeatModal').classList.add('open');
+    $('crpBeatClose')?.focus();
   }
   function closeEditor(){
     stopPreview(); $('crpBeatModal')?.classList.remove('open');
@@ -313,7 +260,7 @@
   function renderBarTabs(){
     const wrap=$('crpBarTabs'); wrap.innerHTML='';
     for(let i=0;i<beat.bars;i++){
-      const b=document.createElement('button'); b.className='crp-bar-tab'+(i===currentBar?' active':''); b.textContent=`Bar ${i+1}`;
+      const b=document.createElement('button'); b.type='button'; b.className='crp-bar-tab'+(i===currentBar?' active':''); b.textContent=`Bar ${i+1}`; b.setAttribute('aria-pressed',String(i===currentBar));
       b.onclick=()=>{currentBar=i; renderBarTabs(); renderGrid();}; wrap.appendChild(b);
     }
   }
@@ -323,7 +270,7 @@
     DRUMS.forEach(([id,label])=>{
       const row=document.createElement('div'); row.className='crp-drum-row';
       const name=document.createElement('div'); name.className='crp-drum-name';
-      name.innerHTML=`<button class="crp-audition" type="button" title="Hear ${label}">▶</button><span>${label}</span>`;
+      name.innerHTML=`<button class="crp-audition" type="button" title="Hear ${label}" aria-label="Hear ${label}">▶</button><span>${label}</span>`;
       name.querySelector('button').onclick=()=>audition(id);
       const steps=document.createElement('div'); steps.className='crp-steps'; steps.style.gridTemplateColumns=`repeat(${cells},40px)`;
       const active=new Set(beat.tracks[id][currentBar]);
@@ -331,6 +278,8 @@
         const canonical=c*stride; const s=document.createElement('button'); s.type='button'; s.className='crp-step';
         const quarter=16; if(canonical%quarter===0) s.classList.add('beat-edge');
         if(active.has(canonical)) s.classList.add('active');
+        s.setAttribute('aria-label',`${label}, bar ${currentBar+1}, step ${c+1}`);
+        s.setAttribute('aria-pressed',String(active.has(canonical)));
         s.dataset.canonical=String(canonical); s.dataset.drum=id;
         s.onclick=()=>toggleStep(id,canonical,s); steps.appendChild(s);
       }
@@ -340,7 +289,7 @@
   function toggleStep(id,step,btn){
     const arr=beat.tracks[id][currentBar]; const i=arr.indexOf(step);
     if(i>=0) arr.splice(i,1); else {arr.push(step);arr.sort((a,b)=>a-b); audition(id,.58);}
-    btn.classList.toggle('active',i<0); $('crpBeatStatus').textContent=`${countHits()} hits • BPM ${getBpm()}`;
+    btn.classList.toggle('active',i<0); btn.setAttribute('aria-pressed',String(i<0)); $('crpBeatStatus').textContent=`${countHits()} hits • BPM ${getBpm()}`;
     persistBeatIntoProject();
   }
   function beatActiveBars(trackIds=DRUMS.map(([id])=>id)){
@@ -384,6 +333,7 @@
   function applyBeatClipToBars(clip,destinationBars){
     if(!clip?.version)return false;const dests=[...new Set((destinationBars||[]).map(Number))].filter(b=>b>=0&&b<16).sort((a,b)=>a-b);if(!dests.length)return false;
     const offsets=(clip.offsets||[]).length?clip.offsets:[0];
+    if(!beforeBigChange('Paste over these bars of the drum region?'))return false;
     for(let i=0;i<dests.length;i++){
       const dest=dests[i],off=offsets[i%offsets.length];
       for(const id of clip.trackIds||[]){if(!beat.tracks[id])continue;beat.tracks[id][dest]=[...(clip.data?.[id]?.[off]||[])];}
@@ -404,7 +354,7 @@
   }
   function clearBar(){
     const activeBars=beatActiveBars(),defaultBars=activeBars.includes(currentBar)?[currentBar]:(activeBars.length?activeBars:[currentBar]),defaultTracks=beatActiveTracks(defaultBars);
-    openBeatBatchDialog({title:'Clear Beat Maker',help:'Only hits on the checked bars and checked drum tracks are removed.',defaultBars,defaultTracks:defaultTracks.length?defaultTracks:beatActiveTracks(activeBars),confirmText:'Clear selected',onConfirm:({bars,tracks})=>{let removed=0;for(const id of tracks){for(const b of bars){removed+=beat.tracks[id]?.[b]?.length||0;if(beat.tracks[id])beat.tracks[id][b]=[];}}renderEditor();persistBeatIntoProject();status(`Cleared ${removed} hit${removed===1?'':'s'} from ${bars.length} bar${bars.length===1?'':'s'} / ${tracks.length} track${tracks.length===1?'':'s'}`);}});
+    openBeatBatchDialog({title:'Clear Beat Maker',help:'Only hits on the checked bars and checked drum tracks are removed.',defaultBars,defaultTracks:defaultTracks.length?defaultTracks:beatActiveTracks(activeBars),confirmText:'Clear selected',onConfirm:({bars,tracks})=>{if(!beforeBigChange('Clear these hits from the drum region?'))return;let removed=0;for(const id of tracks){for(const b of bars){removed+=beat.tracks[id]?.[b]?.length||0;if(beat.tracks[id])beat.tracks[id][b]=[];}}renderEditor();persistBeatIntoProject();status(`Cleared ${removed} hit${removed===1?'':'s'} from ${bars.length} bar${bars.length===1?'':'s'} / ${tracks.length} track${tracks.length===1?'':'s'}`);}});
   }
   function status(s){ if($('crpBeatStatus')) $('crpBeatStatus').textContent=s; }
 
@@ -530,6 +480,7 @@
   function randomizeBeat(){
     const style=$('crpBeatStyle')?.value||'rap';
     const complexity=$('crpBeatComplexity')?.value||'medium';
+    if(!beforeBigChange('Replace this drum region with a random beat?')) return;
     clearAllBeat();
     // 32nd display for trap rolls; 16th is clearer for the other genres.
     beat.resolution = style==='trap' && complexity!=='simple' ? 32 : 16;
@@ -545,6 +496,7 @@
     const style=$('crpBeatStyle')?.value||'rap';
     const complexity=$('crpBeatComplexity')?.value||'medium';
     const bar=Math.max(0,beat.bars-1);
+    if(!beforeBigChange('Add a fill to the last bar of this drum region?')) return;
     // If the last bar is empty, make a groove first, then add the fill.
     const hasHits=DRUMS.some(([id])=>beat.tracks[id][bar].length);
     if(!hasHits) grooveBar(bar,style,complexity);
@@ -559,8 +511,14 @@
   }
 
   function getBpm(){ return clamp(+($('bpmInput')?.value||92),40,240); }
+  // Drums share the suite's audio clock and master limiter (window.CRPAudio from app.js).
+  function drumOutput(){ return window.CRPAudio ? window.CRPAudio.master() : audioCtx.destination; }
+  function playBuffer(id,time,gain){
+    const buf=buffers.get(id); if(!buf||!audioCtx) return;
+    const src=audioCtx.createBufferSource(), g=audioCtx.createGain(); src.buffer=buf; g.gain.value=gain; src.connect(g).connect(drumOutput()); src.start(time);
+  }
   async function ensureDrums(){
-    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(!audioCtx) audioCtx=window.CRPAudio ? window.CRPAudio.context() : new (window.AudioContext||window.webkitAudioContext)();
     if(audioCtx.state==='suspended') await audioCtx.resume();
     if(buffers.size===DRUMS.length) return;
     if(loading) return loading;
@@ -591,17 +549,11 @@
     }).finally(()=>loading=null);
     return loading;
   }
-  function hit(id,time,gain=1){
-    const buf=buffers.get(id); if(!buf||!audioCtx) return;
-    const src=audioCtx.createBufferSource(), g=audioCtx.createGain(); src.buffer=buf; g.gain.value=beat.gain*DRUM_OUTPUT_SCALE*gain; src.connect(g).connect(audioCtx.destination); src.start(time);
-  }
+  function hit(id,time,gain=1){ playBuffer(id,time,beat.gain*DRUM_OUTPUT_SCALE*gain); }
   async function audition(id,gain=.78){ try{await ensureDrums();hit(id,audioCtx.currentTime+.01,gain)}catch(e){console.error(e);status(`Drum error: ${e.message||e}`);} }
   function scheduleCanonicalStep(absStep,time,barIndex,gainScale=1,pattern=beat){
     const pat=normalizeBeat(pattern),step=((absStep%64)+64)%64;
-    DRUMS.forEach(([id])=>{
-      const buf=buffers.get(id);if(!buf||!audioCtx)return;
-      if(pat.tracks[id][barIndex]?.includes(step)){const src=audioCtx.createBufferSource(),g=audioCtx.createGain();src.buffer=buf;g.gain.value=pat.gain*DRUM_OUTPUT_SCALE*gainScale;src.connect(g).connect(audioCtx.destination);src.start(time);}
-    });
+    DRUMS.forEach(([id])=>{ if(pat.tracks[id][barIndex]?.includes(step)) playBuffer(id,time,pat.gain*DRUM_OUTPUT_SCALE*gainScale); });
   }
   function arrangementHitCount(events){
     let n=0;for(const ev of Array.isArray(events)?events:[]){const pat=normalizeBeat(ev?.pattern);DRUMS.forEach(([id])=>{for(let b=0;b<pat.bars;b++)n+=pat.tracks[id][b].length;});}return n;
@@ -611,7 +563,7 @@
     for(const ev of Array.isArray(mainArrangement)?mainArrangement:[]){
       const start=Math.max(0,Number(ev?.startBeat)||0),dur=Math.max(0,Number(ev?.durationBeats)||0),end=start+dur;if(songBeat<start-1e-6||songBeat>=end-1e-6)continue;
       const pat=normalizeBeat(ev?.pattern),offset=Number(ev?.patternOffsetBeats)||0,patternSteps=Math.max(64,Math.max(1,pat.bars)*64),rawStep=Math.round((songBeat-start+offset)*16),localCanonical=((rawStep%patternSteps)+patternSteps)%patternSteps,bar=Math.floor(localCanonical/64),step=localCanonical%64;
-      DRUMS.forEach(([id])=>{if(pat.tracks[id][bar]?.includes(step)){const buf=buffers.get(id);if(!buf||!audioCtx)return;const src=audioCtx.createBufferSource(),g=audioCtx.createGain();src.buffer=buf;g.gain.value=pat.gain*DRUM_OUTPUT_SCALE*gainScale;src.connect(g).connect(audioCtx.destination);src.start(time);}});
+      DRUMS.forEach(([id])=>{ if(pat.tracks[id][bar]?.includes(step)) playBuffer(id,time,pat.gain*DRUM_OUTPUT_SCALE*gainScale); });
     }
   }
   function stepSeconds(){ return (60/getBpm())/16; } // one 64th = quarter/16
@@ -649,19 +601,6 @@
     requestAnimationFrame(()=>{ document.querySelectorAll('.crp-step.playing').forEach(x=>x.classList.remove('playing')); document.querySelectorAll(`.crp-step[data-canonical="${step}"]`).forEach(x=>x.classList.add('playing')); });
   }
 
-  async function startMainDrumsWhenChordStarts(){
-    if(!beat.enabled || countHits()===0) return;
-    stopPreview();
-    try{ await ensureDrums(); }catch(e){console.error(e);return;}
-    let frames=0;
-    const sync=()=>{
-      const play=$('playAllBtn'); if(!play || !/Stop/i.test(play.textContent||'')) return;
-      const first=[...document.querySelectorAll('.chord-card')].some(c => (c.style.outline||'').includes('2px'));
-      if(first || frames++>10){ startMainDrums(); return; }
-      requestAnimationFrame(sync);
-    };
-    requestAnimationFrame(sync);
-  }
   function startMainDrums(delaySeconds=.01,startBeat=0,gainScale=1){
     if(!audioCtx||!beat.enabled) return;
     mainPlaying=true;mainArrangement=null;mainArrangementRangeStart=0;mainArrangementRangeEnd=null;mainArrangementCanLoop=true;
@@ -675,8 +614,8 @@
   }
   function stopMainDrums(){ mainPlaying=false; mainArrangement=null; mainArrangementRangeStart=0; mainArrangementRangeEnd=null; mainArrangementCanLoop=true; mainGainScale=1; if(scheduler && !previewing){clearInterval(scheduler);scheduler=null;} }
 
-  // If the chord progression stops itself (Repeat off), stop drums too.
-  setInterval(()=>{ if(mainPlaying && $('playAllBtn') && !/Stop/i.test($('playAllBtn').textContent||'')) stopMainDrums(); },120);
+  // Main-transport drums are started and stopped explicitly by the transport
+  // (CRPParts.startPlayback/stopPlayback, or the core's fallback player).
 
   // Public bridge used by the core project save/load code. The beat is now
   // stored in the same project payload as chords, BPM, notes, etc.
@@ -719,11 +658,10 @@
     },
     getUpdatedAt(){ return Number(beatUpdatedAt)||0; },
     loadProject(project){
-      // Passing null means New/blank project. Reset the sequencer and discard any
-      // stale unsaved drum draft so another project's beat can never carry over.
-      if(!project) localStorage.removeItem(DRAFT_KEY);
+      // Passing null means New/blank project: start from an empty sequencer.
       loadBeatFromProject(project || null);
     },
+    refreshUndoButton(enabled){ const b=$('crpBeatUndo'); if(b) b.disabled=!enabled; },
     persist(){
       return persistBeatIntoProject();
     },
@@ -738,10 +676,8 @@
     stopMainNow(){stopMainDrums();}
   };
 
-  // v3.2.7: beat-maker.js loads AFTER app.js/parts.js. On startup the core can restore
-  // the active project before CRPBeatMaker exists, so the old init() always replaced the saved
-  // drum state with a fresh blank beat. Restore the active saved project's beat here, after the
-  // bridge is actually available, and announce readiness so the core can re-apply the same project.
+  // beat-maker.js loads after app.js/parts.js, so the core restored the open project
+  // before this bridge existed. Announce readiness so the core loads that project's beat.
   function init(){
     if(!document.querySelector('link[href$="beat-maker.css"]')){
       const css=document.createElement('link'); css.rel='stylesheet'; css.href='beat-maker.css'; document.head.appendChild(css);
@@ -749,17 +685,9 @@
     injectUi();
     beat=freshBeat();
     beatUpdatedAt=0;
-    activeProjectId=null;
-    try{
-      const id=String(localStorage.getItem('crp-active-project-id')||'').trim();
-      const ps=readProjects();
-      const saved=id ? ps.find(p=>String(p?.id||'')===id) : inferActiveProject();
-      if(saved) loadBeatFromProject(saved);
-      else updateMainControls();
-    }catch(err){
-      console.warn('Could not restore saved beat on startup',err);
-      updateMainControls();
-    }
+    try{localStorage.removeItem(LEGACY_DRAFT_KEY);}catch{}
+    updateMainControls();
+    // The core answers by loading the open project's (or draft's) beat into this module.
     try{window.dispatchEvent(new CustomEvent('crp-beat-ready'));}catch{}
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();

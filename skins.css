@@ -34,9 +34,17 @@ html[data-skin]:not([data-skin="rider-original"]) .panel,html[data-skin]:not([da
 html[data-skin]:not([data-skin="rider-original"]) input,html[data-skin]:not([data-skin="rider-original"]) select,html[data-skin]:not([data-skin="rider-original"]) textarea,html[data-skin]:not([data-skin="rider-original"]) .notes-editor,html[data-skin]:not([data-skin="rider-original"]) .segmented{background:var(--srs-skin-input)!important;color:var(--srs-skin-text)!important;border-color:var(--srs-skin-line)!important}
 html[data-skin]:not([data-skin="rider-original"]) button:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close){background:var(--srs-skin-raised);color:var(--srs-skin-text);border-color:var(--srs-skin-line)}
 html[data-skin]:not([data-skin="rider-original"]) button.accent,html[data-skin]:not([data-skin="rider-original"]) .seg.active,html[data-skin]:not([data-skin="rider-original"]) .toggle-btn.on{background:var(--srs-skin-accent)!important;color:#17130a!important;border-color:color-mix(in srgb,var(--srs-skin-accent) 80%,#775f20)!important}
-html[data-skin]:not([data-skin="rider-original"]) .subtle,html[data-skin]:not([data-skin="rider-original"]) label,html[data-skin]:not([data-skin="rider-original"]) .drag-tip,html[data-skin]:not([data-skin="rider-original"]) .project-item .meta{color:var(--srs-skin-muted)!important}
+html[data-skin]:not([data-skin="rider-original"]) .subtle,html[data-skin]:not([data-skin="rider-original"]) label,html[data-skin]:not([data-skin="rider-original"]) .control-group,html[data-skin]:not([data-skin="rider-original"]) .drag-tip,html[data-skin]:not([data-skin="rider-original"]) .project-item .meta{color:var(--srs-skin-muted)!important}
 html[data-skin]:not([data-skin="rider-original"]) .project-item,html[data-skin]:not([data-skin="rider-original"]) .progression-line,html[data-skin]:not([data-skin="rider-original"]) .chord-card,html[data-skin]:not([data-skin="rider-original"]) .chip,html[data-skin]:not([data-skin="rider-original"]) .new-line-drop{background:var(--srs-skin-input)!important;border-color:var(--srs-skin-line)!important;color:var(--srs-skin-text)!important}
-html[data-skin]:not([data-skin="rider-original"]) .chord-card .chord-name,html[data-skin]:not([data-skin="rider-original"]) .auth-box h3{color:var(--srs-skin-gold)!important}
+html[data-skin]:not([data-skin="rider-original"]) .chord-card .chord-name,html[data-skin]:not([data-skin="rider-original"]) .auth-box h3{color:var(--srs-skin-chord-name,var(--srs-skin-gold))!important}
+/* Chord names on light skins: same hue family, dark enough to read (>=4.5:1 on the card).
+   Dark skins do not set --srs-skin-chord-name and keep their gold. */
+html[data-skin="studio-pastel"]{--srs-skin-chord-name:#7f5a12}
+html[data-skin="black-label-light"],html[data-skin="rider-light"]{--srs-skin-chord-name:#83600f}
+html[data-skin-choice="sapphire-paisley-light"]{--srs-skin-chord-name:#7a5f14}
+html[data-skin="royal-wave"]{--srs-skin-chord-name:#a85300}
+html[data-skin="candy-pop"]{--srs-skin-chord-name:#233638}
+html[data-skin="candy-pop"] .chord-card .chord-name{background:#fff600;padding:0 .3em;border-radius:6px;box-shadow:inset 0 -2px 0 rgba(35,54,56,.2)}
 
 /* Header identities: Original/Rider Light retain existing artwork; other skins get clean premium branding. */
 html[data-skin="studio-pastel"] .suite-master-header>img,html[data-skin="black-label"] .suite-master-header>img,html[data-skin="black-label-light"] .suite-master-header>img{display:none!important}
