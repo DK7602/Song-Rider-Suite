@@ -1921,14 +1921,15 @@ function applyManifestUpdate(liveList, beforeList, afterList){
   return Array.from(live.values());
 }
 
-// Stable comparison of song content (key order and bookkeeping fields ignored).
+// Stable comparison of song content: key order, bookkeeping fields and card ids are ignored
+// (normalizing gives blank pages fresh random card ids on every device).
 function stableContentKey(p){
   const walk = (v, top) => {
     if(Array.isArray(v)) return v.map(x => walk(x, false));
     if(v && typeof v === "object"){
       const out = {};
       for(const k of Object.keys(v).sort()){
-        if(top && NON_CONTENT_FIELDS.has(k)) continue;
+        if(top ? NON_CONTENT_FIELDS.has(k) : k === "id") continue;
         out[k] = walk(v[k], false);
       }
       return out;
