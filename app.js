@@ -506,12 +506,15 @@
     // the loudness now comes from gentle compression instead of level.
     const DRIVE_DB=14,GLUE={threshold:-26,knee:10,ratio:3,attack:.008,release:.25},LIMIT={threshold:-8,knee:1,ratio:20,attack:.001,release:.15},TRIM=.89;
     function buildMaster(c,destination=c.destination){
-      const drive=c.createGain(),glue=c.createDynamicsCompressor(),limiter=c.createDynamicsCompressor(),trim=c.createGain(),clip=c.createWaveShaper();
+      const lowCut=c.createBiquadFilter(),drive=c.createGain(),glue=c.createDynamicsCompressor(),limiter=c.createDynamicsCompressor(),trim=c.createGain(),clip=c.createWaveShaper();
+      // Sub-bass no speaker reproduces (below ~45 Hz) only eats headroom and makes phone speakers
+      // strain and crackle; it is removed before the loudness stage.
+      lowCut.type='highpass';lowCut.frequency.value=45;lowCut.Q.value=.707;
       drive.gain.value=Math.pow(10,DRIVE_DB/20);
       for(const [node,cfg] of [[glue,GLUE],[limiter,LIMIT]])for(const k of Object.keys(cfg))node[k].value=cfg[k];
       trim.gain.value=TRIM;clip.curve=safetyClipCurve();clip.oversample='4x';
-      drive.connect(glue);glue.connect(limiter);limiter.connect(trim);trim.connect(clip);clip.connect(destination);
-      return drive;
+      lowCut.connect(drive);drive.connect(glue);glue.connect(limiter);limiter.connect(trim);trim.connect(clip);clip.connect(destination);
+      return lowCut;
     }
     function master(){
       if(!input)input=buildMaster(context());
