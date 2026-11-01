@@ -2284,7 +2284,7 @@
       sheet.appendChild(line);
     }
     if(selection.notes){const notes=$('notesEditor').innerHTML.trim();if(notes&&$('notesEditor').textContent.trim()){const n=document.createElement('section');n.className='export-notes';n.innerHTML=`<h3>Project notes</h3><div class="export-notes-body">${notes}</div>`;sheet.appendChild(n)}}
-    const footer=document.createElement('footer');footer.className='export-sheet-footer';footer.innerHTML=`<img src="assets/rider-and-bones-left-still.png" alt="Rider and Bones"><span>Created with Chord Rider Pro</span>`;sheet.appendChild(footer);stage.appendChild(sheet);return sheet;
+    const footer=document.createElement('footer');footer.className='export-sheet-footer';footer.innerHTML=`<img src="assets/brand/song-rider-suite-logo-256.png" alt="Song Rider Suite"><span>Created with Chord Rider Pro</span>`;sheet.appendChild(footer);stage.appendChild(sheet);return sheet;
   }
   async function waitForExportImages(root){
     const imgs=[...root.querySelectorAll('img')];

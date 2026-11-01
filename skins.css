@@ -1802,7 +1802,6 @@ html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-li
 }
 html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art img,
 html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #babyDawModeBtn.active .baby-exact-art img{
-  content:url('./assets/baby-daw-button-hq-rider-blood-light-active.webp')!important;
   mix-blend-mode:normal!important;
   opacity:1!important;
   filter:none!important;
@@ -1977,7 +1976,6 @@ html[data-skin-choice="rider-blood"] #babyDawModeBtn.active .baby-exact-art::aft
   box-shadow:none!important;
 }
 html[data-skin-choice="rider-blood"] #babyDawModeBtn.active .baby-exact-art img{
-  content:url('./assets/baby-daw-button-hq-rider-blood-light-active.webp')!important;
   mix-blend-mode:normal!important;
   opacity:1!important;
   filter:none!important;

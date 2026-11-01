@@ -4,11 +4,25 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-  <meta name="theme-color" content="#e9e9ea"/>
+  <meta name="theme-color" content="#000000"/>
   <title>Song Rider Pro</title>
-  <link rel="icon" href="./icon-192.png?v=3.2.5" type="image/png">
-  <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=3.2.5">
-  <link rel="manifest" href="./manifest.webmanifest?v=3.2.5">
+<style id="srsBootStyle">
+  /* Song Rider Suite loading art: the logo on black, once per visit, fades out when the page has loaded. */
+  #srsBoot{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#000;pointer-events:none;transition:opacity .45s ease}
+  #srsBoot img{width:min(64vw,52vh,360px);height:auto;filter:drop-shadow(0 0 30px rgba(255,190,60,.22));animation:srsBootIn .7s ease-out both}
+  #srsBoot.is-done{opacity:0}
+  html.srs-booted #srsBoot{display:none}
+  @keyframes srsBootIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){#srsBoot img{animation:none}#srsBoot{transition:none}}
+</style>
+<script>
+  (function(){var h=document.documentElement;try{if(/[?&]playbackBridge=1/.test(location.search)||sessionStorage.getItem('srs-boot-v1'))h.classList.add('srs-booted');else sessionStorage.setItem('srs-boot-v1','1');}catch(e){h.classList.add('srs-booted');}})();
+</script>
+  <link rel="icon" href="../assets/brand/favicon-32.png?v=3.4.1" sizes="32x32" type="image/png">
+  <link rel="icon" href="../assets/brand/favicon-64.png?v=3.4.1" sizes="64x64" type="image/png">
+  <link rel="icon" href="../assets/brand/app-icon-192.png?v=3.4.1" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon-180.png?v=3.4.1">
+  <link rel="manifest" href="./manifest.webmanifest?v=3.4.1">
   <script>(()=>{try{const s=localStorage.getItem('srs-skin-v1')||'black-label-plain',b=(s==='sapphire-paisley'?'black-label':(s==='sapphire-paisley-light'?'black-label-light':((s==='rider-blood'||s==='rider-og')?'rider-original':(s==='black-label-plain'?'black-label':(((s==='rider-blood-light'||s==='rider-blood-light-og')||s==='rider-light-og')?'rider-light':s)))));document.documentElement.dataset.skin=b;document.documentElement.dataset.skinChoice=s;if(s==='rider-blood'||s==='rider-blood-light'||s==='rider-blood-light-og')document.documentElement.dataset.skinVariant='blood'}catch{document.documentElement.dataset.skin='black-label';document.documentElement.dataset.skinChoice='black-label-plain'}})()</script>
   <style>
     :root{
@@ -2968,7 +2982,7 @@ html.crp-integrated .track-master-gold-btn:active{transform:translateY(1px) scal
 html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0a0;outline-offset:3px}
 @media(max-width:700px){html.crp-integrated .track-master-nav-row{margin:5px 0 8px;padding:0 10px}html.crp-integrated .track-master-gold-btn{width:100%;max-width:none;min-height:38px;padding:7px 18px;border-radius:12px;font-size:.78rem}}
 </style>
-  <link rel="stylesheet" href="../skins.css?v=3.4.0">
+  <link rel="stylesheet" href="../skins.css?v=3.4.1">
 <!-- Styles below load after skins.css (they were previously after </body>; same cascade order).
      app.js inserts its runtime <style> elements before #srp241WorkflowPolish, as before. -->
 <style id="srp241WorkflowPolish">
@@ -3350,6 +3364,12 @@ html .fullSectionActions button.fullLyricsMic:focus-visible{outline:2px solid #e
 </head>
 
 <body>
+<div id="srsBoot" aria-hidden="true"><img src="../assets/brand/song-rider-suite-logo-512.webp?v=3.4.1" alt=""></div>
+<script>
+  (function(){var b=document.getElementById('srsBoot');if(!b)return;if(document.documentElement.classList.contains('srs-booted')){b.remove();return;}
+  var t0=Date.now(),fired=false;function done(){if(fired)return;fired=true;setTimeout(function(){b.classList.add('is-done');setTimeout(function(){b.remove();},500);},Math.max(0,800-(Date.now()-t0)));}
+  if(document.readyState==='complete')done();else{window.addEventListener('load',done,{once:true});setTimeout(done,2500);}})();
+</script>
 
   <section id="crpSrpShell" class="crp-srp-shell" aria-label="Chord Rider Pro workspace navigation">
     <div class="app-header suite-master-header">
@@ -3377,11 +3397,7 @@ html .fullSectionActions button.fullLyricsMic:focus-visible{outline:2px solid #e
     </div>
   </section>
 
-  <!-- ✅ Horse GIFs -->
-  <div class="horseWrap" id="horseWrap" aria-hidden="true">
-    <img id="horseRight" src="./Horserunsright.gif?v=64" alt="Horse runs right"/>
-    <img id="horseLeft"  src="./Horserunsleft.gif?v=64"  alt="Horse runs left"/>
-  </div>
+
 
   <header>
     <div class="panel">
@@ -3390,9 +3406,6 @@ html .fullSectionActions button.fullLyricsMic:focus-visible{outline:2px solid #e
           <div class="left" aria-label="Song Rider Pro">
             <img class="srp-exact-wordmark" src="./song-rider-pro-wordmark-hq.webp?v=3.3.12" alt="Song Rider Pro">
           </div>
-
-          <!-- ✅ Parked horse (size controlled by #horseParked CSS) -->
-          <img id="horseParked" src="./horse-parked.png" alt="Horse"/>
         </div>
 
         <button class="btn secondary" id="togglePanelBtn">Hide</button>

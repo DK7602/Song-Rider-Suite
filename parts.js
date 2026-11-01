@@ -1554,7 +1554,7 @@
   }
   function updateMediaMetadata(){
     if(!ensureMediaSession())return;
-    try{navigator.mediaSession.metadata=new MediaMetadata({title:core.projectName||'Song Rider Suite',artist:'Song Rider Suite',album:'Baby DAW',artwork:[{src:new URL('assets/icon-192.png',location.href).href,sizes:'192x192',type:'image/png'}]});}catch{}
+    try{navigator.mediaSession.metadata=new MediaMetadata({title:core.projectName||'Song Rider Suite',artist:'Song Rider Suite',album:'Baby DAW',artwork:[{src:new URL('assets/brand/app-icon-512.png',location.href).href,sizes:'512x512',type:'image/png'}]});}catch{}
   }
   function mediaDurationBeats(){return Math.max(effectiveSongStartBeat()+.05,effectiveSongEndBeats(naturalSongDurationBeats()));}
   function updateMediaPosition(){

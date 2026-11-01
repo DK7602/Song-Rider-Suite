@@ -3,12 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#111111" />
+  <meta name="theme-color" content="#000000" />
   <meta name="description" content="Song Rider Suite - Chord Rider, Baby DAW, and Song Rider Pro." />
   <title>Song Rider Suite</title>
-  <link rel="icon" href="assets/icon-192.png?v=3.2.5" type="image/png" />
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=3.2.5" />
-  <link rel="manifest" href="manifest.webmanifest?v=3.2.5" />
+<style id="srsBootStyle">
+  /* Song Rider Suite loading art: the logo on black, once per visit, fades out when the page has loaded. */
+  #srsBoot{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#000;pointer-events:none;transition:opacity .45s ease}
+  #srsBoot img{width:min(64vw,52vh,360px);height:auto;filter:drop-shadow(0 0 30px rgba(255,190,60,.22));animation:srsBootIn .7s ease-out both}
+  #srsBoot.is-done{opacity:0}
+  html.srs-booted #srsBoot{display:none}
+  @keyframes srsBootIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){#srsBoot img{animation:none}#srsBoot{transition:none}}
+</style>
+<script>
+  (function(){var h=document.documentElement;try{if(/[?&]playbackBridge=1/.test(location.search)||sessionStorage.getItem('srs-boot-v1'))h.classList.add('srs-booted');else sessionStorage.setItem('srs-boot-v1','1');}catch(e){h.classList.add('srs-booted');}})();
+</script>
+  <link rel="icon" href="assets/brand/favicon-32.png?v=3.4.1" sizes="32x32" type="image/png" />
+  <link rel="icon" href="assets/brand/favicon-64.png?v=3.4.1" sizes="64x64" type="image/png" />
+  <link rel="icon" href="assets/brand/app-icon-192.png?v=3.4.1" sizes="192x192" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon-180.png?v=3.4.1" />
+  <link rel="manifest" href="manifest.webmanifest?v=3.4.1" />
   <script>(()=>{try{const s=localStorage.getItem('srs-skin-v1')||'black-label-plain',b=(s==='sapphire-paisley'?'black-label':(s==='sapphire-paisley-light'?'black-label-light':((s==='rider-blood'||s==='rider-og')?'rider-original':(s==='black-label-plain'?'black-label':(((s==='rider-blood-light'||s==='rider-blood-light-og')||s==='rider-light-og')?'rider-light':s)))));document.documentElement.dataset.skin=b;document.documentElement.dataset.skinChoice=s;if(s==='rider-blood'||s==='rider-blood-light'||s==='rider-blood-light-og')document.documentElement.dataset.skinVariant='blood'}catch{document.documentElement.dataset.skin='black-label';document.documentElement.dataset.skinChoice='black-label-plain'}})()</script>
   <link rel="stylesheet" href="styles.css?v=3.4.0" />
   <link rel="stylesheet" href="scale-rider.css?v=1.4.1-PROJECT-STATE" />
@@ -35,11 +49,17 @@
       #chordPartControls>.entry-row>#buildBtn{grid-column:2!important;min-width:0!important;width:auto!important;white-space:nowrap!important}
     }
   </style>
-  <link rel="stylesheet" href="skins.css?v=3.4.0" />
+  <link rel="stylesheet" href="skins.css?v=3.4.1" />
   <link rel="stylesheet" href="suite-brand.css?v=3.4.1" />
   <link rel="stylesheet" href="suite-compact.css?v=3.4.1" />
 </head>
 <body>
+<div id="srsBoot" aria-hidden="true"><img src="assets/brand/song-rider-suite-logo-512.webp?v=3.4.1" alt=""></div>
+<script>
+  (function(){var b=document.getElementById('srsBoot');if(!b)return;if(document.documentElement.classList.contains('srs-booted')){b.remove();return;}
+  var t0=Date.now(),fired=false;function done(){if(fired)return;fired=true;setTimeout(function(){b.classList.add('is-done');setTimeout(function(){b.remove();},500);},Math.max(0,800-(Date.now()-t0)));}
+  if(document.readyState==='complete')done();else{window.addEventListener('load',done,{once:true});setTimeout(done,2500);}})();
+</script>
   <div id="saveProblemBanner" class="save-problem-banner" role="alert" hidden><span data-save-problem-text></span><button id="saveRetryBtn" type="button">Retry</button></div>
   <div id="syncNotice" class="sync-notice" role="status" hidden><span data-sync-notice-text></span><button id="syncNoticeClose" type="button" aria-label="Dismiss message">×</button></div>
   <header class="app-header suite-master-header"><img src="assets/suite-header-new.webp?v=3.3.12" alt="Song Rider Suite — Ride the progression. See it. Hear it. Build it."></header>
@@ -518,8 +538,8 @@
 
   <script src="vendor/soundfont-player.js?v=0.12.0"></script>
   <!-- html2canvas and jsPDF are loaded on demand by the PDF/PNG export (app.js). -->
-  <script src="app.js?v=3.4.0"></script>
-  <script src="parts.js?v=3.4.0"></script>
+  <script src="app.js?v=3.4.1"></script>
+  <script src="parts.js?v=3.4.1"></script>
   <script src="scale-rider.js?v=3.4.0"></script>
   <script src="beat-maker.js?v=3.4.0"></script>
   <script src="skins.js?v=3.4.0"></script>
