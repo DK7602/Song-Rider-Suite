@@ -160,13 +160,67 @@
     else q=q.replace(/^minor/i,'m').replace(/^min/i,'m').replace(/^major/i,'maj');
     return q;
   }
+  // Accepts slash chords ("G/B", "D/F#", "Am7/G"): `base` is the chord without
+  // the bass note, `bass` the note played underneath. The display keeps the
+  // user's own spelling.
   function parseChord(raw) {
     raw=String(raw).trim().replace(/♭/g,'b').replace(/♯/g,'#');
-    const m=raw.match(/^([A-Ga-g])([#b]?)(.*)$/); if(!m)return null;
+    const slash=raw.match(/^(.+?)\/([A-Ga-g][#b]?)$/);
+    const m=(slash?slash[1]:raw).match(/^([A-Ga-g])([#b]?)(.*)$/); if(!m)return null;
     const root=m[1].toUpperCase()+m[2]; if(!(root in NOTE_INDEX))return null;
     const q=normalizeChordQuality(m[3]);
     if(!(q in QUALITY))return null;
-    return {root,quality:q,display:root+q};
+    const bass=slash?slash[2][0].toUpperCase()+slash[2].slice(1):null;
+    if(bass&&!(bass in NOTE_INDEX))return null;
+    const base=root+q;
+    return {root,quality:q,bass,base,display:bass?`${base}/${bass}`:base};
+  }
+  function baseChordName(name){return parseChord(name)?.base||name;}
+
+  // --- Note spelling --------------------------------------------------------
+  // Pitch math uses pitch classes (0-11); names are for display only. Keys are
+  // spelled the way they are written (Bb major, never A# major), chords we suggest
+  // follow the key signature, and nothing the user typed is ever respelled.
+  const FLAT_NOTES=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+  const LETTERS=['C','D','E','F','G','A','B'],NATURAL_PC={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+  const MAJOR_TONICS=['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'],MINOR_TONICS=['C','C#','D','Eb','E','F','F#','G','G#','A','Bb','B'];
+  // Enharmonic tonics that are also normal key signatures (chosen when the user writes them).
+  const MAJOR_ALT_TONICS={1:'C#',6:'Gb',11:'Cb'},MINOR_ALT_TONICS={3:'D#',8:'Ab',10:'A#'};
+  // Scale degree used to spell each semitone above a tonic (b2, 2, b3, 3, 4, #4, 5, b6, 6, b7, 7).
+  const INTERVAL_DEGREE=[1,2,2,3,3,4,4,5,6,6,7,7];
+  // keyTonicName(pc, minor, prefer): prefer is the tonic the user typed, or 'flat'/'sharp'.
+  function keyTonicName(rootPc,minor,prefer=null){
+    const pcn=((rootPc%12)+12)%12,def=(minor?MINOR_TONICS:MAJOR_TONICS)[pcn],alt=(minor?MINOR_ALT_TONICS:MAJOR_ALT_TONICS)[pcn];
+    if(!alt)return def;
+    if(prefer===def||prefer===alt)return prefer;
+    if(prefer==='flat')return [def,alt].find(n=>n.includes('b'))||def;
+    if(prefer==='sharp')return [def,alt].find(n=>n.includes('#'))||def;
+    return def;
+  }
+  function keyTonic(key){return keyTonicName(NOTE_INDEX[key.root],key.minor,key.root);}
+  function spellDegree(tonic,degree,pitch){
+    const start=LETTERS.indexOf(String(tonic)[0]);if(start<0)return null;
+    const letter=LETTERS[(start+degree-1)%7],diff=((pitch-NATURAL_PC[letter]+18)%12)-6;
+    return diff===0?letter:diff===1?letter+'#':diff===-1?letter+'b':null; // null: would need a double accidental
+  }
+  function keyPrefersFlats(key){
+    const t=keyTonic(key);
+    return t.includes('b')||(!t.includes('#')&&(key.minor?['D','G','C','F'].includes(t):t==='F'));
+  }
+  // Spell a pitch class relative to a tonic name (diatonic notes by scale degree).
+  function spellFromTonic(tonic,pitch,flats=tonic.includes('b')){
+    const p=((pitch%12)+12)%12,iv=(p-NOTE_INDEX[tonic]+12)%12;
+    return spellDegree(tonic,INTERVAL_DEGREE[iv],p)||(flats?FLAT_NOTES:NOTES)[p];
+  }
+  function spellInKey(pitch,key){return spellFromTonic(keyTonic(key),pitch,keyPrefersFlats(key));}
+  // Chord tones spelled from the chord root (Bb chord = Bb D F, never A# D F).
+  const CHORD_TONE_DEGREE={0:1,1:2,2:2,3:3,4:3,5:4,6:5,7:5,8:5,9:6,10:7,11:7,13:2,14:2,15:2,17:4,18:4};
+  function chordToneNames(name){
+    const c=parseChord(name);if(!c)return new Map();
+    const rootPc=NOTE_INDEX[c.root],flats=c.root.includes('b')||(c.root.length===1&&keyPrefersFlats(enteredKey()||{root:'C',minor:false})),names=new Map();
+    for(const iv of QUALITY[c.quality]){const p=(rootPc+iv)%12;names.set(p,spellDegree(c.root,CHORD_TONE_DEGREE[iv]??1,p)||(flats?FLAT_NOTES:NOTES)[p]);}
+    if(c.bass)names.set(NOTE_INDEX[c.bass],c.bass);
+    return names;
   }
   function normalizeChordSequence(chords){
     const raw=Array.isArray(chords)?chords:[],values=[],invalid=[];
@@ -175,9 +229,19 @@
   }
   function parseNote(raw){const r=parseRoot(raw);return r&&r in NOTE_INDEX?r:null;}
   function tokens(text){return text.split(/[\s,|]+/).map(x=>x.trim()).filter(Boolean);}
-  function transposeRoot(root,semi){const n=NOTE_INDEX[root];return n==null?root:NOTES[(n+semi+120)%12];}
-  function transposeChord(name,semi){const c=parseChord(name);return c?transposeRoot(c.root,semi)+c.quality:name;}
-  function chordNotes(name,baseOct=4){const c=parseChord(name);if(!c)return[];return QUALITY[c.quality].map(iv=>{const n=NOTE_INDEX[c.root]+iv;return NOTES[n%12]+(baseOct+Math.floor(n/12));});}
+  // Transposed names keep the source's accidental style (Bb up 2 = C, D/F# up 2 = E/G#).
+  function transposeRoot(root,semi){
+    const n=NOTE_INDEX[root];if(n==null)return root;
+    const flats=root.includes('b')||(root.length===1&&keyPrefersFlats(enteredKey()||{root:'C',minor:false}));
+    return (flats?FLAT_NOTES:NOTES)[(n+semi+120)%12];
+  }
+  function transposeChord(name,semi){const c=parseChord(name);return c?transposeRoot(c.root,semi)+c.quality+(c.bass?'/'+transposeRoot(c.bass,semi):''):name;}
+  function chordNotes(name,baseOct=4){
+    const c=parseChord(name);if(!c)return[];
+    const notes=QUALITY[c.quality].map(iv=>{const n=NOTE_INDEX[c.root]+iv;return NOTES[n%12]+(baseOct+Math.floor(n/12));});
+    if(c.bass)notes.unshift(NOTES[NOTE_INDEX[c.bass]]+(baseOct-1));
+    return notes;
+  }
   function midiOf(note){const m=String(note).match(/^([A-G])([#b]?)(-?\d+)$/);return m?(Number(m[3])+1)*12+NOTE_INDEX[m[1]+m[2]]:null;}
   function noteAtMidi(m){return NOTES[(m%12+12)%12]+(Math.floor(m/12)-1);}
   function clampBpm(value){const n=Math.round(Number(value));return Number.isFinite(n)&&n>0?Math.max(40,Math.min(240,n)):92;}
@@ -233,10 +297,13 @@
   // Canonical piano voicing: always spell chords upward from the root.
   // This is the single source used by playback, on-screen diagrams and PDF export.
   // Example: F = F-A-C (never silently C-F-A); extended chords continue upward.
+  // A slash chord adds its bass note in the octave below the chord.
   function canonicalPianoMidis(name,octaveShift=0){
     const c=parseChord(name);if(!c)return[];
     const rootPc=NOTE_INDEX[c.root],baseOct=4+octaveShift;
-    return QUALITY[c.quality].map(iv=>midiOf(NOTES[(rootPc+iv)%12]+(baseOct+Math.floor((rootPc+iv)/12))));
+    const midis=QUALITY[c.quality].map(iv=>midiOf(NOTES[(rootPc+iv)%12]+(baseOct+Math.floor((rootPc+iv)/12))));
+    if(c.bass)midis.unshift(midiOf(NOTES[NOTE_INDEX[c.bass]]+(baseOct-1)));
+    return midis;
   }
   function projectPianoVoicings(){
     const map=new Map();
@@ -304,28 +371,33 @@
   function inferKeyFromCards(cards){
     if(!cards.length)return null;
     const first=cards[0];
+    // Name the detected key in the same accidental style the user typed (Bb, not A#).
+    let flatCount=0,sharpCount=0;
+    for(const card of cards){const r=card.type==='chord'?parseChord(card.value)?.root:card.value;if(/b$/.test(r||''))flatCount++;else if(/#$/.test(r||''))sharpCount++;}
+    const style=flatCount>sharpCount?'flat':sharpCount>flatCount?'sharp':null;
     let best=null;
     for(let rootIndex=0;rootIndex<12;rootIndex++){
       for(const minor of [false,true]){
         const ints=minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
         const triQ=minor?['m','dim','','m','m','','']:['','m','m','','','m','dim'];
         const sevQ=minor?['m7','m7b5','maj7','m7','m7','maj7','7']:['maj7','m7','m7','maj7','7','m7','m7b5'];
-        const scaleRoots=new Set(ints.map(i=>NOTES[(rootIndex+i)%12]));
+        // Compare pitch classes, not names, so Bb and A# count as the same chord.
+        const scalePcs=new Set(ints.map(i=>(rootIndex+i)%12));
         const family=new Set();
         ints.forEach((iv,j)=>{
-          const r=NOTES[(rootIndex+iv)%12];
-          family.add(r+triQ[j]);
-          family.add(r+sevQ[j]);
+          const r=(rootIndex+iv)%12;
+          family.add(r+':'+triQ[j]);
+          family.add(r+':'+sevQ[j]);
         });
         let score=0;
         for(const card of cards){
           if(card.type==='note'){
-            score+=scaleRoots.has(card.value)?3:-5;
+            score+=scalePcs.has(NOTE_INDEX[card.value])?3:-5;
             continue;
           }
           const c=parseChord(card.value);if(!c)continue;
-          if(family.has(c.display))score+=6;
-          else if(scaleRoots.has(NOTES[NOTE_INDEX[c.root]]))score+=1;
+          if(family.has(NOTE_INDEX[c.root]+':'+c.quality))score+=6;
+          else if(scalePcs.has(NOTE_INDEX[c.root]))score+=1;
           else score-=6;
         }
         const tonic=NOTES[rootIndex];
@@ -342,7 +414,7 @@
         if(!best||score>best.score)best={root:tonic,minor,score};
       }
     }
-    return best?{root:best.root,minor:best.minor}:null;
+    return best?{root:keyTonicName(NOTE_INDEX[best.root],best.minor,style),minor:best.minor}:null;
   }
   function cardsFromEntry(){
     return tokens($('chordInput')?.value||'').map(x=>{
@@ -378,12 +450,13 @@
 
   function fitItems(){
     const k=activeKey(),r=NOTE_INDEX[k.root],ints=k.minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
-    if(state.mode==='note')return ints.map(i=>NOTES[(r+i)%12]);
+    const names=ints.map(i=>spellInKey(r+i,k));
+    if(state.mode==='note')return names;
     const triQ=k.minor?['m','dim','','m','m','','']:['','m','m','','','m','dim'];
     const sevQ=k.minor?['m7','m7b5','maj7','m7','m7','maj7','7']:['maj7','m7','m7','maj7','7','m7','m7b5'];
-    const tri=ints.map((i,j)=>NOTES[(r+i)%12]+triQ[j]);
-    const sev=ints.map((i,j)=>NOTES[(r+i)%12]+sevQ[j]);
-    const tonic=NOTES[r],fifth=NOTES[(r+7)%12];
+    const tri=names.map((n,j)=>n+triQ[j]);
+    const sev=names.map((n,j)=>n+sevQ[j]);
+    const tonic=names[0],fifth=names[4];
     const extra=k.minor?[tonic+'m9',tonic+'madd9',tonic+'m6',tonic+'sus2',fifth+'7',fifth+'9']:[tonic+'maj9',tonic+'add9',tonic+'6',tonic+'sus2',tonic+'sus4',fifth+'9'];
     return [...new Set([...tri,...sev,...extra])];
   }
@@ -460,6 +533,9 @@
       const frets=guitarShapeForCard(card),opens=[40,45,50,55,59,64];
       notes=frets.map((f,i)=>f==null?null:opens[i]+f+state.capo+state.octave*12).filter(x=>x!=null);
       if(!notes.length)notes=chordNotes(val,3+state.octave).map(midiOf).filter(x=>x!=null);
+      // Slash chord: the guitar plays the base shape with the bass note underneath.
+      const bass=parseChord(val)?.bass;
+      if(bass&&notes.length){const low=Math.min(...notes),drop=(low-NOTE_INDEX[bass]+120)%12;if(drop)notes.push(low-drop);}
     }else notes=pianoMidisForCard(card);
     if(isBassSound(state.sound))notes=notes.slice(0,card.type==='note'?1:3).map(m=>m-12);
     return [...new Set(notes.map(Number).filter(Number.isFinite))].sort((a,b)=>a-b);
@@ -484,12 +560,13 @@
 
   function pianoSvg(card){
     const val=displayedValue(card),mids=pianoMidisForCard(card),targets=new Set(mids);
+    const names=card.type==='chord'?chordToneNames(val):new Map([[NOTE_INDEX[val],val]]),label=m=>names.get(((m%12)+12)%12)||NOTES[((m%12)+12)%12];
     let start=Math.min(...mids)-2,end=Math.max(...mids)+3;const black=m=>NOTES[(m%12+12)%12].includes('#');
     while(black(start))start--;while(black(end-1))end++;while(end-start<10){start--;if(black(start))start--;if(end-start>=10)break;end++;if(black(end-1))end++;}
     const whites=[];for(let m=start;m<end;m++)if(!black(m))whites.push(m);
     const ww=46,w=whites.length*ww,h=164,xmap=new Map();let ws='',bs='';
-    whites.forEach((m,i)=>{const x=i*ww,pc=NOTES[m%12],hit=targets.has(m);xmap.set(m,x);ws+=`<rect x="${x}" y="18" width="${ww}" height="132" rx="2" fill="${hit?'#e9c46a':'#f6f2e7'}" stroke="#171717" stroke-width="2"/>`;if(hit)ws+=`<text x="${x+ww/2}" y="136" text-anchor="middle" font-size="16" font-weight="800" fill="#161616">${pc}</text>`;});
-    for(let m=start;m<end;m++){if(!black(m))continue;const px=xmap.get(m-1);if(px==null)continue;const hit=targets.has(m),pc=NOTES[m%12],bx=px+ww-14;bs+=`<rect x="${bx}" y="18" width="28" height="82" rx="2" fill="${hit?'#f4a261':'#1a1a1a'}" stroke="#080808" stroke-width="1.5"/>`;if(hit)bs+=`<text x="${bx+14}" y="78" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">${pc}</text>`;}
+    whites.forEach((m,i)=>{const x=i*ww,pc=label(m),hit=targets.has(m);xmap.set(m,x);ws+=`<rect x="${x}" y="18" width="${ww}" height="132" rx="2" fill="${hit?'#e9c46a':'#f6f2e7'}" stroke="#171717" stroke-width="2"/>`;if(hit)ws+=`<text x="${x+ww/2}" y="136" text-anchor="middle" font-size="16" font-weight="800" fill="#161616">${pc}</text>`;});
+    for(let m=start;m<end;m++){if(!black(m))continue;const px=xmap.get(m-1);if(px==null)continue;const hit=targets.has(m),pc=label(m),bx=px+ww-14;bs+=`<rect x="${bx}" y="18" width="28" height="82" rx="2" fill="${hit?'#f4a261':'#1a1a1a'}" stroke="#080808" stroke-width="1.5"/>`;if(hit)bs+=`<text x="${bx+14}" y="78" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">${pc}</text>`;}
     return `<svg viewBox="0 0 ${w} ${h}"><text x="4" y="12" fill="#9aa3ad" font-size="11">Octave ${state.octave>0?'+':''}${state.octave}</text>${ws}${bs}</svg>`;
   }
 
@@ -594,7 +671,9 @@
     if(GUITAR_SHAPES[name])return GUITAR_SHAPES[name].slice();
     return barreShape(name);
   }
+  // Slash chords show the diagram of their base chord; the bass note is named in the subtitle.
   function guitarShapeForName(name){
+    name=baseChordName(name);
     switch(state.neck){
       case'triad':return triadShape(name,false);
       case'barre':return barreShape(name);
@@ -614,10 +693,11 @@
     const shape=shapeValue(card),shown=displayedValue(card),W=360,H=245,L=55,T=36,sg=48,fg=35,nf=5,tuning=['E','A','D','G','B','E'];let frets,start=1;
     if(card.type==='note'){const p=guitarNotePosition(shape);start=Math.max(1,p?.f>4?p.f-1:1);frets=Array(6).fill(null);if(p)frets[p.s]=p.f;}
     else{frets=guitarShapeForName(shape);const pos=frets.filter(f=>f>0);start=frets.includes(0)?1:(pos.length?Math.max(1,Math.min(...pos)):1);}
+    const toneNames=card.type==='chord'?chordToneNames(shown):null;
     let svg=`<svg viewBox="0 0 ${W} ${H}"><text x="10" y="18" fill="#9aa3ad" font-size="12">${state.capo?`Capo ${state.capo}${state.transpose?' • transpose view':''}`:`Fret ${start}`}</text>`;
     for(let s=0;s<6;s++){const x=L+s*sg;svg+=`<line x1="${x}" y1="${T}" x2="${x}" y2="${T+nf*fg}" stroke="#d8dde4" stroke-width="${1+s*.12}"/><text x="${x}" y="${T+nf*fg+24}" text-anchor="middle" fill="#8f99a5" font-size="12">${tuning[s]}</text>`;}
     for(let f=0;f<=nf;f++){const y=T+f*fg;svg+=`<line x1="${L}" y1="${y}" x2="${L+5*sg}" y2="${y}" stroke="${f===0?'#f3f4f6':'#737d89'}" stroke-width="${f===0?4:1.4}"/>`;}
-    frets.forEach((f,s)=>{const x=L+s*sg;if(f==null){if(card.type==='chord')svg+=`<text x="${x}" y="29" text-anchor="middle" fill="#e76f51" font-size="15">×</text>`;return;}if(f===0){svg+=`<circle cx="${x}" cy="24" r="8" fill="none" stroke="#e9c46a" stroke-width="2"/>`;return;}let rel=f-start;if(rel<0||rel>=nf)rel=Math.max(0,Math.min(nf-1,f%nf));const y=T+(rel+.5)*fg,pc=card.type==='note'?shown:NOTES[([40,45,50,55,59,64][s]+f)%12];svg+=`<circle cx="${x}" cy="${y}" r="14" fill="#e9c46a" stroke="#201b0e" stroke-width="2"/><text x="${x}" y="${y+4.5}" text-anchor="middle" fill="#16120a" font-size="11" font-weight="900">${pc}</text>`;});
+    frets.forEach((f,s)=>{const x=L+s*sg;if(f==null){if(card.type==='chord')svg+=`<text x="${x}" y="29" text-anchor="middle" fill="#e76f51" font-size="15">×</text>`;return;}if(f===0){svg+=`<circle cx="${x}" cy="24" r="8" fill="none" stroke="#e9c46a" stroke-width="2"/>`;return;}let rel=f-start;if(rel<0||rel>=nf)rel=Math.max(0,Math.min(nf-1,f%nf));const y=T+(rel+.5)*fg,pc=card.type==='note'?shown:(toneNames.get(([40,45,50,55,59,64][s]+f)%12)||NOTES[([40,45,50,55,59,64][s]+f)%12]);svg+=`<circle cx="${x}" cy="${y}" r="14" fill="#e9c46a" stroke="#201b0e" stroke-width="2"/><text x="${x}" y="${y+4.5}" text-anchor="middle" fill="#16120a" font-size="11" font-weight="900">${pc}</text>`;});
     return svg+'</svg>';
   }
 
@@ -625,9 +705,10 @@
     if(state.instrument!=='guitar')return'';
     const labels={open:'Open / Easy',triad:'Triad',barre:'Barre Chord',power:'Power Chord',shell:'Shell Voicing',inversion:'1st Inversion',color:'Color / Extended'};
     const shape=shapeValue(card),sound=displayedValue(card),kind=card.type==='chord'?labels[state.neck]||labels.open:'';
-    if(!state.capo)return kind;
+    const bass=card.type==='chord'?parseChord(sound)?.bass:null,bassText=bass?`bass note ${bass}`:'';
+    if(!state.capo)return [kind,bassText].filter(Boolean).join(' • ');
     const capoText=state.transpose?`${card.value} shape → sounds ${sound}`:(shape===card.value?`Capo ${state.capo}`:`Play ${shape} shape → sounds ${card.value}`);
-    return [kind,capoText].filter(Boolean).join(' • ');
+    return [kind,bassText,capoText].filter(Boolean).join(' • ');
   }
 
   function isMidiRollActive(){return state.cardView==='midi'&&document.body.classList.contains('workspace-chord-rider');}
@@ -1058,7 +1139,7 @@
   }
   function renderFits(){
     $('fitHeading').textContent=state.mode==='chord'?'Chords that fit':'Notes that fit';const k=activeKey();
-    $('keyHint').innerHTML=`<span>Based on the</span><span>${k.root}${k.minor?' minor':' major'}</span><span>chord family</span>`;
+    $('keyHint').innerHTML=`<span>Based on the</span><span>${esc(keyTonic(k))}${k.minor?' minor':' major'}</span><span>chord family</span>`;
     const w=$('compatibleChords');w.innerHTML='';fitItems().forEach(v=>{const b=document.createElement('button');b.className='chip';b.textContent=v;b.onclick=()=>appendFitValue(v,state.mode);w.appendChild(b);});
     // Scale Rider loads after app.js, so this optional hook keeps its active
     // scale row in sync when Chord/Note mode changes without coupling startup.
@@ -2792,6 +2873,7 @@
     snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,cardDurationBeats,soundPreset,soundOutputGain,isBassSound,loadSoundfontInstrument,createInstrumentFxChain,normalizeInstrument,
     scheduleAutoSave,flushAutoSaveNow,renderAll,syncBuildInput,publishSrpHandoff,loadProjectById:loadProject,
     recordUndo,undo:undoEdit,redo:redoEdit,get canUndo(){return undoHistory.undo.length>0;},
+    keyTonicName,spellInKey,
     get beats(){return +$('beatsSelect').value||4},get bpm(){return +$('bpmInput').value||92},get loop(){return $('loopToggle').checked},
     get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
     startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).flat().reduce((n,c)=>n+storedCardDurationBeats(c),0);},
