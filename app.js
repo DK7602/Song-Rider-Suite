@@ -2860,7 +2860,8 @@
   }
   window.addEventListener('focus',()=>setTimeout(applyHardSync,0));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSync,0);});
-  setInterval(applyHardSync,250);
+  // No polling: storage events, BroadcastChannel, focus, pageshow and visibility cover
+  // every way Song Rider can change the shared transport (it no longer polls either).
 
   // Song Rider now runs as a native same-origin workspace page.
   // The shared link map and handoff snapshot above are consumed directly by song-rider/app.js.
