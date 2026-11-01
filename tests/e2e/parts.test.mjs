@@ -105,6 +105,8 @@ async function playFor(page, ms, start = () => window.CRPParts.startPlayback({ f
 const near = (a, b, tol = 0.02) => Math.abs(a - b) <= tol;
 // Drags with a mouse, or on touch with Track Master's long-press (synthetic touch pointer events).
 async function drag(page, from, to, touch) {
+  const grabbed = await page.evaluate(p => document.elementFromPoint(p.x, p.y)?.className || '', from);
+  assert.match(grabbed, /vox-instrument-event/, `drag must start on a clip, found "${grabbed}"`);
   if (!touch) {
     await page.mouse.move(from.x, from.y); await page.mouse.down();
     await page.mouse.move(from.x + 12, from.y, { steps: 3 }); await page.mouse.move(to.x, to.y, { steps: 10 }); await page.mouse.up();
@@ -186,6 +188,9 @@ async function duplicatedChordSurvivesMove(page, touch) {
   await tap(page, '.vox-instrument-track[data-vox-kind="chord"] .vox-track-menu-btn');
   await press(page, page.locator('#voxTrackContextMenu button', { hasText: 'Duplicate Track' }));
   await page.waitForTimeout(200);
+  // Select the destination track first, as a user would (on a phone this also
+  // folds the Track Effects panel away from the lanes).
+  await tap(page, '.vox-instrument-track[data-vox-kind="chord"] .vox-track-label strong');
   const rows = page.locator('.vox-instrument-track[data-vox-kind="chord"]');
   const card = await rows.nth(1).locator('.vox-chord-event').first().boundingBox(), lane = await rows.nth(0).locator('.vox-track-lane').boundingBox();
   const ppb = await page.evaluate(() => window.innerWidth <= 600 ? 44 : 56);
