@@ -2925,6 +2925,14 @@
     input.onchange=e=>{e.stopPropagation();const n=clampTrackVolumePct(e.target.value);if(drums)setVoxDrumTrackVolume(n,{commit:true});else core.flushAutoSaveNow?.();};
   }
 
+  // The ⋮ button is small: on touch, the browser's tap adjustment can deliver
+  // the click to the surrounding track label instead. Open on the touch
+  // pointerup the button itself receives, and ignore the click that follows.
+  function wireTrackMenuButton(btn,openMenu){
+    let touchOpenedAt=0;
+    btn.addEventListener('pointerup',e=>{if(e.pointerType!=='touch')return;e.stopPropagation();touchOpenedAt=performance.now();openMenu();});
+    btn.onclick=e=>{e.preventDefault();e.stopPropagation();if(performance.now()-touchOpenedAt>700)openMenu();};
+  }
   function makeVoxTrackLabel({name,meta,checked=null,onChecked=null,kind='vocal',part=null}){
     const label=document.createElement('div');label.className='vox-track-label'+(kind!=='vocal'?' vox-instrument-label':'');
     if(checked!==null){const top=document.createElement('label');top.className='vox-track-enable';const c=document.createElement('input');c.type='checkbox';c.checked=!!checked;c.onpointerdown=e=>e.stopPropagation();c.onchange=e=>{e.stopPropagation();onChecked?.(c.checked);};const strong=document.createElement('strong');strong.textContent=name;top.append(c,strong);label.append(top);}else{const strong=document.createElement('strong');strong.textContent=name;label.append(strong);}
@@ -2933,7 +2941,7 @@
       label.dataset.voxPartId=String(part.id);label.dataset.voxPartType=String(part.type);
       appendVoxTrackVolume(label,{part});
       const menu=document.createElement('button');menu.type='button';menu.className='vox-track-menu-btn';menu.textContent='⋮';menu.title='Track actions';menu.setAttribute('aria-label',`${name} track actions`);
-      menu.onclick=e=>{e.preventDefault();e.stopPropagation();const r=menu.getBoundingClientRect();openVoxTrackContextMenu(part,label,r.right,r.bottom);};label.append(menu);
+      wireTrackMenuButton(menu,()=>{const r=menu.getBoundingClientRect();openVoxTrackContextMenu(part,label,r.right,r.bottom);});label.append(menu);
       appendVoxMuteSolo(label,{part});
     }
     return label;
@@ -3424,7 +3432,7 @@
         nameInput.onclick=e=>e.stopPropagation();nameInput.onfocus=()=>{beforeRename=voxSnapshot();voxTargetPartId=part.id;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=null;renderVoxInspector();};
         nameInput.oninput=()=>{if(beforeRename){voxCheckpoint(beforeRename);beforeRename=null;}part.name=String(nameInput.value||'');markPartsDirty();core.scheduleAutoSave();};nameInput.onblur=()=>{beforeRename=null;part.name=String(nameInput.value||'').trim()||`Vocals ${allVocalParts().indexOf(part)+1}`;nameInput.value=part.name;renderParts();markPartsDirty();core.scheduleAutoSave();};
         const meta=document.createElement('span');meta.className='vox-track-meta';meta.textContent=`${Math.round((Number(part.volume)||0)*100)}% • ${(part.voxEvents||[]).length} event${(part.voxEvents||[]).length===1?'':'s'}`;
-        const menu=document.createElement('button');menu.type='button';menu.className='vox-track-menu-btn';menu.textContent='⋮';menu.title='Track actions';menu.setAttribute('aria-label',`${part.name} track actions`);menu.onclick=e=>{e.preventDefault();e.stopPropagation();const r=menu.getBoundingClientRect();openVoxTrackContextMenu(part,label,r.right,r.bottom);};label.append(nameInput,meta);appendVoxTrackVolume(label,{part});label.append(menu);appendVoxMuteSolo(label,{part});
+        const menu=document.createElement('button');menu.type='button';menu.className='vox-track-menu-btn';menu.textContent='⋮';menu.title='Track actions';menu.setAttribute('aria-label',`${part.name} track actions`);wireTrackMenuButton(menu,()=>{const r=menu.getBoundingClientRect();openVoxTrackContextMenu(part,label,r.right,r.bottom);});label.append(nameInput,meta);appendVoxTrackVolume(label,{part});label.append(menu);appendVoxMuteSolo(label,{part});
         label.onclick=e=>{if(e.target.closest('input,button'))return;focusVoxVocalTrack(part,{announce:true});};
         label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(part,label,e.clientX,e.clientY);};
         const lane=document.createElement('div');lane.className='vox-track-lane';lane.dataset.voxPartId=part.id;lane.dataset.voxKind='vocal';lane.onpointerdown=e=>{if(voxRangeMode&&e.target===lane)beginVoxRangePointer(e,part,lane);};lane.onclick=e=>{if(e.target!==lane)return;if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}focusVoxVocalTrack(part,{announce:true});/* Blank vocal space selects the paste/drop target. The ruler is the only seek surface. */};
