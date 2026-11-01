@@ -2002,8 +2002,9 @@ function adoptServerCopy(remote, rev, local){
   return differs;
 }
 
-// Reconcile the server's rows with the local library. Returns {changed, currentChanged}.
-function applyCloudRows(rows){
+// Reconcile server rows with the local library. full: rows is the whole account (a pull), so
+// local songs missing from it have never reached the server. Returns {changed, currentChanged, notices}.
+function applyCloudRows(rows, { full = false } = {}){
   const lib = ensureLibrary();
   const meta = readSyncMeta();
   const result = { changed:false, currentChanged:false, notices:[] };
@@ -2064,7 +2065,7 @@ function applyCloudRows(rows){
   }
 
   // Songs the server has never seen (or lost) are pushed as new.
-  const missing = lib.list.filter(p => !seen.has(String(p.id)) && !meta.dirty[p.id]).map(p => p.id);
+  const missing = full ? lib.list.filter(p => !seen.has(String(p.id)) && !meta.dirty[p.id]).map(p => p.id) : [];
   if(missing.length){
     updateSyncMeta(m => { for(const id of missing){ delete m.rev[id]; m.dirty[id] = dirtyStamp(); } });
   }
@@ -2159,7 +2160,7 @@ async function syncWithCloud(reason="", opts={}){
       flushLibrary({ quiet:true });
       const rows = await fetchCloudProjects();
       assertSyncScope(scope);
-      const pulled = applyCloudRows(rows);
+      const pulled = applyCloudRows(rows, { full:true });
       cloud.lastPullAt = Date.now();
       outcome.notices.push(...pulled.notices);
       flushLibrary({ quiet:true });
@@ -2340,7 +2341,7 @@ async function handleAuthSessionChange(user, reason=""){
         if(seq !== cloud.authChangeSeq) return;
         // Only adopt this device's signed-out songs when the account has none yet.
         if(!rows.length) maybeSeedSignedInScopeFromGuest();
-        const pulled = applyCloudRows(rows);
+        const pulled = applyCloudRows(rows, { full:true });
         if(pulled.notices.length) showSyncNotice(pulled.notices);
         flushLibrary();
         setCloudStatus("ok");
