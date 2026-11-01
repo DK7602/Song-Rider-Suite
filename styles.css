@@ -4074,6 +4074,8 @@ body.vox-track-reordering .vox-track-reorder-handle{cursor:grabbing;}
 .instrument-sound-picker>button{width:100%;min-height:34px!important;padding:7px 9px!important;text-align:left;border-radius:7px!important;background:#18222d!important;color:#eef3f7!important;border:1px solid transparent!important}
 .instrument-sound-picker>button:hover,.instrument-sound-picker>button:focus{border-color:#60758a!important;background:#202d3a!important;outline:none}
 .instrument-sound-picker>button.is-current{border-color:#d7aa37!important;background:#2b2516!important;color:#f6d36a!important}
+.instrument-sound-picker>a.instrument-sound-credits{display:block;padding:6px 9px 2px;color:#a9b6c3;font-size:.74rem;text-decoration:underline;text-underline-offset:2px}
+.instrument-sound-picker>a.instrument-sound-credits:hover,.instrument-sound-picker>a.instrument-sound-credits:focus{color:#eef3f7}
 #instrumentTabs .seg.active::after,#leadInstrumentTabs .seg.active::after{content:' ▾';font-size:.72em;opacity:.75}
 
 /* Edit buttons are one deliberate row on every screen. Split no longer receives

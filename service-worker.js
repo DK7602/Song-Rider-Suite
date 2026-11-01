@@ -1,4 +1,7 @@
-const CACHE = 'song-rider-suite-v3.4.11';
+const CACHE = 'song-rider-suite-v3.4.12';
+// Recorded instrument audio (assets/instruments/<id>/*.mp3) never changes under the same name, so it lives in
+// its own cache that survives app updates and is served from there first. Bump this to drop the old audio.
+const INSTRUMENT_CACHE = 'srs-instruments-v1';
 // Precached so the whole suite opens offline. Everything else is cached the first time it loads.
 const ASSETS = [
   './','./index.html','./manifest.webmanifest','./app.js',
@@ -6,7 +9,7 @@ const ASSETS = [
   './vocal-autotune-worklet.js','./styles.css','./scale-rider.css','./crp-layout-lock.css',
   './suite-shell-lock.css','./branding-shell.css','./suite-header.css','./skins.css',
   './suite-brand.css','./suite-compact.css','./assets/brand/icon-chord-rider-pro-256.webp','./assets/brand/icon-baby-daw-256.webp',
-  './assets/brand/icon-song-rider-pro-256.webp','./instruments.js','./vendor/soundfont-player.js','./vendor/html2canvas.min.js','./vendor/jspdf.umd.min.js',
+  './assets/brand/icon-song-rider-pro-256.webp','./instruments.js','./sound-credits.html','./vendor/soundfont-player.js','./vendor/html2canvas.min.js','./vendor/jspdf.umd.min.js',
   './assets/rider-blood-light-pattern.jpg','./assets/light-diamond-pattern.jpg','./assets/studio-pastel-pattern.jpg','./assets/rider-dark-gold-pattern.jpg',
   './assets/rider-og-pattern.jpg','./assets/rider-blood-pattern.jpg','./assets/rider-light-og-pattern.jpg','./assets/rider-blood-light-og-pattern.jpg',
   './assets/sapphire-paisley-dark.jpg','./assets/sapphire-paisley-light.jpg','./assets/suite-header-new.webp','./assets/chord-rider-pro-wordmark-hq2.webp',
@@ -22,11 +25,18 @@ async function cacheAvailable(cache,url){
   try{const req=new Request(new URL(url,self.registration.scope).href,{cache:'reload'});const res=await fetch(req);if(res?.ok)await cache.put(req,plain(res));}catch{}
 }
 self.addEventListener('install',event=>event.waitUntil((async()=>{const cache=await caches.open(CACHE);await Promise.allSettled(ASSETS.map(url=>cacheAvailable(cache,url)));await self.skipWaiting();})()));
-self.addEventListener('activate',event=>event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith('song-rider-suite-')&&k!==CACHE).map(k=>caches.delete(k)));await self.clients.claim();})()));
+self.addEventListener('activate',event=>event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>(k.startsWith('song-rider-suite-')&&k!==CACHE)||(k.startsWith('srs-instruments-')&&k!==INSTRUMENT_CACHE)).map(k=>caches.delete(k)));await self.clients.claim();})()));
+function isInstrumentAudio(url){return url.pathname.includes('/assets/instruments/')&&/\.mp3$/i.test(url.pathname);}
+async function instrumentAudio(request){
+  const cache=await caches.open(INSTRUMENT_CACHE),hit=await cache.match(request,{ignoreSearch:true});if(hit)return hit;
+  const res=await fetch(request);if(res?.ok&&res.status===200)await cache.put(request,res.clone()).catch(()=>{});
+  return res;
+}
 function isCoreText(url,request){return request.mode==='navigate'||/\.(?:html|css|js|webmanifest)$/i.test(url.pathname);}
 self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET')return;
   const url=new URL(event.request.url);if(url.origin!==self.location.origin||url.pathname.includes('/api/'))return;
+  if(isInstrumentAudio(url)){event.respondWith(instrumentAudio(event.request));return;}
   event.respondWith((async()=>{
     const cache=await caches.open(CACHE),core=isCoreText(url,event.request);
     try{

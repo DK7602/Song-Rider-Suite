@@ -1262,6 +1262,10 @@
       b.onclick=e=>choose(e);
       pop.appendChild(b);
     }
+    // The recorded instruments include CC BY sets, which need visible attribution. The click must not reach
+    // the layer, whose click handler cancels everything to stop taps falling through to the page.
+    const credits=document.createElement('a');credits.className='instrument-sound-credits';credits.href='sound-credits.html';credits.target='_blank';credits.rel='noopener';credits.textContent='Sound credits';
+    credits.addEventListener('click',e=>e.stopPropagation());pop.appendChild(credits);
     layer.appendChild(pop);document.body.appendChild(layer);const ar=anchor.getBoundingClientRect(),pr=pop.getBoundingClientRect(),left=Math.max(6,Math.min(window.innerWidth-pr.width-6,ar.left)),top=Math.max(6,Math.min(window.innerHeight-pr.height-6,ar.bottom+6));pop.style.left=`${left}px`;pop.style.top=`${top}px`;
     // Taps outside the menu are captured by the layer, so they close the picker
     // without ever reaching the page underneath it.

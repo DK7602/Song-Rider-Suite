@@ -23,6 +23,13 @@ Skins live in `skins.js` / `skins.css`; the shared header/shell styles are `suit
   synced when online. See [`docs/SYNC.md`](docs/SYNC.md) for how conflicts between devices are
   handled (nothing is silently overwritten; a "conflict copy" is kept instead).
 - Third-party libraries are vendored in `vendor/` (and `song-rider/pdf*.mjs`, `song-rider/lame.min.js`).
+- **Instruments.** `instruments.js` plays every Chord Rider / Baby DAW / Track Master sound: recorded
+  sample sets in `assets/instruments/<id>/` (a `manifest.json` per set, listed in `index.json`), voices
+  derived from them (EQ, amp, palm mute, layered brass) and synthesized voices. Every sound is levelled
+  to the piano. If a set can't load, the General MIDI SoundFont is used instead. The recordings are free
+  libraries (CC0, CC BY, University of Iowa free-use); their credits are in
+  [`docs/SOUND-CREDITS.md`](docs/SOUND-CREDITS.md) and, for users, `sound-credits.html` (linked from the
+  sound picker). CC BY sets require that attribution to stay reachable.
 
 ## Deploying
 
