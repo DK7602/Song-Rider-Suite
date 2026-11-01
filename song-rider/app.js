@@ -13170,6 +13170,7 @@ function refreshRhymesFromActive(){
 function toggleRhymeDock(show){
   el.rhymeDock.style.display = show ? "block" : "none";
   if(show) refreshRhymesFromActive();
+  scheduleKeyboardDockLayout();
 }
 
 /***********************
@@ -16407,204 +16408,57 @@ init().catch(showBootError);
 
 /***********************
 KEEP RHYME UI ABOVE KEYBOARD
-- simple layout-viewport anchoring for Android Chrome
-- portals rhyme dock + floating R to body so parent transforms cannot trap them
-- when a text editor is focused, pin the R and dock to the bottom of the resized viewport
-- no visualViewport top math (that was lifting the R too high on this device)
+- The rhyme dock and the floating R button live directly in <body> so no transformed
+  ancestor can trap their fixed position (static styles are in index.html).
+- Their vertical position follows the visual viewport, so they sit just above the
+  on-screen keyboard. It is recomputed once per frame when something that can move it
+  happens: viewport resize/scroll, focus moving in or out of an editor, and the dock or
+  Notes opening/closing (see scheduleKeyboardDockLayout callers).
 ***********************/
-{
-  const dock = document.getElementById("rhymeDock");
-  const rBtn = document.getElementById("rBtn");
-  const hideBtn = document.getElementById("hideRhymeBtn");
-  const notesBtn = document.getElementById("notesBtn");
-  const notesCloseBtn = document.getElementById("notesCloseBtn");
-  const notesModal = document.getElementById("notesModal");
-
-  const BASE_BTN_BOTTOM = 12;
-  const BASE_DOCK_BOTTOM = 8;
-  const KB_GAP = 8;
-
-  let rafId = 0;
-  let settleTimer = 0;
-  let pulseUntil = 0;
-
-  function forceStyle(el, prop, value){
-    if(!el) return;
-    try{ el.style.setProperty(prop, value, 'important'); }catch{ el.style[prop] = value; }
+const keyboardDockLayout = { raf:0 };
+function scheduleKeyboardDockLayout(){
+  if(!keyboardDockLayout.raf) keyboardDockLayout.raf = requestAnimationFrame(applyKeyboardDockLayout);
+}
+function applyKeyboardDockLayout(){
+  keyboardDockLayout.raf = 0;
+  const dock = el.rhymeDock, rBtn = el.rBtn;
+  if(!dock && !rBtn) return;
+  const GAP = 8;
+  const vv = window.visualViewport;
+  const vvBottom = vv ? Math.min(window.innerHeight, vv.offsetTop + vv.height) : window.innerHeight;
+  const keyboardInset = vv ? Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height))) : 0;
+  const a = document.activeElement;
+  const editing = !!(a && a.closest && a.closest('textarea, input[type="text"], input:not([type]), [contenteditable="true"]')) || !!state.notesOpen;
+  const keyboardOpen = editing || !!(vv && (window.innerHeight - vv.height > 120 || vv.offsetTop > 0));
+  const notesOpen = !!el.notesModal?.classList.contains('show');
+  const dockShown = !!(dock && dock.style.display === 'block');
+  const pin = (node, fallbackBottom, height) => {
+    if(!keyboardOpen){ node.style.top = 'auto'; node.style.bottom = fallbackBottom + 'px'; return; }
+    if(notesOpen){ node.style.top = 'auto'; node.style.bottom = Math.max(fallbackBottom, keyboardInset + GAP) + 'px'; return; }
+    node.style.bottom = 'auto';
+    node.style.top = Math.max(8, Math.round(vvBottom - height - GAP)) + 'px';
+  };
+  if(dock){
+    pin(dock, 8, Math.max(48, Math.ceil(dock.getBoundingClientRect().height || 0)));
+    if(keyboardOpen) dock.style.maxHeight = Math.max(180, Math.round((notesOpen ? vvBottom - keyboardInset : vvBottom) * 0.42)) + 'px';
+    else dock.style.removeProperty('max-height');
   }
-
-  function portalToBody(node){
-    if(!node || !document.body) return;
-    if(node.parentElement !== document.body) document.body.appendChild(node);
-  }
-
-  function isEditableTarget(node){
-    if(!node || node.nodeType !== 1) return false;
-    if(node.matches && node.matches('textarea, input[type="text"], input:not([type]), [contenteditable="true"]')) return true;
-    if(node.closest){
-      return !!node.closest('textarea, input[type="text"], input:not([type]), [contenteditable="true"], #notesBody, .lyricsTa, .fullLyricsTa');
-    }
-    return false;
-  }
-
-  function keyboardLikelyOpen(){
-    const a = document.activeElement;
-    const vv = window.visualViewport;
-    const focusedEditable = isEditableTarget(a) || !!(state && state.notesOpen);
-    const vvShort = !!(vv && (window.innerHeight - vv.height > 120 || vv.offsetTop > 0));
-    return focusedEditable || vvShort;
-  }
-
-  function getVisibleViewportBottom(){
-    const vv = window.visualViewport;
-    if(vv){
-      return Math.min(window.innerHeight, vv.offsetTop + vv.height);
-    }
-    return window.innerHeight;
-  }
-
-  function isNotesModalOpen(){
-    return !!(notesModal && notesModal.classList && notesModal.classList.contains('show'));
-  }
-
-  function getKeyboardInset(){
-    const vv = window.visualViewport;
-    if(!vv) return 0;
-    return Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height)));
-  }
-
-  function ensureOverlayRoots(){
-    portalToBody(dock);
-    portalToBody(rBtn);
-
-    if(dock){
-      forceStyle(dock, 'position', 'fixed');
-      forceStyle(dock, 'left', '12px');
-      forceStyle(dock, 'right', '12px');
-      forceStyle(dock, 'width', 'auto');
-      forceStyle(dock, 'max-width', 'none');
-      forceStyle(dock, 'margin', '0');
-      forceStyle(dock, 'transform', 'none');
-      forceStyle(dock, 'z-index', '2147483645');
-    }
-
-    if(rBtn){
-      forceStyle(rBtn, 'position', 'fixed');
-      forceStyle(rBtn, 'right', '12px');
-      forceStyle(rBtn, 'left', 'auto');
-      forceStyle(rBtn, 'margin', '0');
-      forceStyle(rBtn, 'transform', 'none');
-      forceStyle(rBtn, 'z-index', '2147483646');
-    }
-  }
-
-  function applyBottomAnchors(){
-    rafId = 0;
-    ensureOverlayRoots();
-
-    const kbOpen = keyboardLikelyOpen();
-    const dockShown = !!(dock && dock.style.display === 'block');
-    const vvBottom = getVisibleViewportBottom();
-    const keyboardInset = getKeyboardInset();
-    const notesOpenNow = isNotesModalOpen();
-
-    if(dock){
-      const dockH = Math.max(48, Math.ceil(dock.getBoundingClientRect().height || 0));
-      if(kbOpen){
-        if(notesOpenNow){
-          forceStyle(dock, 'top', 'auto');
-          forceStyle(dock, 'bottom', Math.max(BASE_DOCK_BOTTOM, keyboardInset + KB_GAP) + 'px');
-          forceStyle(dock, 'max-height', Math.max(180, Math.round((vvBottom - Math.max(0, keyboardInset)) * 0.42)) + 'px');
-        }else{
-          const dockTop = Math.max(8, Math.round(vvBottom - dockH - KB_GAP));
-          forceStyle(dock, 'bottom', 'auto');
-          forceStyle(dock, 'top', dockTop + 'px');
-          forceStyle(dock, 'max-height', Math.max(180, Math.round(vvBottom * 0.42)) + 'px');
-        }
-      }else{
-        forceStyle(dock, 'top', 'auto');
-        forceStyle(dock, 'bottom', BASE_DOCK_BOTTOM + 'px');
-        try{ dock.style.removeProperty('max-height'); }catch{}
-      }
-    }
-
-    if(rBtn){
-      if(kbOpen){
-        if(notesOpenNow){
-          forceStyle(rBtn, 'top', 'auto');
-          forceStyle(rBtn, 'bottom', Math.max(BASE_BTN_BOTTOM, keyboardInset + KB_GAP) + 'px');
-        }else{
-          const btnH = Math.max(52, Math.ceil(rBtn.getBoundingClientRect().height || 52));
-          const btnTop = Math.max(8, Math.round(vvBottom - btnH - KB_GAP));
-          forceStyle(rBtn, 'bottom', 'auto');
-          forceStyle(rBtn, 'top', btnTop + 'px');
-        }
-      }else{
-        forceStyle(rBtn, 'top', 'auto');
-        forceStyle(rBtn, 'bottom', BASE_BTN_BOTTOM + 'px');
-      }
-      if(dockShown){
-        forceStyle(rBtn, 'opacity', '0');
-        forceStyle(rBtn, 'pointer-events', 'none');
-      }else{
-        forceStyle(rBtn, 'opacity', '1');
-        forceStyle(rBtn, 'pointer-events', 'auto');
-      }
-    }
-  }
-
-  function queueApply(){
-    if(rafId) cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(applyBottomAnchors);
-  }
-
-  function pulse(){
-    clearTimeout(settleTimer);
-    if(Date.now() > pulseUntil) return;
-    queueApply();
-    settleTimer = setTimeout(pulse, 50);
-  }
-
-  function settle(ms = 700){
-    pulseUntil = Date.now() + ms;
-    queueApply();
-    setTimeout(queueApply, 60);
-    setTimeout(queueApply, 140);
-    setTimeout(queueApply, 260);
-    setTimeout(queueApply, 420);
-    pulse();
-  }
-
-  ensureOverlayRoots();
-  queueApply();
-
-  window.addEventListener('resize', settle);
-  window.addEventListener('orientationchange', settle);
-  window.addEventListener('scroll', settle, { passive:true });
-  if(window.visualViewport){
-    window.visualViewport.addEventListener('resize', settle);
-    window.visualViewport.addEventListener('scroll', settle);
-  }
-  document.addEventListener('focusin', settle, true);
-  document.addEventListener('focusout', settle, true);
-  document.addEventListener('click', settle, true);
-  document.addEventListener('touchend', settle, { passive:true, capture:true });
-
   if(rBtn){
-    rBtn.addEventListener('click', settle);
-    rBtn.addEventListener('touchstart', settle, { passive:true });
-    rBtn.addEventListener('pointerdown', settle, { passive:true });
+    pin(rBtn, 12, Math.max(52, Math.ceil(rBtn.getBoundingClientRect().height || 52)));
+    rBtn.classList.toggle('srpDockOpen', dockShown);
   }
-  if(hideBtn) hideBtn.addEventListener('click', settle);
-  if(notesBtn) notesBtn.addEventListener('click', settle);
-  if(notesCloseBtn) notesCloseBtn.addEventListener('click', settle);
-
-  if(dock && window.MutationObserver){
-    new MutationObserver(settle).observe(dock, { attributes:true, attributeFilter:['style','class'] });
+}
+{
+  for(const node of [el.rhymeDock, el.rBtn]){
+    if(node && node.parentElement !== document.body) document.body.appendChild(node);
   }
-  if(notesModal && window.MutationObserver){
-    new MutationObserver(settle).observe(notesModal, { attributes:true, attributeFilter:['style','class','aria-hidden'] });
-  }
+  window.addEventListener('resize', scheduleKeyboardDockLayout);
+  window.addEventListener('orientationchange', scheduleKeyboardDockLayout);
+  window.visualViewport?.addEventListener('resize', scheduleKeyboardDockLayout);
+  window.visualViewport?.addEventListener('scroll', scheduleKeyboardDockLayout);
+  document.addEventListener('focusin', scheduleKeyboardDockLayout, true);
+  document.addEventListener('focusout', scheduleKeyboardDockLayout, true);
+  scheduleKeyboardDockLayout();
 }
 
 
