@@ -486,7 +486,11 @@ await test('dictation: ordered insert with retry, stop (not cancel) on hide, sty
   await page.evaluate(() => { window.__answers = [{ text: 'alpha' }, { fail: true, delay: 2500 }, { text: 'charlie' }]; });
   await page.locator('button.fullLyricsMic').first().click();
   await sleep(700);
-  assert.deepEqual(await page.evaluate(() => window.__ctxEvents), ['click']);
+  // The first audio engine is created inside the tap (iOS only allows audio started there); a
+  // second one is made after the mic opens (Android can leave the tap's engine silent).
+  const ctxEvents = await page.evaluate(() => window.__ctxEvents);
+  assert.equal(ctxEvents[0], 'click', 'the first audio engine must be created inside the tap');
+  assert.ok(ctxEvents.length <= 2, `too many audio engines created: ${ctxEvents.join(',')}`);
   await say(2300); await sleep(1700);
   await say(2300); await sleep(1600);
   await say(1200); await sleep(3000);
@@ -666,6 +670,47 @@ await test('dictation still shows its status line on later sessions after the vi
     await mic().click(); await sleep(1500);
   }
   assert.match(await fullText(page), /take1.*take2.*take3/s);
+  noErrors(page);
+  await ctx.close();
+});
+
+await test('dictation hears the mic even when the audio engine made in the tap is stuck (Android)', async () => {
+  const { ctx, page } = await device(browser, null, {
+    init: () => {
+      window.__speak = (on) => { if (window.__micGain) window.__micGain.gain.value = on ? 0.5 : 0; };
+      const OrigAC = window.AudioContext;
+      // Android: opening the mic can leave an engine created earlier "running" but silent.
+      window.AudioContext = function (...a) {
+        const c = new OrigAC(...a);
+        if (window.event && window.event.type === 'click') {
+          c.suspend(); Object.defineProperty(c, 'state', { get: () => 'running' }); c.resume = () => new Promise(() => {});
+        }
+        return c;
+      };
+      navigator.mediaDevices.getUserMedia = async () => {
+        const c = new OrigAC(), osc = c.createOscillator(), g = c.createGain(), dest = c.createMediaStreamDestination();
+        g.gain.value = 0; osc.connect(g); g.connect(dest); osc.start(); window.__micGain = g; return dest.stream;
+      };
+      window.__posts = 0;
+      const of = window.fetch;
+      window.fetch = async (url, opts = {}) => {
+        if (!String(url).includes('/api/lyrics-dictation')) return of(url, opts);
+        if ((opts.method || 'GET').toUpperCase() === 'GET') return new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } });
+        window.__posts++;
+        return new Response(JSON.stringify({ ok: true, text: 'heard' + window.__posts }), { headers: { 'Content-Type': 'application/json' } });
+      };
+    }
+  });
+  await open(page);
+  const say = async (ms) => { await page.evaluate(() => window.__speak(true)); await sleep(ms); await page.evaluate(() => window.__speak(false)); };
+  await page.locator('button.fullLyricsMic').first().click();
+  await sleep(2000);
+  await say(1600); await sleep(2000);
+  const status = await page.locator('.fullLyricsVoiceInfo').first().textContent();
+  assert.doesNotMatch(status, /No sound is reaching/, 'the mic was never heard');
+  assert.ok(await page.evaluate(() => window.__posts) >= 1, 'no phrase was sent');
+  await page.locator('button.fullLyricsMic').first().click(); await sleep(1500);
+  assert.match(await fullText(page), /heard1/);
   noErrors(page);
   await ctx.close();
 });

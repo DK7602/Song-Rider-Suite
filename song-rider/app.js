@@ -10307,36 +10307,7 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
     stop();
   }
   // No audio frames at all means the context or the microphone is not running.
-  function checkAudio(){
-    if(stopped||frames)return;
-    waiting=true;
-    if(context&&context.state!=='running')context.resume?.().catch(()=>{});
-    setStatus('Waiting for sound from the microphone… '+tip);
-    watchdog=setTimeout(()=>{
-      if(!stopped&&!frames)fail('No sound is reaching voice to text from the microphone. Make sure no other app is using it, then tap 🎤 to try again.');
-    },4000);
-  }
-  paintMic();
-  setStatus('Starting microphone… '+tip+' Audio is transcribed by Cloudflare.');
-  (async()=>{
-    try{
-      if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone recording is unavailable in this browser.');
-      // Authenticate and check the transcription service before asking for the microphone.
-      await suiteCloudApi('/api/lyrics-dictation',{method:'GET'});
-      if(stopped){cleanupCapture();return;}
-      stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
-      if(stopped){cleanupCapture();return;}
-      if(!(await waitUntilVisible(1500))){
-        starting=false;
-        fail('Voice to text stopped because the screen was locked or another app opened. Tap 🎤 to start again.');
-        return;
-      }
-      context=await runningDictationContext(context);
-      starting=false;
-      if(stopped){cleanupCapture();return;}
-      source=context.createMediaStreamSource(stream);processor=context.createScriptProcessor(4096,1,1);gain=context.createGain();gain.gain.value=0;
-      source.connect(processor);processor.connect(gain);gain.connect(context.destination);
-      processor.onaudioprocess=e=>{
+  function onAudio(e){
         if(stopped)return;
         frames++;
         if(waiting){waiting=false;clearTimeout(watchdog);setStatus('Listening… '+tip);}
@@ -10357,7 +10328,63 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
         if(hasSpeech&&((quiet/rate>0.9&&samples/rate>1.5)||samples/rate>12))flush();
         else if(!hasSpeech&&samples/rate>0.4){parts=parts.slice(-2);samples=parts.reduce((n,p)=>n+p.length,0);}
         if(segments.length>8){setStatus('Transcription is falling behind. Finishing captured audio…');stop();}
-      };
+  }
+  function buildCapture(){
+    try{processor&&(processor.onaudioprocess=null);processor?.disconnect();source?.disconnect();gain?.disconnect();}catch{}
+    source=context.createMediaStreamSource(stream);processor=context.createScriptProcessor(4096,1,1);gain=context.createGain();gain.gain.value=0;
+    source.connect(processor);processor.connect(gain);gain.connect(context.destination);
+    processor.onaudioprocess=onAudio;
+  }
+  // No sound yet: rebuild the capture once in a brand-new audio engine before giving up.
+  let rebuilt=false;
+  async function rebuildCapture(){
+    rebuilt=true;
+    try{
+      const old=context;
+      const fresh=new (window.AudioContext||window.webkitAudioContext)();
+      if(fresh.state!=='running')await Promise.race([Promise.resolve(fresh.resume?.()).catch(()=>{}),new Promise(r=>setTimeout(r,1200))]);
+      if(stopped||frames){fresh.close?.().catch?.(()=>{});return;}
+      context=fresh;buildCapture();old?.close?.().catch?.(()=>{});
+    }catch(err){console.warn('Could not rebuild the dictation capture',err);}
+  }
+  function checkAudio(){
+    if(stopped||frames)return;
+    waiting=true;
+    if(context&&context.state!=='running')context.resume?.().catch(()=>{});
+    setStatus('Waiting for sound from the microphone… '+tip);
+    if(!rebuilt)rebuildCapture();
+    watchdog=setTimeout(()=>{
+      if(!stopped&&!frames)fail('No sound is reaching voice to text from the microphone. Make sure no other app is using it, then tap 🎤 to try again.');
+    },4000);
+  }
+  paintMic();
+  setStatus('Starting microphone… '+tip+' Audio is transcribed by Cloudflare.');
+  (async()=>{
+    try{
+      if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone recording is unavailable in this browser.');
+      // Authenticate and check the transcription service before asking for the microphone.
+      await suiteCloudApi('/api/lyrics-dictation',{method:'GET'});
+      if(stopped){cleanupCapture();return;}
+      stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
+      if(stopped){cleanupCapture();return;}
+      if(!(await waitUntilVisible(1500))){
+        starting=false;
+        fail('Voice to text stopped because the screen was locked or another app opened. Tap 🎤 to start again.');
+        return;
+      }
+      // Build the capture in an audio engine created AFTER the microphone opened (as the
+      // original build did). On Android, opening the mic switches audio modes and an engine made
+      // earlier (in the tap) can stay "running" while delivering no sound at all. The engine made
+      // in the tap is kept as the fallback iOS needs (it only allows audio started in a tap).
+      const tapContext=context;
+      let fresh=null;
+      try{fresh=new (window.AudioContext||window.webkitAudioContext)();}catch{}
+      if(fresh&&fresh.state!=='running')await Promise.race([Promise.resolve(fresh.resume?.()).catch(()=>{}),new Promise(r=>setTimeout(r,1200))]);
+      if(fresh&&fresh.state==='running'){context=fresh;if(tapContext&&tapContext!==fresh)tapContext.close?.().catch?.(()=>{});}
+      else{fresh?.close?.().catch?.(()=>{});context=await runningDictationContext(tapContext);}
+      starting=false;
+      if(stopped){cleanupCapture();return;}
+      buildCapture();
       stream.getTracks().forEach(t=>t.addEventListener('ended',()=>{if(!stopped){setStatus('Microphone disconnected. Finishing captured audio…');stop();}}));
       watchdog=setTimeout(checkAudio,2500);
       if(!stopped)setStatus('Listening… '+tip);
