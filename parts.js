@@ -1459,12 +1459,17 @@
   }
   let drumMasterSyncing=false;
   function primaryDrumEvent(){return [...drumEvents].sort((a,b)=>(Number(a.startBeat)||0)-(Number(b.startBeat)||0))[0]||null;}
-  function syncDrumMasterToBeatMaker(){
+  // Beat Maker's copy of the beat follows the song's first drum region: its
+  // pattern (hits, bars, grid) only. Volume, mute, solo and on/off are the Drums
+  // track's mix and stay as they are (gainFromRegion: take the region's volume).
+  function syncDrumMasterToBeatMaker({gainFromRegion=false}={}){
     if(drumMasterSyncing||!window.CRPBeatMaker?.setBeat)return false;
     ensureLegacyDrumEvent();
-    const primary=primaryDrumEvent(),target=primary?clone(primary.pattern):blankDrumPattern();
+    const primary=primaryDrumEvent(),source=primary?clone(primary.pattern):blankDrumPattern();
     try{
       const current=window.CRPBeatMaker?.getBeat?.();
+      const target=current?{...current,bars:source.bars,resolution:source.resolution,tracks:source.tracks}:source;
+      if(gainFromRegion&&primary&&Number.isFinite(Number(source.gain)))target.gain=Number(source.gain);
       if(current&&JSON.stringify(current)===JSON.stringify(target))return false;
       drumMasterSyncing=true;window.CRPBeatMaker.setBeat(target,{persist:false});return true;
     }catch(err){console.warn('Could not sync Track Master drums to Beat Maker',err);return false;}finally{drumMasterSyncing=false;}
@@ -1478,6 +1483,39 @@
     // region's own pattern, but keep its gain connected to that master slider.
     const masterGain=Math.max(0,Math.min(1,Number(pat.gain)||0));for(const ev of drumEvents){if(ev?.pattern)ev.pattern.gain=masterGain;}
     markPartsDirty();playbackTotalBeats=mediaDurationBeats();if(voxBoxOpen)renderVoxBox();core.scheduleAutoSave();return true;
+  }
+  // The Drums track's mix changed in Beat Maker (volume, mute, solo, on/off; see
+  // CRPBeatMaker.setMix). The regions are one Drums track, so each plays at the
+  // track volume: only their gain follows. No region's pattern is touched.
+  function syncDrumMix(mix){
+    const gain=Number(mix?.gain);if(!Number.isFinite(gain))return false;
+    const g=Math.max(0,Math.min(1,gain));
+    for(const ev of drumEvents){if(ev?.pattern)ev.pattern.gain=g;}
+    for(const input of document.querySelectorAll?.('.vox-track-volume-input[data-drum-track]')||[])paintVoxTrackVolume(input,Math.round(g*100));
+    markPartsDirty();liveEditRefresh();return true;
+  }
+  // A song was loaded. Its drums are its Track Master regions: they are what plays
+  // and what Track Master shows. Beat Maker's copy (edited from Chord Rider, saved
+  // as project.beatMaker) starts as the first region's pattern, so a copy an older
+  // build left blank, missing or out of date can never be written over the
+  // regions. A song whose drums are only in that copy (older builds played it when
+  // a song had no region) gets them as its first region, so no edit or save drops
+  // them.
+  function adoptLoadedSongDrums(project){
+    const bm=window.CRPBeatMaker;
+    if(!bm?.getBeat)return; // at startup Beat Maker loads after this module; the core loads the song again then
+    const beat=bm.getBeat(),beatHits=drumPatternHitCount(beat)>0;
+    if(!drumEvents.length){
+      drumArrangementInitialized=true;
+      if(beatHits)drumEvents=[normalizeDrumEvent({id:'beat-maker-drums',startBeat:0,durationBeats:Math.max(4,musicalVocalDurationBeats(),(Number(beat.bars)||1)*4),patternOffsetBeats:0,pattern:beat})];
+      return;
+    }
+    // Every region is empty but the copy has hits: those are the song's only drums.
+    if(beatHits&&drumEvents.every(e=>drumPatternHitCount(e.pattern)<=0)){
+      const primary=primaryDrumEvent();primary.pattern=clone(beat);primary.durationBeats=Math.max(Number(primary.durationBeats)||0,(Number(beat.bars)||1)*4);
+      return;
+    }
+    syncDrumMasterToBeatMaker({gainFromRegion:!project?.beatMaker});
   }
   function musicalVocalDurationBeats(){
     const musical=parts.filter(p=>p.type==='chord'||p.type==='lead').map(partDurationBeats),vocals=parts.filter(p=>p.type==='vocal').map(vocalDurationBeats);return Math.max(0,...musical,...vocals);
@@ -2463,6 +2501,7 @@
     if(!savedLoadedChordId&&Array.isArray(project?.rows)&&project.rows.length){
       c.data=migrateChordData({...(c.data||core.snapshot()),rows:clone(project.rows)});
     }
+    adoptLoadedSongDrums(project);
     loadedChordPartId=c.id;core.apply(c.data);
     if(activePartId!==c.id)selectPart(activePartId);else{setEditorMode('chord');renderParts();}
     refreshPartsFingerprintBaseline();renderSongEndEditor();scheduleRecoverCheck({banner:true});
@@ -2743,7 +2782,9 @@
     if(!snap)return;parts=(snap.parts||[]).map((p,i)=>normalizePart(p,i)).filter(Boolean);ensureInitial();
     activePartId=parts.some(p=>String(p.id)===String(snap.activePartId))?snap.activePartId:(parts[0]?.id||null);
     loadedChordPartId=parts.some(p=>p.type==='chord'&&String(p.id)===String(snap.loadedChordPartId))?snap.loadedChordPartId:(parts.find(p=>p.type==='chord')?.id||null);
-    if(snap.beat)window.CRPBeatMaker?.setBeat?.(snap.beat,{persist:true});drumEvents=Array.isArray(snap.drumEvents)?snap.drumEvents.map(normalizeDrumEvent).filter(Boolean):drumEvents;drumArrangementInitialized=snap.drumArrangementInitialized!==false;songStartBeat=Math.max(0,Number(snap.songStartBeat)||0);songEndBeat=Number.isFinite(Number(snap.effectiveSongEndBeat))?Number(snap.effectiveSongEndBeat):songEndBeat;
+    // The snapshot's regions are the drums; Beat Maker gets their pattern below
+    // (persistVoxEdits) and the snapshot's mix here, without writing any region.
+    if(snap.beat)window.CRPBeatMaker?.setBeat?.(snap.beat,{persist:false});drumEvents=Array.isArray(snap.drumEvents)?snap.drumEvents.map(normalizeDrumEvent).filter(Boolean):drumEvents;drumArrangementInitialized=snap.drumArrangementInitialized!==false;songStartBeat=Math.max(0,Number(snap.songStartBeat)||0);songEndBeat=Number.isFinite(Number(snap.effectiveSongEndBeat))?Number(snap.effectiveSongEndBeat):songEndBeat;
     voxTargetPartId=parts.some(p=>p.type==='vocal'&&String(p.id)===String(snap.voxTargetPartId))?snap.voxTargetPartId:(allVocalParts()[0]?.id||null);voxPlayheadBeat=Math.max(0,Number(snap.voxPlayheadBeat)||0);voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=snap.voxInstrumentTrackFocus?clone(snap.voxInstrumentTrackFocus):null;voxToolMode=snap.voxToolMode||voxToolMode;voxRangeMode=!!snap.voxRangeMode;voxRangeSelection=snap.voxRangeSelection?clone(snap.voxRangeSelection):null;
     const c=parts.find(p=>p.type==='chord'&&String(p.id)===String(loadedChordPartId));if(c)core.apply(c.data);
     if(Number.isFinite(Number(snap.bpm))&&Math.round(Number(snap.bpm))!==Math.round(songBpm()))setProjectBpm(Number(snap.bpm));
@@ -2916,11 +2957,12 @@
     voxStatus(`${part.name} ${kind==='mute'?(part.muted?'muted':'unmuted'):(part.solo?'soloed':'solo off')}.`);
   }
   function toggleVoxDrumMuteSolo(kind){
-    const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;
+    const b=window.CRPBeatMaker?.getMix?.();if(!b)return;
     voxCheckpoint();
     if(kind==='mute'){b.muted=!b.muted;if(b.muted)b.solo=false;}
     else{b.solo=!b.solo;if(b.solo)b.muted=false;}
-    window.CRPBeatMaker.setBeat(b,{persist:true});
+    // Mute/solo is the Drums track's mix: no drum pattern is written.
+    window.CRPBeatMaker.setMix({muted:b.muted,solo:b.solo});core.scheduleAutoSave();
     liveEditRefresh();
     renderVoxBox();
     voxStatus(`Drums ${kind==='mute'?(b.muted?'muted':'unmuted'):(b.solo?'soloed':'solo off')}.`);
@@ -2965,13 +3007,13 @@
     if(!part)return;const n=clampTrackVolumePct(pct);part.volume=n/100;syncPartVolumeControls(part,n);markPartsDirty();liveEditRefresh();core.scheduleAutoSave();
   }
   function setVoxDrumTrackVolume(pct,{commit=false}={}){
-    const n=clampTrackVolumePct(pct),gain=n/100,b=window.CRPBeatMaker?.getBeat?.();if(!b)return;
-    b.gain=gain;
+    const n=clampTrackVolumePct(pct),gain=n/100;if(!window.CRPBeatMaker?.setMix)return;
     // Drums are one mixer track even when the Track Master timeline has several
-    // drum regions. Keep every region on the same master gain.
-    for(const ev of drumEvents){if(ev?.pattern)ev.pattern.gain=gain;}
-    window.CRPBeatMaker?.setBeat?.(b,{persist:!!commit});
-    markPartsDirty();liveEditRefresh();core.scheduleAutoSave();if(commit)core.flushAutoSaveNow?.();
+    // drum regions: the volume is that track's gain, which every region plays at
+    // (syncDrumMix). It only changes the gain; it never writes a drum pattern, so a
+    // Beat Maker copy that is not the song's drums cannot replace them.
+    window.CRPBeatMaker.setMix({gain});
+    core.scheduleAutoSave();if(commit)core.flushAutoSaveNow?.();
   }
   function appendVoxTrackVolume(host,{part=null,drums=false}={}){
     if(!host||(!part&&!drums))return;host.classList.add('has-track-volume');
@@ -3115,7 +3157,7 @@
   function renderVoxDrumMap(tracks,width,ppb,clickBeat){
     if(!voxShowInstrumentals)return;ensureLegacyDrumEvent();const master=window.CRPBeatMaker?.getBeat?.()||blankDrumPattern();
     const row=document.createElement('div');row.className='vox-track-row vox-instrument-track vox-drum-region-row';row.style.width=`${width}px`;row.dataset.voxTrackKey='drum-map';row.dataset.voxKind='drum';row.classList.toggle('is-instrument-focus',voxInstrumentTrackFocus?.key==='drum-map');
-    const label=makeVoxTrackLabel({name:'Drums',meta:`${drumEvents.length} region${drumEvents.length===1?'':'s'}`,checked:master.enabled!==false,onChecked:on=>{voxCheckpoint();const b=window.CRPBeatMaker?.getBeat?.();if(!b)return;b.enabled=on;window.CRPBeatMaker.setBeat(b,{persist:true});persistVoxEdits();renderVoxBox();},kind:'drum'});label.title='Double-click (desktop) or double-tap (touch) empty drum-lane space to add a 4-beat region.';label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('drum','Drums','drum-map',{announce:true});};appendVoxTrackVolume(label,{drums:true});appendVoxMuteSolo(label,{drums:true});
+    const label=makeVoxTrackLabel({name:'Drums',meta:`${drumEvents.length} region${drumEvents.length===1?'':'s'}`,checked:master.enabled!==false,onChecked:on=>{if(!window.CRPBeatMaker?.setMix)return;voxCheckpoint();window.CRPBeatMaker.setMix({enabled:on});persistVoxEdits();renderVoxBox();},kind:'drum'});label.title='Double-click (desktop) or double-tap (touch) empty drum-lane space to add a 4-beat region.';label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('drum','Drums','drum-map',{announce:true});};appendVoxTrackVolume(label,{drums:true});appendVoxMuteSolo(label,{drums:true});
     const drumRange={kind:'drum',trackKey:'drum-map',name:'Drums'};
     const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane vox-drum-region-lane';lane.dataset.voxKind='drum';lane.onpointerdown=e=>{if(voxRangeMode&&e.target===lane)beginVoxRangePointer(e,drumRange,lane);};lane.onclick=e=>{if(e.target!==lane)return;if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}if(recentVoxLaneAdd({id:'drum-map'},e)){e.preventDefault();e.stopPropagation();return;}focusVoxInstrumentTrack('drum','Drums','drum-map',{announce:true});/* Empty drum-lane creation is double-click/double-tap only. The ruler owns seeking. */};wireDrumLaneDoubleAdd(lane,clickBeat);
     for(const event of drumEvents){const key=`drum:${event.id}`,sel={kind:'drum',key,event,startBeat:event.startBeat,dur:event.durationBeats,name:'Drums'},ev=document.createElement('div');ev.className='vox-instrument-event vox-drum-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.style.left=`${event.startBeat*ppb}px`;ev.style.width=`${Math.max(34,event.durationBeats*ppb)}px`;const hits=drumPatternHitCount(event.pattern),bars=Math.max(1,Number(event.pattern?.bars)||1);ev.innerHTML=`<strong>Drums</strong><span>${event.durationBeats.toFixed(2)}b • ${bars}-bar pattern • ${hits} hits</span>`;ev.title='Drag to move • drag either edge to resize • Split • double-tap to edit pattern';ev.__voxSelection=sel;ev.onclick=e=>{if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}instrumentClickSelection(sel,ev,e);};ev.ondblclick=e=>{if(voxRangeMode)return;e.preventDefault();e.stopPropagation();openDrumEventEditor(sel);};ev.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,drumRange,lane);return;}if(e.target.classList.contains('vox-inst-handle'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}
@@ -3856,7 +3898,7 @@
       msUntilNextBeat=beatMs;
     }
     return {playing:true,ready:true,bpm,beatMs,currentBeat,msUntilNextBeat};
-  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncMidiTimelineFromCore,syncCloudAudio,openStudioExport,openAudioExport,refreshBabySetupToggle,syncBeatMakerMaster,focusChordPart(){const c=parts.find(p=>p.type==='chord');if(!c){refreshBabySetupToggle();return;}if(activePartId!==c.id)selectPart(c.id);else{setEditorMode('chord');refreshBabySetupToggle();core.refreshSetupVisibility?.();}},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
+  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncMidiTimelineFromCore,syncCloudAudio,openStudioExport,openAudioExport,refreshBabySetupToggle,syncBeatMakerMaster,syncDrumMix,syncDrumMasterToBeatMaker:()=>syncDrumMasterToBeatMaker(),focusChordPart(){const c=parts.find(p=>p.type==='chord');if(!c){refreshBabySetupToggle();return;}if(activePartId!==c.id)selectPart(c.id);else{setEditorMode('chord');refreshBabySetupToggle();core.refreshSetupVisibility?.();}},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
   // app.js intentionally loads first to expose CRPCore. Tell it that the parts module now
   // exists so the active saved project can be rehydrated with ALL Baby DAW parts before any
   // workspace navigation/save is allowed to capture state.

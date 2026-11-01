@@ -124,12 +124,34 @@
     window.CRPCore?.scheduleAutoSave?.();
     return true;
   }
+  // Volume, mute, solo and Drums on/off are the Drums track's mix, not part of a
+  // drum pattern. Changing them changes only these values (and, for the volume,
+  // the gain each Track Master region plays at). They never write a pattern, so a
+  // copy of the beat that is not the song's real drums (not loaded yet, saved by an
+  // older build, blank) can never replace the song's drums.
+  function mixOf(b){ return {gain:clamp(Number(b?.gain)||0,0,1), muted:b?.muted===true, solo:b?.solo===true, enabled:b?.enabled!==false}; }
+  function applyMix(next){
+    const m={};
+    if(next && Number.isFinite(Number(next.gain))) m.gain=clamp(Number(next.gain),0,1);
+    if(next && 'muted' in next) m.muted=next.muted===true;
+    if(next && 'solo' in next) m.solo=next.solo===true;
+    if(next && 'enabled' in next) m.enabled=next.enabled!==false;
+    Object.assign(beat,m);
+    // While a Track Master region is open in the editor, `beat` is that region's
+    // copy; the song's beat comes back when the editor closes, with this mix.
+    if(eventEditPriorBeat) Object.assign(eventEditPriorBeat,m);
+    beatUpdatedAt=Date.now();
+    updateMainControls();
+    const mix=mixOf(eventEditPriorBeat||beat);
+    try{window.CRPParts?.syncDrumMix?.(mix);}catch(e){console.warn('Could not apply the drum mix to Track Master',e);}
+    return mix;
+  }
   // Big pattern changes are undoable through the core's undo history. While a
   // Track Master drum region is being edited the history belongs to the song, so
   // ask before replacing the region instead.
   function beforeBigChange(question){
     if(typeof eventEditCommit==='function') return window.confirm(question);
-    window.CRPCore?.recordUndo?.();
+    window.CRPCore?.recordUndo?.({beat:true});
     return true;
   }
   function countHits(){
@@ -199,11 +221,11 @@
     $('crpBeatClose').addEventListener('click', closeEditor);
     modal.addEventListener('click', e => { if(e.target===modal) closeEditor(); });
     $('crpBeatSave').addEventListener('click', ()=>{ persistBeatIntoProject(); closeEditor(); updateMainControls(); });
-    $('crpDrumsToggle').addEventListener('change', e=>{ beat.enabled=e.target.checked; persistBeatIntoProject(); updateMainControls(); });
+    $('crpDrumsToggle').addEventListener('change', e=>{ applyMix({enabled:e.target.checked}); window.CRPCore?.scheduleAutoSave?.(); });
     const setVolume = value => {
       beat.gain = clamp(+value / 100, 0, 1);
       updateVolumeControls();
-      persistBeatIntoProject();
+      applyMix({gain:beat.gain}); window.CRPCore?.scheduleAutoSave?.(); // the mix only: no pattern is written
     };
     $('crpDrumVolume').addEventListener('input', e=>setVolume(e.target.value));
     $('crpBeatVolume').addEventListener('input', e=>setVolume(e.target.value));
@@ -246,6 +268,8 @@
     }
   }
   function openEditor(){
+    // Edit the song's drums: its first Track Master region, which is what plays.
+    try{window.CRPParts?.syncDrumMasterToBeatMaker?.();}catch(e){console.warn('Could not load the song\'s drums into Beat Maker',e);}
     renderEditor(); $('crpBeatModal').classList.add('open');
     $('crpBeatClose')?.focus();
   }
@@ -704,6 +728,10 @@
       try{window.dispatchEvent(new CustomEvent('crp-beat-changed',{detail:{source:'vox-box'}}));}catch{}
       return JSON.parse(JSON.stringify(beat));
     },
+    // The Drums track's mix ({gain, muted, solo, enabled}). setMix changes only the
+    // fields given and never a drum pattern; the caller saves.
+    getMix(){ return mixOf(eventEditPriorBeat||beat); },
+    setMix(next){ return applyMix(next); },
     editBeatEvent(next,{onCommit=null,onClose=null}={}){
       // A playing song keeps its drums: the region's edits reach them through
       // updateArrangement as they are committed.
@@ -752,7 +780,8 @@
     injectUi();
     beat=freshBeat();
     beatUpdatedAt=0;
-    try{localStorage.removeItem(LEGACY_DRAFT_KEY);}catch{}
+    // LEGACY_DRAFT_KEY is left alone: it may hold the only copy of a beat an older
+    // build never saved into a song.
     updateMainControls();
     // The core answers by loading the open project's (or draft's) beat into this module.
     try{window.dispatchEvent(new CustomEvent('crp-beat-ready'));}catch{}

@@ -1227,33 +1227,40 @@
 
   // Undo/redo for the chord editor: whole-editor snapshots (lines, song key, drum
   // beat), 50 steps deep, cleared whenever a project is loaded. Call recordUndo()
-  // right before any edit you want to be undoable.
+  // right before any edit you want to be undoable; recordUndo({beat:true}) before a
+  // Beat Maker pattern change. Only stepping over such a change puts a snapshot's
+  // beat back: the drums can change elsewhere too (Track Master regions, volume),
+  // so undoing a chord edit must not put an older or blank beat over them.
   const UNDO_LIMIT=50;
   const undoHistory={
     undo:[],redo:[],
-    snapshot(){return JSON.stringify({rows:state.rows,selectedRow:state.selectedRow,key:$('keyInput')?.value||'',autoKey:$('keyInput')?.dataset.autoKey||'1',beat:window.CRPBeatMaker?.getBeat?.()||null});},
-    record(){const s=this.snapshot();if(this.undo[this.undo.length-1]!==s){this.undo.push(s);if(this.undo.length>UNDO_LIMIT)this.undo.shift();}this.redo=[];updateUndoButtons();},
+    snapshot(beatEdit=false){return JSON.stringify({rows:state.rows,selectedRow:state.selectedRow,key:$('keyInput')?.value||'',autoKey:$('keyInput')?.dataset.autoKey||'1',beat:window.CRPBeatMaker?.getBeat?.()||null,beatEdit:!!beatEdit});},
+    record({beat=false}={}){const s=this.snapshot(beat);if(this.undo[this.undo.length-1]!==s){this.undo.push(s);if(this.undo.length>UNDO_LIMIT)this.undo.shift();}this.redo=[];updateUndoButtons();},
     reset(){this.undo=[];this.redo=[];updateUndoButtons();}
   };
-  function recordUndo(){undoHistory.record();}
+  function recordUndo(options){undoHistory.record(options&&typeof options==='object'&&!(options instanceof Event)?options:{});}
   function updateUndoButtons(){
     const u=$('undoBtn'),r=$('redoBtn');
     if(u)u.disabled=!undoHistory.undo.length;
     if(r)r.disabled=!undoHistory.redo.length;
     window.CRPBeatMaker?.refreshUndoButton?.(undoHistory.undo.length>0);
   }
-  function restoreUndoSnapshot(json){
+  function restoreUndoSnapshot(json,{beat:withBeat=false}={}){
     const s=JSON.parse(json);
     state.rows=Array.isArray(s.rows)&&s.rows.length?s.rows:[[]];
     state.selectedRow=Math.max(0,Math.min(state.rows.length-1,Number(s.selectedRow)||0));
     const key=$('keyInput');if(key){key.value=s.key||'';key.dataset.autoKey=s.autoKey||'1';}
-    const beat=window.CRPBeatMaker?.getBeat?.();
-    if(s.beat&&JSON.stringify(beat)!==JSON.stringify(s.beat))window.CRPBeatMaker?.setBeat?.(s.beat);
+    if(withBeat&&s.beat){
+      // The pattern comes back; the drums' volume/mute/solo stay as they are now.
+      const now=window.CRPBeatMaker?.getBeat?.(),next={...s.beat,...(window.CRPBeatMaker?.getMix?.()||{})};
+      if(JSON.stringify(now)!==JSON.stringify(next))window.CRPBeatMaker?.setBeat?.(next);
+    }
     renderAll();syncBuildInput();window.CRPParts?.syncCoreLive?.();scheduleAutoSave();
   }
   function stepHistory(from,to,message){
     if(!from.length)return false;
-    to.push(undoHistory.snapshot());restoreUndoSnapshot(from.pop());updateUndoButtons();
+    const s=from.pop(),beatEdit=JSON.parse(s).beatEdit===true;
+    to.push(undoHistory.snapshot(beatEdit));restoreUndoSnapshot(s,{beat:beatEdit});updateUndoButtons();
     $('status').textContent=message;return true;
   }
   function undoEdit(){return stepHistory(undoHistory.undo,undoHistory.redo,'Undone.');}
