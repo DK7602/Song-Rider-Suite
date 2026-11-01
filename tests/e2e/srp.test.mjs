@@ -590,6 +590,46 @@ await test('dictation signed in on a phone: survives the permission prompt (blur
   await A.ctx.close(); await P.ctx.close();
 });
 
+await test('dictation sends phrases at each pause even with steady background noise (phone auto-gain)', async () => {
+  const { ctx, page } = await device(browser, null, {
+    init: () => {
+      window.__speak = (on) => { if (window.__micGain) window.__micGain.gain.value = on ? 0.5 : 0; };
+      const OrigAC = window.AudioContext;
+      navigator.mediaDevices.getUserMedia = async () => {
+        const c = new OrigAC(), dest = c.createMediaStreamDestination();
+        const osc = c.createOscillator(), g = c.createGain(); g.gain.value = 0; osc.connect(g); g.connect(dest); osc.start(); window.__micGain = g;
+        // Constant hiss around -34 dBFS: above the old fixed speech threshold, so the old code never heard a pause.
+        const len = c.sampleRate * 2, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * 0.035;
+        const noise = c.createBufferSource(); noise.buffer = buf; noise.loop = true; noise.connect(dest); noise.start();
+        return dest.stream;
+      };
+      window.__posts = 0;
+      const of = window.fetch;
+      window.fetch = async (url, opts = {}) => {
+        if (!String(url).includes('/api/lyrics-dictation')) return of(url, opts);
+        if ((opts.method || 'GET').toUpperCase() === 'GET') return new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } });
+        window.__posts++;
+        return new Response(JSON.stringify({ ok: true, text: 'line' + window.__posts }), { headers: { 'Content-Type': 'application/json' } });
+      };
+    }
+  });
+  await open(page);
+  const say = async (ms) => { await page.evaluate(() => window.__speak(true)); await sleep(ms); await page.evaluate(() => window.__speak(false)); };
+  await page.locator('button.fullLyricsMic').first().click();
+  await sleep(1200);
+  await say(1600); await sleep(2000);
+  await say(1600); await sleep(2000);
+  const before = await page.evaluate(() => window.__posts);
+  assert.ok(before >= 2, `only ${before} phrase(s) were sent while talking in a noisy room`);
+  assert.match(await page.locator('.fullLyricsVoiceInfo').first().textContent(), /Listening [▮▯]{5}/);
+  await page.locator('button.fullLyricsMic').first().click();
+  await sleep(1500);
+  assert.match(await fullText(page), /^line1 line2/);
+  noErrors(page);
+  await ctx.close();
+});
+
 await test('typing cost does not grow with the library; few cloud requests while typing', async () => {
   const user = await newUser();
   const songs = Array.from({ length: 60 }, (_, i) => ({

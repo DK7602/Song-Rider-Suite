@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.4.5';
+const CACHE = 'song-rider-suite-v3.4.6';
 // Precached so the whole suite opens offline. Everything else is cached the first time it loads.
 const ASSETS = [
   './','./index.html','./manifest.webmanifest','./app.js',

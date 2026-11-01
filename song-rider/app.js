@@ -10142,13 +10142,27 @@ function attachFullLyricsMic(ta, card, actions, sectionIndex){
   const s=fullLyricsDictation;
   if(s&&s.projectId===String(state.project?.id||'')&&s.sectionIndex===sectionIndex)s.rebind(ta,mic,info);
 }
+// A tiny live level meter so you can see the microphone is hearing you.
+function micLevelBars(level){
+  const n=Math.max(0,Math.min(5,Math.round(Math.sqrt(Math.max(0,level))*5)));
+  return '▮'.repeat(n)+'▯'.repeat(5-n);
+}
+// Plain-language reasons the microphone could not start, with what to do.
+function micErrorMessage(err){
+  const name=String(err?.name||''),msg=String(err?.message||err||'');
+  if(name==='NotAllowedError'||name==='SecurityError'||/permission|denied|not allowed/i.test(msg))
+    return 'The microphone is blocked for this site. Tap the icon left of the web address → Permissions (or Site settings) → Microphone → Allow, then tap 🎤 again.';
+  if(name==='NotFoundError'||name==='OverconstrainedError')return 'No microphone was found on this device.';
+  if(name==='NotReadableError'||name==='AbortError')return 'The microphone is busy (another app or tab may be using it). Close that, then tap 🎤 again.';
+  return 'Could not start voice to text: '+msg;
+}
 function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
   const tip='Say “new bar” (or “next bar”) to leave a blank line between bars. Tap the mic to stop. Text appears after a pause.';
   const projectId=String(state.project?.id||'');
   const songName=String(state.project?.name||'').trim()||'this song';
   let boundProject=state.project; // the copy of the song the textarea was rendered from
   let stopped=false,finished=false,starting=true,stream=null,source=null,processor=null,gain=null;
-  let parts=[],samples=0,hasSpeech=false,quiet=0,frames=0,waiting=false,watchdog=0;
+  let parts=[],samples=0,hasSpeech=false,quiet=0,frames=0,waiting=false,watchdog=0,noiseFloor=1;
   let cursor=ta.selectionStart??ta.value.length,end=ta.selectionEnd??cursor;
   let pendingCommand='',failure=null,pumping=false,held='';
   const segments=[]; // phrases waiting to be transcribed / inserted, oldest first
@@ -10323,12 +10337,19 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
         if(waiting){waiting=false;clearTimeout(watchdog);setStatus('Listening… '+tip);}
         const data=new Float32Array(e.inputBuffer.getChannelData(0));
         let power=0;for(const x of data)power+=x*x;
-        const speech=Math.sqrt(power/data.length)>0.008;
+        const rms=Math.sqrt(power/data.length);
+        // Phones boost background noise (auto gain), so a fixed threshold can hear "speech" all
+        // the time and never find the pause that sends a phrase. Track the room's noise floor
+        // (a slowly rising minimum) and count as speech only what is clearly above it.
+        noiseFloor=Math.min(noiseFloor*1.015,Math.max(rms,1e-5));
+        const speech=rms>Math.max(0.008,noiseFloor*2.8);
+        if(frames%3===0&&info.textContent.startsWith('Listening'))setStatus('Listening '+micLevelBars(rms/Math.max(0.02,noiseFloor*6))+' '+tip);
         // Retain a short pre-roll, then submit only nonoverlapping phrases.
         parts.push(data);samples+=data.length;
         if(speech){hasSpeech=true;quiet=0;}else quiet+=data.length;
         const rate=e.inputBuffer.sampleRate||context.sampleRate;
-        if(hasSpeech&&((quiet/rate>1.2&&samples/rate>2)||samples/rate>20))flush();
+        // A phrase is sent after a short pause, or after 12 s of continuous sound at the latest.
+        if(hasSpeech&&((quiet/rate>0.9&&samples/rate>1.5)||samples/rate>12))flush();
         else if(!hasSpeech&&samples/rate>0.4){parts=parts.slice(-2);samples=parts.reduce((n,p)=>n+p.length,0);}
         if(segments.length>8){setStatus('Transcription is falling behind. Finishing captured audio…');stop();}
       };
@@ -10338,7 +10359,7 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
     }catch(err){
       starting=false;
       failure=failure||{};
-      setStatus('Could not start voice to text: '+(err?.message||err));
+      setStatus(micErrorMessage(err));
       stopped=true;cleanupCapture();finish();
     }
   })();
