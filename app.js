@@ -490,22 +490,26 @@
       return ctx;
     }
     function safetyClipCurve(){
-      // Unity gain up to 0.95, then a smooth knee that never exceeds full scale. The limiter
-      // keeps the signal below the knee, so this only catches rare overshoots.
-      const n=2048,curve=new Float32Array(n);
-      for(let i=0;i<n;i++){const x=i/(n-1)*2-1,a=Math.abs(x);curve[i]=Math.sign(x)*(a<=.95?a:.95+.05*Math.tanh((a-.95)/.05));}
+      // Unity gain up to 0.8 (-2 dBFS), then a smooth knee that tops out at 0.9 (-1 dBFS). The
+      // limiter keeps the signal under the knee; this only rounds off rare overshoots, and the
+      // remaining headroom absorbs resampling and the phone's own processing.
+      const n=4096,curve=new Float32Array(n);
+      for(let i=0;i<n;i++){const x=i/(n-1)*2-1,a=Math.abs(x);curve[i]=Math.sign(x)*(a<=.8?a:.8+.1*Math.tanh((a-.8)/.1));}
       return curve;
     }
     // Loudness. The SoundFont instruments and drum samples are recorded quietly: a full mix
     // used to peak around -15 dBFS and average about -32 dBFS, so phones sounded faint and half
     // volume was nearly silent. The master now drives the mix up, glues it with gentle
     // compression and limits peaks just under full scale (no clipping). Also used by exports.
-    const DRIVE_DB=17,GLUE={threshold:-22,knee:12,ratio:2.5,attack:.012,release:.25},LIMIT={threshold:-1.5,knee:0,ratio:20,attack:.002,release:.12},TRIM=1;
+    // Peaks are held about 3 dB below full scale. Running right at full scale made piano peaks
+    // clip in the final safety stage or the phone's own speaker limiter, which crackled. More of
+    // the loudness now comes from gentle compression instead of level.
+    const DRIVE_DB=14,GLUE={threshold:-26,knee:10,ratio:3,attack:.008,release:.25},LIMIT={threshold:-8,knee:1,ratio:20,attack:.001,release:.15},TRIM=.89;
     function buildMaster(c,destination=c.destination){
       const drive=c.createGain(),glue=c.createDynamicsCompressor(),limiter=c.createDynamicsCompressor(),trim=c.createGain(),clip=c.createWaveShaper();
       drive.gain.value=Math.pow(10,DRIVE_DB/20);
       for(const [node,cfg] of [[glue,GLUE],[limiter,LIMIT]])for(const k of Object.keys(cfg))node[k].value=cfg[k];
-      trim.gain.value=TRIM;clip.curve=safetyClipCurve();clip.oversample='none'; // transparent below the knee: no need to spend CPU oversampling
+      trim.gain.value=TRIM;clip.curve=safetyClipCurve();clip.oversample='4x';
       drive.connect(glue);glue.connect(limiter);limiter.connect(trim);trim.connect(clip);clip.connect(destination);
       return drive;
     }
