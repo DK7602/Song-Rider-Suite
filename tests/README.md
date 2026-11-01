@@ -12,7 +12,18 @@ npm test               # API contract tests + browser tests
 
 - `api.test.mjs` checks the server contract in `docs/SYNC.md` (conflicts, deletes, account
   isolation, login throttling, media access).
-- `e2e/*.test.mjs` drive the app in headless Chromium at phone and desktop sizes.
+- `e2e/*.test.mjs` drive the app in headless Chromium at phone and desktop sizes:
+  - `smoke.test.mjs`: both apps load in all 15 skins without errors, overflow or page-weight
+    regressions; suite navigation; both apps open offline after one visit.
+  - `crp.test.mjs`: Chord Rider drafts, flats, slash chords, Scale Rider minor keys, undo/redo,
+    two-device conflicts and deletes, touch target sizes.
+  - `parts.test.mjs`: Baby DAW / Track Master takes, take recovery, recording not touching the
+    mix, chord placement, repeats, audio-graph cleanup, offline WAV export (uses a fake mic and
+    a synthetic SoundFont, so no network is needed).
+  - `srp.test.mjs`: Song Rider Pro conflicts, deletes, Chord Rider link, full storage, XSS,
+    typing cost, idle timers, dictation, paste confirmation.
+
+Each browser test was checked to fail on the code before these fixes.
 
 To run one file against a server you already started:
 
