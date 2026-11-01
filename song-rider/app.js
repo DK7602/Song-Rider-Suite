@@ -10009,8 +10009,13 @@ function renderSheetTitleBar(){
 // - Audio is cut into phrases at pauses and transcribed in order; text is inserted strictly in
 //   that order, so a failed phrase holds back the ones after it until it is retried.
 // - Leaving the page or locking the screen *stops* the session: the phrase being spoken is
-//   still sent and in-flight results are still inserted (nothing is thrown away).
-// - Re-rendering the Full view hands the session the section's new textarea.
+//   still sent and in-flight results are still inserted (nothing is thrown away). While the
+//   microphone is still starting, hiding the page does not end the session (some Android
+//   phones show the permission prompt as its own screen); it is checked once the mic is open.
+// - The session follows the song by id, not one copy of it: a cloud pull, another tab or Undo
+//   can swap in a new copy of the open song and re-render the Full view, and the session then
+//   carries on in the section's new textarea. Opening a different song stops it; text that
+//   cannot be placed any more is shown in a notice instead of being dropped.
 const DICTATION_STYLE_KEY = "srp-dictation-style-v1";
 const DICTATION_STYLES = [
   ["hiphop", "Hip-hop/Rap"],
@@ -10084,58 +10089,103 @@ function makeDictationStyleSelect(){
   select.addEventListener("pointerdown", (e) => e.stopPropagation());
   return select;
 }
+function waitUntilVisible(ms){
+  return new Promise(resolve => {
+    if(!document.hidden){ resolve(true); return; }
+    const done = (v) => { clearTimeout(timer); document.removeEventListener("visibilitychange", onChange); resolve(v); };
+    const onChange = () => { if(!document.hidden) done(true); };
+    const timer = setTimeout(() => done(!document.hidden), ms);
+    document.addEventListener("visibilitychange", onChange);
+  });
+}
+// The context made in the tap can still be suspended once the microphone is open (Android can
+// interrupt audio for the permission prompt). Resume it; if it will not run, use a fresh one
+// (the tap still counts as user activation). A context that never runs is caught by the
+// session's no-audio check.
+async function runningDictationContext(ctx){
+  const resume = (c) => Promise.race([Promise.resolve(c.resume?.()).catch(() => {}), new Promise(r => setTimeout(r, 1500))]);
+  if(ctx && ctx.state !== "closed"){
+    if(ctx.state !== "running") await resume(ctx);
+    if(ctx.state === "running") return ctx;
+    ctx.close?.().catch?.(() => {});
+  }
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const fresh = new Ctx();
+  if(fresh.state !== "running") await resume(fresh);
+  return fresh;
+}
 function attachFullLyricsMic(ta, card, actions, sectionIndex){
   const mic=document.createElement('button');mic.type='button';mic.className='pillBtn fullLyricsMic';
   mic.textContent='🎤';mic.title='Speak lyrics into this section';mic.setAttribute('aria-label',mic.title);mic.setAttribute('aria-pressed','false');
   const info=document.createElement('div');info.className='fullLyricsVoiceInfo';info.setAttribute('role','status');info.setAttribute('aria-live','polite');info.hidden=true;
-  card.appendChild(info);actions.appendChild(makeDictationStyleSelect());actions.appendChild(mic);
+  // The mic stays next to + / × with the style picker after it, so on a phone the floating
+  // R button (bottom right) cannot cover it.
+  card.appendChild(info);actions.appendChild(mic);actions.appendChild(makeDictationStyleSelect());
   mic.addEventListener('click',e=>{
     e.preventDefault();e.stopPropagation();
-    if(fullLyricsDictation?.mic===mic&&!fullLyricsDictation.isStopped()){fullLyricsDictation.stop();return;}
+    const cur=fullLyricsDictation;
+    if(cur?.mic===mic&&!cur.isStopped()){cur.stop();return;}
     stopFullLyricsDictation();
+    // A session that is still finishing (or waiting for Retry) keeps its own status line.
+    let status=cur?.info||info;
+    if(cur&&!cur.isFinished()&&status.isConnected&&card.contains(status)){
+      status=document.createElement('div');status.className='fullLyricsVoiceInfo';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+      cur.info.after(status);
+    }else status=info;
     // iOS Safari only lets audio start inside the tap itself: create/resume before any await.
     let context=null;
     try{const Ctx=window.AudioContext||window.webkitAudioContext;context=new Ctx();context.resume?.().catch(()=>{});}
-    catch(err){info.hidden=false;info.textContent='Microphone recording is unavailable in this browser.';return;}
-    startFullLyricsDictation({ta,mic,info,sectionIndex,context});
+    catch(err){status.hidden=false;status.textContent='Microphone recording is unavailable in this browser.';return;}
+    startFullLyricsDictation({ta,mic,info:status,sectionIndex,context});
   });
-  // A re-render replaced this section while a session was running: continue in the new editor.
-  if(fullLyricsDictation&&fullLyricsDictation.project===state.project&&fullLyricsDictation.sectionIndex===sectionIndex){
-    fullLyricsDictation.rebind(ta,mic,info);
-  }
+  // The Full view was re-rendered (this song, possibly a newer copy of it): continue in the new editor.
+  const s=fullLyricsDictation;
+  if(s&&s.projectId===String(state.project?.id||'')&&s.sectionIndex===sectionIndex)s.rebind(ta,mic,info);
 }
 function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
   const tip='Say “new bar” (or “next bar”) to leave a blank line between bars. Tap the mic to stop. Text appears after a pause.';
-  const project=state.project;
-  let stopped=false,stream=null,source=null,processor=null,gain=null;
-  let parts=[],samples=0,hasSpeech=false,quiet=0;
+  const projectId=String(state.project?.id||'');
+  const songName=String(state.project?.name||'').trim()||'this song';
+  let boundProject=state.project; // the copy of the song the textarea was rendered from
+  let stopped=false,finished=false,starting=true,stream=null,source=null,processor=null,gain=null;
+  let parts=[],samples=0,hasSpeech=false,quiet=0,frames=0,waiting=false,watchdog=0;
   let cursor=ta.selectionStart??ta.value.length,end=ta.selectionEnd??cursor;
   let pendingCommand='',failure=null,pumping=false,held='';
   const segments=[]; // phrases waiting to be transcribed / inserted, oldest first
-  const session={project,sectionIndex,mic,stop,rebind,isStopped:()=>stopped};
+  const session={projectId,sectionIndex,mic,info,stop,rebind,onHidden,isStopped:()=>stopped,isFinished:()=>finished};
   fullLyricsDictation=session;
   info.hidden=false;
-  const live=()=>state.project===project;
+  const sameSong=()=>String(state.project?.id||'')===projectId;
+  // Write only into the editor that shows the song's current copy; otherwise hold the text
+  // until the Full view is rendered again (rebind) or the session ends (notice).
+  const canWrite=()=>sameSong()&&state.project===boundProject&&ta.isConnected;
   const setStatus=(text)=>{info.hidden=false;info.textContent=text;};
   const paintMic=()=>{
     const active=fullLyricsDictation===session;
+    if(!active&&fullLyricsDictation?.mic===session.mic)return; // a newer session owns this button
     session.mic.textContent=!active||failure?'🎤':(stopped?'…':'⏹');
     session.mic.setAttribute('aria-pressed',active&&!stopped?'true':'false');
   };
   const manual=e=>{if(e.isTrusted){cursor=ta.selectionStart??ta.value.length;end=ta.selectionEnd??cursor;}};
   ta.addEventListener('input',manual);
   function rebind(newTa,newMic,newInfo){
+    if(finished)return;
     ta.removeEventListener('input',manual);
-    newInfo.replaceWith(info);
-    ta=newTa;session.mic=newMic;
-    cursor=Math.min(cursor,ta.value.length);end=Math.min(end,ta.value.length);
+    if(newInfo!==info)newInfo.replaceWith(info);
+    const oldValue=ta.value;
+    ta=newTa;session.mic=newMic;boundProject=state.project;
+    if(ta.value===oldValue){cursor=Math.min(cursor,ta.value.length);end=Math.min(end,ta.value.length);}
+    else{
+      // A newer copy of the song arrived: keep inserting in front of the same text if it is still there.
+      const tail=oldValue.slice(end);
+      cursor=end=(tail&&ta.value.endsWith(tail))?ta.value.length-tail.length:ta.value.length;
+    }
     ta.addEventListener('input',manual);
     paintMic();
-    if(held){const t=held;held='';insertText(t);}
+    if(held&&canWrite()){const t=held;held='';insertText(t);}
   }
   function insertText(text){
-    if(!live())return;
-    if(!ta.isConnected){held+=text;return;} // re-render in progress; placed on rebind
+    if(!canWrite()){held+=(held&&!/\s$/.test(held)&&!/^\s/.test(text)?' ':'')+text;return;}
     let words=text;
     const before=ta.value.slice(0,cursor),after=ta.value.slice(end);
     if(before&&!/\s$/.test(before)&&!/^\s/.test(words))words=' '+words;
@@ -10154,15 +10204,18 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
     if(words)insertText(words);
   }
   function cleanupCapture(){
+    clearTimeout(watchdog);
     if(processor){processor.onaudioprocess=null;processor.disconnect();}
     source?.disconnect();gain?.disconnect();stream?.getTracks().forEach(t=>t.stop());
     if(context){context.close().catch(()=>{});context=null;}
   }
   function finish(){
+    if(finished)return;
+    finished=true;
     ta.removeEventListener('input',manual);
     if(fullLyricsDictation===session)fullLyricsDictation=null;
     paintMic();
-    if(held&&live())showSyncNotice([`Dictated text could not be placed in the song (the Full view was closed): “${held.trim()}”`]);
+    if(held.trim())showSyncNotice([`Dictated text could not be placed in “${songName}” because the song or its Full view was closed. Here it is so you can paste it: “${held.trim()}”`]);
     held='';
     if(!failure){info.hidden=true;info.textContent='';}
   }
@@ -10183,16 +10236,15 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
     if(pumping)return;
     pumping=true;
     try{
-      while(segments.length&&live()){
+      while(segments.length){
         const seg=segments[0];
         if(seg.state==='failed')return; // waits for Retry; later phrases stay behind it
         if(seg.state==='queued'){
           seg.state='sending';
           setStatus((stopped?'Finishing transcription… ':'Listening / transcribing… ')+tip);
-          try{seg.text=String((await transcribeLyricsAudio(seg.blob)).text||'');seg.state='done';}
+          try{seg.text=String((await transcribeLyricsAudio(seg.blob))?.text||'');seg.state='done';}
           catch(err){
             seg.state='failed';
-            if(!live())return;
             // Stop listening, keep every captured phrase in order until this one succeeds.
             if(!stopped){stopped=true;flush();cleanupCapture();}
             showFailure(seg,err);
@@ -10200,15 +10252,15 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
             return;
           }
         }
-        if(!live())return;
         segments.shift();
-        insert(seg.text);
+        try{insert(seg.text);}
+        catch(err){console.error('Could not insert dictated text',err);held+=(held?' ':'')+String(seg.text||'');}
         if(!stopped)setStatus('Listening… '+tip);
       }
     }finally{
       pumping=false;
-      if(stopped&&!segments.length&&fullLyricsDictation===session){
-        if(pendingCommand&&live()){const word=pendingCommand;pendingCommand='';insert(word,true);}
+      if(stopped&&!segments.length&&!finished){
+        if(pendingCommand){const word=pendingCommand;pendingCommand='';insert(word,true);}
         finish();
       }
     }
@@ -10216,7 +10268,7 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
   function flush(){
     const audioParts=parts,rate=context?.sampleRate,speech=hasSpeech;
     parts=[];samples=0;hasSpeech=false;quiet=0;
-    if(!speech||!audioParts.length||!rate||!live())return;
+    if(!speech||!audioParts.length||!rate)return;
     segments.push({blob:lyricsPcmWav(audioParts,rate),state:'queued',text:''});
     pump();
   }
@@ -10225,6 +10277,26 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
     stopped=true;flush();cleanupCapture();paintMic();
     if(!segments.length)pump();
   }
+  // Screen lock / app switch. While the microphone is starting this is usually the permission
+  // prompt, so the decision waits until the microphone is open.
+  function onHidden(){
+    if(!starting)stop();
+  }
+  function fail(message){
+    failure=failure||{};
+    setStatus(message);
+    stop();
+  }
+  // No audio frames at all means the context or the microphone is not running.
+  function checkAudio(){
+    if(stopped||frames)return;
+    waiting=true;
+    if(context&&context.state!=='running')context.resume?.().catch(()=>{});
+    setStatus('Waiting for sound from the microphone… '+tip);
+    watchdog=setTimeout(()=>{
+      if(!stopped&&!frames)fail('No sound is reaching voice to text from the microphone. Make sure no other app is using it, then tap 🎤 to try again.');
+    },4000);
+  }
   paintMic();
   setStatus('Starting microphone… '+tip+' Audio is transcribed by Cloudflare.');
   (async()=>{
@@ -10232,13 +10304,23 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone recording is unavailable in this browser.');
       // Authenticate and check the transcription service before asking for the microphone.
       await suiteCloudApi('/api/lyrics-dictation',{method:'GET'});
-      if(!live()||stopped){cleanupCapture();return;}
+      if(stopped){cleanupCapture();return;}
       stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
-      if(!live()||stopped){cleanupCapture();return;}
+      if(stopped){cleanupCapture();return;}
+      if(!(await waitUntilVisible(1500))){
+        starting=false;
+        fail('Voice to text stopped because the screen was locked or another app opened. Tap 🎤 to start again.');
+        return;
+      }
+      context=await runningDictationContext(context);
+      starting=false;
+      if(stopped){cleanupCapture();return;}
       source=context.createMediaStreamSource(stream);processor=context.createScriptProcessor(4096,1,1);gain=context.createGain();gain.gain.value=0;
       source.connect(processor);processor.connect(gain);gain.connect(context.destination);
       processor.onaudioprocess=e=>{
-        if(!live()||stopped)return;
+        if(stopped)return;
+        frames++;
+        if(waiting){waiting=false;clearTimeout(watchdog);setStatus('Listening… '+tip);}
         const data=new Float32Array(e.inputBuffer.getChannelData(0));
         let power=0;for(const x of data)power+=x*x;
         const speech=Math.sqrt(power/data.length)>0.008;
@@ -10251,9 +10333,11 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
         if(segments.length>8){setStatus('Transcription is falling behind. Finishing captured audio…');stop();}
       };
       stream.getTracks().forEach(t=>t.addEventListener('ended',()=>{if(!stopped){setStatus('Microphone disconnected. Finishing captured audio…');stop();}}));
+      watchdog=setTimeout(checkAudio,2500);
       if(!stopped)setStatus('Listening… '+tip);
     }catch(err){
-      failure={};
+      starting=false;
+      failure=failure||{};
       setStatus('Could not start voice to text: '+(err?.message||err));
       stopped=true;cleanupCapture();finish();
     }
@@ -10262,11 +10346,13 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
 // Screen lock, app switch or navigation: finish, never discard.
 window.addEventListener("pagehide", stopFullLyricsDictation);
 document.addEventListener("visibilitychange", () => {
-  if(document.hidden) stopFullLyricsDictation();
+  if(document.hidden) fullLyricsDictation?.onHidden();
 });
 function renderSheet(){
-  // A Full-view re-render hands a running dictation the new textarea; any other view ends it.
-  if(state.currentSection !== "Full" || state.fullPerfMode) stopFullLyricsDictation();
+  // A Full-view re-render of the same song hands a running dictation the new textarea; any
+  // other view or another song ends it (what was captured is still transcribed).
+  const dictation = fullLyricsDictation;
+  if(dictation && (state.currentSection !== "Full" || state.fullPerfMode || dictation.projectId !== String(state.project?.id || ""))) stopFullLyricsDictation();
   cancelChordDragCopy();
   renderSheetTitleBar();
   renderSheetActions();
@@ -16801,7 +16887,8 @@ function applyKeyboardDockLayout(){
     }
     const rows=Array.isArray(payload.rows)?payload.rows:[];
     const sig=crpRowsFingerprint(rows);
-    if(forceCreate||p.crpRowsSig!==sig){
+    const merge=forceCreate||p.crpRowsSig!==sig;
+    if(merge){
       editProject('linkCrpChords',()=>{
         mergeCrpRowsIntoPage1(p,rows);
         syncFullTextFromSections();
@@ -16817,8 +16904,12 @@ function applyKeyboardDockLayout(){
       p.linkedOctave=p.steps;
     }
     upsertProject(p,{bump:false});
-    applyProjectSettingsToUI();
-    renderAll();
+    // Nothing visible changed on a background refresh (focus, storage event): do not re-render
+    // the editors under the user (it would drop the caret and restart the Full view).
+    if(merge){
+      applyProjectSettingsToUI();
+      renderAll();
+    }
     return p;
   }
   window.CRP_SRP_importCrpStructure=importCrpStructure;
@@ -16852,23 +16943,32 @@ function applyKeyboardDockLayout(){
       button.setAttribute('aria-label',busy?'Linking Song Rider Pro project':'Link SRP project');
     }
   }
+  // The CRP / Baby DAW project open in Chord Rider right now ('' when its editor is empty).
+  function openCrpProjectId(){
+    let id='';
+    try{id=String(localStorage.getItem('crp-active-project-id')||'').trim();}catch{}
+    return id&&(readJson('crp-projects',[])||[]).some(x=>String(x?.id??'')===id)?id:'';
+  }
+  // SRP song (other than the open one) that a CRP project is linked to, or null.
+  function otherSongLinkedTo(crpId){
+    const rec=links()[String(crpId||'')];
+    const sid=String(rec?.srpProjectId||'');
+    if(!sid||sid===String(state.project?.id||''))return null;
+    const song=libraryProject(sid);
+    return {id:sid,name:String(song?.name||rec.srpName||'').trim()||'another song'};
+  }
   function refreshCrpLinkUi(){
     const rec=persistentLinkForSrpProject(state.project,false);
-    const payload=rec?null:crpPayloadFor('');
     const st=document.getElementById('crpSrpLinkStatus');
     const b=document.getElementById('crpSrpLinkBtn');
     if(!b&&!st)return;
-    if(!rec&&!payload?.crpProjectId){
-      if(st)st.textContent='Save this CRP project first';
-      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});b.classList.remove('is-linked');b.title='Link this project to Song Rider Pro';}
-      return;
-    }
     const crpName=rec?crpProjectNameForLink(rec.crpProjectId,null):'';
-    if(st)st.textContent=rec?`Linked • ${crpName}`:'Not linked';
+    const openId=rec?'':openCrpProjectId();
+    if(st)st.textContent=rec?`Linked • ${crpName}`:(openId?'Not linked':'No Chord Rider project is open');
     if(b){
       b.disabled=false;
       setCrpLinkButtonContent(b,{linked:!!rec,name:crpName});
-      b.title=rec?`Unlink this SRP project from ${crpName}`:'Link this SRP project to the CRP/Baby DAW project currently open';
+      b.title=rec?`Unlink this song from ${crpName}`:(openId?`Link this song to the Chord Rider / Baby DAW project open now (${crpProjectNameForLink(openId,null)})`:'Choose a Chord Rider / Baby DAW project to link this song to');
       b.classList.toggle('is-linked',!!rec);
     }
   }
@@ -16892,39 +16992,199 @@ function applyKeyboardDockLayout(){
     setActiveLinkId('');
     refreshCrpLinkUi();
     renderSheetTitleBar();
+    return crpId?crpProjectNameForLink(crpId,null):'';
   }
-  // forceCreate: the user tapped Link SRP. Otherwise refresh the open song from its saved partner.
-  function syncFromHandoff(forceCreate=false){
-    const savedRec=persistentLinkForSrpProject(state.project,false);
-    const payload=crpPayloadFor(forceCreate?'':(savedRec?.crpProjectId||''));
+  // The user chose a CRP / Baby DAW project: link the song on screen to it (one-to-one; a song
+  // previously linked to that project is detached). Its chords are merged into PAGE 1 (undoable)
+  // and the pair shares BPM / capo / step / key from now on.
+  function linkToCrpProject(crpId){
+    const id=String(crpId||'');
+    if(!state.project)return {ok:false,error:'Open a song first, then tap Link SRP.'};
+    const payload=id?crpPayloadFor(id):null;
+    if(!payload?.crpProjectId||String(payload.crpProjectId)!==id)return {ok:false,error:'That Chord Rider project is not on this device any more. Open it in Chord Rider, then tap Link SRP again.'};
+    const moved=otherSongLinkedTo(id);
+    const wasOpenInCrp=openCrpProjectId();
+    const linked=importCrpStructure(payload,true);
+    if(!linked)return {ok:false,error:'Linking failed. Tap Link SRP to try again.'};
+    const all=links();
+    const rec={srpProjectId:linked.id,srpName:linked.name||payload.name||'Song Rider project',linkedAt:Date.now()};
+    all[id]=rec;
+    setLinks(all);
+    writeLinkSession(id,linked.id);
+    setActiveLinkId(id);
+    writeJson(HANDOFF_KEY,{payload,rec,ts:Date.now()});
+    // Chord Rider had nothing open: open the linked project there next time (never over unsaved work).
+    if(!wasOpenInCrp){
+      let draft=null;
+      try{draft=localStorage.getItem('crp-unsaved-draft-v1');}catch{}
+      if(!draft){try{localStorage.setItem('crp-active-project-id',id);}catch{}}
+    }
+    // Seed the shared transport from the just-linked song so both apps start from the same values.
+    publishSrpTransport();
+    ensureLinkedPlaybackBridge();
+    refreshCrpLinkUi();
+    renderSheetTitleBar();
+    return {ok:true,name:crpProjectNameForLink(id,payload),moved};
+  }
+
+  // ---------------------------------------------------------------- link feedback
+  // The old status line (#crpSrpLinkStatus) is hidden in the suite layout, so results are shown
+  // in a small notice: success fades after a few seconds, problems stay until dismissed.
+  let linkNoticeTimer=0;
+  function showLinkNotice(message,{sticky=false}={}){
+    let box=document.getElementById('srpLinkNotice');
+    if(!box){
+      box=document.createElement('div');
+      box.id='srpLinkNotice';
+      box.className='srpNotice';
+      box.setAttribute('role','status');
+      box.setAttribute('aria-live','polite');
+      const text=document.createElement('div');
+      text.className='srpNoticeText';
+      const ok=document.createElement('button');
+      ok.type='button';ok.className='srpNoticeClose';ok.textContent='OK';
+      ok.addEventListener('click',()=>{box.hidden=true;});
+      box.append(text,ok);
+      document.body.appendChild(box);
+    }
+    box.querySelector('.srpNoticeText').textContent=message;
+    box.hidden=false;
+    clearTimeout(linkNoticeTimer);
+    if(!sticky)linkNoticeTimer=setTimeout(()=>{box.hidden=true;},6000);
+  }
+  function runLink(crpId){
     const b=document.getElementById('crpSrpLinkBtn');
-    const st=document.getElementById('crpSrpLinkStatus');
-    if(!payload?.crpProjectId){
-      if(forceCreate){
-        if(st)st.textContent='No saved CRP project was handed off. Return to Chord Rider, save it once, then open Song Rider again.';
-        if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});}
+    if(b){b.disabled=true;setCrpLinkButtonContent(b,{busy:true});}
+    let result;
+    try{result=linkToCrpProject(crpId);}
+    catch(err){console.error('Linking to the Chord Rider project failed',err);result={ok:false,error:'Linking failed ('+(err?.message||err)+'). Tap Link SRP to try again.'};}
+    refreshCrpLinkUi();
+    const song=String(state.project?.name||'').trim()||'This song';
+    if(!result.ok){showLinkNotice(result.error,{sticky:true});return false;}
+    showLinkNotice(`“${song}” is linked to the Chord Rider / Baby DAW project “${result.name}”. Its chords are on PAGE 1 (Undo removes them) and BPM, capo and key now stay in sync.`+(result.moved?` “${result.moved.name}” is no longer linked to it.`:''));
+    return true;
+  }
+
+  // ---------------------------------------------------------------- project chooser
+  // Shown when Chord Rider has no project open (or the open one belongs to another song).
+  let linkChooser=null;
+  function chooserKeydown(e){if(e.key==='Escape'){e.preventDefault();closeLinkChooser();}}
+  function closeLinkChooser(){
+    if(!linkChooser)return;
+    linkChooser.remove();
+    linkChooser=null;
+    document.removeEventListener('keydown',chooserKeydown,true);
+    unlockBodyScroll();
+  }
+  function crpProjectsForLink(){
+    const openId=openCrpProjectId(),lastId=String(handoff()?.payload?.crpProjectId||'');
+    return (readJson('crp-projects',[])||[])
+      .filter(p=>p&&String(p.id??'')&&(!p.archived||String(p.id)===openId))
+      .map(p=>{
+        const id=String(p.id);
+        return {id,name:String(p.name||'').trim()||'Untitled',updatedAt:Number(p.updatedAt)||0,open:id===openId,last:id===lastId,linkedTo:otherSongLinkedTo(id)};
+      })
+      .sort((a,b)=>(b.open-a.open)||(b.last-a.last)||(b.updatedAt-a.updatedAt)||a.name.localeCompare(b.name));
+  }
+  function openChordRider(){
+    closeLinkChooser();
+    location.href=new URL(canonicalSuiteRoot()+'index.html?workspace=chord-rider',location.origin).href;
+  }
+  function openLinkChooser(){
+    closeLinkChooser();
+    const song=String(state.project?.name||'').trim()||'this song';
+    const items=crpProjectsForLink();
+    const modal=document.createElement('div');
+    modal.id='srpLinkChooser';
+    modal.className='archiveModal show';
+    modal.setAttribute('role','dialog');
+    modal.setAttribute('aria-modal','true');
+    modal.setAttribute('aria-labelledby','srpLinkChooserTitle');
+    const card=document.createElement('div');
+    card.className='archiveCard';
+    // Same look as the app's other pickers; the text colour is set here because the dark skins
+    // give modal text a light colour (skins that restyle .archiveCard still win: no !important).
+    card.style.cssText='background:#15191f;color:#f4f0e7;border:1px solid rgba(233,196,106,.55);';
+    const head=document.createElement('div');
+    head.className='archiveHead';
+    const title=document.createElement('div');
+    title.className='archiveTitle';title.id='srpLinkChooserTitle';
+    title.textContent='Link to a Chord Rider / Baby DAW project';
+    const close=document.createElement('button');
+    close.type='button';close.className='authClose';close.setAttribute('aria-label','Close');close.textContent='×';
+    close.addEventListener('click',closeLinkChooser);
+    head.append(title,close);
+    const intro=document.createElement('div');
+    intro.className='archiveControls srpLinkChooserIntro';
+    intro.style.cssText='display:block;font-size:14px;font-weight:800;line-height:1.35;';
+    const signedIn=typeof cloudSignedIn==='function'&&cloudSignedIn();
+    const openItem=items.find(it=>it.open);
+    const why=openItem?.linkedTo?`“${openItem.name}”, open in Chord Rider, is linked to “${openItem.linkedTo.name}”; picking it moves the link to this song.`:'Chord Rider has no project open right now.';
+    intro.textContent=items.length
+      ?`${why} Pick the project to link with “${song}”. Its chords go onto PAGE 1 (your lyrics stay; Undo removes them) and BPM, capo and key stay in sync.`
+      :`There are no Chord Rider / Baby DAW projects on this device yet. Open Chord Rider, build or open a project and save it, then come back to “${song}” and tap Link SRP.`+(signedIn?' Projects saved in your account download when Chord Rider opens.':'');
+    const list=document.createElement('div');
+    list.className='archiveList';
+    if(items.length){
+      for(const it of items){
+        const row=document.createElement('button');
+        row.type='button';row.className='archiveRow srpLinkChoice';row.dataset.crpProjectId=it.id;
+        const name=document.createElement('span');
+        name.className='archiveRowName';name.textContent=it.name;
+        const meta=document.createElement('span');
+        meta.className='archiveRowMeta';
+        meta.textContent=[it.open?'Open in Chord Rider':(it.last?'Last opened':''),it.linkedTo?`Linked to “${it.linkedTo.name}”`:''].filter(Boolean).join(' · ');
+        row.append(name,meta);
+        row.addEventListener('click',()=>{closeLinkChooser();runLink(it.id);});
+        list.appendChild(row);
       }
-      return null;
+    }else{
+      const empty=document.createElement('div');
+      empty.className='archiveEmpty';
+      empty.textContent='No Chord Rider projects yet';
+      list.appendChild(empty);
     }
-    if(!forceCreate&&(!savedRec||!state.project||String(savedRec.srpProjectId||'')!==String(state.project.id||''))){refreshCrpLinkUi();return null;}
-    const linked=importCrpStructure(payload,forceCreate);
-    if(!linked){
-      if(st)st.textContent='Link failed — tap Link SRP to try again.';
-      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});}
-      return null;
+    const foot=document.createElement('div');
+    foot.className='archiveControls srpLinkChooserActions';
+    const cancel=document.createElement('button');
+    cancel.type='button';cancel.className='authBtn secondary';cancel.textContent='Cancel';
+    cancel.addEventListener('click',closeLinkChooser);
+    const crp=document.createElement('button');
+    crp.type='button';crp.className='authBtn';crp.textContent='Open Chord Rider';
+    crp.addEventListener('click',openChordRider);
+    foot.append(cancel,crp);
+    card.append(head,intro,list,foot);
+    modal.appendChild(card);
+    modal.addEventListener('click',e=>{if(e.target===modal)closeLinkChooser();});
+    document.body.appendChild(modal);
+    linkChooser=modal;
+    lockBodyScroll();
+    wireModalInnerScroller(modal,list);
+    document.addEventListener('keydown',chooserKeydown,true);
+    try{(list.querySelector('button')||crp).focus({preventScroll:true});}catch{}
+  }
+  // Link SRP / Unlink SRP button.
+  function onLinkButton(){
+    if(!state.project){showLinkNotice('Open a song first, then tap Link SRP.',{sticky:true});return;}
+    if(persistentLinkForSrpProject(state.project,false)){
+      const name=unlinkCurrentCrpSrp();
+      showLinkNotice(`“${String(state.project?.name||'').trim()||'This song'}” is no longer linked${name?` to “${name}”`:''}. Its lyrics and chords stay as they are.`);
+      return;
     }
-    if(forceCreate){
-      const all=links();
-      const rec={srpProjectId:linked.id,srpName:linked.name||payload.name||'Song Rider project',linkedAt:Date.now()};
-      all[payload.crpProjectId]=rec;
-      setLinks(all);
-      writeLinkSession(payload.crpProjectId,linked.id);
-      setActiveLinkId(payload.crpProjectId);
-      writeJson(HANDOFF_KEY,{payload,rec,ts:Date.now()});
-      // Seed the shared transport from the just-linked song so both apps start from the same values.
-      publishSrpTransport();
-      ensureLinkedPlaybackBridge();
-    }
+    // The project open in Chord Rider / Baby DAW is linked straight away, unless it already
+    // belongs to another song: then the user picks (so a link is never moved by surprise).
+    const openId=openCrpProjectId();
+    if(openId&&!otherSongLinkedTo(openId)){runLink(openId);return;}
+    openLinkChooser();
+  }
+  // Background refresh of the open song from its saved CRP partner (storage event, focus,
+  // startup). Linking itself only happens from the button (linkToCrpProject).
+  function syncFromHandoff(){
+    const savedRec=persistentLinkForSrpProject(state.project,false);
+    if(!savedRec||!state.project||String(savedRec.srpProjectId||'')!==String(state.project.id||'')){refreshCrpLinkUi();return null;}
+    const payload=crpPayloadFor(savedRec.crpProjectId);
+    if(!payload?.crpProjectId)return null;
+    const linked=importCrpStructure(payload,false);
     refreshCrpLinkUi();
     return linked;
   }
@@ -16994,7 +17254,7 @@ function applyKeyboardDockLayout(){
   // ---------------------------------------------------------------- wiring
   function reconcileLinkedWorkspace(){
     activateLinkForCurrentSrpProject();
-    syncFromHandoff(false);
+    syncFromHandoff();
     applyCrpMetaToSrp();
     if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}
   }
@@ -17002,24 +17262,19 @@ function applyKeyboardDockLayout(){
   document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{
     e.preventDefault();
     e.stopPropagation();
-    const b=e.currentTarget;
-    b.disabled=true;
-    if(persistentLinkForSrpProject(state.project,false)){
-      b.textContent='Unlinking…';
-      unlinkCurrentCrpSrp();
-      return;
+    try{onLinkButton();}
+    catch(err){
+      console.error('Link SRP failed',err);
+      refreshCrpLinkUi();
+      showLinkNotice('Link SRP failed ('+(err?.message||err)+'). Tap it to try again.',{sticky:true});
     }
-    setCrpLinkButtonContent(b,{busy:true});
-    const st=document.getElementById('crpSrpLinkStatus');
-    if(st)st.textContent='Linking CRP project…';
-    setTimeout(()=>syncFromHandoff(true),0);
   });
   if(transportChannel)transportChannel.onmessage=()=>applyCrpMetaToSrp();
   window.addEventListener('storage',e=>{
     const k=String(e.key||'');
     if(k===TRANSPORT_KEY||k.startsWith(CANONICAL_PREFIX)||k===LEGACY_LIVE_META_KEY||k.startsWith(LEGACY_UNIFIED_PREFIX)||k===LEGACY_HARD_SYNC_KEY||k.startsWith(SHARED_META_PREFIX)){applyCrpMetaToSrp();return;}
     if(k===LINKS_KEY||k===LINK_SESSION_KEY){refreshCrpLinkUi();renderSheetTitleBar();return;}
-    if(k==='crp-projects'||k===HANDOFF_KEY)syncFromHandoff(false); // CRP rows may have changed
+    if(k==='crp-projects'||k===HANDOFF_KEY)syncFromHandoff(); // CRP rows may have changed
   });
   const onAppReady=()=>{
     reconcileLinkedWorkspace();
