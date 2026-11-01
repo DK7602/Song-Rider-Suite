@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.4.1 — new look, Link SRP, dictation, drums
+
+### New look
+- **New Song Rider Suite logo** (gold rider and sound wave in a gold ring): app icon on phones,
+  tablets and computers, the splash screen when the installed app opens, a short loading screen
+  the first time the suite opens in a visit, Chord Rider PDF/PNG exports and the lock-screen
+  media controls.
+- **Gold module icons** on the Chord Rider, Baby DAW and Song Rider buttons in every skin.
+- All the old skull art is gone (stickers, icons, Baby DAW button art, skeleton horses).
+- On phones the Song Rider Suite banner spans the whole top line, and the Chord Rider Pro / Song
+  Rider Pro titles fill their row up to the Hide button.
+
+### Fixes
+- **Link SRP works again in every situation.** With a Chord Rider project open it links at once;
+  with none open it lists your Chord Rider projects to pick from (or explains how to make one);
+  it asks before moving a link that belongs to another song; tapping it on a linked song unlinks.
+- **Speech-to-text works when signed in on a phone.** The microphone permission prompt and cloud
+  refreshes no longer silently end dictation, a silent microphone is reported, and the mic button
+  no longer sits under the round "R" button.
+- **Track Master drums stay in.** Editing a drum region during playback no longer stops the drums
+  for good; drums no longer drift on every repeat when the song end isn't on the beat grid; drums
+  switched on mid-song start on the beat; Stop, Pause and seeking silence drums already queued.
+  (These problems existed in v3.3 too.)
+
 ## v3.4.0 — reliability release
 
 The theme of this release: **your work is never silently lost**, plus the musical fixes musicians
