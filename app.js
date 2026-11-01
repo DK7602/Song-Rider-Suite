@@ -487,22 +487,29 @@
       return ctx;
     }
     function safetyClipCurve(){
-      // Unity gain up to 0.8, then a smooth knee that never exceeds full scale.
+      // Unity gain up to 0.9, then a smooth knee that never exceeds full scale.
       const n=2048,curve=new Float32Array(n);
-      for(let i=0;i<n;i++){const x=i/(n-1)*2-1,a=Math.abs(x);curve[i]=Math.sign(x)*(a<=.8?a:.8+.2*Math.tanh((a-.8)/.2));}
+      for(let i=0;i<n;i++){const x=i/(n-1)*2-1,a=Math.abs(x);curve[i]=Math.sign(x)*(a<=.9?a:.9+.1*Math.tanh((a-.9)/.1));}
       return curve;
     }
+    // Loudness. The SoundFont instruments and drum samples are recorded quietly: a full mix
+    // used to peak around -15 dBFS and average about -32 dBFS, so phones sounded faint and half
+    // volume was nearly silent. The master now drives the mix up, glues it with gentle
+    // compression and limits peaks just under full scale (no clipping). Also used by exports.
+    const DRIVE_DB=17,GLUE={threshold:-22,knee:12,ratio:2.5,attack:.012,release:.25},LIMIT={threshold:-1.5,knee:0,ratio:20,attack:.002,release:.12},TRIM=1;
+    function buildMaster(c,destination=c.destination){
+      const drive=c.createGain(),glue=c.createDynamicsCompressor(),limiter=c.createDynamicsCompressor(),trim=c.createGain(),clip=c.createWaveShaper();
+      drive.gain.value=Math.pow(10,DRIVE_DB/20);
+      for(const [node,cfg] of [[glue,GLUE],[limiter,LIMIT]])for(const k of Object.keys(cfg))node[k].value=cfg[k];
+      trim.gain.value=TRIM;clip.curve=safetyClipCurve();clip.oversample='2x';
+      drive.connect(glue);glue.connect(limiter);limiter.connect(trim);trim.connect(clip);clip.connect(destination);
+      return drive;
+    }
     function master(){
-      if(input)return input;
-      const c=context();
-      input=c.createGain();
-      const limiter=c.createDynamicsCompressor();
-      limiter.threshold.value=-3;limiter.knee.value=0;limiter.ratio.value=20;limiter.attack.value=.003;limiter.release.value=.12;
-      const clip=c.createWaveShaper();clip.curve=safetyClipCurve();clip.oversample='2x';
-      input.connect(limiter);limiter.connect(clip);clip.connect(c.destination);
+      if(!input)input=buildMaster(context());
       return input;
     }
-    return {context,master};
+    return {context,master,buildMaster};
   })();
   window.CRPAudio=CRPAudio;
 

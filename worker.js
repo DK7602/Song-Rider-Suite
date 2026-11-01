@@ -193,7 +193,7 @@ async function api(request, env, url) {
   const path = url.pathname, method = request.method;
 
   if (path === '/api/health') {
-    try { const r = await env.DB.prepare('SELECT 1 ok').first(); return json({ ok: r?.ok === 1, app: 'Song Rider Suite', database: 'connected' }); }
+    try { const r = await env.DB.prepare('SELECT 1 ok').first(); return json({ ok: r?.ok === 1, app: 'Song Rider Suite', database: 'connected', speech: !!env.AI, mediaStorage: !!env.AUDIO }); }
     catch (e) { console.error('Health check failed', e); return json({ ok: false, error: 'Database unavailable.' }, 500); }
   }
   if (path === '/api/auth/me' && method === 'GET') { const u = await userFor(request, env); return json({ ok: true, user: u }); }
@@ -367,7 +367,11 @@ async function api(request, env, url) {
         initial_prompt: dictationPrompt(request, url),
       });
       return json({ ok: true, text: String(result?.text || result?.transcription_info?.text || '').trim() });
-    } catch (e) { console.error('Lyric dictation failed', e); return json({ ok: false, error: 'Speech transcription failed. Please retry.' }, 502); }
+    } catch (e) {
+      console.error('Lyric dictation failed', e);
+      // The model's own message (e.g. an input-validation error) is shown so a failure can be diagnosed from the phone.
+      return json({ ok: false, error: `Speech transcription failed (${String(e?.message || e).slice(0, 160)}). Please retry.` }, 502);
+    }
   }
 
   // ---------------------------------------------------------------- vocal take transcription

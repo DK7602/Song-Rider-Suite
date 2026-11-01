@@ -1694,6 +1694,9 @@
   function createMixOutput(ctx,sharedMaster=null){
     const input=ctx.createGain();input.gain.value=MIX_HEADROOM;
     if(sharedMaster&&sharedMaster.context===ctx){input.connect(sharedMaster);return input;}
+    // Offline export: the suite's loudness master (drive, glue, limiter) so the WAV
+    // sounds as loud as playback.
+    if(typeof window.CRPAudio?.buildMaster==='function'){input.connect(window.CRPAudio.buildMaster(ctx));return input;}
     // Safety stage: a fast compressor, then a soft clipper that is transparent
     // below 0.8 and never reaches full scale.
     const comp=ctx.createDynamicsCompressor(),pre=ctx.createGain(),clip=ctx.createWaveShaper();
