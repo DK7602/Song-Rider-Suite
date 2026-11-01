@@ -1897,7 +1897,8 @@
     document.body.appendChild(modal);
     const close=()=>{modal.hidden=true;modal._continue=null;};
     modal.querySelector('[data-cancel]').onclick=close;modal.querySelector('.unsaved-project-backdrop').onclick=close;
-    modal.querySelector('[data-continue]').onclick=()=>{const fn=modal._continue;close();clearTimeout(autoSaveTimer);autoSaveTimer=null;clearDraft();unsavedProjectTouched=false;fn?.();};
+    // "Continue Without Saving" discards the unsaved work (editor and draft slot).
+    modal.querySelector('[data-continue]').onclick=()=>{const fn=modal._continue;close();clearDraft();resetEditorToBlank();fn?.();};
     modal.querySelector('[data-save]').onclick=async()=>{
       const saveBtn=modal.querySelector('[data-save]'),buttons=[...modal.querySelectorAll('button')],name=modal.querySelector('#unsavedProjectNameInput')?.value.trim();if(name&&$('projectName'))$('projectName').value=name;
       buttons.forEach(b=>b.disabled=true);saveBtn.textContent='Saving…';
@@ -2681,9 +2682,10 @@
 
   function performOpenSongRiderWorkspace(){
     try{
-      // Persist the editor before leaving CRP so SRP reads current data and CRP
-      // restores the same project on return.
-      flushAutoSaveNow();
+      // Persist the open project before leaving CRP so SRP reads current data and CRP
+      // restores it on return. (Unsaved work only reaches this point after the user
+      // chose "Continue Without Saving", so it is not written back to the draft slot.)
+      if(state.currentProjectId)flushAutoSaveNow();
       publishLiveSrpMeta('crp');
       writeHardSync('crp');
       const payload=srpPayload();
