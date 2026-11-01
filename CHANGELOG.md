@@ -23,6 +23,18 @@
   for good; drums no longer drift on every repeat when the song end isn't on the beat grid; drums
   switched on mid-song start on the beat; Stop, Pause and seeking silence drums already queued.
   (These problems existed in v3.3 too.)
+- **Changing drum volume can no longer erase drums.** The Track Master drum volume, Mute/Solo and
+  Drums switch (and Chord Rider's drum Vol slider and Drums box) used to rewrite the whole drum
+  pattern from Beat Maker's copy; on songs where that copy was blank or different, one volume
+  drag wiped the drums and saved it to the cloud. They now change only volume/mute/solo. Two other
+  drum-erasing paths (an unrelated Track Master edit, Chord Rider Undo) are fixed too.
+- **Much louder playback.** The sounds are recorded quietly and nothing boosted them (a full mix
+  averaged about -32 dBFS). A loudness stage (drive, gentle compression, limiter) now brings the
+  whole suite and WAV exports to normal music loudness (about -15 dBFS) without distortion.
+- **Dictation in noisy rooms.** Phone microphones boost background noise, so dictation never
+  found a pause and sent nothing while you talked. Pause detection now follows the room's noise
+  level, a live level meter shows the mic is hearing you, and a blocked microphone explains how
+  to allow it.
 
 ## v3.4.0 — reliability release
 
