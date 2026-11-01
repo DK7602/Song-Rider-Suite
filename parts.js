@@ -2843,7 +2843,15 @@
     const inst=voxInstrumentSelectionList()[0]||null,instList=voxInstrumentSelectionList();
     const ids=['voxFxVolume','voxFxEq','voxFxComp','voxFxReverb','voxFxDelay','voxFxAutotune','voxFxTarget','voxResetEventFxBtn'];
     const instrumentEditing=!!(inst||voxInstrumentTrackFocus);
-    setVoxInspectorCollapsed(voxInspectorManualOverride===null?instrumentEditing:voxInspectorManualOverride);
+    // With no vocal track there is nothing for the effects panel to edit; keep it out
+    // of the way (on phones it otherwise covers half the timeline) unless the user chose.
+    const nothingToEdit=!instrumentEditing&&!voxTargetPart();
+    setVoxInspectorCollapsed(voxInspectorManualOverride===null?(instrumentEditing||nothingToEdit):voxInspectorManualOverride);
+    if(nothingToEdit){
+      if($('voxInspectorTitle'))$('voxInspectorTitle').textContent='Track Effects';
+      if($('voxInspectorMeta'))$('voxInspectorMeta').textContent='Add a Vocal Track (track ⋮ menu) to use vocal effects.';
+      ids.forEach(id=>{if($(id))$(id).disabled=true;});
+    }
     if(instrumentEditing){
       const focusName=inst?instrumentalSelectionDescription():(voxInstrumentTrackFocus?.name||'Instrument track'),rangeReady=!!voxRangeResolved();
       if($('voxInspectorTitle'))$('voxInspectorTitle').textContent=inst?'Instrument Event':'Instrument Track';
