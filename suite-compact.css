@@ -16,8 +16,10 @@
     min-height:0!important;height:auto!important;padding:3px 8px!important;
     display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
   }
+  /* The banner artwork (gold lettering with full-width light rails) spans the whole top line. */
+  :root[data-skin][data-skin-choice] .suite-master-header:has(>img:not([hidden])){padding:0!important;}
   :root[data-skin][data-skin-choice] .suite-master-header>img{
-    width:auto!important;max-width:100%!important;height:34px!important;object-fit:contain!important;margin:0 auto!important;
+    width:100%!important;max-width:100%!important;height:auto!important;max-height:none!important;object-fit:contain!important;margin:0!important;
   }
   :root[data-skin][data-skin-choice] .suite-master-header::before{font-size:1.15rem!important;letter-spacing:.05em!important;}
   :root[data-skin][data-skin-choice] .suite-master-header::after{display:none!important;}
@@ -53,13 +55,22 @@
   /* App wordmarks: Chord Rider Pro (root page) and Song Rider Pro (SRP). */
   /* Vertical spacing only: light skins draw the title as a full-bleed band with side margins. */
   :root[data-skin][data-skin-choice] .workspace-chord-rider .crp-pro-titlebar{margin-bottom:10px!important;padding-bottom:8px!important;}
+  /* The wordmark fills the row up to the Hide button. */
+  :root[data-skin][data-skin-choice] .workspace-chord-rider .crp-pro-titlebar{display:flex!important;align-items:center!important;gap:10px!important;}
   :root[data-skin][data-skin-choice] .workspace-chord-rider .crp-pro-titlebar .crp-pro-wordmark-img{
-    width:auto!important;max-width:100%!important;height:30px!important;
+    flex:1 1 0!important;min-width:0!important;width:0!important;max-width:none!important;height:auto!important;max-height:48px!important;
+    object-fit:contain!important;object-position:left center!important;
   }
+  :root[data-skin][data-skin-choice] .workspace-chord-rider .crp-pro-titlebar .crp-controls-toggle{flex:0 0 auto!important;}
   :root[data-skin][data-skin-choice] .workspace-chord-rider .crp-pro-titlebar .crp-controls-toggle{height:34px!important;min-height:34px!important;max-height:34px!important;}
+  :root[data-skin][data-skin-choice] body header .panel .panelTop{display:flex!important;align-items:center!important;gap:10px!important;}
+  :root[data-skin][data-skin-choice] body header .panel .panelTop>div:first-child{flex:1 1 0!important;min-width:0!important;}
+  :root[data-skin][data-skin-choice] body header .panel .panelTop .left{flex:1 1 0!important;min-width:0!important;width:100%!important;max-width:none!important;}
   :root[data-skin][data-skin-choice] body header .panel .panelTop .left .srp-exact-wordmark{
-    width:auto!important;max-width:100%!important;height:30px!important;max-height:30px!important;
+    display:block!important;width:100%!important;max-width:100%!important;height:auto!important;max-height:48px!important;
+    object-fit:contain!important;object-position:left center!important;
   }
+  :root[data-skin][data-skin-choice] body header .panel .panelTop #togglePanelBtn{flex:0 0 auto!important;}
 }
 @media (max-width:360px){
   /* Very narrow phones: the tab names need the icon's room. */
