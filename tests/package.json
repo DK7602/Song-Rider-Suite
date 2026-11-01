@@ -1,0 +1,15 @@
+{
+  "name": "song-rider-suite-tests",
+  "private": true,
+  "type": "module",
+  "description": "Automated tests for Song Rider Suite. Kept in tests/ so the app itself stays build-free.",
+  "scripts": {
+    "test": "node run.mjs",
+    "test:api": "node run.mjs api",
+    "test:e2e": "node run.mjs e2e"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0",
+    "wrangler": "^4.156.0"
+  }
+}
