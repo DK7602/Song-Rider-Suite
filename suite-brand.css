@@ -1,0 +1,36 @@
+/* Song Rider Suite — gold module icons.
+   Every skin shows the same 24k gold icon + name on the Chord Rider / Baby DAW / Song Rider
+   buttons (the skull stickers and per-skin line icons are retired). Loaded after skins.css and
+   before suite-compact.css on both pages. Rules are scoped with :root[data-skin][data-skin-choice]
+   so they outrank the skin sheets' !important rules by specificity. */
+:root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn :is(.mode-art,.baby-exact-art){display:none!important;}
+:root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn{
+  display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;gap:14px!important;
+}
+:root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .srs-theme-mode-icon{
+  display:grid!important;place-items:center!important;flex:0 0 72px!important;width:72px!important;height:72px!important;
+  padding:0!important;margin:0!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;
+  position:relative!important;z-index:2;
+}
+:root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .srs-theme-mode-icon img{
+  display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));
+}
+:root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn :is(.mode-copy,.srs-theme-mode-copy){
+  display:flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:center!important;
+  position:relative!important;inset:auto!important;transform:none!important;z-index:2;min-width:0;text-align:left!important;
+}
+@media (min-width:601px) and (max-width:900px){
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn{gap:10px!important;}
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .srs-theme-mode-icon{flex-basis:76px!important;width:76px!important;height:76px!important;}
+}
+/* Desktop/tablet: cards were sized for the old full-height stickers; size them to the icon instead. */
+@media (min-width:601px){
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn{
+    aspect-ratio:auto!important;height:auto!important;min-height:0!important;max-height:none!important;padding:18px 22px!important;
+  }
+}
+@media (min-width:901px){
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn{gap:20px!important;}
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .srs-theme-mode-icon{flex-basis:104px!important;width:104px!important;height:104px!important;}
+  :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn :is(.mode-copy,.srs-theme-mode-copy) strong{white-space:nowrap!important;}
+}

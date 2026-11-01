@@ -1,9 +1,10 @@
-const CACHE = 'song-rider-suite-v3.4.0';
+const CACHE = 'song-rider-suite-v3.4.1';
 // Precached so the whole suite opens offline. Everything else is cached the first time it loads.
 const ASSETS = [
   './','./index.html','./manifest.webmanifest',
   './app.js','./parts.js','./beat-maker.js','./scale-rider.js','./skins.js','./vocal-autotune-worklet.js',
-  './styles.css','./scale-rider.css','./crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css','./skins.css','./suite-compact.css',
+  './styles.css','./scale-rider.css','./crp-layout-lock.css','./suite-shell-lock.css','./branding-shell.css','./suite-header.css','./skins.css','./suite-brand.css','./suite-compact.css',
+  './assets/brand/icon-chord-rider-pro-256.webp','./assets/brand/icon-baby-daw-256.webp','./assets/brand/icon-song-rider-pro-256.webp',
   './vendor/soundfont-player.js','./vendor/html2canvas.min.js','./vendor/jspdf.umd.min.js',
   './assets/rider-blood-light-pattern.jpg','./assets/light-diamond-pattern.jpg','./assets/studio-pastel-pattern.jpg','./assets/rider-dark-gold-pattern.jpg','./assets/rider-og-pattern.jpg','./assets/rider-blood-pattern.jpg','./assets/rider-light-og-pattern.jpg','./assets/rider-blood-light-og-pattern.jpg','./assets/sapphire-paisley-dark.jpg','./assets/sapphire-paisley-light.jpg',
   './assets/suite-header-new.webp','./assets/chord-rider-pro-wordmark-hq2.webp','./assets/baby-daw-button-hq.webp','./assets/baby-daw-button-hq-rider-blood-light-active.webp',

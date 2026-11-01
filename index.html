@@ -36,7 +36,8 @@
     }
   </style>
   <link rel="stylesheet" href="skins.css?v=3.4.0" />
-  <link rel="stylesheet" href="suite-compact.css?v=3.4.0" />
+  <link rel="stylesheet" href="suite-brand.css?v=3.4.1" />
+  <link rel="stylesheet" href="suite-compact.css?v=3.4.1" />
 </head>
 <body>
   <div id="saveProblemBanner" class="save-problem-banner" role="alert" hidden><span data-save-problem-text></span><button id="saveRetryBtn" type="button">Retry</button></div>
@@ -45,14 +46,15 @@
 
   <nav id="workspaceModeSwitch" class="workspace-mode-switch" aria-label="Workspace mode">
     <button id="chordRiderModeBtn" class="workspace-mode-btn active" type="button" data-workspace-mode="chord-rider" aria-pressed="true">
-      <span class="mode-art rider-mode-art"><img src="assets/crp-rider-bones-sticker.webp?v=3.0.1" alt="" /></span>
+      <span class="srs-theme-mode-icon srs-theme-mode-icon-chord" aria-hidden="true"><img src="assets/brand/icon-chord-rider-pro-256.webp?v=3.4.0" alt="" decoding="async" draggable="false"></span>
       <span class="mode-copy"><strong>Chord Rider</strong><small>Chords + Beat</small></span>
     </button>
     <button id="babyDawModeBtn" class="workspace-mode-btn" type="button" data-workspace-mode="baby-daw" aria-pressed="false" aria-label="Baby DAW">
-      <span class="baby-exact-art" aria-hidden="true"><img src="assets/baby-daw-button-hq.webp?v=3.3.12" alt=""></span>
+      <span class="srs-theme-mode-icon srs-theme-mode-icon-daw" aria-hidden="true"><img src="assets/brand/icon-baby-daw-256.webp?v=3.4.0" alt="" decoding="async" draggable="false"></span>
+        <span class="mode-copy"><strong>Baby DAW</strong><small>Lead, Bass, Vocals</small></span>
     </button>
     <button id="songRiderModeBtn" class="workspace-mode-btn" type="button" data-workspace-mode="song-rider" aria-pressed="false">
-      <span class="mode-art song-mode-art" aria-hidden="true"><img src="assets/srp-rider-bones-sticker.webp?v=3.0.1" alt="" /></span>
+      <span class="srs-theme-mode-icon srs-theme-mode-icon-song" aria-hidden="true"><img src="assets/brand/icon-song-rider-pro-256.webp?v=3.4.0" alt="" decoding="async" draggable="false"></span>
       <span class="mode-copy"><strong>Song Rider</strong><small>Lyrics + Flow</small></span>
     </button>
   </nav>

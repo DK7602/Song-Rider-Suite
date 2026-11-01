@@ -35,7 +35,7 @@
   }
   :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn :is(.mode-art,.baby-exact-art){display:none!important;}
   :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .srs-theme-mode-icon{
-    flex:0 0 26px!important;width:26px!important;height:26px!important;padding:4px!important;border-radius:8px!important;
+    flex:0 0 30px!important;width:30px!important;height:30px!important;padding:0!important;border-radius:0!important;
   }
   :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .mode-copy{
     display:flex!important;position:static!important;flex:0 1 auto!important;min-width:0!important;
