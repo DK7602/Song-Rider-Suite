@@ -58,16 +58,22 @@ const GENERATED = {
 };
 const generatedFiles = new Map();
 for (const [id, g] of Object.entries(GENERATED)) {
-  generatedFiles.set(`${id}/manifest.json`, Buffer.from(JSON.stringify({ id, name: `${id} (generated test set)`, license: 'test data', samples: g.notes.map(m => ({ midi: m, file: `n${m}.wav`, vel: 100, loopStart: g.loop ? g.loop(m)[0] : null, loopEnd: g.loop ? g.loop(m)[1] : null })), release: g.release, sustained: g.sustained, gain: 1 })));
+  generatedFiles.set(`${id}/manifest.json`, Buffer.from(JSON.stringify({ id, name: `${id} (generated test set)`, license: 'test data', samples: g.notes.map(m => ({ midi: m, file: `n${m}.wav`, vel: 100, loopStart: g.loop ? g.loop(m)[0] : null, loopEnd: g.loop ? g.loop(m)[1] : null, frames: g.make(m).length })), release: g.release, sustained: g.sustained, sampleRate: 44100 })));
   for (const m of g.notes) generatedFiles.set(`${id}/n${m}.wav`, wav(g.make(m)));
 }
 // marimba is listed but its files are broken: the engine must fall back to the SoundFont.
 generatedFiles.set('marimba/manifest.json', Buffer.from(JSON.stringify({ id: 'marimba', samples: [{ midi: 60, file: 'missing.mp3' }], release: .3 })));
 const fixtureIds = ['acoustic_grand_piano', ...Object.keys(GENERATED), 'marimba'];
+// Sets listed by the INSTRUMENT_SETS library (assets/instruments/index.json lists them under "delivered").
+const EXTRA_IDS = (() => {
+  if (!EXTRA || !existsSync(join(EXTRA, 'index.json'))) return [];
+  const x = JSON.parse(readFileSync(join(EXTRA, 'index.json'), 'utf8'));
+  return [...(Array.isArray(x) ? x : x.instruments || x.delivered || x.ids || [])].map(v => typeof v === 'string' ? v : v.id);
+})();
 function serveFixture(rel) {
   if (rel === 'index.json') {
     const ids = new Set(fixtureIds);
-    if (EXTRA && existsSync(join(EXTRA, 'index.json'))) for (const id of JSON.parse(readFileSync(join(EXTRA, 'index.json'), 'utf8')).instruments || []) ids.add(id);
+    for (const id of EXTRA_IDS) ids.add(id);
     return { type: 'application/json', body: Buffer.from(JSON.stringify({ instruments: [...ids] })) };
   }
   for (const dir of [EXTRA, FIXTURES].filter(Boolean)) {
@@ -94,6 +100,7 @@ const SOUNDFONT = (() => {
 // Page-side helpers: oscillator counting, graph reachability, offline renders and analysis.
 const PAGE_LIB = `(() => {
   window.CRP_INSTRUMENTS_CONFIG = { basePath: '/__fixtures__/instruments/' };
+  window.__extraLibrary = ${EXTRA ? 'true' : 'false'};
   const edges = new Map(), connect = AudioNode.prototype.connect, disconnect = AudioNode.prototype.disconnect;
   AudioNode.prototype.connect = function (dest, ...rest) { const r = connect.call(this, dest, ...rest); if (dest instanceof AudioNode) { let s = edges.get(this); if (!s) edges.set(this, s = new Set()); s.add(dest); } return r; };
   AudioNode.prototype.disconnect = function (...a) { const r = disconnect.apply(this, a); if (a[0] instanceof AudioNode) edges.get(this)?.delete(a[0]); else if (a[0] === undefined || typeof a[0] === 'number') edges.delete(this); return r; };
@@ -110,7 +117,7 @@ const PAGE_LIB = `(() => {
   }
   // Renders the reference phrase (chord + melody) through the suite's real chain: bus at
   // soundOutputGain, then createInstrumentFxChain (wah / worm), measured before the master.
-  async function phrase(id, { master = false } = {}) {
+  async function phrase(id, { master = false, strum = 0 } = {}) {
     const sr = 48000, ctx = new OfflineAudioContext(2, Math.ceil(sr * 5.6), sr);
     const cap = ctx.createGain(); cap.connect(master ? window.CRPAudio.buildMaster(ctx) : ctx.destination);
     const fx = window.CRPCore.createInstrumentFxChain(ctx, cap); fx.setSound(id);
@@ -118,7 +125,7 @@ const PAGE_LIB = `(() => {
     const inst = await window.CRPCore.loadSoundfontInstrument(ctx, id, bus);
     bus.gain.value = window.CRPCore.soundOutputGain(id);
     const bass = window.CRPCore.isBassSound(id), chord = bass ? [48, 52, 55] : [60, 64, 67], mel = bass ? [52, 55, 57, 60, 55, 52, 50, 48] : [64, 67, 69, 72, 67, 64, 62, 60];
-    for (const m of chord) inst.play(name(m), .3, { duration: 1.6, gain: .95 });
+    chord.forEach((m, i) => inst.play(name(m), .3 + i * strum, { duration: 1.6, gain: .95 }));
     mel.forEach((m, i) => inst.play(name(m), 2.5 + i * .3, { duration: .28, gain: .92 }));
     const buf = await ctx.startRendering();
     return { buf, provider: window.CRPCore.instrumentProvider(id), kind: inst.kind || (inst.buffers ? 'soundfont' : '?') };
@@ -216,6 +223,14 @@ const EXPECT_KIND = {
   trumpet: 'sample', trombone: 'sample', french_horn: 'sample', brass_section: 'layered',
   ...Object.fromEntries(SYNTH.map(id => [id, 'synth'])),
 };
+// With a real library, every set it delivers plays from its own recordings.
+for (const id of EXTRA_IDS) EXPECT_KIND[id] = 'sample';
+// Sustained (looped) sets and a note inside each one's range.
+const LOOPED = EXTRA ? { trumpet: 67, trombone: 53, french_horn: 60, tuba: 41, flute: 76, tenor_sax: 55, alto_sax: 63 } : { trumpet: 67 };
+const GUITAR_TAB = new Set(GUITAR);
+const BETWEEN = { acoustic_grand_piano: 62, electric_grand_piano: 61, electric_piano_1: 63, electric_bass_finger: 40, acoustic_guitar_steel: 52, acoustic_guitar_nylon: 57, electric_guitar_clean: 55, tenor_sax: 58, alto_sax: 65, trumpet: 70, trombone: 52, french_horn: 63, tuba: 43, flute: 79, vibraphone: 66, marimba: 71 };
+// Real recordings loop near their end (about 3-5.7 s in), so they are held for 12 s to cross several loop wraps.
+const loopPlan = (id, plan) => LOOPED[id] ? (EXTRA ? { seconds: 14, notes: [[LOOPED[id], .1, 12]] } : { ...plan, notes: [[LOOPED[id], .1, 5]] }) : plan;
 // Levels are held to +-1.5 dB of the piano for voices made from real recordings or synthesized;
 // voices built on this test's generated sets only get a coarse check (their trims were measured on real sets).
 const GENERATED_BASED = new Set(['electric_guitar_clean', 'electric_guitar_jazz', 'electric_guitar_muted', 'overdriven_guitar', 'distortion_guitar', 'wah_wah_guitar', 'trumpet', 'trombone', 'french_horn', 'brass_section']);
@@ -247,7 +262,8 @@ try {
   await test('peaks after the suite master stay at or below about -3 dBFS', () => withPage(async page => {
     const over = [];
     for (const id of ALL) {
-      const p = await page.evaluate(async id => window.__inst.levels((await window.__inst.phrase(id, { master: true })).buf).peakDb, id);
+      // Guitar-tab chords are strummed 35 ms apart, as Chord Rider and Baby DAW play them (app.js, parts.js).
+      const p = await page.evaluate(async ([id, strum]) => window.__inst.levels((await window.__inst.phrase(id, { master: true, strum })).buf).peakDb, [id, GUITAR_TAB.has(id) ? .035 : 0]);
       if (p > -2.5) over.push(`${id}: ${p.toFixed(1)} dBFS`);
     }
     assert.deepEqual(over, []);
@@ -261,6 +277,8 @@ try {
       ['bright_acoustic_piano', 65], ['electric_grand_piano', 61],
       ['electric_guitar_clean', 52], ['overdriven_guitar', 47], ['distortion_guitar', 52], ['electric_guitar_jazz', 57], ['electric_guitar_muted', 50],
       ['brass_section', 58], ['trumpet', 67],
+      // Every recorded set, at a note between two of its samples.
+      ...(EXTRA ? Object.entries(BETWEEN).filter(([id]) => EXTRA_IDS.includes(id)) : []),
     ];
     for (const [id, midi] of cases) {
       // Worm and whistle have a delayed vibrato: measure before it starts. The organ's 16' drawbar
@@ -286,21 +304,60 @@ try {
       // Held for 5 s on a 2.2 s looped recording: it must sustain to the note-off, then end cleanly.
       looped: { seconds: 7, notes: [[67, .1, 5]] },
     };
-    const ids = [...SYNTH, 'acoustic_grand_piano', 'electric_guitar_muted', 'overdriven_guitar', 'brass_section', 'trumpet'];
+    const ids = [...new Set([...SYNTH, 'acoustic_grand_piano', 'electric_guitar_muted', 'overdriven_guitar', 'brass_section', ...Object.keys(LOOPED)])];
     for (const id of ids) for (const [kind, plan] of Object.entries(plans)) {
       if (kind === 'longerThanSample' && !['acoustic_grand_piano', 'overdriven_guitar'].includes(id)) continue;
-      if (kind === 'looped' && !['trumpet', 'brass_section'].includes(id)) continue;
-      const r = await page.evaluate(([id, plan]) => window.__inst.voiceEnd(id, plan), [id, plan]);
+      if (kind === 'looped' && !(id in LOOPED) && id !== 'brass_section') continue;
+      const run = kind === 'looped' ? loopPlan(id, plan) : plan;
+      const r = await page.evaluate(([id, plan]) => window.__inst.voiceEnd(id, plan), [id, run]);
       if (r.nan) bad.push(`${id} ${kind}: non-finite output`);
       if (!(r.peak > 1e-4)) { bad.push(`${id} ${kind}: tapped voice silent`); continue; }
       if (r.tailRel > .0005) bad.push(`${id} ${kind}: last 2 ms at ${(r.tailRel * 100).toFixed(3)}% of peak (not silent before stopping)`);
       if (r.jumpRel > .25) bad.push(`${id} ${kind}: ${(r.jumpRel * 100).toFixed(1)}% step at the end`);
-      if (r.endSec > plan.seconds - .05) bad.push(`${id} ${kind}: still sounding at the end of the render`);
+      if (r.endSec > run.seconds - .05) bad.push(`${id} ${kind}: still sounding at the end of the render`);
       if (kind === 'stop' && r.endSec > .45 + 3) bad.push(`${id} stop: ended ${r.endSec.toFixed(2)} s`);
-      if (kind === 'looped' && !(r.endSec > 5.1 && r.endSec < 5.6)) bad.push(`${id} looped: ended at ${r.endSec.toFixed(2)} s instead of after the 5.1 s note-off`);
+      const off = kind === 'looped' ? run.notes[0][1] + run.notes[0][2] : 0;
+      if (kind === 'looped' && !(r.endSec > off && r.endSec < off + .5)) bad.push(`${id} looped: ended at ${r.endSec.toFixed(2)} s instead of after the ${off.toFixed(1)} s note-off`);
     }
     assert.deepEqual(bad, []);
   }));
+
+  await test('loops stay exact on a decoder that keeps the MP3 start padding (Safari)', async () => {
+    // Renders each looped note held across several loop wraps, once with normal decoding and once with
+    // decodeAudioData returning 1105 extra frames at the start (what a decoder that ignores the LAME gapless
+    // header returns). The engine reads each file's true length from the manifest and shifts the loop points,
+    // so both renders must match. At 44.1 kHz the padding is a whole number of frames.
+    const PAD = `(() => {
+      const orig = BaseAudioContext.prototype.decodeAudioData;
+      BaseAudioContext.prototype.decodeAudioData = function (data, ok, bad) {
+        const c = this, p = orig.call(this, data).then(b => {
+          const pad = Math.round(1105 * b.sampleRate / 44100), nb = c.createBuffer(b.numberOfChannels, b.length + pad, b.sampleRate);
+          for (let k = 0; k < b.numberOfChannels; k++) nb.getChannelData(k).set(b.getChannelData(k), pad);
+          return nb;
+        });
+        if (ok) p.then(ok, bad);
+        return p;
+      };
+    })();`;
+    const render = (padded) => {
+      const out = {};
+      return withPage(async page => {
+        for (const [id, midi] of Object.entries(LOOPED)) out[id] = await page.evaluate(async ([id, midi]) => {
+          const sr = 44100, ctx = new OfflineAudioContext(1, Math.ceil(sr * 12.5), sr), inst = await window.CRPInstruments.load(ctx, id, ctx.destination);
+          inst.play(midi, 0, { duration: 12, gain: .95 });
+          return Array.from((await ctx.startRendering()).getChannelData(0));
+        }, [id, midi]);
+      }, { routes: padded ? context => context.addInitScript({ content: PAD }) : null }).then(() => out);
+    };
+    const plain = await render(false), padded = await render(true), bad = [];
+    for (const id of Object.keys(LOOPED)) {
+      const a = plain[id], b = padded[id];
+      let peak = 0, diff = 0; for (let i = 0; i < a.length; i++) { peak = Math.max(peak, Math.abs(a[i])); diff = Math.max(diff, Math.abs(a[i] - b[i])); }
+      if (!(peak > 1e-3)) bad.push(`${id}: silent`);
+      else if (diff / peak > .01) bad.push(`${id}: padded decode differs by ${(100 * diff / peak).toFixed(1)}% of peak`);
+    }
+    assert.deepEqual(bad, []);
+  });
 
   await test('realtime: chords and melodies play, voices end and the graph returns to its size', () => withPage(async page => {
     const r = await page.evaluate(async () => {
@@ -352,6 +409,8 @@ try {
   await test('a missing or broken sample set falls back to the SoundFont', () => withPage(async page => {
     const r = await page.evaluate(async () => {
       const out = {};
+      // With a real library every set is delivered: point the engine at an empty one instead.
+      if (window.__extraLibrary) window.CRPInstruments.configure({ basePath: '/__fixtures__/instruments/__none__/' });
       for (const id of ['tenor_sax', 'marimba', 'vibraphone']) {
         const ctx = new OfflineAudioContext(1, 48000, 48000), p = await window.CRPCore.loadSoundfontInstrument(ctx, id, ctx.destination);
         p.play('C4', 0, { duration: .3, gain: .9 });

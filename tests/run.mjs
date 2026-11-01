@@ -41,11 +41,14 @@ for (let i = 0; i < 90 && !ready; i++) {
 }
 if (!ready) { console.error('Local worker did not start'); process.exit(1); }
 
+// The instrument tests run twice: against their small fixtures, then against the real recorded library
+// (assets/instruments) so every delivered set is level-checked, pitch-checked and loop-checked.
+const runs = files.flatMap(f => f.endsWith('instruments.test.mjs') ? [{ f }, { f, env: { INSTRUMENT_SETS: join(root, 'assets', 'instruments') }, label: ' (recorded library)' }] : [{ f }]);
 let failed = 0;
-for (const f of files) {
-  console.log(`\n=== ${f.replace(root + '/', '')}`);
-  const r = spawnSync(process.execPath, [f], { cwd: root, stdio: 'inherit', env: { ...process.env, BASE_URL: base } });
+for (const { f, env = {}, label = '' } of runs) {
+  console.log(`\n=== ${f.replace(root + '/', '')}${label}`);
+  const r = spawnSync(process.execPath, [f], { cwd: root, stdio: 'inherit', env: { ...process.env, ...env, BASE_URL: base } });
   if (r.status !== 0) failed++;
 }
-console.log(`\n${files.length - failed}/${files.length} test files passed`);
+console.log(`\n${runs.length - failed}/${runs.length} test runs passed`);
 process.exit(failed ? 1 : 0);

@@ -34,7 +34,9 @@ npm test               # API contract tests + browser tests
     pitch-shifting between samples), click-free ends/stops/steals, oscillator budget, graph cleanup,
     SoundFont fallback for missing or broken sets, Baby DAW live playback + WAV export, Chord Rider.
     `PRINT_LEVELS=1` prints the level table; `INSTRUMENT_SETS=<dir>` serves real sets from `<dir>`
-    first (to re-measure levels when the recorded sets land).
+    first. `npm test` runs it twice: with the fixtures, then with the recorded library
+    (`INSTRUMENT_SETS=assets/instruments`), which level-checks, pitch-checks and loop-checks every
+    delivered set and checks that loops stay exact on a decoder that keeps the MP3 start padding (Safari).
 
 Each browser test was checked to fail on the code before these fixes.
 
