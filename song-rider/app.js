@@ -28,8 +28,6 @@
 
 "use strict";
 
-// ✅ prevents heavy full-text auto-apply from running on every render
-let didInitialFullApply = false;
 let sheetHeaderBtnLock = false;
 let pendingFullBlockScroll = null;
 
@@ -46,12 +44,6 @@ const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
 const nextTick = () => new Promise(r => setTimeout(r, 0));
 
 
-// BOOT-SAFE STUB: some deployed builds have hit a startup ReferenceError on
-// updateFullIfVisible during init. Define a harmless stub early; the real
-// implementation later in the file will override this function.
-function updateFullIfVisible(){
-  return;
-}
 
 /***********************
 Textarea autosize (Full page blocks)
@@ -246,6 +238,15 @@ function uuid(){
     const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+// Runtime <style> elements keep their historical cascade position: after the head styles
+// and skins.css, but before the late SRP blocks (#srp241WorkflowPolish onward) and the
+// shared compact header sheet, which must stay last.
+function appendAppStyle(style){
+  const anchor = document.getElementById("srp241WorkflowPolish");
+  if(anchor && anchor.parentNode) anchor.parentNode.insertBefore(style, anchor);
+  else document.head.appendChild(style);
 }
 
 function escapeHtml(s){
@@ -490,7 +491,7 @@ function injectBspCardLook(){
     }
 `;
 
-  document.head.appendChild(style);
+  appendAppStyle(style);
 }
 function injectHeaderMiniIconBtnStyle(){
   const old = document.getElementById("srpMiniIconBtnStyle");
@@ -526,7 +527,7 @@ function injectHeaderMiniIconBtnStyle(){
       box-shadow: 0 0 0 6px rgba(34,197,94,.18);
     }
   `;
-  document.head.appendChild(style);
+  appendAppStyle(style);
 }
 function injectHeaderControlTightStyle(){
   const old = document.getElementById("srpHeaderControlTightStyle");
@@ -618,7 +619,7 @@ style.textContent = `
   }
   #capoStepToggle.on{ background:#fff !important; color:#090a0c !important; -webkit-text-fill-color:#090a0c !important; }
 `;
-  document.head.appendChild(style);
+  appendAppStyle(style);
 }
 
 
@@ -644,7 +645,7 @@ function injectChordCopyModeStyle(){
       border-radius: 18px;
     }
   `;
-  document.head.appendChild(style);
+  appendAppStyle(style);
 }
 
 const chordDragCopy = {
@@ -1503,7 +1504,8 @@ function reconcileDeletedBaseSections(){
 
 // Back-compat alias: older code calls cleanupDeletedBaseSections()
 function cleanupDeletedBaseSections(){
-  try{ reconcileDeletedBaseSections(); }catch{}
+  try{ reconcileDeletedBaseSections(); }
+  catch(err){ console.error("Could not tidy deleted pages", err); }
 }
 
 function applyFullTextToProjectSections(fullText){
@@ -1681,23 +1683,20 @@ function parseNotesBackupRaw(raw){
   }
 }
 
+// Notes HTML comes from storage and other devices, so it is untrusted. It is only ever parsed
+// into an inert document (DOMParser: no scripts run, no images load) and reduced to an
+// allowlist of tags and attributes before it reaches the live page.
+function parseInertHtml(html){
+  return new DOMParser().parseFromString(`<!doctype html><body>${String(html || "")}</body>`, "text/html").body;
+}
+
 // Notes are user-critical data. Treat an unexpected blank note document as
 // dangerous unless there is no older non-empty copy anywhere. This protects
 // notes across app updates, cloud merges, reloads, and delayed sync races.
 function notesPlainTextFromHtml(html){
-  try{
-    const div = document.createElement("div");
-    div.innerHTML = String(html || "");
-    div.querySelectorAll("script,style").forEach(n => n.remove());
-    return String(div.textContent || "").replace(/ /g, " ").trim();
-  }catch{
-    return String(html || "")
-      .replace(/<[^>]*>/g, " ")
-      .replace(/&nbsp;/gi, " ")
-      .replace(/&amp;/gi, "&")
-      .replace(/s+/g, " ")
-      .trim();
-  }
+  const body = parseInertHtml(html);
+  body.querySelectorAll("script,style,template").forEach(n => n.remove());
+  return String(body.textContent || "").replace(/\u00a0/g, " ").trim();
 }
 
 function notesDocHasMeaningfulContent(html){
@@ -1743,70 +1742,6 @@ function pickBestNotesBackup(items){
   return best;
 }
 
-function readNotesBackup(projectId){
-  try{
-    if(!projectId) return null;
-    const candidates = [];
-    const seen = new Set();
-    const scope = getStorageScope();
-    const scopes = [scope].filter(Boolean);
-
-    for(const oneScope of scopes){
-      const key = notesBackupKey(projectId, oneScope);
-      if(seen.has(key)) continue;
-      seen.add(key);
-      const parsed = parseNotesBackupRaw(localStorage.getItem(key));
-      if(parsed) candidates.push(parsed);
-    }
-
-    const legacy = parseNotesBackupRaw(localStorage.getItem(legacyNotesBackupKey(projectId)));
-    if(legacy) candidates.push(legacy);
-
-    return pickBestNotesBackup(candidates);
-  }catch{
-    return null;
-  }
-}
-
-function writeNotesBackup(project, opts={}){
-  try{
-    if(!project || !project.id) return;
-
-    const incomingDoc = String(project.notesDoc || "");
-    const incomingHasNotes = notesDocHasMeaningfulContent(incomingDoc);
-    const allowBlankOverwrite = !!opts.allowBlankOverwrite;
-    const existing = readNotesBackup(project.id);
-    const existingHasNotes = notesDocHasMeaningfulContent(existing?.notesDoc || "");
-
-    // Keep protection against accidental blank saves, but allow a deliberate
-    // user delete-all to become the authoritative state for this project.
-    const protectedCopy = (!allowBlankOverwrite && !incomingHasNotes && existingHasNotes) ? existing : null;
-    const notesUpdatedAt = protectedCopy
-      ? (Number(protectedCopy.notesUpdatedAt ?? protectedCopy.updatedAt) || Number(project.notesUpdatedAt) || Number(project.updatedAt) || now())
-      : (Number(project.notesUpdatedAt) || Number(project.updatedAt) || now());
-
-    const payload = {
-      notesDoc: protectedCopy ? String(protectedCopy.notesDoc || "") : incomingDoc,
-      notesColor: protectedCopy ? String(protectedCopy.notesColor || project.notesColor || "") : String(project.notesColor || ""),
-      notesUpdatedAt,
-      notesClearedAt: protectedCopy
-        ? (Number(protectedCopy.notesClearedAt) || 0)
-        : (allowBlankOverwrite && !incomingHasNotes ? (Number(project.notesClearedAt) || notesUpdatedAt) : (Number(project.notesClearedAt) || 0)),
-      updatedAt: notesUpdatedAt
-    };
-    const json = JSON.stringify(payload);
-    const scopes = [getStorageScope(), "guest", getAuthUserId()].filter(Boolean);
-    const seen = new Set();
-    for(const scope of scopes){
-      const key = notesBackupKey(project.id, scope);
-      if(seen.has(key)) continue;
-      seen.add(key);
-      localStorage.setItem(key, json);
-    }
-    localStorage.setItem(legacyNotesBackupKey(project.id), json);
-  }catch{}
-}
-
 function deleteNotesBackup(projectId){
   try{
     if(!projectId) return;
@@ -1825,40 +1760,39 @@ function deleteNotesBackup(projectId){
 
 /***********************
 CLOUD SYNC (Cloudflare / Song Rider Suite)
-- Local-first app with automatic cloud backup/restore
-- Uses the Suite's existing authenticated Cloudflare account
-- Project target: D1 srp_projects
-- Media target: R2 via authenticated Worker API
+- Local-first: songs live in the library below; the cloud is a backup that follows the
+  user across devices. See docs/SYNC.md for the server contract.
+- Every song remembers the server revision it was last synced at. Only songs with real
+  local changes are pushed, always with that revision as baseRev, so a stale device can
+  never silently overwrite newer work: the server answers 409 and we keep both copies.
+- Pulls happen at startup, when the tab becomes visible or focused, when the device comes
+  back online and on Sync Now.
+- Media (recordings, note photos) lives in R2 and is listed in per-song manifests.
 ***********************/
-const CLOUD_PROVIDER = "cloudflare";
 const CLOUD_SRP_PROJECTS_API = "/api/srp/projects";
 const CLOUD_SRP_MEDIA_API = "/api/srp/media";
+const CLOUD_PUSH_DELAY_MS = 1500;
+const CLOUD_FOCUS_PULL_GAP_MS = 2000;
 
 const cloud = {
-  client: null,
   ready: false,
-  initTried: false,
   syncing: false,
   syncQueued: false,
+  mediaQueued: false,
   queueTimer: null,
-  suspendQueue: false,
+  lastPullAt: 0,
   status: "local",
   lastError: "",
-  onlineListenerWired: false,
+  listenersWired: false,
   user: null,
-  session: null,
   authBusy: false,
   authInitialized: false,
   authChangeSeq: 0,
-  appMounted: false,
-  authMode: "signin",
-  recoveryMode: false,
-  pendingSyncReasons: [],
-  deferInitialMerge: false
+  appMounted: false
 };
 
-function canUseCloudSync(){
-  return typeof window.fetch === "function";
+function cloudSignedIn(){
+  return !!(cloud.ready && cloud.user && getAuthUserId());
 }
 
 async function suiteCloudApi(path, options={}){
@@ -1872,11 +1806,12 @@ async function suiteCloudApi(path, options={}){
   const type = String(res.headers.get("Content-Type") || "").toLowerCase();
   let payload = null;
   if(type.includes("application/json")){
-    try{ payload = await res.json(); }catch{}
+    try{ payload = await res.json(); }catch(err){ console.warn("Cloud response was not valid JSON", path, err); }
   }
   if(!res.ok || payload?.ok === false){
     const err = new Error(payload?.error || `Cloud request failed (${res.status})`);
     err.status = res.status;
+    err.payload = payload;
     throw err;
   }
   return payload || { ok:true };
@@ -1896,7 +1831,7 @@ function cloudMediaUrl(path, projectId=""){
 
 function setCloudStatus(kind, extra=""){
   cloud.status = kind || "local";
-  cloud.lastError = extra || cloud.lastError || "";
+  cloud.lastError = (kind === "error") ? (extra || cloud.lastError || "") : "";
 
   const btn = document.getElementById("cloudSyncBtn");
   if(!btn) return;
@@ -1931,10 +1866,7 @@ function serializeProjectForCloud(project){
     project_id: normalized.id,
     name: String(normalized.name || "Untitled"),
     data: normalized,
-    updated_at: Number(normalized.updatedAt) || now(),
-    deleted: false,
-    deleted_at: null,
-    last_synced_at: new Date().toISOString()
+    updated_at: Number(normalized.updatedAt) || now()
   };
 }
 
@@ -1947,6 +1879,7 @@ function projectFromCloudRow(row){
   const data = (source && typeof source === "object") ? deepClone(source) : {};
   data.id = String(data.id || row.project_id || "");
   if(!data.id) return null;
+  delete data.deleted;
   if(typeof row.name === "string" && row.name.trim()) data.name = row.name.trim();
   if(Number.isFinite(Number(row.updated_at))){
     data.updatedAt = Number(row.updated_at);
@@ -1955,299 +1888,391 @@ function projectFromCloudRow(row){
 }
 
 async function fetchCloudProjects(){
-  if(!cloud.client || !getAuthUserId()) return [];
+  if(!cloudSignedIn()) return [];
   const result = await suiteCloudApi(CLOUD_SRP_PROJECTS_API);
   return Array.isArray(result?.projects) ? result.projects : [];
 }
 
-async function pushProjectToCloud(project){
-  if(!cloud.client || !getAuthUserId() || !project || !project.id) return;
-  const row = serializeProjectForCloud(project);
-  await suiteCloudApi(CLOUD_SRP_PROJECTS_API, {
-    method:"POST",
-    body:JSON.stringify({ project: row })
-  });
-}
-
-async function deleteProjectFromCloud(projectId){
-  if(!cloud.client || !getAuthUserId() || !projectId) return;
-  await suiteCloudApi(`${CLOUD_SRP_PROJECTS_API}/${encodeURIComponent(String(projectId))}`, {
-    method:"DELETE"
-  });
-}
-
-async function mergeCloudIntoLocal(){
-  if(!cloud.client) return;
-
-  const remoteRows = await fetchCloudProjects();
-
-  const remoteMap = new Map();
-  for(const row of remoteRows){
-    if(!row || !row.project_id) continue;
-    remoteMap.set(String(row.project_id), row);
+// Manifests (recordings, note photos) are merged entry by entry: the newest change to an
+// entry wins, and deletes are kept as tombstones so they travel to the other devices.
+function mergeMediaManifests(a, b){
+  const map = new Map();
+  for(const entry of [...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]){
+    if(!entry || !entry.id) continue;
+    const prev = map.get(String(entry.id));
+    if(!prev || (Number(entry.updatedAt) || 0) > (Number(prev.updatedAt) || 0)) map.set(String(entry.id), { ...entry });
   }
+  return Array.from(map.values()).sort((x, y) => (Number(y.updatedAt) || 0) - (Number(x.updatedAt) || 0));
+}
 
-  const localList = loadAllProjects().map(normalizeProject).filter(Boolean);
-  const localMap = new Map(localList.map(p => [String(p.id), p]));
+// Apply what a media sync pass changed (before -> after) onto the project's current
+// manifest, without undoing anything that changed meanwhile (e.g. a delete during an upload).
+function applyManifestUpdate(liveList, beforeList, afterList){
+  const key = (e) => JSON.stringify(e || null);
+  const live = new Map((liveList || []).map(e => [String(e.id), e]));
+  const before = new Map((beforeList || []).map(e => [String(e.id), e]));
+  for(const [id, entry] of before){
+    if(!(afterList || []).some(e => String(e.id) === id) && key(live.get(id)) === key(entry)) live.delete(id);
+  }
+  for(const entry of (afterList || [])){
+    const id = String(entry.id), cur = live.get(id);
+    if(!cur || key(cur) === key(before.get(id)) || (Number(entry.updatedAt) || 0) >= (Number(cur.updatedAt) || 0)) live.set(id, entry);
+  }
+  return Array.from(live.values());
+}
 
-  let localChanged = false;
-  let remoteNeedsPush = false;
+// Stable comparison of song content: key order, bookkeeping fields and card ids are ignored
+// (normalizing gives blank pages fresh random card ids on every device).
+function stableContentKey(p){
+  const walk = (v, top) => {
+    if(Array.isArray(v)) return v.map(x => walk(x, false));
+    if(v && typeof v === "object"){
+      const out = {};
+      for(const k of Object.keys(v).sort()){
+        if(top ? NON_CONTENT_FIELDS.has(k) : k === "id") continue;
+        out[k] = walk(v[k], false);
+      }
+      return out;
+    }
+    return v;
+  };
+  const n = normalizeProject(deepClone(p));
+  // Blank-line differences in the Full text are formatting, not content.
+  n.fullText = String(n.fullText || "").trim() ? fullTextBlocksToText(splitFullTextBlocks(n.fullText)) : "";
+  return JSON.stringify(walk(n, true));
+}
 
-  // apply cloud deletions / newer cloud versions
-  for(const [id, row] of remoteMap.entries()){
-    const local = localMap.get(id);
-    const rowUpdated = Number(row.updated_at) || 0;
+function conflictStamp(){
+  try{
+    return new Date().toLocaleString(undefined, { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+  }catch{
+    return new Date().toISOString().slice(0, 16).replace("T", " ");
+  }
+}
+
+// Keep the local version of a song as a separate project (new id) so nothing is lost.
+function keepLocalAsConflictCopy(local){
+  const copy = normalizeProject(deepClone(local));
+  copy.id = uuid();
+  copy.name = `${String(local.name || "Untitled").trim() || "Untitled"} (conflict copy ${conflictStamp()})`;
+  copy.createdAt = now();
+  copy.archived = false;
+  // Recordings stay with the original song; a copied manifest would re-download deleted takes.
+  copy.cloudAudioManifest = [];
+  copy.linkedCrpProjectId = "";
+  copy.linkedOctave = 0;
+  copy.linkedTranspose = false;
+  addProjectToLibrary(copy);
+  markProjectsDirty([copy.id]);
+  return copy;
+}
+
+// Replace a local song with the server copy, keeping media manifest entries and notes
+// the server does not have yet. Returns true when the result still differs from the server.
+function adoptServerCopy(remote, rev, local){
+  let differs = false;
+  if(local){
+    const mergedAudio = mergeMediaManifests(local.cloudAudioManifest, remote.cloudAudioManifest);
+    const mergedImages = mergeMediaManifests(local.notesImages, remote.notesImages);
+    if(JSON.stringify(mergedAudio) !== JSON.stringify(mergeMediaManifests(remote.cloudAudioManifest, []))) differs = true;
+    if(JSON.stringify(mergedImages) !== JSON.stringify(mergeMediaManifests(remote.notesImages, []))) differs = true;
+    setProjectCloudAudioManifest(remote, mergedAudio);
+    setProjectNotesImages(remote, mergedImages);
+    const best = mergeNotesSafely(
+      { notesDoc: remote.notesDoc, notesColor: remote.notesColor, notesUpdatedAt: Number(remote.notesUpdatedAt) || 0, notesClearedAt: Number(remote.notesClearedAt) || 0 },
+      { notesDoc: local.notesDoc, notesColor: local.notesColor, notesUpdatedAt: Number(local.notesUpdatedAt) || 0, notesClearedAt: Number(local.notesClearedAt) || 0 }
+    );
+    if(best && String(best.notesDoc || "") !== String(remote.notesDoc || "")){
+      remote.notesDoc = String(best.notesDoc || "");
+      remote.notesUpdatedAt = Number(best.notesUpdatedAt) || remote.notesUpdatedAt;
+      remote.notesClearedAt = Number(best.notesClearedAt) || 0;
+      differs = true;
+    }
+    // Local link bookkeeping belongs to this device's CRP pairing.
+    for(const k of ["linkedCrpProjectId", "linkedOctave", "linkedTranspose", "crpRowsSig"]){
+      if(local[k] !== undefined && remote[k] === undefined) remote[k] = local[k];
+    }
+  }
+  replaceProjectFromCloud(remote);
+  updateSyncMeta(m => {
+    m.rev[remote.id] = rev;
+    if(differs) m.dirty[remote.id] = dirtyStamp();
+    else delete m.dirty[remote.id];
+  });
+  return differs;
+}
+
+// Reconcile server rows with the local library. full: rows is the whole account (a pull), so
+// local songs missing from it have never reached the server. Returns {changed, currentChanged, notices}.
+function applyCloudRows(rows, { full = false } = {}){
+  const lib = ensureLibrary();
+  const meta = readSyncMeta();
+  const result = { changed:false, currentChanged:false, notices:[] };
+  const currentId = String(state.project?.id || "");
+  const seen = new Set();
+  const touch = (id) => { result.changed = true; if(String(id) === currentId) result.currentChanged = true; };
+
+  for(const row of rows){
+    const id = String(row?.project_id || "");
+    if(!id) continue;
+    seen.add(id);
+    const rev = Number(row.rev) || 0;
+    const known = Object.prototype.hasOwnProperty.call(meta.rev, id) ? Number(meta.rev[id]) : null;
+    const local = libraryProject(id);
+    const dirty = !!meta.dirty[id] || lib.pending.has(id);
 
     if(row.deleted){
-      if(local && (rowUpdated >= (Number(local.updatedAt) || 0))){
-        localMap.delete(id);
-        localChanged = true;
-      }else if(local){
-        remoteNeedsPush = true;
+      if(meta.deleted[id]){
+        updateSyncMeta(m => { delete m.deleted[id]; delete m.rev[id]; delete m.dirty[id]; });
+        continue;
       }
+      if(!local){
+        if(known !== null) updateSyncMeta(m => { delete m.rev[id]; });
+        continue;
+      }
+      const deletedAt = Date.parse(row.deleted_at || "") || Number(row.updated_at) || 0;
+      if(dirty && (Number(local.updatedAt) || 0) > deletedAt){
+        const copy = keepLocalAsConflictCopy(local);
+        result.notices.push(`“${local.name || "Untitled"}” was deleted on another device after you edited it here. Your version was kept as “${copy.name}”.`);
+      }else{
+        result.notices.push(`“${local.name || "Untitled"}” was deleted on another device.`);
+      }
+      removeProjectFromLibrary(id);
+      updateSyncMeta(m => { delete m.rev[id]; delete m.dirty[id]; });
+      touch(id);
       continue;
     }
 
-    const remoteProject = projectFromCloudRow(row);
-    if(!remoteProject) continue;
+    if(meta.deleted[id]) continue; // deleted here; the DELETE is still on its way
+    const remote = projectFromCloudRow(row);
+    if(!remote) continue;
 
     if(!local){
-      localMap.set(id, remoteProject);
-      localChanged = true;
+      adoptServerCopy(remote, rev, null);
+      touch(id);
       continue;
     }
+    if(known === rev) continue; // nothing new on the server
 
-    const localUpdated = Number(local.updatedAt) || 0;
-    if(rowUpdated > localUpdated){
-      const bestNotes = mergeNotesSafely(
-        { notesDoc: remoteProject.notesDoc, notesColor: remoteProject.notesColor, notesUpdatedAt: Number(remoteProject.notesUpdatedAt) || Number(remoteProject.updatedAt) || rowUpdated, notesClearedAt: Number(remoteProject.notesClearedAt) || 0, updatedAt: Number(remoteProject.notesUpdatedAt) || Number(remoteProject.updatedAt) || rowUpdated },
-        { notesDoc: local.notesDoc, notesColor: local.notesColor, notesUpdatedAt: Number(local.notesUpdatedAt) || 0, notesClearedAt: Number(local.notesClearedAt) || 0, updatedAt: Number(local.notesUpdatedAt) || 0 },
-        readNotesBackup(id)
-      );
-      if(bestNotes){
-        remoteProject.notesDoc = String(bestNotes.notesDoc || "");
-        remoteProject.notesClearedAt = Number(bestNotes.notesClearedAt) || 0;
-        remoteProject.notesUpdatedAt = Number(bestNotes.notesUpdatedAt ?? bestNotes.updatedAt) || remoteProject.notesUpdatedAt || 0;
-        if(String(bestNotes.notesColor || "").trim()) remoteProject.notesColor = String(bestNotes.notesColor || remoteProject.notesColor || "");
-      }
-      localMap.set(id, remoteProject);
-      localChanged = true;
-    }else if(localUpdated > rowUpdated){
-      remoteNeedsPush = true;
+    const sameContent = stableContentKey(local) === stableContentKey(remote);
+    if(!sameContent && (known === null ? (Number(local.updatedAt) || 0) > (Number(row.updated_at) || 0) : dirty)){
+      // Both sides changed (or an older build left local edits we cannot place): keep both.
+      const copy = keepLocalAsConflictCopy(local);
+      result.notices.push(`“${local.name || "Untitled"}” was changed on another device while you were editing it here. The other device's version is now in “${remote.name || "Untitled"}”, and your version was saved as “${copy.name}”.`);
     }
+    adoptServerCopy(remote, rev, local);
+    touch(id);
   }
 
-  // local-only projects should get pushed up
-  for(const [id] of localMap.entries()){
-    if(!remoteMap.has(id)) remoteNeedsPush = true;
+  // Songs the server has never seen (or lost) are pushed as new.
+  const missing = full ? lib.list.filter(p => !seen.has(String(p.id)) && !meta.dirty[p.id]).map(p => p.id) : [];
+  if(missing.length){
+    updateSyncMeta(m => { for(const id of missing){ delete m.rev[id]; m.dirty[id] = dirtyStamp(); } });
   }
+  return result;
+}
 
-  if(localChanged){
-    const merged = Array.from(localMap.values()).sort((a,b)=>(Number(b.updatedAt)||0) - (Number(a.updatedAt)||0));
-    cloud.suspendQueue = true;
+// Server answered 409 for a save or delete: resolve it the same way a pull would.
+function resolveCloudConflict(id, err, outcome){
+  const row = err?.payload?.project;
+  if(!row) return;
+  const r = applyCloudRows([{ ...row, project_id: String(row.project_id || id) }]);
+  outcome.notices.push(...r.notices);
+  outcome.changed = outcome.changed || r.changed;
+  outcome.currentChanged = outcome.currentChanged || r.currentChanged;
+}
+
+async function pushDirtyProjects(outcome, scope){
+  const meta = readSyncMeta();
+  for(const id of Object.keys(meta.dirty)){
+    assertSyncScope(scope);
+    if(meta.deleted[id]){ updateSyncMeta(m => { delete m.dirty[id]; }); continue; }
+    const project = libraryProject(id);
+    if(!project){ updateSyncMeta(m => { delete m.dirty[id]; }); continue; }
+    const stamp = meta.dirty[id];
+    const baseRev = Number(meta.rev[id]) || 0;
     try{
-      saveAllProjects(merged);
-      merged.forEach((proj) => {
-        try{ writeNotesBackup(proj); }catch{}
+      const res = await suiteCloudApi(CLOUD_SRP_PROJECTS_API, {
+        method:"POST",
+        body:JSON.stringify({ project: serializeProjectForCloud(project), baseRev })
       });
-      const curId = getCurrentProjectIdForScope(getStorageScope());
-      if(curId && !merged.some(p => p.id === curId)){
-        setCurrentProjectIdForScope(getStorageScope(), merged[0]?.id || "");
-      }
-    }finally{
-      cloud.suspendQueue = false;
-    }
-
-    // ✅ Important: when remote projects land on a device that is already signed in
-    // (for example computer -> phone), localStorage updates alone are not enough.
-    // Refresh the in-memory project list/UI immediately so the new cloud projects
-    // show up without needing a hard browser refresh or sign-out/sign-in cycle.
-    if(cloud.appMounted){
-      try{
-        await reloadProjectForCurrentScope();
-      }catch(err){
-        console.error("Reload after cloud merge failed", err);
-      }
+      updateSyncMeta(m => {
+        m.rev[id] = Number(res.rev) || baseRev;
+        if(m.dirty[id] === stamp) delete m.dirty[id];
+      });
+    }catch(err){
+      if(err.status !== 409) throw err;
+      resolveCloudConflict(id, err, outcome);
     }
   }
+}
 
-  scheduleDeferredCloudAudioSync("merge");
-  scheduleDeferredCloudNoteImageSync("merge");
-
-  if(remoteNeedsPush){
-    await syncAllProjectsToCloud();
+async function pushPendingDeletes(outcome, scope){
+  const meta = readSyncMeta();
+  for(const [id, tomb] of Object.entries(meta.deleted)){
+    assertSyncScope(scope);
+    try{
+      await suiteCloudApi(`${CLOUD_SRP_PROJECTS_API}/${encodeURIComponent(id)}?baseRev=${encodeURIComponent(Number(tomb?.rev) || 0)}`, { method:"DELETE" });
+      updateSyncMeta(m => { delete m.deleted[id]; delete m.rev[id]; delete m.dirty[id]; });
+    }catch(err){
+      if(err.status !== 409 || !err.payload?.project) throw err;
+      // Edited on another device since this device last saw it: bring it back instead of deleting.
+      updateSyncMeta(m => { delete m.deleted[id]; delete m.rev[id]; });
+      const name = err.payload.project?.name || "A song";
+      outcome.notices.push(`“${name}” was changed on another device, so it was not deleted. Delete it again if you still want it gone.`);
+      resolveCloudConflict(id, err, outcome);
+    }
   }
 }
 
-function enqueuePendingCloudSync(reason=""){
-  const why = String(reason || "unspecified").trim() || "unspecified";
-  if(!Array.isArray(cloud.pendingSyncReasons)) cloud.pendingSyncReasons = [];
-  cloud.pendingSyncReasons.push(why);
-  if(cloud.pendingSyncReasons.length > 20) cloud.pendingSyncReasons = cloud.pendingSyncReasons.slice(-20);
-}
-
-function consumePendingCloudSyncReason(fallback=""){
-  const list = Array.isArray(cloud.pendingSyncReasons) ? cloud.pendingSyncReasons : [];
-  const pending = list.length ? list.join(",") : "";
-  cloud.pendingSyncReasons = [];
-  return String(pending || fallback || "manual");
-}
-
-function queueCloudSync(reason=""){
-  if(cloud.suspendQueue) return;
-  if(!cloud.ready || !cloud.client || !getAuthUserId()){
-    enqueuePendingCloudSync(reason || "queued-before-ready");
-    return;
+// The account can change while a sync is waiting on the network; never apply its results
+// to another account's songs.
+function assertSyncScope(scope){
+  if(getStorageScope() !== scope){
+    const err = new Error("Account changed during sync");
+    err.scopeChanged = true;
+    throw err;
   }
-
-  if(cloud.queueTimer) clearTimeout(cloud.queueTimer);
-  cloud.syncQueued = true;
-  const why = consumePendingCloudSyncReason(reason || "queued");
-  cloud.queueTimer = setTimeout(() => {
-    cloud.queueTimer = null;
-    syncAllProjectsToCloud(why).catch(err => {
-      console.error("Cloud sync failed", err);
-    });
-  }, 700);
 }
 
-function triggerImmediateCloudSync(reason=""){
-  // Recording changes can enqueue sync even before auth/cloud is fully ready.
-  // triggerImmediateCloudSync() persists the reason first, then syncs immediately when possible.
-  if(cloud.suspendQueue) return;
-  if(!cloud.ready || !cloud.client || !getAuthUserId()){
-    enqueuePendingCloudSync(reason || "immediate-before-ready");
-    return;
-  }
-  if(cloud.queueTimer){
-    clearTimeout(cloud.queueTimer);
-    cloud.queueTimer = null;
-  }
-  cloud.syncQueued = true;
-  const why = consumePendingCloudSyncReason(reason || "immediate");
-  setTimeout(() => {
-    syncAllProjectsToCloud(why).catch(err => {
-      console.error("Immediate cloud sync failed", err);
-    });
-  }, 120);
+function withCloudSyncLock(fn){
+  // One sync at a time across tabs, so two tabs never push the same song with the same baseRev.
+  if(navigator.locks?.request) return navigator.locks.request(`srp-cloud-sync:${getStorageScope()}`, fn);
+  return fn();
 }
 
-async function syncAllProjectsToCloud(reason=""){
-  if(cloud.suspendQueue) return;
+async function syncWithCloud(reason="", opts={}){
+  if(!cloudSignedIn()) return;
   if(cloud.syncing){
     cloud.syncQueued = true;
+    if(opts.media) cloud.mediaQueued = true;
     return;
   }
-  if(!cloud.ready || !cloud.client || !getAuthUserId()) return;
-
+  clearTimeout(cloud.queueTimer);
+  cloud.queueTimer = null;
   cloud.syncing = true;
   cloud.syncQueued = false;
   setCloudStatus("syncing");
-
+  const scope = getStorageScope();
+  const outcome = { notices:[], changed:false, currentChanged:false };
   try{
-    // ✅ Always start by pulling latest cloud state down first.
-    // This makes "Sync Now" truly bidirectional so a second device can fetch
-    // newly uploaded recordings / manifests instead of only pushing its own state.
-    await mergeCloudIntoLocal();
-
-    // ✅ Upload any local audio blobs and refresh per-project manifests.
-    await syncCloudAudioForAllProjects(reason || "projects");
-    await syncCloudNoteImagesForAllProjects(reason || "projects");
-
-    // ✅ Re-read projects AFTER audio sync so freshly-written manifests get pushed
-    // in the same sync pass (important for new recordings/uploads).
-    const all = loadAllProjects().map(normalizeProject).filter(Boolean);
-    for(const project of all){
-      await pushProjectToCloud(project);
-    }
-
-    // ✅ Pull once more so this device also picks up anything that landed remotely
-    // during the same sync window.
-    await mergeCloudIntoLocal();
-
+    await withCloudSyncLock(async () => {
+      flushLibrary({ quiet:true });
+      const rows = await fetchCloudProjects();
+      assertSyncScope(scope);
+      const pulled = applyCloudRows(rows, { full:true });
+      cloud.lastPullAt = Date.now();
+      outcome.notices.push(...pulled.notices);
+      flushLibrary({ quiet:true });
+      if(pulled.changed) refreshAfterLibraryChange(pulled);
+      await pushDirtyProjects(outcome, scope);
+      if(opts.media || cloud.mediaQueued || pulled.changed){
+        cloud.mediaQueued = false;
+        await syncCloudAudioForAllProjects(reason);
+        assertSyncScope(scope);
+        await syncCloudNoteImagesForAllProjects(reason);
+        assertSyncScope(scope);
+        flushLibrary({ quiet:true });
+        await pushDirtyProjects(outcome, scope);
+      }
+      await pushPendingDeletes(outcome, scope);
+      flushLibrary({ quiet:true });
+      if(outcome.changed) refreshAfterLibraryChange(outcome);
+    });
     setCloudStatus("ok");
   }catch(err){
+    if(err?.scopeChanged) return;
     console.error("Cloud sync failed", reason, err);
     setCloudStatus("error", err?.message || String(err || "Unknown error"));
     throw err;
   }finally{
     cloud.syncing = false;
-    if(cloud.syncQueued && !cloud.suspendQueue && cloud.ready && cloud.client && getAuthUserId()){
+    if(outcome.notices.length) showSyncNotice(outcome.notices);
+    if(cloud.syncQueued && cloudSignedIn()){
       cloud.syncQueued = false;
-      setTimeout(() => {
-        syncAllProjectsToCloud("queued-followup").catch(err => {
-          console.error("Queued cloud sync failed", err);
-        });
-      }, 180);
+      queueCloudSync("queued-followup", 200);
     }
   }
 }
 
+// Called after local saves: push soon, but not on every keystroke.
+function queueCloudSync(reason="", delay=CLOUD_PUSH_DELAY_MS){
+  if(!cloudSignedIn()) return;
+  if(cloud.syncing){ cloud.syncQueued = true; return; }
+  clearTimeout(cloud.queueTimer);
+  cloud.queueTimer = setTimeout(() => {
+    cloud.queueTimer = null;
+    syncWithCloud(reason).catch(() => {});
+  }, delay);
+}
 
-function setAuthMode(mode="signin"){
-  cloud.authMode = mode || "signin";
-  cloud.recoveryMode = (cloud.authMode === "recovery");
+// Recording / note-photo changes: sync media now.
+function triggerImmediateCloudSync(reason=""){
+  if(!cloudSignedIn()) return;
+  if(cloud.syncing){ cloud.syncQueued = true; cloud.mediaQueued = true; return; }
+  clearTimeout(cloud.queueTimer);
+  cloud.queueTimer = setTimeout(() => {
+    cloud.queueTimer = null;
+    syncWithCloud(reason, { media:true }).catch(() => {});
+  }, 120);
+}
 
-  const modal = document.getElementById("authModal");
-  if(modal) modal.classList.toggle("resetting", cloud.authMode === "forgot" || cloud.authMode === "recovery");
+function pullFromCloudSoon(reason){
+  if(!cloudSignedIn() || !cloud.appMounted) return;
+  if(Date.now() - cloud.lastPullAt < CLOUD_FOCUS_PULL_GAP_MS) return;
+  cloud.lastPullAt = Date.now();
+  syncWithCloud(reason).catch(() => {});
+}
 
-  const resetEmail = document.getElementById("authResetEmailInput");
-  const newPass = document.getElementById("authNewPasswordInput");
-  const sendBtn = document.getElementById("authSendResetBtn");
-  const updateBtn = document.getElementById("authUpdatePasswordBtn");
-  const backBtn = document.getElementById("authBackToSignInBtn");
-  const forgotRow = document.getElementById("authForgotRow");
-  const emailInput = document.getElementById("authEmailInput");
-
-  if(resetEmail){
-    resetEmail.style.display = (cloud.authMode === "forgot") ? "block" : "none";
-    if(emailInput && !resetEmail.value) resetEmail.value = String(emailInput.value || "").trim();
+// Plain-language notices for sync conflicts (kept on screen until dismissed).
+function showSyncNotice(messages){
+  const list = (Array.isArray(messages) ? messages : [messages]).filter(Boolean);
+  if(!list.length) return;
+  let box = document.getElementById("srpNotice");
+  if(!box){
+    box = document.createElement("div");
+    box.id = "srpNotice";
+    box.className = "srpNotice";
+    box.setAttribute("role", "status");
+    box.setAttribute("aria-live", "polite");
+    const text = document.createElement("div");
+    text.className = "srpNoticeText";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "srpNoticeClose";
+    close.textContent = "OK";
+    close.addEventListener("click", () => { box.hidden = true; text.textContent = ""; });
+    box.append(text, close);
+    document.body.appendChild(box);
   }
-  if(newPass) newPass.style.display = (cloud.authMode === "recovery") ? "block" : "none";
-  if(sendBtn) sendBtn.style.display = (cloud.authMode === "forgot") ? "inline-flex" : "none";
-  if(updateBtn) updateBtn.style.display = (cloud.authMode === "recovery") ? "inline-flex" : "none";
-  if(backBtn) backBtn.textContent = (cloud.authMode === "recovery") ? "Back to Sign In" : "Back to Sign In";
-  if(forgotRow) forgotRow.style.display = (cloud.authMode === "signin") ? "flex" : "none";
+  const text = box.querySelector(".srpNoticeText");
+  for(const msg of list){
+    const p = document.createElement("p");
+    p.textContent = msg;
+    text.appendChild(p);
+  }
+  box.hidden = false;
 }
 
 function updateAuthModalUI(message=""){
   const modal = document.getElementById("authModal");
   if(!modal) return;
   const signedIn = !!cloud.user;
-  modal.classList.toggle("signed-in", signedIn && cloud.authMode !== "forgot" && cloud.authMode !== "recovery");
-  modal.classList.toggle("signed-out", !signedIn && cloud.authMode !== "forgot" && cloud.authMode !== "recovery");
+  modal.classList.toggle("signed-in", signedIn);
+  modal.classList.toggle("signed-out", !signedIn);
 
   const status = document.getElementById("authStatus");
   const userEmail = document.getElementById("authUserEmail");
-  const syncBtn = document.getElementById("authSyncNowBtn");
-  const signOutBtn = document.getElementById("authSignOutBtn");
-  const signInBtn = document.getElementById("authSignInBtn");
-  const signUpBtn = document.getElementById("authSignUpBtn");
-  const emailInput = document.getElementById("authEmailInput");
-  const passInput = document.getElementById("authPasswordInput");
-  const forgotBtn = document.getElementById("authForgotPasswordBtn");
-  const resetEmailInput = document.getElementById("authResetEmailInput");
-  const newPasswordInput = document.getElementById("authNewPasswordInput");
-  const sendResetBtn = document.getElementById("authSendResetBtn");
-  const updatePasswordBtn = document.getElementById("authUpdatePasswordBtn");
-  const backBtn = document.getElementById("authBackToSignInBtn");
-
-  setAuthMode(cloud.authMode || "signin");
-
   if(status){
     if(message) status.textContent = message;
-    else if(cloud.authMode === "forgot") status.textContent = "Enter your email and we’ll send you a password reset link.";
-    else if(cloud.authMode === "recovery") status.textContent = "Enter your new password below.";
     else if(cloud.user) status.textContent = "Projects sync privately to your signed-in account.";
     else status.textContent = "Sign in so your projects follow you across devices.";
   }
   if(userEmail) userEmail.textContent = cloud.user ? (cloud.user.email || cloud.user.id || "Signed in") : "";
 
-  [syncBtn, signOutBtn, signInBtn, signUpBtn, forgotBtn, sendResetBtn, updatePasswordBtn, backBtn].forEach(btn => {
-    if(btn) btn.disabled = !!cloud.authBusy;
-  });
-  [emailInput, passInput, resetEmailInput, newPasswordInput].forEach(inp => {
-    if(inp) inp.disabled = !!cloud.authBusy;
+  ["authSyncNowBtn", "authSignOutBtn", "authSignInBtn", "authSignUpBtn", "authEmailInput", "authPasswordInput"].forEach(id => {
+    const node = document.getElementById(id);
+    if(node) node.disabled = !!cloud.authBusy;
   });
 }
 
@@ -2255,7 +2280,6 @@ function updateAuthModalUI(message=""){
 function openAuthModal(message=""){
   const modal = document.getElementById("authModal");
   if(!modal) return;
-  if(cloud.authMode !== "recovery") setAuthMode(cloud.user ? "signin" : "signin");
   updateAuthModalUI(message);
   modal.classList.add("show");
 }
@@ -2271,24 +2295,16 @@ function setAuthBusy(v, message=""){
   updateAuthModalUI(message);
 }
 
+// Tell the CRP link bridge the open song changed (switch, new, delete, reload).
+function notifyLinkedProjectChanged(){
+  try{ window.CRP_SRP_onSrpProjectChanged?.(); }
+  catch(err){ console.error("Could not refresh the CRP link for this song", err); }
+}
+
 async function reloadProjectForCurrentScope(){
-  const prevProject = state.project ? deepClone(state.project) : null;
   state.project = getCurrentProject();
-  if(prevProject && state.project && prevProject.id === state.project.id){
-    const bestNotes = mergeNotesSafely(
-      { notesDoc: state.project.notesDoc, notesColor: state.project.notesColor, notesUpdatedAt: Number(state.project.notesUpdatedAt) || 0, notesClearedAt: Number(state.project.notesClearedAt) || 0, updatedAt: Number(state.project.notesUpdatedAt) || 0 },
-      { notesDoc: prevProject.notesDoc, notesColor: prevProject.notesColor, notesUpdatedAt: Number(prevProject.notesUpdatedAt) || 0, notesClearedAt: Number(prevProject.notesClearedAt) || 0, updatedAt: Number(prevProject.notesUpdatedAt) || 0 },
-      readNotesBackup(state.project.id)
-    );
-    if(bestNotes){
-      state.project.notesDoc = String(bestNotes.notesDoc || "");
-      state.project.notesClearedAt = Number(bestNotes.notesClearedAt) || 0;
-      state.project.notesUpdatedAt = Number(bestNotes.notesUpdatedAt ?? bestNotes.updatedAt) || state.project.notesUpdatedAt || 0;
-      if(String(bestNotes.notesColor || "").trim()) state.project.notesColor = String(bestNotes.notesColor || state.project.notesColor || "");
-    }
-    writeNotesBackup(state.project);
-  }
   state.currentSection = "Full";
+  resetProjectHistory();
   applyProjectSettingsToUI();
   renderProjectsDropdown();
   renderArchiveModal();
@@ -2302,37 +2318,36 @@ async function reloadProjectForCurrentScope(){
   refreshRhymesFromActive();
   refreshDisplayedNoteCells();
   updateAudioButtonsUI();
-  try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
+  notifyLinkedProjectChanged();
 }
 
-async function handleAuthSessionChange(session, reason=""){
+async function handleAuthSessionChange(user, reason=""){
   const seq = ++cloud.authChangeSeq;
   const prevScope = getStorageScope();
+  if(cloud.appMounted) flushLibrary();
 
-  cloud.session = session || null;
-  cloud.user = session?.user || null;
+  cloud.user = user || null;
+  cloud.ready = !!cloud.user;
 
   if(cloud.user){
-    cloud.ready = true;
     setCloudStatus("syncing");
     try{
-      /* Returning users already have a scoped local cache. During initial boot, render that cache immediately after auth and reconcile Cloudflare just after the app mounts. This removes the large SRP project-list network/JSON merge from the critical paint path. New devices with no cached projects still perform the full cloud restore before rendering, so we never create/push a stray blank project. */
-      const cachedForUser = loadAllProjectsForScope(getAuthUserId());
-      const canDeferInitialMerge = reason === "init" && Array.isArray(cachedForUser) && cachedForUser.length > 0;
-      if(canDeferInitialMerge){
-        cloud.deferInitialMerge = true;
-        updateAuthModalUI();
-      }else{
-        // Only adopt guest projects when this account has no SRP cloud projects yet.
-        // Migrated/established accounts must never be polluted by a device's guest scratch data.
-        const existingRemote = await fetchCloudProjects();
-        if(!existingRemote.length) maybeSeedSignedInScopeFromGuest();
-        await mergeCloudIntoLocal();
+      // Returning users already have a local copy: render it first and reconcile with the
+      // cloud right after the app mounts. A new device with nothing cached restores from
+      // the cloud before rendering, so it never creates and pushes a stray blank song.
+      const cached = readStoredProjects(getAuthUserId()).list;
+      if(!(reason === "init" && cached.length)){
+        const rows = await fetchCloudProjects();
         if(seq !== cloud.authChangeSeq) return;
+        // Only adopt this device's signed-out songs when the account has none yet.
+        if(!rows.length) maybeSeedSignedInScopeFromGuest();
+        const pulled = applyCloudRows(rows, { full:true });
+        if(pulled.notices.length) showSyncNotice(pulled.notices);
+        flushLibrary();
         setCloudStatus("ok");
-        queueCloudSync(reason || "auth");
-        updateAuthModalUI();
+        queueCloudSync(reason || "auth", 200);
       }
+      updateAuthModalUI();
     }catch(err){
       if(seq !== cloud.authChangeSeq) return;
       console.error("Cloud auth sync failed", err);
@@ -2340,42 +2355,50 @@ async function handleAuthSessionChange(session, reason=""){
       updateAuthModalUI(err?.message || "Cloud sync failed.");
     }
   }else{
-    cloud.ready = false;
     setCloudStatus("local");
     updateAuthModalUI();
   }
 
-  const nextScope = getStorageScope();
-  if(cloud.appMounted && prevScope !== nextScope){
+  if(cloud.appMounted && prevScope !== getStorageScope()){
     await reloadProjectForCurrentScope();
   }
+}
+
+function wireLibraryAndCloudEvents(){
+  if(cloud.listenersWired) return;
+  cloud.listenersWired = true;
+  // Another tab saved songs: take its changes so neither tab overwrites the other.
+  window.addEventListener("storage", (e) => {
+    if(!library.scope) return;
+    if(e.key === getCurrentProjectStorageKey(library.scope)){
+      currentProjectIdCache = { scope:null, id:null };
+      return;
+    }
+    if(e.key !== getProjectsStorageKey(library.scope) || e.newValue === null || e.newValue === library.lastRaw) return;
+    if(library.pending.size || library.removed.size){
+      flushLibrary();
+      return;
+    }
+    const merged = mergeStoredLibrary(e.newValue, new Set(library.ownSinceWrite), new Set());
+    library.lastRaw = e.newValue;
+    if(merged.changed) refreshAfterLibraryChange(merged);
+  });
+  window.addEventListener("pagehide", () => flushLibrary());
+  document.addEventListener("visibilitychange", () => {
+    if(document.visibilityState === "hidden") flushLibrary();
+    else pullFromCloudSoon("visible");
+  });
+  window.addEventListener("focus", () => pullFromCloudSoon("focus"));
+  window.addEventListener("online", () => { syncWithCloud("online", { media:true }).catch(() => {}); });
 }
 
 async function initCloudSync(){
   if(cloud.authInitialized) return;
   cloud.authInitialized = true;
-
-  if(!canUseCloudSync()){
-    setCloudStatus("local");
-    return;
-  }
-
-  // Keep a lightweight provider marker so all existing cloud-ready guards remain intact.
-  cloud.client = { provider:CLOUD_PROVIDER };
-
+  wireLibraryAndCloudEvents();
   try{
     const result = await suiteCloudApi("/api/auth/me");
-    const user = result?.user || null;
-    await handleAuthSessionChange(user ? { user } : null, "init");
-
-    if(!cloud.onlineListenerWired){
-      cloud.onlineListenerWired = true;
-      window.addEventListener("online", () => {
-        if(cloud.user){
-          syncAllProjectsToCloud("online").catch(err => console.error(err));
-        }
-      });
-    }
+    await handleAuthSessionChange(result?.user || null, "init");
   }catch(err){
     console.error("Cloud init failed", err);
     cloud.ready = false;
@@ -2383,32 +2406,8 @@ async function initCloudSync(){
   }
 }
 
-function scheduleDeferredCloudAudioSync(reason="deferred"){
-  try{
-    if(!cloud.client || !cloud.user || !getAuthUserId()) return;
-    clearTimeout(cloud._audioDeferredTimer);
-    cloud._audioDeferredTimer = setTimeout(() => {
-      syncCloudAudioForAllProjects(reason).catch(err => {
-        console.error("Deferred cloud audio sync failed", err);
-      });
-    }, 1200);
-  }catch{}
-}
-
-function scheduleDeferredCloudNoteImageSync(reason="deferred"){
-  try{
-    if(!cloud.client || !cloud.user || !getAuthUserId()) return;
-    clearTimeout(cloud._noteImageDeferredTimer);
-    cloud._noteImageDeferredTimer = setTimeout(() => {
-      syncCloudNoteImagesForAllProjects(reason).catch(err => {
-        console.error("Deferred cloud note image sync failed", err);
-      });
-    }, 1200);
-  }catch{}
-}
-
 async function submitAuthSignIn(){
-  if(!cloud.client) await initCloudSync();
+  if(!cloud.authInitialized) await initCloudSync();
   const email = String(document.getElementById("authEmailInput")?.value || "").trim();
   const password = String(document.getElementById("authPasswordInput")?.value || "");
   if(!email || !password){
@@ -2421,7 +2420,7 @@ async function submitAuthSignIn(){
       method:"POST",
       body:JSON.stringify({ email, password })
     });
-    await handleAuthSessionChange(result?.user ? { user:result.user } : null, "SIGNED_IN");
+    await handleAuthSessionChange(result?.user || null, "SIGNED_IN");
     updateAuthModalUI("Signed in.");
     closeAuthModal();
   }catch(err){
@@ -2432,7 +2431,7 @@ async function submitAuthSignIn(){
 }
 
 async function submitAuthSignUp(){
-  if(!cloud.client) await initCloudSync();
+  if(!cloud.authInitialized) await initCloudSync();
   const email = String(document.getElementById("authEmailInput")?.value || "").trim();
   const password = String(document.getElementById("authPasswordInput")?.value || "");
   if(!email || !password){
@@ -2454,7 +2453,7 @@ async function submitAuthSignUp(){
       method:"POST",
       body:JSON.stringify({ email, password, displayName, inviteCode })
     });
-    await handleAuthSessionChange(result?.user ? { user:result.user } : null, "SIGNED_UP");
+    await handleAuthSessionChange(result?.user || null, "SIGNED_UP");
     updateAuthModalUI("Account created and signed in.");
     closeAuthModal();
   }catch(err){
@@ -2464,21 +2463,11 @@ async function submitAuthSignUp(){
   }
 }
 
-async function submitAuthSendReset(){
-  // Song Rider Suite account recovery is handled from the main Cloud Account panel.
-  setAuthMode("signin");
-  updateAuthModalUI("Password recovery is handled from the main Song Rider Suite Cloud Account panel.");
-}
-
-async function submitAuthUpdatePassword(){
-  setAuthMode("signin");
-  updateAuthModalUI("Change your password from the main Song Rider Suite Cloud Account panel.");
-}
-
 async function submitAuthSignOut(){
-  if(!cloud.client) return;
+  if(!cloud.user) return;
   try{
     setAuthBusy(true, "Signing out…");
+    await syncWithCloud("sign-out").catch(err => console.warn("Final sync before sign-out failed", err));
     await suiteCloudApi("/api/auth/logout", { method:"POST", body:"{}" });
     await handleAuthSessionChange(null, "SIGNED_OUT");
     closeAuthModal();
@@ -2500,23 +2489,12 @@ function wireAuthModal(){
   });
   document.getElementById("authSignInBtn")?.addEventListener("click", submitAuthSignIn);
   document.getElementById("authSignUpBtn")?.addEventListener("click", submitAuthSignUp);
-  const forgotBtn = document.getElementById("authForgotPasswordBtn");
-  if(forgotBtn) forgotBtn.style.display = "none";
-  const resetWrap = document.getElementById("authResetWrap");
-  if(resetWrap) resetWrap.style.display = "none";
-  document.getElementById("authBackToSignInBtn")?.addEventListener("click", () => {
-    setAuthMode("signin");
-    updateAuthModalUI();
-  });
-  document.getElementById("authSendResetBtn")?.addEventListener("click", submitAuthSendReset);
-  document.getElementById("authUpdatePasswordBtn")?.addEventListener("click", submitAuthUpdatePassword);
   document.getElementById("authSignOutBtn")?.addEventListener("click", submitAuthSignOut);
   document.getElementById("authSyncNowBtn")?.addEventListener("click", async () => {
     try{
       updateAuthModalUI("Syncing now…");
-      await syncAllProjectsToCloud("manual");
-      try{ await reloadProjectForCurrentScope(); }catch{}
-      updateAuthModalUI("Synced.");
+      await syncWithCloud("manual", { media:true });
+      updateAuthModalUI(cloud.status === "error" ? `Sync failed: ${cloud.lastError}` : "Synced.");
     }catch(err){
       updateAuthModalUI(err?.message || "Sync failed.");
     }
@@ -2526,13 +2504,6 @@ function wireAuthModal(){
     document.getElementById(id)?.addEventListener("keydown", (e) => {
       if(e.key === "Enter") submitAuthSignIn();
     });
-  });
-
-  document.getElementById("authResetEmailInput")?.addEventListener("keydown", (e) => {
-    if(e.key === "Enter") submitAuthSendReset();
-  });
-  document.getElementById("authNewPasswordInput")?.addEventListener("keydown", (e) => {
-    if(e.key === "Enter") submitAuthUpdatePassword();
   });
 
   updateAuthModalUI();
@@ -2605,6 +2576,9 @@ function pruneLegacyTrailingBlankFullBlocks(fullText){
     }
     break;
   }
+  // Nothing to prune: return the text unchanged so normalizing is idempotent
+  // (rebuilding it here used to add a blank line on every pass).
+  if(lastKeep === blocks.length - 1) return txt;
 
   const kept = blocks.slice(0, Math.max(1, lastKeep + 1));
   const out = [];
@@ -2651,185 +2625,441 @@ steps: 0,
 };
 }
 
-function hydrateProjectsArrayWithNotes(projects, scope){
-  const arr = Array.isArray(projects) ? projects : [];
-  let changed = false;
+/***********************
+Project library (local-first store)
+- One in-memory list of projects per storage scope ("guest" or the signed-in user id).
+  state.project and the editors hold live references into this list.
+- Saves are debounced and flushed on pagehide / when the tab is hidden, so typing does
+  not re-serialize the whole library on every keystroke.
+- localStorage keeps the same key and JSON array format older builds use. Before writing,
+  changes another tab made to other songs are merged in (no lost multi-tab edits).
+- A small per-scope sync record remembers each song's server revision, which songs have
+  unsynced changes and which deletes still have to reach the server.
+- If storage is full the songs stay in memory (and are still pushed to the cloud) and a
+  banner tells the user.
+***********************/
+const LS_SYNC = "songrider_v25_sync";
+const LIBRARY_SAVE_DELAY_MS = 300;
+// Bookkeeping fields: changing them must not move a song's "last changed" time.
+const NON_CONTENT_FIELDS = new Set(["updatedAt", "cloudAudioManifest", "notesImages", "linkedCrpProjectId", "linkedOctave", "linkedTranspose", "crpChordRows", "crpBeatsPerChord", "crpKey", "crpRowsSig"]);
 
-  const out = arr.map((proj) => {
-    if(!proj || typeof proj !== "object") return proj;
+const library = {
+  scope: null,
+  list: [],
+  written: new Map(),     // id -> JSON last written to (or read from) storage
+  content: new Map(),     // id -> content signature at that point
+  pending: new Set(),     // ids changed in memory since the last write
+  bump: new Set(),        // pending ids whose change may count as a content edit
+  removed: new Set(),     // ids deleted in memory since the last write
+  ownSinceWrite: new Set(), // ids whose in-memory copy wins over another tab's write until we write
+  lastRaw: null,          // the exact string we last read/wrote, to spot other tabs' writes
+  writeFailed: false,
+  legacyNoteKeys: [],     // old notes backup keys to drop after the next good write
+  saveTimer: 0,
+  forceWrite: false,      // rewrite even without pending edits (server copies adopted)
+  syncMetaFallback: null  // sync record kept in memory while storage is full
+};
+let currentProjectIdCache = { scope:null, id:null };
 
-    const next = deepClone(proj);
-    const projectId = String(next.id || "").trim();
-    if(!projectId) return next;
-
-    const candidates = [];
-    const existingDoc = (typeof next.notesDoc === "string") ? next.notesDoc : "";
-    const existingColor = (typeof next.notesColor === "string") ? next.notesColor : "";
-    candidates.push({
-      notesDoc: existingDoc,
-      notesColor: existingColor,
-      notesUpdatedAt: Number(next.notesUpdatedAt) || 0,
-      notesClearedAt: Number(next.notesClearedAt) || 0,
-      updatedAt: Number(next.notesUpdatedAt) || 0
-    });
-
-    try{
-      const scopedBackup = parseNotesBackupRaw(localStorage.getItem(notesBackupKey(projectId, scope)));
-      if(scopedBackup) candidates.push(scopedBackup);
-    }catch{}
-
-    try{
-      const legacyBackup = parseNotesBackupRaw(localStorage.getItem(legacyNotesBackupKey(projectId)));
-      if(legacyBackup) candidates.push(legacyBackup);
-    }catch{}
-
-    const best = pickBestNotesBackup(candidates);
-    if(best){
-      const bestDoc = String(best.notesDoc || "");
-      const bestColor = String(best.notesColor || "");
-      const bestNotesUpdatedAt = Number(best.notesUpdatedAt ?? best.updatedAt) || 0;
-      const bestNotesClearedAt = Number(best.notesClearedAt) || 0;
-
-      if(bestDoc !== existingDoc){
-        next.notesDoc = bestDoc;
-        changed = true;
-      }else if(typeof next.notesDoc !== "string"){
-        next.notesDoc = bestDoc;
-        changed = true;
-      }
-
-      if(bestNotesUpdatedAt !== (Number(next.notesUpdatedAt) || 0)){
-        next.notesUpdatedAt = bestNotesUpdatedAt;
-        changed = true;
-      }
-      if(bestNotesClearedAt !== (Number(next.notesClearedAt) || 0)){
-        next.notesClearedAt = bestNotesClearedAt;
-        changed = true;
-      }
-
-      if(bestColor && bestColor !== existingColor){
-        next.notesColor = bestColor;
-        changed = true;
-      }else if(!existingColor && bestColor){
-        next.notesColor = bestColor;
-        changed = true;
-      }
-    }else{
-      if(typeof next.notesDoc !== "string"){
-        next.notesDoc = "";
-        changed = true;
-      }
-      if(typeof next.notesColor !== "string"){
-        next.notesColor = "#151515";
-        changed = true;
-      }
-      if(!Number.isFinite(Number(next.notesUpdatedAt))){
-        next.notesUpdatedAt = 0;
-        changed = true;
-      }
-      if(!Number.isFinite(Number(next.notesClearedAt))){
-        next.notesClearedAt = 0;
-        changed = true;
-      }
-    }
-
-    return next;
-  });
-
-  return { projects: out, changed };
+function contentSignature(p){
+  return JSON.stringify(p, function(k, v){ return (this === p && NON_CONTENT_FIELDS.has(k)) ? undefined : v; });
 }
 
-function loadAllProjectsForScope(scope){
+function readStoredProjects(scope){
   try{
     const raw = localStorage.getItem(getProjectsStorageKey(scope));
     const arr = raw ? JSON.parse(raw) : [];
-    const list = Array.isArray(arr) ? arr : [];
-    const hydrated = hydrateProjectsArrayWithNotes(list, scope);
-    if(hydrated.changed){
-      try{ localStorage.setItem(getProjectsStorageKey(scope), JSON.stringify(hydrated.projects)); }catch{}
-    }
-    return hydrated.projects;
-  }catch{
-    return [];
+    return { raw, list: (Array.isArray(arr) ? arr : []).filter(p => p && typeof p === "object" && p.id) };
+  }catch(err){
+    console.error("Could not read saved songs", err);
+    return { raw:null, list:[] };
   }
 }
 
-function saveAllProjectsForScope(scope, projects){
-  const hydrated = hydrateProjectsArrayWithNotes(projects, scope);
-  localStorage.setItem(getProjectsStorageKey(scope), JSON.stringify(hydrated.projects));
+// Older builds kept up to three extra copies of each song's notes in separate keys.
+// They are read once here, merged into the song if they hold better notes, and removed
+// after the library has been written successfully.
+function adoptLegacyNotesBackups(project, scope){
+  const candidates = [];
+  for(const key of [notesBackupKey(project.id, scope), legacyNotesBackupKey(project.id)]){
+    let raw = null;
+    try{ raw = localStorage.getItem(key); }catch{}
+    if(raw === null) continue;
+    library.legacyNoteKeys.push(key);
+    const parsed = parseNotesBackupRaw(raw);
+    if(parsed) candidates.push(parsed);
+  }
+  if(!candidates.length) return false;
+  const own = { notesDoc: String(project.notesDoc || ""), notesColor: String(project.notesColor || ""), notesUpdatedAt: Number(project.notesUpdatedAt) || 0, notesClearedAt: Number(project.notesClearedAt) || 0 };
+  const best = pickBestNotesBackup([own, ...candidates]);
+  if(!best || best === own || String(best.notesDoc || "") === own.notesDoc) return false;
+  project.notesDoc = String(best.notesDoc || "");
+  project.notesUpdatedAt = Number(best.notesUpdatedAt) || own.notesUpdatedAt;
+  project.notesClearedAt = Number(best.notesClearedAt) || 0;
+  if(String(best.notesColor || "").trim()) project.notesColor = String(best.notesColor);
+  return true;
+}
+
+function rememberWritten(p){
+  library.written.set(p.id, JSON.stringify(p));
+  library.content.set(p.id, contentSignature(p));
+}
+
+function ensureLibrary(){
+  const scope = getStorageScope();
+  if(library.scope === scope) return library;
+  if(library.scope) flushLibrary();
+  library.scope = scope;
+  library.list = [];
+  library.written.clear();
+  library.content.clear();
+  library.pending.clear();
+  library.bump.clear();
+  library.removed.clear();
+  library.ownSinceWrite.clear();
+  library.legacyNoteKeys = [];
+  library.writeFailed = false;
+  library.syncMetaFallback = null;
+  const stored = readStoredProjects(scope);
+  library.lastRaw = stored.raw;
+  for(const raw of stored.list){
+    const notesRecovered = adoptLegacyNotesBackups(raw, scope);
+    const p = normalizeProject(raw);
+    if(library.list.some(x => x.id === p.id)) continue;
+    library.list.push(p);
+    rememberWritten(p);
+    if(notesRecovered){
+      library.written.delete(p.id);
+      library.pending.add(p.id);
+    }
+  }
+  if(library.pending.size || library.legacyNoteKeys.length) scheduleLibrarySave();
+  return library;
+}
+
+function libraryProject(id){
+  const sid = String(id || "");
+  if(!sid) return null;
+  // The open song is the one the editors write to; keep the library pointing at it.
+  if(state.project && String(state.project.id || "") === sid){
+    const lib = ensureLibrary();
+    const i = lib.list.findIndex(p => String(p.id) === sid);
+    if(i >= 0 && lib.list[i] !== state.project) lib.list[i] = state.project;
+    if(i >= 0) return state.project;
+  }
+  return ensureLibrary().list.find(p => String(p.id) === sid) || null;
+}
+
+function scheduleLibrarySave(){
+  clearTimeout(library.saveTimer);
+  library.saveTimer = setTimeout(flushLibrary, LIBRARY_SAVE_DELAY_MS);
+}
+
+function addProjectToLibrary(p){
+  const lib = ensureLibrary();
+  if(!lib.list.some(x => x.id === p.id)) lib.list.unshift(p);
+  lib.removed.delete(p.id);
+  lib.pending.add(p.id);
+  scheduleLibrarySave();
+}
+
+function removeProjectFromLibrary(id){
+  const lib = ensureLibrary();
+  const sid = String(id);
+  lib.list = lib.list.filter(p => String(p.id) !== sid);
+  lib.pending.delete(sid);
+  lib.bump.delete(sid);
+  lib.written.delete(sid);
+  lib.content.delete(sid);
+  lib.removed.add(sid);
+  scheduleLibrarySave();
+}
+
+// A server copy replaces the local one. This is not a local edit: it is written but not
+// marked for upload.
+function replaceProjectFromCloud(remote){
+  const lib = ensureLibrary();
+  const i = lib.list.findIndex(p => String(p.id) === String(remote.id));
+  if(i >= 0) lib.list[i] = remote; else lib.list.push(remote);
+  if(state.project && String(state.project.id) === String(remote.id)) state.project = remote;
+  lib.pending.delete(remote.id);
+  lib.bump.delete(remote.id);
+  lib.removed.delete(remote.id);
+  lib.ownSinceWrite.add(remote.id);
+  library.forceWrite = true;
+  rememberWritten(remote);
+  scheduleLibrarySave();
+}
+
+function dirtyStamp(){
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getSyncMetaKey(scope){
+  return scopedStorageKey(LS_SYNC, scope);
+}
+
+function readSyncMeta(scope){
+  const s = scope || ensureLibrary().scope;
+  let m = (s === library.scope) ? library.syncMetaFallback : null;
+  if(!m){
+    try{ m = JSON.parse(localStorage.getItem(getSyncMetaKey(s)) || "null"); }
+    catch(err){ console.warn("Sync record unreadable; starting fresh", err); m = null; }
+  }
+  m = (m && typeof m === "object") ? m : {};
+  return {
+    v: 1,
+    rev: (m.rev && typeof m.rev === "object") ? m.rev : {},
+    dirty: (m.dirty && typeof m.dirty === "object") ? m.dirty : {},
+    deleted: (m.deleted && typeof m.deleted === "object") ? m.deleted : {}
+  };
+}
+
+function updateSyncMeta(fn){
+  const scope = ensureLibrary().scope;
+  const m = readSyncMeta(scope);
+  fn(m);
+  try{
+    localStorage.setItem(getSyncMetaKey(scope), JSON.stringify(m));
+    library.syncMetaFallback = null;
+  }catch(err){
+    library.syncMetaFallback = m;
+    reportStorageError(err);
+  }
+  return m;
+}
+
+function markProjectsDirty(ids){
+  if(!ids.length || library.scope === "guest") return;
+  updateSyncMeta(m => { for(const id of ids) m.dirty[id] = dirtyStamp(); });
+}
+
+// Merge another tab's write into memory. Songs this tab changed (or deleted) keep this
+// tab's version; everything else takes the stored version.
+function mergeStoredLibrary(raw, keepIds, droppedIds){
+  let stored = [];
+  try{ stored = JSON.parse(raw || "[]"); }catch(err){ console.warn("Another tab wrote unreadable songs; ignoring", err); return { currentChanged:false, changed:false }; }
+  if(!Array.isArray(stored)) return { currentChanged:false, changed:false };
+  const lib = library;
+  const meta = readSyncMeta(lib.scope);
+  const currentId = String(state.project?.id || "");
+  const storedIds = new Set();
+  let changed = false, currentChanged = false;
+  for(const s of stored){
+    if(!s || !s.id) continue;
+    const id = String(s.id);
+    storedIds.add(id);
+    if(keepIds.has(id) || droppedIds.has(id) || meta.deleted[id]) continue;
+    const json = JSON.stringify(s);
+    if(json === lib.written.get(id)) continue;
+    const p = normalizeProject(s);
+    const i = lib.list.findIndex(x => String(x.id) === id);
+    if(i >= 0) lib.list[i] = p; else lib.list.push(p);
+    lib.written.set(id, json);
+    lib.content.set(id, contentSignature(p));
+    if(id === currentId) currentChanged = true;
+    changed = true;
+  }
+  const before = lib.list.length;
+  lib.list = lib.list.filter(p => storedIds.has(String(p.id)) || keepIds.has(String(p.id)));
+  if(lib.list.length !== before){
+    changed = true;
+    if(currentId && !lib.list.some(p => String(p.id) === currentId)) currentChanged = true;
+  }
+  return { changed, currentChanged };
+}
+
+// Write pending changes now. quiet: called from inside a cloud sync, which pushes them itself.
+function flushLibrary(opts={}){
+  clearTimeout(library.saveTimer);
+  library.saveTimer = 0;
+  const lib = library;
+  if(!lib.scope) return true;
+  if(!lib.pending.size && !lib.removed.size && !lib.writeFailed && !lib.forceWrite && !lib.legacyNoteKeys.length) return true;
+
+  const changedIds = [];
+  for(const id of lib.pending){
+    const p = lib.list.find(x => x.id === id);
+    if(!p) continue;
+    let json = JSON.stringify(p);
+    if(json === lib.written.get(id)) continue; // nothing actually changed (echo / repeated save)
+    const sig = contentSignature(p);
+    if(lib.bump.has(id) && lib.content.has(id) && sig !== lib.content.get(id)){
+      p.updatedAt = now(); // a real content edit
+      json = JSON.stringify(p);
+    }
+    lib.written.set(id, json);
+    lib.content.set(id, contentSignature(p));
+    changedIds.push(id);
+    lib.ownSinceWrite.add(id);
+  }
+  const keep = new Set(lib.ownSinceWrite);
+  const dropped = new Set([...lib.removed]);
+  lib.pending.clear();
+  lib.bump.clear();
+  lib.removed.clear();
+  lib.forceWrite = false;
+
+  const key = getProjectsStorageKey(lib.scope);
+  let merged = { changed:false, currentChanged:false };
+  try{
+    const raw = localStorage.getItem(key);
+    if(raw !== null && raw !== lib.lastRaw) merged = mergeStoredLibrary(raw, keep, dropped);
+  }catch(err){ console.warn("Could not check for other tabs' changes", err); }
+
+  const text = "[" + lib.list.map(p => lib.written.get(p.id) || JSON.stringify(p)).join(",") + "]";
+  let ok = true;
+  try{
+    localStorage.setItem(key, text);
+    lib.lastRaw = text;
+    lib.writeFailed = false;
+    lib.ownSinceWrite.clear();
+    reportStorageError(null);
+    if(lib.legacyNoteKeys.length){
+      for(const k of lib.legacyNoteKeys){ try{ localStorage.removeItem(k); }catch{} }
+      lib.legacyNoteKeys = [];
+    }
+  }catch(err){
+    ok = false;
+    lib.writeFailed = true;
+    reportStorageError(err);
+  }
+  markProjectsDirty(changedIds);
+  if((changedIds.length || dropped.size) && !opts.quiet) queueCloudSync("local-save");
+  if(merged.changed && cloud.appMounted) refreshAfterLibraryChange(merged);
+  return ok;
+}
+
+// Persistent, visible warning when the browser refuses to store songs.
+function reportStorageError(err){
+  let bar = document.getElementById("srpStorageBanner");
+  if(!err){
+    if(bar) bar.hidden = true;
+    return;
+  }
+  if(!bar || bar.hidden) console.error("Saving songs on this device failed", err);
+  if(!bar){
+    bar = document.createElement("div");
+    bar.id = "srpStorageBanner";
+    bar.className = "srpStorageBanner";
+    bar.setAttribute("role", "alert");
+    document.body.prepend(bar);
+  }
+  const quota = /quota|exceeded|full/i.test(String(err?.name || "") + " " + String(err?.message || ""));
+  bar.textContent = (quota ? "This device's storage is full, so your latest changes could not be saved on this device. " : "Your latest changes could not be saved on this device. ")
+    + (cloudSignedIn() ? "They are still being backed up to your cloud account. " : "Sign in to back them up to the cloud, ")
+    + "Keep this tab open, then free up space (delete old songs or recordings, or clear other site data).";
+  bar.hidden = false;
+}
+
+// Re-render after songs changed underneath the editors (cloud pull, another tab).
+function refreshAfterLibraryChange({ currentChanged } = {}){
+  if(!cloud.appMounted) return;
+  if(currentChanged || !state.project || !library.list.includes(state.project)){
+    const focus = captureEditorFocus();
+    const keepSection = state.currentSection;
+    state.project = getCurrentProject();
+    state.currentSection = (keepSection === "Full" || isSectionVisible(keepSection)) ? keepSection : "Full";
+    applyProjectSettingsToUI();
+    renderAll();
+    renderRecordings();
+    restoreEditorFocus(focus);
+    notifyLinkedProjectChanged();
+  }
+  renderProjectsDropdown();
+  renderArchiveModal();
+}
+
+function captureEditorFocus(){
+  const a = document.activeElement;
+  if(!a || !a.matches?.("textarea.fullSectionText, textarea.lyrics")) return null;
+  const sel = a.matches("textarea.fullSectionText") ? "textarea.fullSectionText" : "textarea.lyrics";
+  return { sel, index: Array.from(document.querySelectorAll(sel)).indexOf(a), start: a.selectionStart, end: a.selectionEnd };
+}
+
+function restoreEditorFocus(f){
+  if(!f || f.index < 0) return;
+  const ta = document.querySelectorAll(f.sel)[f.index];
+  if(!ta) return;
+  try{
+    ta.focus({ preventScroll:true });
+    const max = ta.value.length;
+    ta.setSelectionRange(Math.min(f.start, max), Math.min(f.end, max));
+  }catch{}
 }
 
 function getCurrentProjectIdForScope(scope){
-  try{ return localStorage.getItem(getCurrentProjectStorageKey(scope)) || ""; }catch{ return ""; }
+  if(currentProjectIdCache.scope === scope) return currentProjectIdCache.id || "";
+  let id = "";
+  try{ id = localStorage.getItem(getCurrentProjectStorageKey(scope)) || ""; }catch{}
+  currentProjectIdCache = { scope, id };
+  return id;
 }
 
 function setCurrentProjectIdForScope(scope, id){
-  try{ localStorage.setItem(getCurrentProjectStorageKey(scope), String(id || "")); }catch{}
+  const sid = String(id || "");
+  if(currentProjectIdCache.scope === scope && currentProjectIdCache.id === sid) return;
+  currentProjectIdCache = { scope, id:sid };
+  try{ localStorage.setItem(getCurrentProjectStorageKey(scope), sid); }catch(err){ console.warn("Could not remember the open song", err); }
 }
 
 function clearCurrentProjectIdForScope(scope){
+  currentProjectIdCache = { scope, id:"" };
   try{ localStorage.removeItem(getCurrentProjectStorageKey(scope)); }catch{}
 }
 
+// A brand-new account adopts the songs this device made while signed out.
 function maybeSeedSignedInScopeFromGuest(){
-  const userId = getAuthUserId();
-  if(!userId) return;
-  const userProjects = loadAllProjectsForScope(userId);
-  if(Array.isArray(userProjects) && userProjects.length) return;
-  const guestProjects = loadAllProjectsForScope("guest");
-  if(!Array.isArray(guestProjects) || !guestProjects.length) return;
-  saveAllProjectsForScope(userId, deepClone(guestProjects));
+  const lib = ensureLibrary();
+  if(lib.scope === "guest" || lib.list.length) return;
+  const guest = readStoredProjects("guest").list;
+  if(!guest.length) return;
+  for(const raw of guest) addProjectToLibrary(normalizeProject(deepClone(raw)));
   const guestCur = getCurrentProjectIdForScope("guest");
-  if(guestCur) setCurrentProjectIdForScope(userId, guestCur);
+  if(guestCur) setCurrentProjectIdForScope(lib.scope, guestCur);
+  flushLibrary();
 }
 
-
+// Snapshot copies (callers may modify them freely and save them with upsertProject).
 function loadAllProjects(){
-  return loadAllProjectsForScope(getStorageScope());
+  return ensureLibrary().list.map(p => deepClone(p));
 }
 
-function saveAllProjects(projects){
-  saveAllProjectsForScope(getStorageScope(), projects);
-  if(!cloud.suspendQueue) queueCloudSync("saveAllProjects");
+// Save a project. Options:
+//   bump:false   - bookkeeping / echo: never moves the song's "last changed" time
+//   select:false - do not make it the song that opens next time
+function upsertProject(p, opts={}){
+  if(!p || !p.id) return;
+  const lib = ensureLibrary();
+  const i = lib.list.findIndex(x => x.id === p.id);
+  if(i >= 0) lib.list[i] = p; else lib.list.unshift(p);
+  lib.removed.delete(p.id);
+  lib.pending.add(p.id);
+  if(opts.bump !== false) lib.bump.add(p.id);
+  if(opts.select === true || (opts.select !== false && (!state.project || state.project === p))) setCurrentProjectIdForScope(lib.scope, p.id);
+  scheduleLibrarySave();
 }
 
-function upsertProject(p){
-  const all = loadAllProjects();
-  const i = all.findIndex(x => x.id === p.id);
-  p.updatedAt = now();
-  if(i >= 0) all[i] = p;
-  else all.unshift(p);
-  saveAllProjects(all);
-  writeNotesBackup(p);
-  setCurrentProjectIdForScope(getStorageScope(), p.id);
-  if(!cloud.suspendQueue) queueCloudSync("upsertProject");
-}
-
-// Some newer UI paths call this helper.
-// Keep it simple and reliable: persist the current project snapshot.
 function saveCurrentProject(){
-  try{
-    if(state && state.project) upsertProject(state.project);
-  }catch(err){
-    console.error(err);
-  }
+  if(state && state.project) upsertProject(state.project);
 }
 
 function deleteProjectById(id){
-  const all = loadAllProjects().filter(p => p.id !== id);
-  saveAllProjects(all);
-  deleteNotesBackup(id);
-  clearCurrentProjectIdForScope(getStorageScope());
-  if(!cloud.suspendQueue && getAuthUserId()){
-    deleteProjectFromCloud(id).then(() => {
-      setCloudStatus("ok");
-    }).catch(err => {
-      console.error("Cloud delete failed", err);
-      setCloudStatus("error", err?.message || String(err || "Unknown error"));
+  const lib = ensureLibrary();
+  const sid = String(id || "");
+  if(!sid) return;
+  removeProjectFromLibrary(sid);
+  deleteNotesBackup(sid);
+  clearCurrentProjectIdForScope(lib.scope);
+  if(lib.scope !== "guest"){
+    // Keep a local tombstone until the server confirms, so a pull cannot bring it back.
+    updateSyncMeta(m => {
+      m.deleted[sid] = { at: now(), rev: Number(m.rev[sid]) || 0 };
+      delete m.dirty[sid];
     });
   }
+  flushLibrary();
 }
-
 
 async function dbGet(id){
   const db = await openDB();
@@ -2839,11 +3069,6 @@ async function dbGet(id){
     req.onsuccess = () => resolve(req.result || null);
     req.onerror = () => reject(req.error);
   });
-}
-
-function getProjectByIdLocal(projectId){
-  const all = loadAllProjects().map(normalizeProject).filter(Boolean);
-  return all.find(p => String(p.id || "") === String(projectId || "")) || null;
 }
 
 function getCloudAudioManifest(project){
@@ -2906,7 +3131,7 @@ function recordingToManifestEntry(rec){
 }
 
 async function uploadRecordingToCloud(rec){
-  if(!cloud.client || !cloud.user || !rec || !rec.id || !rec.blob) return null;
+  if(!cloudSignedIn() || !rec || !rec.id || !rec.blob) return null;
   const entry = recordingToManifestEntry(rec);
   const path = entry.path;
   const url = cloudMediaUrl(path, rec.projectId || entry.projectId);
@@ -2927,7 +3152,7 @@ async function uploadRecordingToCloud(rec){
 }
 
 async function downloadRecordingFromCloud(entry){
-  if(!cloud.client || !cloud.user || !entry?.path) return null;
+  if(!cloudSignedIn() || !entry?.path) return null;
   const url = cloudMediaUrl(entry.path, entry.projectId);
   if(!url) return null;
   const res = await fetch(url, { credentials:"same-origin", cache:"no-store" });
@@ -2954,7 +3179,7 @@ async function downloadRecordingFromCloud(entry){
 }
 
 async function removeRecordingFromCloud(entry){
-  if(!cloud.client || !cloud.user || !entry?.path) return;
+  if(!cloudSignedIn() || !entry?.path) return;
   try{
     const url = cloudMediaUrl(entry.path, entry.projectId);
     if(!url) return;
@@ -2969,26 +3194,18 @@ async function removeRecordingFromCloud(entry){
   }
 }
 
-async function saveProjectAudioManifest(project, manifest){
-  if(!project || !project.id) return;
-  const next = normalizeProject(deepClone(project));
-  setProjectCloudAudioManifest(next, manifest);
-
-  if(state.project && String(state.project.id || "") === String(next.id || "")) state.project = next;
-
-  cloud.suspendQueue = true;
-  try{
-    upsertProject(next);
-  }finally{
-    cloud.suspendQueue = false;
-  }
+// Apply a manifest change to the song as it is now (the open song keeps its identity, so the
+// editors' references stay valid and nothing typed meanwhile is reverted).
+function saveProjectAudioManifest(projectId, beforeManifest, nextManifest){
+  const live = libraryProject(projectId);
+  if(!live) return;
+  setProjectCloudAudioManifest(live, applyManifestUpdate(getCloudAudioManifest(live), beforeManifest, nextManifest));
+  upsertProject(live, { bump:false, select:false });
 }
 
-async function tombstoneRecordingInProject(projectId, rec){
-  if(!projectId || !rec) return;
-  const project = getProjectByIdLocal(projectId) || (state.project && String(state.project.id||"")===String(projectId) ? normalizeProject(deepClone(state.project)) : null);
-  if(!project) return;
-  const manifest = getCloudAudioManifest(project);
+function tombstoneRecordingInProject(projectId, rec){
+  const live = libraryProject(projectId);
+  if(!live || !rec) return;
   const path = String(rec.cloudPath || getCloudAudioPath(projectId, rec.id, rec.blob || rec.contentType || "audio/mpeg"));
   const tomb = {
     id: String(rec.id),
@@ -3003,108 +3220,106 @@ async function tombstoneRecordingInProject(projectId, rec){
     size: Number(rec.blob?.size || rec.size || 0),
     deleted: true
   };
-  const map = new Map(manifest.map(e => [String(e.id || ""), { ...(e || {}) }]));
-  map.set(tomb.id, tomb);
-  const nextManifest = Array.from(map.values());
-  await saveProjectAudioManifest(project, nextManifest);
+  const manifest = getCloudAudioManifest(live).filter(e => String(e.id || "") !== tomb.id);
+  manifest.push(tomb);
+  setProjectCloudAudioManifest(live, manifest);
+  upsertProject(live, { bump:false, select:false });
   triggerImmediateCloudSync("recording-delete");
 }
 
 async function syncCloudAudioForAllProjects(reason=""){
-  if(!cloud.client || !cloud.user || !getAuthUserId()) return;
+  if(!cloudSignedIn()) return;
 
-  const allProjects = loadAllProjects().map(normalizeProject).filter(Boolean);
-  const allRecs = await dbGetAll().catch(() => []);
+  const allProjects = ensureLibrary().list.slice();
+  const allRecs = await dbGetAll().catch(err => { console.error("Could not read recordings", err); return []; });
   const recMap = new Map((Array.isArray(allRecs) ? allRecs : []).map(r => [String(r.id || ""), r]));
-  let anyManifestChanged = false;
   let currentProjectTouched = false;
+  let firstError = null;
 
   for(const project of allProjects){
     const projectId = String(project.id || "");
     if(!projectId) continue;
 
-    const manifestMap = new Map(getCloudAudioManifest(project).map(e => [String(e.id || ""), { ...(e || {}) }]));
+    const before = getCloudAudioManifest(project);
+    const manifestMap = new Map(before.map(e => [String(e.id || ""), { ...(e || {}) }]));
     const localProjectRecs = (Array.isArray(allRecs) ? allRecs : []).filter(r => String(r.projectId || "") === projectId);
-    let manifestChanged = false;
     let projectTouched = false;
 
-    for(const rec of localProjectRecs){
-      if(!rec || !rec.id || !rec.blob) continue;
-      const localUpdated = Number(rec.updatedAt) || Number(rec.createdAt) || now();
-      const remoteEntry = manifestMap.get(String(rec.id));
-      const remoteUpdated = Number(remoteEntry?.updatedAt) || 0;
+    try{
+      for(const rec of localProjectRecs){
+        if(!rec || !rec.id || !rec.blob) continue;
+        const localUpdated = Number(rec.updatedAt) || Number(rec.createdAt) || now();
+        const remoteEntry = manifestMap.get(String(rec.id));
+        const remoteUpdated = Number(remoteEntry?.updatedAt) || 0;
 
-      if(!remoteEntry || remoteEntry.deleted || localUpdated > remoteUpdated){
-        const uploadedEntry = await uploadRecordingToCloud(rec);
-        uploadedEntry.updatedAt = localUpdated;
-        uploadedEntry.createdAt = Number(rec.createdAt) || uploadedEntry.createdAt;
-        uploadedEntry.offsetSec = Number(rec.offsetSec) || 0;
-        uploadedEntry.title = String(rec.title || "");
-        manifestMap.set(String(rec.id), uploadedEntry);
-        manifestChanged = true;
-      }else if(remoteUpdated > localUpdated){
-        const remoteRec = await downloadRecordingFromCloud(remoteEntry);
-        if(!remoteRec){
-          manifestMap.delete(String(rec.id));
-          manifestChanged = true;
-          continue;
-        }
-        await dbPut(remoteRec);
-        recMap.set(String(remoteRec.id), remoteRec);
-        projectTouched = true;
-      }
-    }
-
-    for(const [recId, entry] of manifestMap.entries()){
-      const localRec = recMap.get(String(recId));
-      const localUpdated = Number(localRec?.updatedAt) || Number(localRec?.createdAt) || 0;
-      const remoteUpdated = Number(entry?.updatedAt) || 0;
-
-      if(entry?.deleted){
-        if(localRec && remoteUpdated >= localUpdated){
-          await dbDelete(recId);
-          recMap.delete(recId);
+        if(!remoteEntry || remoteEntry.deleted || localUpdated > remoteUpdated){
+          if(remoteEntry?.deleted && remoteUpdated >= localUpdated) continue; // deleted after this copy was made
+          const uploadedEntry = await uploadRecordingToCloud(rec);
+          uploadedEntry.updatedAt = localUpdated;
+          uploadedEntry.createdAt = Number(rec.createdAt) || uploadedEntry.createdAt;
+          uploadedEntry.offsetSec = Number(rec.offsetSec) || 0;
+          uploadedEntry.title = String(rec.title || "");
+          manifestMap.set(String(rec.id), uploadedEntry);
+        }else if(remoteUpdated > localUpdated){
+          const remoteRec = await downloadRecordingFromCloud(remoteEntry);
+          if(!remoteRec){
+            manifestMap.delete(String(rec.id));
+            continue;
+          }
+          await dbPut(remoteRec);
+          recMap.set(String(remoteRec.id), remoteRec);
           projectTouched = true;
         }
-        await removeRecordingFromCloud(entry);
-        continue;
       }
 
-      if(!localRec){
-        const remoteRec = await downloadRecordingFromCloud(entry);
-        if(!remoteRec){
-          manifestMap.delete(String(recId));
-          manifestChanged = true;
+      for(const [recId, entry] of manifestMap.entries()){
+        const localRec = recMap.get(String(recId));
+        const localUpdated = Number(localRec?.updatedAt) || Number(localRec?.createdAt) || 0;
+        const remoteUpdated = Number(entry?.updatedAt) || 0;
+
+        if(entry?.deleted){
+          if(localRec && remoteUpdated >= localUpdated){
+            await dbDelete(recId);
+            recMap.delete(recId);
+            projectTouched = true;
+          }
+          await removeRecordingFromCloud(entry);
           continue;
         }
-        await dbPut(remoteRec);
-        recMap.set(String(remoteRec.id), remoteRec);
-        projectTouched = true;
+
+        if(!localRec){
+          const remoteRec = await downloadRecordingFromCloud(entry);
+          if(!remoteRec){
+            manifestMap.delete(String(recId));
+            continue;
+          }
+          await dbPut(remoteRec);
+          recMap.set(String(remoteRec.id), remoteRec);
+          projectTouched = true;
+        }
       }
+    }catch(err){
+      // Keep going with the other songs; report the failure at the end.
+      console.error("Recording sync failed for", projectId, err);
+      firstError = firstError || err;
     }
 
-    const nextManifest = Array.from(manifestMap.values())
-      .filter(Boolean)
-      .sort((a,b) => (Number(b.updatedAt)||0) - (Number(a.updatedAt)||0));
-
-    if(JSON.stringify(getCloudAudioManifest(project)) !== JSON.stringify(nextManifest)){
-      await saveProjectAudioManifest(project, nextManifest);
-      manifestChanged = true;
+    const nextManifest = Array.from(manifestMap.values()).filter(Boolean);
+    if(JSON.stringify(mergeMediaManifests(before, [])) !== JSON.stringify(mergeMediaManifests(nextManifest, []))){
+      saveProjectAudioManifest(projectId, before, nextManifest);
     }
-
-    if(manifestChanged) anyManifestChanged = true;
-    if(projectTouched) currentProjectTouched = currentProjectTouched || (state.project && String(state.project.id||"") === projectId);
+    if(projectTouched && state.project && String(state.project.id || "") === projectId) currentProjectTouched = true;
   }
 
-  if(anyManifestChanged) queueCloudSync(`audio-manifest-${reason || "sync"}`);
   if(currentProjectTouched) await renderRecordings();
+  if(firstError) throw firstError;
 }
 
 async function deleteRecordingWithSync(rec){
   if(!rec || !rec.id) return;
   const projectId = String(rec.projectId || "");
-  if(cloud.ready && cloud.user && projectId){
-    await tombstoneRecordingInProject(projectId, rec);
+  if(cloudSignedIn() && projectId){
+    tombstoneRecordingInProject(projectId, rec);
   }
   await dbDelete(rec.id);
   if(state.audioSyncRecId === rec.id) stopAudioSync();
@@ -3133,27 +3348,6 @@ function normalizeProject(p){
     deleted: !!entry.deleted
   })).filter((entry) => entry.id);
 
-  const notesBackup = readNotesBackup(p.id);
-  if(notesBackup){
-    const bestNotes = mergeNotesSafely(
-      {
-        notesDoc: String(p.notesDoc || ""),
-        notesColor: String(p.notesColor || ""),
-        notesUpdatedAt: Number(p.notesUpdatedAt) || 0,
-        notesClearedAt: Number(p.notesClearedAt) || 0,
-        updatedAt: Number(p.notesUpdatedAt) || 0
-      },
-      notesBackup
-    );
-    if(bestNotes){
-      p.notesDoc = String(bestNotes.notesDoc || "");
-      p.notesClearedAt = Number(bestNotes.notesClearedAt) || 0;
-      p.notesUpdatedAt = Number(bestNotes.notesUpdatedAt ?? bestNotes.updatedAt) || p.notesUpdatedAt || 0;
-      if(String(bestNotes.notesColor || "").trim()){
-        p.notesColor = String(bestNotes.notesColor || p.notesColor || "#151515");
-      }
-    }
-  }
   if(typeof p.fullSeeded !== "boolean") p.fullSeeded = false; // ✅ NEW
   if(!p.sections || typeof p.sections !== "object") p.sections = {};
   // ✅ Pages-only model: enabledSections must be a subset of BASE_PAGES
@@ -3192,7 +3386,7 @@ function normalizeProject(p){
       }
     }
     p.enabledSections = migratedEnabled;
-  }catch{}
+  }catch(err){ console.error("Could not migrate old section names for", p.id, err); }
 
   // sanitize enabledSections to valid pages (base + extras)
   {
@@ -3236,15 +3430,17 @@ function normalizeProject(p){
   return p;
 }
 
+// The song to show: the remembered one, else the first active song, else a new blank one.
+// Returns the live library object (editors write straight into it).
 function getCurrentProject(){
-  const all = loadAllProjects().map(normalizeProject).filter(Boolean);
-  const active = all.filter(p => !p.archived);
+  const lib = ensureLibrary();
+  const active = lib.list.filter(p => !p.archived);
   if(active.length === 0){
     const p = defaultProject("New Song");
-    upsertProject(p);
+    upsertProject(p, { bump:false, select:true });
     return p;
   }
-  const curId = getCurrentProjectIdForScope(getStorageScope());
+  const curId = getCurrentProjectIdForScope(lib.scope);
   return (curId && active.find(p => p.id === curId)) || active[0];
 }
 
@@ -3764,23 +3960,6 @@ function shouldTickRun(){
   return !!(state.drumsOn || state.instrumentOn || state.autoScrollOn);
 }
 
-
-function getVisibleCards(){
-  const cards = getCards();
-  if(cards.length === 0) return [];
-
-  const topLine = getHeaderBottomY() - 18;
-  const bottomLine = window.innerHeight + 18;
-
-  const vis = [];
-  for(const c of cards){
-    const r = c.getBoundingClientRect();
-    if(r.bottom < topLine) continue;
-    if(r.top > bottomLine) continue;
-    vis.push(c);
-  }
-  return vis.length ? vis : [cards[0]];
-}
 
 function uiTick8(){
   if(state.autoScrollPaused){
@@ -7894,10 +8073,8 @@ function ensureCapoStepToggle(){
       repaint();
       refreshDisplayedNoteCells();
       updateKeyFromAllNotes();
-      updateFullIfVisible?.();
       if(state.project) upsertProject(state.project);
       window.CRP_SRP_syncMetaToCrp?.();
-      window.CRP_SRP_writeHardSyncFromSrp?.();
     });
   }
 
@@ -8618,7 +8795,6 @@ function applyChordRowUiRefresh(card, line, noteInputs){
     }
   }catch{}
   updateKeyFromAllNotes();
-  updateFullIfVisible();
   refreshDisplayedNoteCells();
 }
 
@@ -8928,21 +9104,23 @@ function buildAlignedLine(line, semis=0){
   return { notesLine, lyricsLine, beatsLine: lyricsLine };
 }
 
+// Chord line placed over a lyric line: each chord goes to its slot's column, but never on top
+// of (or glued to) the previous chord, even when the lyric is short. Two spaces between chords
+// keep the line readable as an aligned chord row when the Full text is parsed back into cards.
 function buildChordSheetLines(noteRows, lyric){
   const L = String(lyric || "");
   const slots = Array.isArray(noteRows) ? noteRows.slice(0,8) : [];
   if(!L.trim() || !slots.some(x => String(x||"").trim())) return { chordLine: "", lyricLine: L };
   const len = Math.max(1, L.length);
-  let arr = Array(len).fill(" ");
+  let line = "";
   for(let i=0;i<8;i++){
     const ch = String(slots[i]||"").trim();
     if(!ch) continue;
-    const col = Math.max(0, Math.min(len-1, Math.round(i * (len-1) / 7)));
-    for(let k=0;k<ch.length && col+k < len;k++){
-      arr[col+k] = ch[k];
-    }
+    const want = Math.max(0, Math.min(len-1, Math.round(i * (len-1) / 7)));
+    const col = line.length ? Math.max(want, line.length + 2) : want;
+    line = line.padEnd(col, " ") + ch;
   }
-  return { chordLine: arr.join(""), lyricLine: L };
+  return { chordLine: line.padEnd(len, " "), lyricLine: L };
 }
 
 
@@ -9215,10 +9393,6 @@ function buildFullPreviewHtmlDoc(title){
 ${bodyHtml}
 </body>
 </html>`;
-}
-
-function updateFullIfVisible(){
-  return;
 }
 
 /***********************
@@ -9607,7 +9781,6 @@ function renderSheetTitleBar(){
           else { try{ delete state.project.sectionTitles[state.currentSection]; }catch{} }
           syncFullTextFromSections();
         });
-        updateFullIfVisible();
       }, 220);
     });
 
@@ -9832,10 +10005,45 @@ function renderSheetTitleBar(){
 }
 
 
-// One dictation session at a time; never write into a replaced editor/project.
+// Lyric dictation (Full view). One session at a time, tied to one song and one section.
+// - Audio is cut into phrases at pauses and transcribed in order; text is inserted strictly in
+//   that order, so a failed phrase holds back the ones after it until it is retried.
+// - Leaving the page or locking the screen *stops* the session: the phrase being spoken is
+//   still sent and in-flight results are still inserted (nothing is thrown away).
+// - Re-rendering the Full view hands the session the section's new textarea.
+const DICTATION_STYLE_KEY = "srp-dictation-style-v1";
+const DICTATION_STYLES = [
+  ["hiphop", "Hip-hop/Rap"],
+  ["worship", "Worship/Gospel"],
+  ["country", "Country"],
+  ["pop", "Pop/Rock"],
+  ["rnb", "R&B"],
+  ["general", "General"]
+];
 let fullLyricsDictation = null;
+
+function getDictationStyle(){
+  try{
+    const v = localStorage.getItem(DICTATION_STYLE_KEY);
+    if(DICTATION_STYLES.some(([id]) => id === v)) return v;
+  }catch{}
+  return "hiphop";
+}
+function setDictationStyle(v){
+  if(!DICTATION_STYLES.some(([id]) => id === v)) return;
+  try{ localStorage.setItem(DICTATION_STYLE_KEY, v); }catch(err){ console.warn("Could not remember the dictation style", err); }
+  document.querySelectorAll("select.fullLyricsStyle").forEach(s => { if(s.value !== v) s.value = v; });
+}
+function transcribeLyricsAudio(blob){
+  return suiteCloudApi("/api/lyrics-dictation", {
+    method:"POST",
+    body:blob,
+    headers:{ "Content-Type":"audio/wav", "X-Dictation-Style":getDictationStyle() }
+  });
+}
+// Finish the session: keep listening no longer, but transcribe and insert what was captured.
 function stopFullLyricsDictation(){
-  if(fullLyricsDictation) fullLyricsDictation.cancel();
+  fullLyricsDictation?.stop();
 }
 function spokenLyricsToText(text){
   return String(text || "").replace(/\b(?:new|next)[\s,.-]+bar\b[.,!?;:]?/gi, "\n\n")
@@ -9860,117 +10068,205 @@ function lyricsPcmWav(parts, rate){
   }
   return new Blob([buffer],{type:'audio/wav'});
 }
-function attachFullLyricsMic(ta, card, actions){
+function makeDictationStyleSelect(){
+  const select = document.createElement("select");
+  select.className = "fullLyricsStyle";
+  select.title = "Dictation style (helps spell lyrics for this genre)";
+  select.setAttribute("aria-label", "Dictation style");
+  for(const [id, label] of DICTATION_STYLES){
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = label;
+    select.appendChild(opt);
+  }
+  select.value = getDictationStyle();
+  select.addEventListener("change", () => setDictationStyle(select.value));
+  select.addEventListener("pointerdown", (e) => e.stopPropagation());
+  return select;
+}
+function attachFullLyricsMic(ta, card, actions, sectionIndex){
   const mic=document.createElement('button');mic.type='button';mic.className='pillBtn fullLyricsMic';
   mic.textContent='🎤';mic.title='Speak lyrics into this section';mic.setAttribute('aria-label',mic.title);mic.setAttribute('aria-pressed','false');
   const info=document.createElement('div');info.className='fullLyricsVoiceInfo';info.setAttribute('role','status');info.setAttribute('aria-live','polite');info.hidden=true;
-  card.appendChild(info);actions.appendChild(mic);
-  const tip='Say “new bar” (or “next bar”) to leave a blank line between bars. Tap the mic to stop. Text appears after a pause.';
-  mic.addEventListener('click',async e=>{
+  card.appendChild(info);actions.appendChild(makeDictationStyleSelect());actions.appendChild(mic);
+  mic.addEventListener('click',e=>{
     e.preventDefault();e.stopPropagation();
-    if(fullLyricsDictation?.mic===mic){fullLyricsDictation.stop();return;}
-    stopFullLyricsDictation();info.hidden=false;
-    if(!navigator.mediaDevices?.getUserMedia){info.textContent='Microphone recording is unavailable in this browser.';return;}
-    const project=state.project;
-    let cancelled=false,stopped=false,stream=null,context=null,source=null,processor=null,gain=null;
-    let parts=[],samples=0,hasSpeech=false,quiet=0,chain=Promise.resolve(),pending=0;
-    let cursor=ta.selectionStart??ta.value.length,end=ta.selectionEnd??cursor;
-    let pendingCommand='',hadError=false;
-    const valid=()=>!cancelled&&ta.isConnected&&state.project===project;
-    const cleanup=()=>{
-      if(processor){processor.onaudioprocess=null;processor.disconnect();}
-      source?.disconnect();gain?.disconnect();stream?.getTracks().forEach(t=>t.stop());
-      if(context)context.close().catch(()=>{});
-      ta.removeEventListener('input',manual);
-    };
-    const reset=()=>{mic.textContent='🎤';mic.setAttribute('aria-pressed','false');if(fullLyricsDictation?.mic===mic)fullLyricsDictation=null;if(!hadError){info.hidden=true;info.textContent='';}};
-    const cancel=()=>{cancelled=true;stopped=true;cleanup();reset();};
-    // A touch beginning on lyrics may be a scroll gesture, not a stop request.
-    // Manual edits move the insertion point without ending microphone capture.
-    const manual=e=>{
-      if(e.isTrusted){cursor=ta.selectionStart??ta.value.length;end=ta.selectionEnd??cursor;}
-    };
-    const insert=(text,final=false)=>{
-      if(!valid())return;
-      // Keep a trailing command word until the next segment, so a chunk boundary
-      // between “new” and “bar” cannot turn the command into lyric text.
-      text=pendingCommand+text;pendingCommand='';
-      if(!final&&/\b(?:new|next)\s*[.,!?]?$/i.test(text)){
-        const m=text.match(/\b(?:new|next)\s*[.,!?]?$/i);pendingCommand=m[0].replace(/[.,!?]/g,'').trim()+' ';text=text.slice(0,m.index);
-      }
-      let words=spokenLyricsToText(text);if(!words)return;
-      const before=ta.value.slice(0,cursor),after=ta.value.slice(end);
-      if(before&&!/\s$/.test(before)&&!/^\s/.test(words))words=' '+words;
-      const suffix=after&&!/^\s/.test(after)&&!/\s$/.test(words)?' ':'';
-      ta.value=before+words+suffix+after;cursor=before.length+words.length;end=cursor;
-      ta.setSelectionRange(cursor,cursor);lastLyricsTextarea=ta;ta.dispatchEvent(new Event('input',{bubbles:true}));
-    };
-    const flush=()=>{
-      const audioParts=parts,rate=context?.sampleRate;
-      const speech=hasSpeech;parts=[];samples=0;hasSpeech=false;quiet=0;
-      if(!speech||!audioParts.length||!valid())return;
-      const blob=lyricsPcmWav(audioParts,rate);pending++;
-      chain=chain.then(async()=>{
-        if(!valid())return;
-        info.textContent=(stopped?'Finishing transcription… ':'Listening / transcribing… ')+tip;
-        try{
-          const result=await suiteCloudApi('/api/lyrics-dictation',{method:'POST',body:blob,headers:{'Content-Type':'audio/wav'}});
-          if(valid())insert(String(result.text||''));
-        }catch(err){
-          if(!valid())return;
-          hadError=true;stopped=true;cleanup();
-          info.textContent='Transcription failed: '+err.message+' Your audio is available below.';
-          const url=URL.createObjectURL(blob),link=document.createElement('a');
-          link.href=url;link.download='lyrics-dictation.wav';link.textContent=' Download recording';info.appendChild(link);
-          const retry=document.createElement('button');retry.type='button';retry.textContent='Retry transcription';
-          retry.onclick=async()=>{retry.disabled=true;try{const r=await suiteCloudApi('/api/lyrics-dictation',{method:'POST',body:blob,headers:{'Content-Type':'audio/wav'}});if(valid())insert(String(r.text||''));retry.textContent='Transcribed';URL.revokeObjectURL(url);}catch(e){retry.textContent='Retry: '+e.message;retry.disabled=false;}};
-          info.appendChild(retry);reset();throw err;
-        }finally{pending--;}
-        if(valid()&&!hadError)info.textContent=(stopped?'Voice to text stopped. ':'Listening… ')+tip;
-      }).catch(()=>{});
-    };
-    const stop=()=>{
-      if(stopped)return;stopped=true;flush();cleanup();mic.textContent='…';
-      chain.then(()=>{
-        if(valid()&&pendingCommand){const word=pendingCommand;pendingCommand='';insert(word,true);}
-        reset();
-      });
-    };
-    fullLyricsDictation={mic,cancel,stop};ta.addEventListener('input',manual);
-    info.textContent='Starting microphone… '+tip+' Audio is transcribed by Cloudflare.';
+    if(fullLyricsDictation?.mic===mic&&!fullLyricsDictation.isStopped()){fullLyricsDictation.stop();return;}
+    stopFullLyricsDictation();
+    // iOS Safari only lets audio start inside the tap itself: create/resume before any await.
+    let context=null;
+    try{const Ctx=window.AudioContext||window.webkitAudioContext;context=new Ctx();context.resume?.().catch(()=>{});}
+    catch(err){info.hidden=false;info.textContent='Microphone recording is unavailable in this browser.';return;}
+    startFullLyricsDictation({ta,mic,info,sectionIndex,context});
+  });
+  // A re-render replaced this section while a session was running: continue in the new editor.
+  if(fullLyricsDictation&&fullLyricsDictation.project===state.project&&fullLyricsDictation.sectionIndex===sectionIndex){
+    fullLyricsDictation.rebind(ta,mic,info);
+  }
+}
+function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
+  const tip='Say “new bar” (or “next bar”) to leave a blank line between bars. Tap the mic to stop. Text appears after a pause.';
+  const project=state.project;
+  let stopped=false,stream=null,source=null,processor=null,gain=null;
+  let parts=[],samples=0,hasSpeech=false,quiet=0;
+  let cursor=ta.selectionStart??ta.value.length,end=ta.selectionEnd??cursor;
+  let pendingCommand='',failure=null,pumping=false,held='';
+  const segments=[]; // phrases waiting to be transcribed / inserted, oldest first
+  const session={project,sectionIndex,mic,stop,rebind,isStopped:()=>stopped};
+  fullLyricsDictation=session;
+  info.hidden=false;
+  const live=()=>state.project===project;
+  const setStatus=(text)=>{info.hidden=false;info.textContent=text;};
+  const paintMic=()=>{
+    const active=fullLyricsDictation===session;
+    session.mic.textContent=!active||failure?'🎤':(stopped?'…':'⏹');
+    session.mic.setAttribute('aria-pressed',active&&!stopped?'true':'false');
+  };
+  const manual=e=>{if(e.isTrusted){cursor=ta.selectionStart??ta.value.length;end=ta.selectionEnd??cursor;}};
+  ta.addEventListener('input',manual);
+  function rebind(newTa,newMic,newInfo){
+    ta.removeEventListener('input',manual);
+    newInfo.replaceWith(info);
+    ta=newTa;session.mic=newMic;
+    cursor=Math.min(cursor,ta.value.length);end=Math.min(end,ta.value.length);
+    ta.addEventListener('input',manual);
+    paintMic();
+    if(held){const t=held;held='';insertText(t);}
+  }
+  function insertText(text){
+    if(!live())return;
+    if(!ta.isConnected){held+=text;return;} // re-render in progress; placed on rebind
+    let words=text;
+    const before=ta.value.slice(0,cursor),after=ta.value.slice(end);
+    if(before&&!/\s$/.test(before)&&!/^\s/.test(words))words=' '+words;
+    const suffix=after&&!/^\s/.test(after)&&!/\s$/.test(words)?' ':'';
+    ta.value=before+words+suffix+after;cursor=before.length+words.length;end=cursor;
+    ta.setSelectionRange(cursor,cursor);lastLyricsTextarea=ta;ta.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+  function insert(text,final=false){
+    // Keep a trailing command word until the next phrase, so a phrase boundary between
+    // “new” and “bar” cannot turn the command into lyric text.
+    text=pendingCommand+text;pendingCommand='';
+    if(!final&&/\b(?:new|next)\s*[.,!?]?$/i.test(text)){
+      const m=text.match(/\b(?:new|next)\s*[.,!?]?$/i);pendingCommand=m[0].replace(/[.,!?]/g,'').trim()+' ';text=text.slice(0,m.index);
+    }
+    const words=spokenLyricsToText(text);
+    if(words)insertText(words);
+  }
+  function cleanupCapture(){
+    if(processor){processor.onaudioprocess=null;processor.disconnect();}
+    source?.disconnect();gain?.disconnect();stream?.getTracks().forEach(t=>t.stop());
+    if(context){context.close().catch(()=>{});context=null;}
+  }
+  function finish(){
+    ta.removeEventListener('input',manual);
+    if(fullLyricsDictation===session)fullLyricsDictation=null;
+    paintMic();
+    if(held&&live())showSyncNotice([`Dictated text could not be placed in the song (the Full view was closed): “${held.trim()}”`]);
+    held='';
+    if(!failure){info.hidden=true;info.textContent='';}
+  }
+  function showFailure(seg,err){
+    failure=seg;
+    setStatus('Transcription failed: '+(err?.message||'unknown error')+' Your audio is kept. ');
+    const url=URL.createObjectURL(seg.blob),link=document.createElement('a');
+    link.href=url;link.download='lyrics-dictation.wav';link.textContent='Download recording';
+    const retry=document.createElement('button');retry.type='button';retry.textContent='Retry transcription';
+    retry.addEventListener('click',()=>{
+      retry.disabled=true;failure=null;seg.state='queued';
+      setStatus('Retrying… '+tip);
+      pump();
+    });
+    info.append(link,' ',retry);
+  }
+  async function pump(){
+    if(pumping)return;
+    pumping=true;
     try{
-      // Authenticate and verify AI availability before requesting microphone access.
+      while(segments.length&&live()){
+        const seg=segments[0];
+        if(seg.state==='failed')return; // waits for Retry; later phrases stay behind it
+        if(seg.state==='queued'){
+          seg.state='sending';
+          setStatus((stopped?'Finishing transcription… ':'Listening / transcribing… ')+tip);
+          try{seg.text=String((await transcribeLyricsAudio(seg.blob)).text||'');seg.state='done';}
+          catch(err){
+            seg.state='failed';
+            if(!live())return;
+            // Stop listening, keep every captured phrase in order until this one succeeds.
+            if(!stopped){stopped=true;flush();cleanupCapture();}
+            showFailure(seg,err);
+            paintMic();
+            return;
+          }
+        }
+        if(!live())return;
+        segments.shift();
+        insert(seg.text);
+        if(!stopped)setStatus('Listening… '+tip);
+      }
+    }finally{
+      pumping=false;
+      if(stopped&&!segments.length&&fullLyricsDictation===session){
+        if(pendingCommand&&live()){const word=pendingCommand;pendingCommand='';insert(word,true);}
+        finish();
+      }
+    }
+  }
+  function flush(){
+    const audioParts=parts,rate=context?.sampleRate,speech=hasSpeech;
+    parts=[];samples=0;hasSpeech=false;quiet=0;
+    if(!speech||!audioParts.length||!rate||!live())return;
+    segments.push({blob:lyricsPcmWav(audioParts,rate),state:'queued',text:''});
+    pump();
+  }
+  function stop(){
+    if(stopped)return;
+    stopped=true;flush();cleanupCapture();paintMic();
+    if(!segments.length)pump();
+  }
+  paintMic();
+  setStatus('Starting microphone… '+tip+' Audio is transcribed by Cloudflare.');
+  (async()=>{
+    try{
+      if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone recording is unavailable in this browser.');
+      // Authenticate and check the transcription service before asking for the microphone.
       await suiteCloudApi('/api/lyrics-dictation',{method:'GET'});
-      if(!valid()||stopped)return;
+      if(!live()||stopped){cleanupCapture();return;}
       stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
-      if(!valid()||stopped){stream.getTracks().forEach(t=>t.stop());return;}
-      const Audio=window.AudioContext||window.webkitAudioContext;context=new Audio();await context.resume();
-      if(!valid()||stopped){cleanup();return;}
+      if(!live()||stopped){cleanupCapture();return;}
       source=context.createMediaStreamSource(stream);processor=context.createScriptProcessor(4096,1,1);gain=context.createGain();gain.gain.value=0;
       source.connect(processor);processor.connect(gain);gain.connect(context.destination);
       processor.onaudioprocess=e=>{
-        if(!valid()||stopped)return;
+        if(!live()||stopped)return;
         const data=new Float32Array(e.inputBuffer.getChannelData(0));
         let power=0;for(const x of data)power+=x*x;
         const speech=Math.sqrt(power/data.length)>0.008;
-        // Retain a short pre-roll, then submit only nonoverlapping utterances.
+        // Retain a short pre-roll, then submit only nonoverlapping phrases.
         parts.push(data);samples+=data.length;
         if(speech){hasSpeech=true;quiet=0;}else quiet+=data.length;
-        if(hasSpeech&&((quiet/context.sampleRate>1.2&&samples/context.sampleRate>2)||samples/context.sampleRate>20))flush();
-        else if(!hasSpeech&&samples/context.sampleRate>0.4){parts=parts.slice(-2);samples=parts.reduce((n,p)=>n+p.length,0);}
-        if(pending>8){info.textContent='Transcription is falling behind. Finishing captured audio…';stop();}
+        const rate=e.inputBuffer.sampleRate||context.sampleRate;
+        if(hasSpeech&&((quiet/rate>1.2&&samples/rate>2)||samples/rate>20))flush();
+        else if(!hasSpeech&&samples/rate>0.4){parts=parts.slice(-2);samples=parts.reduce((n,p)=>n+p.length,0);}
+        if(segments.length>8){setStatus('Transcription is falling behind. Finishing captured audio…');stop();}
       };
-      stream.getTracks().forEach(t=>t.addEventListener('ended',()=>{if(!stopped){info.textContent='Microphone disconnected. Finishing captured audio…';stop();}}));
-      mic.textContent='⏹';mic.setAttribute('aria-pressed','true');info.textContent='Listening… '+tip;
-    }catch(err){hadError=true;info.textContent='Could not start voice to text: '+err.message;cancel();}
-  });
+      stream.getTracks().forEach(t=>t.addEventListener('ended',()=>{if(!stopped){setStatus('Microphone disconnected. Finishing captured audio…');stop();}}));
+      if(!stopped)setStatus('Listening… '+tip);
+    }catch(err){
+      failure={};
+      setStatus('Could not start voice to text: '+(err?.message||err));
+      stopped=true;cleanupCapture();finish();
+    }
+  })();
 }
+// Screen lock, app switch or navigation: finish, never discard.
 window.addEventListener("pagehide", stopFullLyricsDictation);
 document.addEventListener("visibilitychange", () => {
   if(document.hidden) stopFullLyricsDictation();
 });
 function renderSheet(){
-  stopFullLyricsDictation();
+  // A Full-view re-render hands a running dictation the new textarea; any other view ends it.
+  if(state.currentSection !== "Full" || state.fullPerfMode) stopFullLyricsDictation();
   cancelChordDragCopy();
   renderSheetTitleBar();
   renderSheetActions();
@@ -10135,20 +10431,13 @@ if(state.currentSection === "Full"){
   if(el.sheetHint) el.sheetHint.textContent = "";
   (el.sheetInner || el.sheetBody).innerHTML = "";
 
-  // Ensure at least one section exists
-  if(!String(state.project.fullText || "").trim()){
-    state.project.fullText = `${BREAK_LINE}\n\n`;
-    upsertProject(state.project);
-  }
-
   const splitBlocks = splitFullTextBlocks;
   const blocksToFullText = fullTextBlocksToText;
 
+  // Show the text in canonical block form. This is formatting only: it is saved with the
+  // next real edit, not on its own (a render must never count as a change to sync).
   let blocks = splitBlocks(pruneLegacyTrailingBlankFullBlocks(state.project.fullText || ""));
-  if(String(state.project.fullText || "") !== blocksToFullText(blocks)){
-    state.project.fullText = blocksToFullText(blocks);
-    upsertProject(state.project);
-  }
+  state.project.fullText = blocksToFullText(blocks);
 
   // Ensure we have enough section names for block mapping
   const pageOrder = getAllSectionOrder().filter(s => s !== "Full");
@@ -10385,7 +10674,8 @@ if(state.currentSection === "Full"){
       }
       // Remove the corresponding page/card immediately (if it exists)
       if(sec){
-        try{ deleteSectionPage(sec); }catch{}
+        try{ deleteSectionPage(sec); }
+        catch(err){ console.error("Could not remove the page for this song part", err); }
       }
       state.project.fullText = blocksToFullText(blocks);
       quickSaveFullText();
@@ -10397,7 +10687,7 @@ if(state.currentSection === "Full"){
     });
     actions.appendChild(addBtn);
     actions.appendChild(delBtn);
-    attachFullLyricsMic(ta, card, actions);
+    attachFullLyricsMic(ta, card, actions, idx);
 
     card.appendChild(head);
     card.appendChild(textWrap);
@@ -10425,416 +10715,6 @@ if(state.currentSection === "Full"){
     }catch(err){ console.error(err); }
     pendingFullBlockScroll = null;
   });
-  return;
-
-  const wrap = document.createElement("div");
-  wrap.className = "fullBoxWrap";
-
-  // ✅ Break title pills now live INSIDE the Full textarea at every break line.
-  //    We render an overlay that aligns pills to the break-line rows in the textarea.
-  const pillPages = getAllSectionOrder().filter(s => s !== "Full");
-
-
-  const host = document.createElement("div");
-  host.className = "fullPillHost";
-
-  const ta = document.createElement("textarea");
-  ta.className = "fullBox";
-  _attachCaretRemember(ta);
-  ta.addEventListener("focus", () => {
-  lastLyricsTextarea = ta;     // ✅ so rhyme taps insert into Full view
-  refreshRhymesFromActive();
-});
-ta.addEventListener("click", () => {
-  lastLyricsTextarea = ta;     // ✅ cursor moves, seed word changes
-  refreshRhymesFromActive();
-});
-  ta.readOnly = false;
-  ta.placeholder = `__________Page name
-Line 1
-Line 2
-
-(blank line = new card)
-
-__________
-...`;
-
-  // ✅ STOP AUTO-POPULATING FULL TEXT
-// (No template gets inserted anymore)
-
-// ✅ OPTIONAL CLEANUP:
-// If a project already has the old template text, wipe it once automatically.
-const _tpl = buildFullTemplate();
-if(String(state.project.fullText || "") === _tpl){
-  state.project.fullText = "";
-  // keep flag true so it never tries to seed again (even if other code remains)
-  state.project.fullSeeded = true;
-  upsertProject(state.project);
-}
-
-// ✅ Seed headings scaffold if empty
-if(!String(state.project.fullText || "").trim()){
-  const scaffold = buildFullScaffold();
-  state.project.fullText = scaffold;
-  upsertProject(state.project);
-}
-ta.value = state.project.fullText || "";
-
-  const overlay = document.createElement("div");
-  overlay.className = "fullPillOverlay";
-  host.appendChild(ta);
-  host.appendChild(overlay);
-
-
-  // Fill the available space better (no index.html edits required)
-  ta.style.width = "100%";
-  ta.style.minHeight = "calc(100vh - 220px)";
-  ta.style.resize = "none";
-
-  // ---------- Break-pill overlay helpers ----------
-  function parseBreakLinesFromText(text){
-    const lines = String(text || "").replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n");
-    const breaks = [];
-    for(let i=0;i<lines.length;i++){
-      const raw = String(lines[i] ?? "");
-      const t = raw.trim();
-      if(!t) continue;
-      if(t === BREAK_LINE || t === "_"){
-        breaks.push({ lineIndex:i, title:"" });
-        continue;
-      }
-      if(t[0] === "_"){
-        const m = t.match(/^_{1,}\s*(.+)?$/);
-        const title = (m && m[1]) ? String(m[1] || "").trim() : "";
-        breaks.push({ lineIndex:i, title });
-      }
-    }
-    return { lines, breaks };
-  }
-
-  function setBreakLineTitleByOccurrence(occIdx, title){
-    const parsed = parseBreakLinesFromText(ta.value);
-    const b = parsed.breaks[occIdx];
-    if(!b) return;
-
-    const lines = parsed.lines.slice();
-    const t = String(title || "").trim();
-    // Force canonical inline title form: ________Title
-    lines[b.lineIndex] = BREAK_LINE + (t ? t : "");
-    const newText = lines.join("\n");
-
-    if(newText === ta.value) return;
-
-    // Preserve cursor as best we can (keep it close)
-    const selStart = ta.selectionStart;
-    const selEnd = ta.selectionEnd;
-    ta.value = newText;
-    try{
-      ta.selectionStart = clamp(selStart, 0, ta.value.length);
-      ta.selectionEnd = clamp(selEnd, 0, ta.value.length);
-    }catch{}
-
-    // Commit via the same pipeline used by typing in Full
-    onFullTextareaInput();
-  }
-  function insertSectionAfterOccurrence(occIdx){
-    const parsed = parseBreakLinesFromText(ta.value);
-    const lines = parsed.lines.slice();
-    const breaks = parsed.breaks;
-
-    if(!breaks.length) return;
-
-    // insertion point is right BEFORE the next break, or end of text
-    let insertAt = (occIdx + 1 < breaks.length) ? breaks[occIdx + 1].lineIndex : lines.length;
-
-    // Ensure at least one blank line before the new break (so + / × feels "under" the section)
-    if(insertAt > 0 && String(lines[insertAt - 1] || "").trim() !== ""){
-      lines.splice(insertAt, 0, "");
-      insertAt += 1;
-    }
-
-    // Insert new break + a blank line for typing
-    lines.splice(insertAt, 0, BREAK_LINE, "");
-
-    ta.value = lines.join("\n");
-    state.project.fullText = ta.value;
-
-    // Move cursor to the blank line right after the inserted break
-    try{
-      const targetLine = insertAt + 1; // the blank line after BREAK_LINE
-      let idx = 0;
-      for(let i=0;i<lines.length;i++){
-        if(i === targetLine){ break; }
-        idx += lines[i].length + 1;
-      }
-      ta.focus();
-      ta.setSelectionRange(idx, idx);
-    }catch{}
-
-    onFullTextareaInput();
-    positionOverlayPills();
-  }
-
-  function deleteSectionByOccurrence(occIdx){
-    const parsed = parseBreakLinesFromText(ta.value);
-    const lines = parsed.lines.slice();
-    const breaks = parsed.breaks;
-
-    if(!breaks.length) return;
-
-    // If this is the only section, just clear its content (keep one break)
-    if(breaks.length <= 1){
-      ta.value = `${BREAK_LINE}\n\n`;
-      state.project.fullText = ta.value;
-      onFullTextareaInput();
-      positionOverlayPills();
-      return;
-    }
-
-    const startLine = breaks[occIdx].lineIndex;
-    const endLine = (occIdx + 1 < breaks.length) ? breaks[occIdx + 1].lineIndex : lines.length;
-
-    lines.splice(startLine, Math.max(0, endLine - startLine));
-
-    // Always ensure the text begins with a break line
-    if(String(lines[0] || "").trim() !== BREAK_LINE){
-      lines.unshift(BREAK_LINE, "");
-    }
-
-    ta.value = lines.join("\n");
-    state.project.fullText = ta.value;
-
-    onFullTextareaInput();
-    positionOverlayPills();
-  }
-
-
-  function positionOverlayPills(){
-    overlay.innerHTML = "";
-
-    const parsed = parseBreakLinesFromText(ta.value);
-    const breaks = parsed.breaks;
-    if(!breaks.length) return;
-
-    const cs = getComputedStyle(ta);
-    const lineH = parseFloat(cs.lineHeight) || 18;
-    const padT = parseFloat(cs.paddingTop) || 0;
-    const padB = parseFloat(cs.paddingBottom) || 0;
-    const scrollTop = ta.scrollTop || 0;
-    const viewH = ta.clientHeight || 0;
-
-    // Visual sizes for overlay elements
-    const pillH = 34;
-    const rowH  = Math.max(pillH + 8, lineH + 10); // also masks the raw break-line text
-
-    const pages = pillPages.slice();
-    for(let i=0;i<breaks.length;i++){
-      const sec = pages[i] || null;
-      if(!sec) break;
-
-      const y = padT + (breaks[i].lineIndex * lineH) - scrollTop;
-
-      // Only render if near viewport (small buffer)
-      if(y < -80 || y > viewH + 80) continue;
-
-      const row = document.createElement("div");
-      row.className = "breakRow";
-      // Center the pill over the break-line, and mask the literal "__________TITLE" text behind it
-      row.style.top = `${Math.max(0, Math.round(y - ((rowH - lineH) / 2)))}px`;
-      row.style.height = `${Math.round(rowH)}px`;
-      // Allow editing the pill input (row acts as a mask, input handles the interaction)
-      row.style.pointerEvents = "auto";
-      row.style.background = "#fff";
-      row.style.borderRadius = "16px";
-
-      const inp = document.createElement("input");
-      inp.type = "text";
-      inp.className = "songPartPill";
-      inp.placeholder = "Song Part";
-
-      // CRP: force the Full Song section title itself to the gold control style.
-      // Use inline !important so mobile Chromium/theme rules cannot turn it dark.
-      inp.style.setProperty("background", "#efc85d", "important");
-      inp.style.setProperty("background-image", "linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)", "important");
-      inp.style.setProperty("color", "#111", "important");
-      inp.style.setProperty("-webkit-text-fill-color", "#111", "important");
-      inp.style.setProperty("border", "1px solid #d6aa3f", "important");
-      inp.style.setProperty("font-weight", "1000", "important");
-      inp.style.setProperty("text-shadow", "none", "important");
-      inp.style.setProperty("caret-color", "#111", "important");
-      row.style.setProperty("background", "transparent", "important");
-
-      // Two-way: prefer explicit project title, else derive from Full break line
-      const stored = (state.project.sectionTitles && state.project.sectionTitles[sec])
-        ? String(state.project.sectionTitles[sec] || "").trim()
-        : "";
-      const derived = String(breaks[i].title || "").trim();
-      inp.value = stored || derived;
-
-      inp.addEventListener("keydown", (e) => {
-        if(e.key === "Enter"){ e.preventDefault(); inp.blur(); }
-      });
-
-      // keep the pill sized so it doesn't block lyrics (lyrics start beneath a blank line)
-      inp.style.height = `${pillH}px`;
-
-      let tmrP = null;
-      inp.addEventListener("input", () => {
-        if(tmrP) clearTimeout(tmrP);
-        tmrP = setTimeout(() => {
-          const val = String(inp.value || "").trim();
-          editProject("fullBreakTitle", () => {
-            ensurePageMeta();
-            if(val) state.project.sectionTitles[sec] = val;
-            else { try{ delete state.project.sectionTitles[sec]; }catch{} }
-          });
-
-          // Update the actual break line text for this occurrence so parsing/sync stays correct
-          setBreakLineTitleByOccurrence(i, val);
-
-          // Keep pages + Full synced
-          editProject("syncAfterFullBreakTitle", () => {
-            syncFullTextFromSections();
-          });
-          updateFullIfVisible();
-        }, 180);
-      });
-
-      row.appendChild(inp);
-      overlay.appendChild(row);
-
-      // + / × action row UNDER this section's text (not on top of lyrics)
-      try{
-        const endLine = (i + 1 < breaks.length) ? breaks[i + 1].lineIndex : parsed.lines.length;
-
-        // Find last non-empty line within this section (between this break and the next break)
-        let last = breaks[i].lineIndex;
-        for(let k=endLine-1;k>breaks[i].lineIndex;k--){
-          const t = String(parsed.lines[k] || "").trim();
-          if(t){ last = k; break; }
-        }
-
-        let yBtn = padT + ((last + 1) * lineH) - scrollTop + 6;
-
-        // Keep the controls at least under the pill area
-        yBtn = Math.max(y + rowH + 6, yBtn);
-
-        // Clamp above next pill to prevent collisions
-        if(i + 1 < breaks.length){
-          const yNext = padT + (breaks[i + 1].lineIndex * lineH) - scrollTop;
-          yBtn = Math.min(yBtn, yNext - rowH - 8);
-        }
-
-        if(yBtn >= -80 && yBtn <= viewH + 80){
-          const act = document.createElement("div");
-          act.className = "breakActions";
-          act.style.top = `${Math.max(0, Math.round(yBtn))}px`;
-          act.style.pointerEvents = "auto";
-
-          const bAdd = document.createElement("button");
-          bAdd.type = "button";
-          bAdd.className = "breakActBtn";
-          bAdd.textContent = "+";
-          bAdd.addEventListener("click", (e) => {
-            e.preventDefault(); e.stopPropagation();
-            insertSectionAfterOccurrence(i);
-          });
-
-          const bDel = document.createElement("button");
-          bDel.type = "button";
-          bDel.className = "breakActBtn";
-          bDel.textContent = "×";
-          bDel.addEventListener("click", (e) => {
-            e.preventDefault(); e.stopPropagation();
-            deleteSectionByOccurrence(i);
-          });
-
-          act.appendChild(bAdd);
-          act.appendChild(bDel);
-          overlay.appendChild(act);
-        }
-      }catch{}
-
-    }
-
-    // prevent overlay from blocking textarea bottom taps
-    overlay.style.paddingBottom = `${padB}px`;
-  }
-
-  // Debounced Full input handler (shared by typing and pill edits)
-  let tmr = null;
-  let fullTextBurstBefore = null;
-  function onFullTextareaInput(){
-    // Capture the PRE-edit project once for this typing burst before mutating the
-    // live fullText. This makes the on-screen Undo button actually restore text.
-    if(!fullTextBurstBefore) fullTextBurstBefore = deepClone(state.project);
-    state.project.fullText = ta.value;
-
-    if(tmr) clearTimeout(tmr);
-    tmr = setTimeout(() => {
-      const before = fullTextBurstBefore;
-      fullTextBurstBefore = null;
-
-      state.project.fullText = ta.value;
-      applyFullTextToProjectSections(state.project.fullText || "");
-      state.project.fullText = ensureFullBreaksPresent(state.project.fullText || "");
-
-      if(before && projectSignature(before) !== projectSignature(state.project)){
-        historyCommitBeforeSnapshot(before);
-      }
-      upsertProject(state.project);
-      updateFullIfVisible();
-      refreshKeyUI();
-      // re-align pills after parsing may normalize break lines
-      positionOverlayPills();
-    }, 220);
-  }
-
-  // Keep overlay aligned while scrolling
-  ta.addEventListener("scroll", () => positionOverlayPills(), { passive:true });
-
-  // Rebuild overlay as the user types
-  ta.addEventListener("input", () => {
-    onFullTextareaInput();
-    positionOverlayPills();
-  });
-
-  // Initial overlay build
-  queueMicrotask(() => positionOverlayPills());
-
-  wrap.appendChild(host);
-
-  // (the rest of the Full-view render continues below)
-
-  // ✅ On first open: optionally seed sections from Full text ONCE (prevents freezes)
-  if(!didInitialFullApply){
-    didInitialFullApply = true;
-
-    const ft = String(state.project?.fullText || "");
-    // Only auto-apply if sections are essentially empty (otherwise preserve existing cards)
-    const hasAnyCards = FULL_EDIT_SECTIONS.some(sec => {
-      const arr = state.project?.sections?.[sec] || [];
-      return Array.isArray(arr) && arr.some(lineHasContent);
-    });
-
-    if(ft.trim() && !hasAnyCards){
-      // defer so UI can paint first
-      setTimeout(()=>{
-        try{
-          applyFullTextToProjectSections(ft);
-          upsertProject(state.project); // ok to keep (no history needed on first open)
-          // re-render after seeding
-          try{ renderAllSections?.(); }catch{}
-          try{ renderAll?.(); }catch{}
-        }catch(e){
-          console.error("Full->cards seed failed:", e);
-        }
-      }, 0);
-    }
-  }
-
-  // textarea is inside `host` (so overlay can sit on top)
-(el.sheetInner || el.sheetBody).appendChild(wrap);
   return;
 }
 
@@ -10892,7 +10772,6 @@ addBtn.addEventListener("click", (e) => {
     syncFullTextFromSections();
   });
   renderSheet();
-  updateFullIfVisible();
   updateKeyFromAllNotes();
   clearTick(); applyTick();
   refreshDisplayedNoteCells();
@@ -10929,7 +10808,6 @@ delBtn.addEventListener("click", (e) => {
     syncFullTextFromSections();
   });
   renderSheet();
-  updateFullIfVisible();
   updateKeyFromAllNotes();
   clearTick(); applyTick();
   refreshDisplayedNoteCells();
@@ -11059,7 +10937,6 @@ card.appendChild(top);
 
         upsertProject(state.project);
         updateKeyFromAllNotes();
-        updateFullIfVisible();
       });
 
       inp.addEventListener("blur", () => {
@@ -11067,9 +10944,9 @@ card.appendChild(top);
         inp.dataset.raw = rawNow;
         editProject("note", () => {
           line.notes[i] = rawNow;
+          syncFullTextFromSections();
         });
         updateKeyFromAllNotes();
-        updateFullIfVisible();
 
         inp.value = (state.capo ? transposeChordName(rawNow, state.capo) : rawNow);
       });
@@ -11112,7 +10989,6 @@ card.appendChild(top);
         editProject("beat", () => {
           line.beats[i] = nextBeat;
         });
-        updateFullIfVisible();
       });
 
       beatInputs.push(inp);
@@ -11256,8 +11132,16 @@ async function uploadAudioFile(){
 // ----------------------
 // ✅ IMPORT: Text -> Full -> Cards (with chord parsing)
 // ----------------------
+function songHasContent(p){
+  if(!p) return false;
+  if(String(p.fullText || "").split("\n").some(line => line.trim() && !_parseBreakLine(line))) return true;
+  return Object.values(p.sections || {}).some(cards => Array.isArray(cards) && cards.some(lineHasContent));
+}
+
+// Replaces the open song's lyrics with imported text (paste outside an editor, PDF, .txt).
+// Asks first when the song already has lyrics; the import is one Undo step.
 async function importTextToFull(text){
-  if(!state.project) return;
+  if(!state.project) return false;
 
   // Normalize and lightly clean import text
   let cleaned = normalizeLineBreaks(String(text || ""));
@@ -11265,8 +11149,9 @@ async function importTextToFull(text){
   cleaned = cleaned.trim();
   if(!cleaned){
     alert("No text found to import.");
-    return;
+    return false;
   }
+  if(songHasContent(state.project) && !confirm(`Replace the lyrics of “${state.project.name || "this song"}” with the imported text?\n\nYou can undo this with the ↶ button.`)) return false;
 
   // ✅ Full Song View uses the break-line block editor.
   // If the import has no break-lines, it may still parse into cards,
@@ -11341,11 +11226,12 @@ async function importTextToFull(text){
   updateKeyFromAllNotes();
   renderAll();
   goToSection("Full");
+  return true;
 }
 
 // ----------------------
 // ✅ IMPORT: PDF -> extract text -> Full -> Cards (with chord parsing)
-// Requires PDF.js (pdfjsLib global)
+// PDF.js is loaded on demand (loadPdfJs)
 // ----------------------
 async function importPdfToFull(file){
   try{
@@ -11354,9 +11240,8 @@ async function importPdfToFull(file){
       alert("PDF imported, but no selectable text was found.\n\nThis usually means the PDF is a scanned image (picture-only). Export a text-based PDF (not scanned), or save as .txt and import that.");
       return;
     }
-    await importTextToFull(text);
-    // ✅ After PDF import, jump straight to the first parsed song-part cards.
-    try{ goToSection("PAGE 1"); renderTabs(); renderSheet(); }catch{}
+    // After a PDF import, jump straight to the first parsed song-part cards.
+    if(await importTextToFull(text)) goToSection("PAGE 1");
 }catch(err){
     console.error(err);
     const online = (typeof navigator !== "undefined" && "onLine" in navigator) ? navigator.onLine : "unknown";
@@ -11391,194 +11276,44 @@ function fixPdfLetterSpacing(text){
   }).join("\n");
 }
 
-async function extractTextFromPdfFile(file){
-  // ✅ Bulletproof PDF import for Android Chrome + GitHub Pages
-  // Strategy:
-  // 1) Load PDF.js *legacy* build via <script> (best compatibility).
-  // 2) Prefer local ./pdf.min.js (recommended), then fall back to CDNs.
-  // 3) Always parse with disableWorker:true (workers often fail on mobile/CDN/SW).
-  // 4) Handle password-protected PDFs (prompt).
-  //
-  // NOTE: For best reliability + offline, add these to your repo root:
-  //   - pdf.min.js
-  //   - pdf.worker.min.js (optional when disableWorker:true, but nice to have)
-
-  const withTimeout = (p, ms, label) => new Promise((res, rej) => {
-    const t = setTimeout(()=>rej(new Error(label + " (timeout)")), ms);
-    p.then(v=>{ clearTimeout(t); res(v); }).catch(e=>{ clearTimeout(t); rej(e); });
-  });
-
-  const fetchOk = async (url) => {
-    // Try a quick HEAD/GET to verify the file exists and isn't returning an HTML error page.
-    try{
-      const r = await fetch(url, { method:"GET", cache:"no-store" });
-      const ct = (r.headers.get("content-type") || "").toLowerCase();
-      return !!(r.ok && (ct.includes("javascript") || ct.includes("ecmascript") || ct.includes("text/plain") || ct.includes("application/octet-stream")));
-    }catch{
-      return false;
-    }
-  };
-
-  const loadScript = (src) => withTimeout(new Promise((res, rej) => {
-    const s = document.createElement("script");
-    s.src = src;
-    s.async = true;
-    s.crossOrigin = "anonymous";
-    s.onload = () => res(true);
-    s.onerror = () => rej(new Error("Failed to load script: " + src));
-    document.head.appendChild(s);
-  }), 15000, "Failed to load script: " + src);
-
-  async function ensurePdfJs(){
-    // ✅ Reliable PDF.js loader for GitHub Pages + Android Chrome/PWA
-    // We intentionally prefer the CLASSIC build (pdf.min.js + pdf.worker.min.js)
-    // because ESM (pdf.mjs) requires a matching pdf.worker.mjs which most repos don't include.
-    if(window.pdfjsLib?.getDocument) return;
-
-    const base = document.baseURI || location.href;
-    const stamp = String(Date.now());
-    const asUrl = (p)=> new URL(p, base).toString();
-
-    const localClassicCandidates = [
-      asUrl("pdf.min.js?v="+stamp),
-      asUrl("./pdf.min.js?v="+stamp),
-      asUrl("../pdf.min.js?v="+stamp),
-      // some users keep it in /lib
-      asUrl("lib/pdf.min.js?v="+stamp),
-      asUrl("./lib/pdf.min.js?v="+stamp),
-    ];
-    const localModuleCandidates = [
-      asUrl("pdf.mjs?v="+stamp),
-      asUrl("./pdf.mjs?v="+stamp),
-      asUrl("../pdf.mjs?v="+stamp),
-      asUrl("lib/pdf.mjs?v="+stamp),
-      asUrl("./lib/pdf.mjs?v="+stamp),
-    ];
-
-    // CDN fallbacks (classic / legacy builds)
-    const cdnClassicCandidates = [
-      { js:"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.js", worker:"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.js" },
-      { js:"https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.min.js", worker:"https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.js" },
-      { js:"https://unpkg.com/pdfjs-dist@4.10.38/legacy/build/pdf.min.js", worker:"https://unpkg.com/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.js" },
-    ];
-
-    const fetchOk = async (url) => {
-      try{
-        const r = await fetch(url, { method:"GET", cache:"no-store" });
-        const ct = (r.headers.get("content-type") || "").toLowerCase();
-        return !!(r.ok && (ct.includes("javascript") || ct.includes("ecmascript") || ct.includes("text/plain") || ct.includes("application/octet-stream")));
-      }catch{
-        return false;
-      }
-    };
-
-    const loadScript = (src) => withTimeout(new Promise((res, rej) => {
-      const s = document.createElement("script");
-      s.src = src;
-      s.async = true;
-      s.crossOrigin = "anonymous";
-      s.onload = () => res(true);
-      s.onerror = () => rej(new Error("Failed to load script: " + src));
-      document.head.appendChild(s);
-    }), 15000, "Failed to load script: " + src);
-
-    async function setWorkerSrc(preferred){
-      try{
-        const lib = window.pdfjsLib;
-        if(!lib) return false;
-        if(lib.GlobalWorkerOptions && lib.GlobalWorkerOptions.workerSrc) return true;
-
-        const workerCandidates = [
-          // repo root
-          asUrl("pdf.worker.min.js?v="+stamp),
-          asUrl("./pdf.worker.min.js?v="+stamp),
-          asUrl("../pdf.worker.min.js?v="+stamp),
-          // /lib folder
-          asUrl("lib/pdf.worker.min.js?v="+stamp),
-          asUrl("./lib/pdf.worker.min.js?v="+stamp),
-          // ESM worker (only if you have it)
-          asUrl("pdf.worker.mjs?v="+stamp),
-          asUrl("./pdf.worker.mjs?v="+stamp),
-          asUrl("lib/pdf.worker.mjs?v="+stamp),
-        ];
-
-        for(const u of workerCandidates){
-          if(await fetchOk(u)){
-            lib.GlobalWorkerOptions = lib.GlobalWorkerOptions || {};
-            lib.GlobalWorkerOptions.workerSrc = u;
-            return true;
-          }
-        }
-
-        if(preferred){
-          lib.GlobalWorkerOptions = lib.GlobalWorkerOptions || {};
-          lib.GlobalWorkerOptions.workerSrc = preferred;
-          return true;
-        }
-      }catch(e){}
-      return false;
-    }
-
-    // 1) Local classic
-    for(const jsUrl of localClassicCandidates){
-      const ok = await fetchOk(jsUrl);
-      if(!ok) continue;
-      try{
-        await loadScript(jsUrl);
-        if(window.pdfjsLib?.getDocument){
-          // ensure workerSrc exists (some builds throw if missing)
-          await setWorkerSrc(null);
-          return;
-        }
-      }catch(e){}
-    }
-
-    // 2) Local ESM build. This repo ships pdf.mjs/pdf.worker.mjs, so use them
-    // before going to the network when the classic pdf.min.js file is absent.
-    for(const mjsUrl of localModuleCandidates){
-      const ok = await fetchOk(mjsUrl);
-      if(!ok) continue;
-      try{
-        const mod = await import(mjsUrl);
-        const lib = (mod && typeof mod.getDocument === "function") ? mod : mod?.default;
-        if(lib && typeof lib.getDocument === "function"){
-          window.pdfjsLib = lib;
-          await setWorkerSrc(null);
-          return;
-        }
-      }catch(e){
-        console.warn("Local PDF.js module load failed", e);
-      }
-    }
-
-    // 3) CDN classic with known worker URL pair
-    for(const cdn of cdnClassicCandidates){
-      const ok = await fetchOk(cdn.js);
-      if(!ok) continue;
-      try{
-        await loadScript(cdn.js);
-        if(window.pdfjsLib?.getDocument){
-          await setWorkerSrc(cdn.worker);
-          return;
-        }
-      }catch(e){}
-    }
-
-    throw new Error("PDF.js failed to load. Ensure `pdf.min.js` + `pdf.worker.min.js` are present in your repo root (recommended).");
+// Large vendored libraries (pdf.js ~800 KB, lame ~150 KB) load on first use only.
+// The promise is cached; a failed load is retried next time.
+const lazyLibraries = { pdf:null, lame:null };
+function loadPdfJs(){
+  if(!lazyLibraries.pdf){
+    lazyLibraries.pdf = import(new URL("pdf.mjs?v=20", document.baseURI).href).then((lib) => {
+      lib.GlobalWorkerOptions.workerSrc = new URL("pdf.worker.mjs?v=20", document.baseURI).href;
+      return lib;
+    }).catch((err) => {
+      lazyLibraries.pdf = null;
+      throw err;
+    });
   }
-await ensurePdfJs();
-  const pdfjsLib = window.pdfjsLib;
-  if(!pdfjsLib?.getDocument) throw new Error("pdfjsLib.getDocument missing");
+  return lazyLibraries.pdf;
+}
+function loadLame(){
+  if(!lazyLibraries.lame){
+    lazyLibraries.lame = new Promise((resolve, reject) => {
+      if(window.lamejs?.Mp3Encoder){ resolve(window.lamejs); return; }
+      const script = document.createElement("script");
+      script.src = new URL("lame.min.js?v=63", document.baseURI).href;
+      script.onload = () => window.lamejs?.Mp3Encoder ? resolve(window.lamejs) : reject(new Error("The MP3 encoder did not initialise."));
+      script.onerror = () => reject(new Error("Could not load the MP3 encoder."));
+      document.head.appendChild(script);
+    }).catch((err) => {
+      lazyLibraries.lame = null;
+      throw err;
+    });
+  }
+  return lazyLibraries.lame;
+}
 
-  // Always disable worker (most reliable on mobile/PWA/CDN)
+async function extractTextFromPdfFile(file){
+  const pdfjsLib = await loadPdfJs();
   const ab = await file.arrayBuffer();
 
   // Support password-protected PDFs
-  const loadPdf = (password) => pdfjsLib.getDocument({
-    data: ab,
-    disableWorker: true,
-    password
-  }).promise;
+  const loadPdf = (password) => pdfjsLib.getDocument({ data: ab.slice(0), password }).promise;
 
   let pdf;
   try{
@@ -11709,8 +11444,9 @@ function installClipboardImport(){
       }
 
       // If the user pastes copied chord/lyric text while focus is NOT already in an editor,
-      // treat it as a song import. Pasting inside an SRP textarea/contenteditable stays normal;
-      // its own input handler will parse the updated Full Song text automatically.
+      // treat it as a song import (importTextToFull asks before replacing existing lyrics).
+      // Pasting inside an SRP textarea/contenteditable stays normal; its own input handler
+      // will parse the updated Full Song text automatically.
       const target = e.target;
       const editable = !!(target && (
         target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable ||
@@ -12078,10 +11814,6 @@ MP3 AUTO-CONVERT (WebM/Opus -> MP3 using lamejs)
 - converts immediately after recording stops
 - stores MP3 blob into IndexedDB so in-app playback + download are MP3
 ***********************/
-function hasLame(){
-  return !!(window.lamejs && window.lamejs.Mp3Encoder);
-}
-
 function blobToArrayBuffer(blob){
   if(blob.arrayBuffer) return blob.arrayBuffer();
   return new Response(blob).arrayBuffer();
@@ -12168,8 +11900,12 @@ async function encodeMp3FromBlob(inputBlob, opts={}){
 
 // High-level: try convert -> if fails, return original blob
 async function convertRecordingBlobToMp3(blob){
-  // If lame isn't loaded, we cannot encode
-  if(!hasLame()) return blob;
+  try{
+    await loadLame();
+  }catch(err){
+    console.warn("MP3 encoder unavailable, keeping the original recording:", err);
+    return blob;
+  }
 
   try{
     const mp3 = await encodeMp3FromBlob(blob, { kbps: 192 });
@@ -12349,12 +12085,13 @@ function compareProjectsBySort(a, b, sort){
   return (Number(b.updatedAt)||0) - (Number(a.updatedAt)||0);
 }
 
+// Read-only views of the library for lists and pickers (do not modify the results).
 function getVisibleProjects(){
-  return loadAllProjects().map(normalizeProject).filter(p => p && !p.archived);
+  return ensureLibrary().list.filter(p => p && !p.archived);
 }
 
 function getArchivedProjects(){
-  return loadAllProjects().map(normalizeProject).filter(p => p && p.archived);
+  return ensureLibrary().list.filter(p => p && p.archived);
 }
 
 function renderArchiveLoadedName(){
@@ -12400,7 +12137,7 @@ function renderProjectsDropdown(){
 
   if(!list.length){
     const p = defaultProject("New Song");
-    upsertProject(p);
+    upsertProject(p, { bump:false, select:true });
     state.project = p;
     return renderProjectsDropdown();
   }
@@ -12525,7 +12262,7 @@ function moveProjectToArchive(projectId){
     resetProjectHistory();
     applyProjectSettingsToUI();
     renderAll();
-    try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
+    notifyLinkedProjectChanged();
   }else{
     renderProjectsDropdown();
   }
@@ -12647,8 +12384,7 @@ function loadProjectById(id){
    closeNotesModal?.();
    // ✅ prevent “wrong project audio” weirdness
   if(state.audioSyncOn) stopAudioSync();
-  const all = loadAllProjects().map(normalizeProject).filter(Boolean);
-  const p = all.find(x => x.id === id);
+  const p = libraryProject(id);
   if(!p) return;
   // Stop the OLD project's linked CRP/BD playback before state.project changes,
   // otherwise the exact-pair guard correctly refuses to stop it after the switch.
@@ -12664,7 +12400,7 @@ function loadProjectById(id){
   // v3.2.9: the CRP↔SRP link is project-scoped. Switching SRP projects must
   // immediately activate ONLY this project's saved pair (or no pair at all),
   // instead of leaving the previous project's global link-session/UI behind.
-  try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
+  notifyLinkedProjectChanged();
 }
 
 /***********************
@@ -12681,8 +12417,7 @@ function getLastWord(text){
 
 function notesHtmlToText(src){
   try{
-    const root = (src && src.nodeType) ? src.cloneNode(true) : document.createElement("div");
-    if(!(src && src.nodeType)) root.innerHTML = String(src || "");
+    const root = (src && src.nodeType) ? src.cloneNode(true) : parseInertHtml(src);
     const out = [];
     const BLOCK = new Set(["DIV","P","LI","UL","OL","BLOCKQUOTE","PRE","H1","H2","H3","H4","H5","H6"]);
 
@@ -13439,6 +13174,7 @@ function refreshRhymesFromActive(){
 function toggleRhymeDock(show){
   el.rhymeDock.style.display = show ? "block" : "none";
   if(show) refreshRhymesFromActive();
+  scheduleKeyboardDockLayout();
 }
 
 /***********************
@@ -13480,7 +13216,6 @@ function wireAudioProgressControl(){
   
   clearTick();
   applyTick();
-  updateFullIfVisible();
   refreshRhymesFromActive();
   refreshDisplayedNoteCells();
   
@@ -13546,7 +13281,7 @@ function noteImageToManifestEntry(rec){
 }
 
 async function uploadNoteImageToCloud(rec){
-  if(!cloud.client || !cloud.user || !rec || !rec.id || !rec.blob) return null;
+  if(!cloudSignedIn() || !rec || !rec.id || !rec.blob) return null;
   const entry = noteImageToManifestEntry(rec);
   const url = cloudMediaUrl(entry.path, rec.projectId || entry.projectId);
   if(!url) throw new Error("Cloud note-image path is invalid.");
@@ -13566,7 +13301,7 @@ async function uploadNoteImageToCloud(rec){
 }
 
 async function downloadNoteImageFromCloud(entry){
-  if(!cloud.client || !cloud.user || !entry?.path) return null;
+  if(!cloudSignedIn() || !entry?.path) return null;
   const url = cloudMediaUrl(entry.path, entry.projectId);
   if(!url) return null;
   const res = await fetch(url, { credentials:"same-origin", cache:"no-store" });
@@ -13591,7 +13326,7 @@ async function downloadNoteImageFromCloud(entry){
 }
 
 async function removeNoteImageFromCloud(entry){
-  if(!cloud.client || !cloud.user || !entry?.path) return;
+  if(!cloudSignedIn() || !entry?.path) return;
   try{
     const url = cloudMediaUrl(entry.path, entry.projectId);
     if(!url) return;
@@ -13606,97 +13341,104 @@ async function removeNoteImageFromCloud(entry){
   }
 }
 
-async function saveProjectNotesImageManifest(project, manifest){
-  if(!project || !project.id) return;
-  const next = normalizeProject(deepClone(project));
-  setProjectNotesImages(next, manifest);
-  if(state.project && String(state.project.id || "") === String(next.id || "")) state.project = next;
-  cloud.suspendQueue = true;
-  try{
-    upsertProject(next);
-  }finally{
-    cloud.suspendQueue = false;
-  }
+// Record where a just-uploaded note photo lives. Bookkeeping on the photo's own song (which may
+// no longer be the open one after the upload): no undo step, no "last changed" bump.
+function setNoteImageManifestEntry(projectId, entry){
+  const live = libraryProject(projectId);
+  if(!live || !entry) return;
+  const manifest = getProjectNotesImages(live).filter((item) => String(item.id || '') !== String(entry.id || ''));
+  manifest.unshift(entry);
+  setProjectNotesImages(live, manifest);
+  upsertProject(live, { bump:false, select:false });
+}
+
+// Same contract as saveProjectAudioManifest: change the song in place, never swap it out.
+function saveProjectNotesImageManifest(projectId, beforeManifest, nextManifest){
+  const live = libraryProject(projectId);
+  if(!live) return;
+  setProjectNotesImages(live, applyManifestUpdate(getProjectNotesImages(live), beforeManifest, nextManifest));
+  upsertProject(live, { bump:false, select:false });
 }
 
 async function syncCloudNoteImagesForAllProjects(reason=""){
-  if(!cloud.client || !cloud.user || !getAuthUserId()) return;
-  const allProjects = loadAllProjects().map(normalizeProject).filter(Boolean);
-  const allImages = await dbGetAllNoteImages().catch(() => []);
+  if(!cloudSignedIn()) return;
+  const allProjects = ensureLibrary().list.slice();
+  const allImages = await dbGetAllNoteImages().catch(err => { console.error("Could not read note photos", err); return []; });
   const imageMap = new Map((Array.isArray(allImages) ? allImages : []).map(r => [String(r.id || ""), r]));
-  let anyManifestChanged = false;
   let currentProjectTouched = false;
+  let firstError = null;
 
   for(const project of allProjects){
     const projectId = String(project.id || "");
     if(!projectId) continue;
-    const manifestMap = new Map(getProjectNotesImages(project).map(e => [String(e.id || ""), { ...(e || {}) }]));
+    const before = getProjectNotesImages(project);
+    const manifestMap = new Map(before.map(e => [String(e.id || ""), { ...(e || {}) }]));
     const localProjectImages = (Array.isArray(allImages) ? allImages : []).filter(r => String(r.projectId || "") === projectId);
-    let manifestChanged = false;
     let projectTouched = false;
 
-    for(const rec of localProjectImages){
-      if(!rec || !rec.id || !rec.blob) continue;
-      const localUpdated = Number(rec.updatedAt) || Number(rec.createdAt) || now();
-      const remoteEntry = manifestMap.get(String(rec.id));
-      const remoteUpdated = Number(remoteEntry?.updatedAt) || 0;
-      if(!remoteEntry || remoteEntry.deleted || localUpdated > remoteUpdated){
-        const uploadedEntry = await uploadNoteImageToCloud(rec);
-        uploadedEntry.updatedAt = localUpdated;
-        uploadedEntry.createdAt = Number(rec.createdAt) || uploadedEntry.createdAt;
-        uploadedEntry.title = String(rec.title || "");
-        manifestMap.set(String(rec.id), uploadedEntry);
-        manifestChanged = true;
-      }else if(remoteUpdated > localUpdated){
-        const remoteRec = await downloadNoteImageFromCloud(remoteEntry);
-        if(!remoteRec){
-          manifestMap.delete(String(rec.id));
-          manifestChanged = true;
-          continue;
-        }
-        await dbPutNoteImage(remoteRec);
-        imageMap.set(String(remoteRec.id), remoteRec);
-        projectTouched = true;
-      }
-    }
-
-    for(const [imageId, entry] of manifestMap.entries()){
-      const localRec = imageMap.get(String(imageId));
-      const localUpdated = Number(localRec?.updatedAt) || Number(localRec?.createdAt) || 0;
-      const remoteUpdated = Number(entry?.updatedAt) || 0;
-      if(entry?.deleted){
-        if(localRec && remoteUpdated >= localUpdated){
-          await dbDeleteNoteImage(imageId);
-          imageMap.delete(imageId);
+    try{
+      for(const rec of localProjectImages){
+        if(!rec || !rec.id || !rec.blob) continue;
+        const localUpdated = Number(rec.updatedAt) || Number(rec.createdAt) || now();
+        const remoteEntry = manifestMap.get(String(rec.id));
+        const remoteUpdated = Number(remoteEntry?.updatedAt) || 0;
+        if(!remoteEntry || remoteEntry.deleted || localUpdated > remoteUpdated){
+          if(remoteEntry?.deleted && remoteUpdated >= localUpdated) continue; // deleted after this copy was made
+          const uploadedEntry = await uploadNoteImageToCloud(rec);
+          uploadedEntry.updatedAt = localUpdated;
+          uploadedEntry.createdAt = Number(rec.createdAt) || uploadedEntry.createdAt;
+          uploadedEntry.title = String(rec.title || "");
+          manifestMap.set(String(rec.id), uploadedEntry);
+        }else if(remoteUpdated > localUpdated){
+          const remoteRec = await downloadNoteImageFromCloud(remoteEntry);
+          if(!remoteRec){
+            manifestMap.delete(String(rec.id));
+            continue;
+          }
+          await dbPutNoteImage(remoteRec);
+          imageMap.set(String(remoteRec.id), remoteRec);
           projectTouched = true;
         }
-        await removeNoteImageFromCloud(entry);
-        continue;
       }
-      if(!localRec){
-        const remoteRec = await downloadNoteImageFromCloud(entry);
-        if(!remoteRec){
-          manifestMap.delete(String(imageId));
-          manifestChanged = true;
+
+      for(const [imageId, entry] of manifestMap.entries()){
+        const localRec = imageMap.get(String(imageId));
+        const localUpdated = Number(localRec?.updatedAt) || Number(localRec?.createdAt) || 0;
+        const remoteUpdated = Number(entry?.updatedAt) || 0;
+        if(entry?.deleted){
+          if(localRec && remoteUpdated >= localUpdated){
+            await dbDeleteNoteImage(imageId);
+            imageMap.delete(imageId);
+            projectTouched = true;
+          }
+          await removeNoteImageFromCloud(entry);
           continue;
         }
-        await dbPutNoteImage(remoteRec);
-        imageMap.set(String(remoteRec.id), remoteRec);
-        projectTouched = true;
+        if(!localRec){
+          const remoteRec = await downloadNoteImageFromCloud(entry);
+          if(!remoteRec){
+            manifestMap.delete(String(imageId));
+            continue;
+          }
+          await dbPutNoteImage(remoteRec);
+          imageMap.set(String(remoteRec.id), remoteRec);
+          projectTouched = true;
+        }
       }
+    }catch(err){
+      console.error("Note photo sync failed for", projectId, err);
+      firstError = firstError || err;
     }
 
-    const nextManifest = Array.from(manifestMap.values()).filter(Boolean).sort((a,b) => (Number(b.updatedAt)||0) - (Number(a.updatedAt)||0));
-    if(JSON.stringify(getProjectNotesImages(project)) !== JSON.stringify(nextManifest)){
-      await saveProjectNotesImageManifest(project, nextManifest);
-      manifestChanged = true;
+    const nextManifest = Array.from(manifestMap.values()).filter(Boolean);
+    if(JSON.stringify(mergeMediaManifests(before, [])) !== JSON.stringify(mergeMediaManifests(nextManifest, []))){
+      saveProjectNotesImageManifest(projectId, before, nextManifest);
     }
-    if(manifestChanged) anyManifestChanged = true;
-    if(projectTouched) currentProjectTouched = currentProjectTouched || (state.project && String(state.project.id||"") === projectId);
+    if(projectTouched && state.project && String(state.project.id || "") === projectId) currentProjectTouched = true;
   }
 
-  if(anyManifestChanged) queueCloudSync(`notes-image-manifest-${reason || "sync"}`);
   if(currentProjectTouched && state.notesOpen) resolveNotesImageElementSources();
+  if(firstError) throw firstError;
 }
 
 /***********************
@@ -13899,7 +13641,7 @@ function insertChecklistIntoNotes(){
   setCaretAtStartOfNode(text);
   saveNotesDoc({ allowBlank:true });
   pushNotesHistorySnapshot(true);
-  if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-move');
+  if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-move');
   return true;
 }
 
@@ -14035,7 +13777,7 @@ async function moveNotesImageBlockBy(id, direction){
   selectNotesImageBlockById(imageId);
   saveNotesDoc({ allowBlank:true });
   pushNotesHistorySnapshot(true);
-  if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-delete');
+  if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-delete');
   return true;
 }
 
@@ -14068,7 +13810,7 @@ function stopNotesImageResize(commit=false){
   if(commit){
     saveNotesDoc();
     pushNotesHistorySnapshot(true);
-    if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-resize');
+    if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-resize');
   }
 }
 
@@ -14194,7 +13936,7 @@ function stopNotesImageDrag(){
   if(drag?.active){
     saveNotesDoc();
     pushNotesHistorySnapshot(true);
-    if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-move');
+    if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-move');
   }
   state.notesImageDrag = null;
 }
@@ -14212,7 +13954,7 @@ function removeSelectedNotesImageBlock(){
   setCaretAtStartOfNode(next);
   saveNotesDoc({ allowBlank:true });
   pushNotesHistorySnapshot(true);
-  if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-delete');
+  if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-delete');
   return true;
 }
 
@@ -14506,7 +14248,7 @@ function injectNotesCropStyles(){
       background:#f5f5f6;
     }
   `;
-  document.head.appendChild(style);
+  appendAppStyle(style);
 }
 
 function ensureNotesCropModal(){
@@ -14609,7 +14351,8 @@ async function getNoteImageRecordForCrop(imageId){
   const id = String(imageId || '').trim();
   if(!id || !state.project) return null;
   let rec = null;
-  try{ rec = await dbGetNoteImage(id); }catch{}
+  try{ rec = await dbGetNoteImage(id); }
+  catch(err){ console.warn("Could not read the note photo to crop", err); }
   if(rec?.blob) return rec;
 
   const manifestEntry = getProjectNotesImages(state.project).find((entry) => String(entry.id || '') === id && !entry.deleted);
@@ -14915,15 +14658,11 @@ async function applyNotesCrop(){
       setProjectNotesImages(state.project, manifest);
     });
 
-    if(cloud.ready && cloud.client && getAuthUserId()){
+    if(cloudSignedIn()){
       try{
         const uploaded = await uploadNoteImageToCloud(updatedRec);
         if(uploaded){
-          editProject('notesImageCropCloud', () => {
-            const manifest = getProjectNotesImages(state.project).filter((item) => String(item.id || '') !== String(updatedRec.id || ''));
-            manifest.unshift(uploaded);
-            setProjectNotesImages(state.project, manifest);
-          });
+          setNoteImageManifestEntry(updatedRec.projectId, uploaded);
           const oldPath = String(oldEntry?.path || '').trim();
           const newPath = String(uploaded?.path || '').trim();
           if(oldPath && newPath && oldPath !== newPath){
@@ -14938,7 +14677,7 @@ async function applyNotesCrop(){
     await refreshNotesImageElementFromBlob(updatedRec.id, newBlob);
     saveNotesDoc();
     pushNotesHistorySnapshot(true);
-    if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-crop');
+    if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-crop');
     closeNotesCropModal();
     selectNotesImageBlockById(updatedRec.id);
     return true;
@@ -14992,15 +14731,11 @@ async function insertNotesImageFromFile(file){
     setProjectNotesImages(state.project, manifest);
   });
 
-  if(cloud.ready && cloud.client && getAuthUserId()){
+  if(cloudSignedIn()){
     try{
       const uploaded = await uploadNoteImageToCloud(rec);
       if(uploaded){
-        editProject('notesImageCloudPath', () => {
-          const manifest = getProjectNotesImages(state.project).filter((item) => String(item.id || '') !== imageId);
-          manifest.unshift(uploaded);
-          setProjectNotesImages(state.project, manifest);
-        });
+        setNoteImageManifestEntry(rec.projectId, uploaded);
       }
     }catch(err){
       console.warn('Immediate notes image upload failed', err);
@@ -15029,7 +14764,7 @@ async function insertNotesImageFromFile(file){
   await resolveNotesImageElementSources();
   saveNotesDoc({ allowBlank:true });
   pushNotesHistorySnapshot(true);
-  if(cloud.ready && cloud.client && getAuthUserId()) triggerImmediateCloudSync('notes-image-add');
+  if(cloudSignedIn()) triggerImmediateCloudSync('notes-image-add');
   return true;
 }
 
@@ -15056,7 +14791,7 @@ function applyNotesHistoryAt(index){
   if(!el.notesEditor) return;
   const snap = normalizeNotesHtml(state.notesHistory[index] ?? "");
   state.notesApplyingHistory = true;
-  el.notesEditor.innerHTML = snap;
+  el.notesEditor.innerHTML = sanitizeNotesHtml(snap);
   resolveNotesImageElementSources();
   applyNotesEditorDefaults();
   state.notesApplyingHistory = false;
@@ -15128,12 +14863,47 @@ function applyNotesEditorDefaults(){
   }catch{}
 }
 
+const NOTES_ALLOWED_TAGS = new Set(["DIV","P","BR","SPAN","B","STRONG","I","EM","U","S","STRIKE","FONT","SMALL","BIG","MARK","SUB","SUP","UL","OL","LI","H1","H2","H3","H4","H5","H6","BLOCKQUOTE","PRE","CODE","HR","IMG","A","INPUT"]);
+const NOTES_DROPPED_TAGS = new Set(["SCRIPT","STYLE","TEMPLATE","IFRAME","FRAME","FRAMESET","OBJECT","EMBED","APPLET","SVG","MATH","NOSCRIPT","TEXTAREA","SELECT","OPTION","BUTTON","FORM","LINK","META","BASE","TITLE","HEAD","VIDEO","AUDIO","SOURCE","TRACK","CANVAS","PORTAL"]);
+const NOTES_ALLOWED_ATTRS = new Set(["class","style","contenteditable","aria-hidden","alt","title","loading","decoding","width","height","color","size","face","type","checked","href","src",
+  "data-notes-image-id","data-notes-checkbox","data-notes-rhyme-marker","data-free-x","data-free-y"]);
+const NOTES_SAFE_URL = /^(?:https?:|mailto:|blob:|data:image\/(?:png|jpe?g|gif|webp);|\/|\.{0,2}\/|#|[^:]*$)/i;
+const NOTES_UNSAFE_STYLE = /url\s*\(|expression\s*\(|javascript:|@import|behavior\s*:|-moz-binding/i;
+
+// Allowlist sanitizer for notes HTML (see parseInertHtml).
 function sanitizeNotesHtml(html){
-  let s = stripNotesRhymeMarkers(String(html || ""));
+  const s = stripNotesRhymeMarkers(String(html || ""));
   if(!s.trim()) return "";
-  s = s.replace(/<script[\s\S]*?<\/script>/gi, "");
-  s = s.replace(/ on\w+=("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
-  return s;
+  const body = parseInertHtml(s);
+  const clean = (node) => {
+    for(const child of Array.from(node.childNodes)){
+      if(child.nodeType === Node.COMMENT_NODE){ child.remove(); continue; }
+      if(child.nodeType !== Node.ELEMENT_NODE) continue;
+      const tag = child.tagName.toUpperCase();
+      if(NOTES_DROPPED_TAGS.has(tag) || (tag === "INPUT" && String(child.getAttribute("type") || "").toLowerCase() !== "checkbox")){
+        child.remove();
+        continue;
+      }
+      if(!NOTES_ALLOWED_TAGS.has(tag)){
+        clean(child);
+        child.replaceWith(...Array.from(child.childNodes)); // unknown wrapper: keep its text
+        continue;
+      }
+      for(const attr of Array.from(child.attributes)){
+        const name = attr.name.toLowerCase();
+        const value = String(attr.value || "").trim();
+        const ok = NOTES_ALLOWED_ATTRS.has(name)
+          && !(name === "style" && NOTES_UNSAFE_STYLE.test(value))
+          && !(name === "href" && (tag !== "A" || !NOTES_SAFE_URL.test(value)));
+        if(!ok) child.removeAttribute(attr.name);
+      }
+      // Note photos get their src at runtime from local storage; keep only harmless sources.
+      if(tag === "IMG" && child.hasAttribute("src") && !NOTES_SAFE_URL.test(String(child.getAttribute("src")).trim())) child.removeAttribute("src");
+      clean(child);
+    }
+  };
+  clean(body);
+  return body.innerHTML;
 }
 
 function getNotesDoc(){
@@ -15157,40 +14927,22 @@ function saveNotesDoc(opts={}){
   const newHasNotes = notesDocHasMeaningfulContent(newDoc);
   const allowBlank = !!opts.allowBlank;
   const prevDoc = String(state.project.notesDoc || "");
-  const backup = readNotesBackup(state.project.id);
-  const prevHasNotes = notesDocHasMeaningfulContent(prevDoc);
-  const backupHasNotes = notesDocHasMeaningfulContent(backup?.notesDoc || "");
 
-  // Preserve real notes only for non-user/background blank saves. A deliberate
+  // Preserve real notes for non-user/background blank saves. A deliberate
   // editor mutation is allowed to clear the document completely.
-  if(!allowBlank && !newHasNotes && (prevHasNotes || backupHasNotes)){
-    const bestNotes = mergeNotesSafely(
-      { notesDoc: prevDoc, notesColor: state.project.notesColor, notesUpdatedAt: Number(state.project.notesUpdatedAt) || 0, notesClearedAt: Number(state.project.notesClearedAt) || 0, updatedAt: Number(state.project.notesUpdatedAt) || 0 },
-      backup
-    );
-    if(bestNotes){
-      state.project.notesDoc = String(bestNotes.notesDoc || "");
-      state.project.notesUpdatedAt = Number(bestNotes.notesUpdatedAt ?? bestNotes.updatedAt) || Number(state.project.notesUpdatedAt) || 0;
-      state.project.notesClearedAt = Number(bestNotes.notesClearedAt) || 0;
-      if(String(bestNotes.notesColor || "").trim()) state.project.notesColor = String(bestNotes.notesColor);
-    }
-    writeNotesBackup(state.project);
-    upsertProject(state.project);
-    return false;
-  }
+  if(!allowBlank && !newHasNotes && notesDocHasMeaningfulContent(prevDoc)) return false;
 
   // Canonical empty state: don't keep harmless browser scaffolding such as
   // <div><br></div> after the user has deleted everything.
   if(!newHasNotes) newDoc = "";
+  if(newDoc === prevDoc && state.project.notesColor) return false;
 
   const stamp = now();
   state.project.notesDoc = newDoc;
   state.project.notesUpdatedAt = stamp;
   state.project.notesClearedAt = newHasNotes ? 0 : stamp;
-  state.project.updatedAt = stamp;
   if(!state.project.notesColor) state.project.notesColor = state.notesDefaultColor || "#151515";
 
-  writeNotesBackup(state.project, { allowBlankOverwrite: allowBlank && !newHasNotes });
   upsertProject(state.project);
   return true;
 }
@@ -15207,13 +14959,7 @@ function persistActiveProjectState(opts={}){
     String(state.notesEditorProjectId || "") === String(state.project.id || "")
   );
 
-  if(requestedSave && editorOwnsCurrentProject){
-    saveNotesDoc({ allowBlank:true });
-    return;
-  }
-
-  // Keep a fresh notes backup even when the notes modal is closed.
-  writeNotesBackup(state.project);
+  if(requestedSave && editorOwnsCurrentProject) saveNotesDoc({ allowBlank:true });
   upsertProject(state.project);
 }
 
@@ -15361,19 +15107,6 @@ function renderNotesFromProject(){
 
 function openNotesModal(){
   if(!el.notesModal || !el.notesEditor) return;
-  const backup = readNotesBackup(state?.project?.id);
-  if(state.project && backup){
-    const bestNotes = mergeNotesSafely(
-      { notesDoc: state.project.notesDoc, notesColor: state.project.notesColor, notesUpdatedAt: Number(state.project.notesUpdatedAt) || 0, notesClearedAt: Number(state.project.notesClearedAt) || 0, updatedAt: Number(state.project.notesUpdatedAt) || 0 },
-      backup
-    );
-    if(bestNotes){
-      state.project.notesDoc = String(bestNotes.notesDoc || "");
-      state.project.notesClearedAt = Number(bestNotes.notesClearedAt) || 0;
-      state.project.notesUpdatedAt = Number(bestNotes.notesUpdatedAt ?? bestNotes.updatedAt) || state.project.notesUpdatedAt || 0;
-      if(String(bestNotes.notesColor || "").trim()) state.project.notesColor = String(bestNotes.notesColor || state.project.notesColor || "");
-    }
-  }
   state.notesOpen = true;
   renderNotesFromProject();
   resetNotesHistory(getNotesDoc());
@@ -15737,7 +15470,6 @@ function goToSection(sec){
   lastLyricsTextarea = null;
   refreshRhymesFromActive();
   refreshDisplayedNoteCells();
-  updateFullIfVisible();
 
 scrollToTopOfSheet();
 }
@@ -15881,8 +15613,9 @@ function wire(){
 
   if(el.saveBtn) el.saveBtn.addEventListener("click", () => {
     if(!state.project) return;
-    // force commit + visual feedback
+    // Save now (not after the usual short delay); a storage failure shows the banner.
     persistActiveProjectState({ saveNotes:true });
+    flushLibrary();
     updateUndoRedoUI();
 
     try{
@@ -15949,12 +15682,10 @@ if(el.capoInput){
     ensureCapoStepToggle();
     refreshDisplayedNoteCells();
     updateKeyFromAllNotes();
-    updateFullIfVisible?.();
     if(state.currentSection === "Full"){ try{ renderSheet(); }catch{} }
 
     // Commit once, after editing is complete, to the same hard sync bus used by CRP + BD.
     window.CRP_SRP_syncMetaToCrp?.();
-    window.CRP_SRP_writeHardSyncFromSrp?.()
   };
 
   el.capoInput.addEventListener("input", previewCapoStep_CAPTURE, true);
@@ -15962,9 +15693,6 @@ if(el.capoInput){
   el.capoInput.addEventListener("blur", commitCapoStep_CAPTURE, true);
 }
 // ===== CAPO / STEP input (mode-aware, supports .5 in STEP) =====
-function roundToHalf(n){
-  return Math.round(n * 2) / 2;
-}
 
 function commitCapoOrStepFromInput(){
   const mode = state.transposeMode || "capo";
@@ -15990,7 +15718,6 @@ function commitCapoOrStepFromInput(){
   if(state.project) upsertProject(state.project);
   refreshDisplayedNoteCells();
   updateKeyFromAllNotes();
-  updateFullIfVisible();
   ensureCapoStepToggle(); // ✅ re-paint label CAPO/STEP every commit
   if(state.currentSection === "Full"){
     try{ renderSheet(); }catch{}
@@ -16025,7 +15752,8 @@ if(el.capoInput){
     if(state.currentSection === "Full"){
       try{ renderSheet(); }catch{}
     }
-    if(state.project){ upsertProject(state.project); window.CRP_SRP_syncMetaToCrp?.(); }
+    // Linked CRP/BD hears about the value once editing is finished (change/blur/Enter).
+    if(state.project) upsertProject(state.project);
   });
 
   el.capoInput.addEventListener("change", () => {
@@ -16264,12 +15992,10 @@ if(el.capoInput){
   }
 
   const flushNotesPersistence = () => {
-    try{
-      if(state.project){
-        if(state.notesOpen && el.notesEditor && String(state.notesEditorProjectId || "") === String(state.project.id || "")) saveNotesDoc({ allowBlank:true });
-        else writeNotesBackup(state.project);
-      }
-    }catch{}
+    if(state.project && state.notesOpen && el.notesEditor && String(state.notesEditorProjectId || "") === String(state.project.id || "")){
+      saveNotesDoc({ allowBlank:true });
+    }
+    flushLibrary();
   };
   window.addEventListener("beforeunload", flushNotesPersistence);
   window.addEventListener("pagehide", flushNotesPersistence);
@@ -16343,7 +16069,6 @@ if(el.capoInput){
     if(state.drumsOn) startDrums();
     restartClockIfRunning();
     window.CRP_SRP_syncMetaToCrp?.();
-    window.CRP_SRP_writeHardSyncFromSrp?.();
   }
 
   if(el.bpmInput) el.bpmInput.addEventListener("input", () => {
@@ -16384,7 +16109,6 @@ if(el.bpmInput){
     if(!el.capoInput) return;
     commitCapoStepFromInput();
     window.CRP_SRP_syncMetaToCrp?.();
-    window.CRP_SRP_writeHardSyncFromSrp?.();
   }
 
  if(el.capoInput) el.capoInput.addEventListener("input", () => {
@@ -16528,14 +16252,14 @@ const v = Number.isFinite(raw) ? raw : 0;
     const name = prompt("New project name:", "New Song");
     if(name === null) return;
     const p = defaultProject(name.trim() || "New Song");
-    upsertProject(p);
     closeNotesModal?.();
+    upsertProject(p, { bump:false, select:true });
     state.project = p;
     state.currentSection = "Full";
     resetProjectHistory();
     applyProjectSettingsToUI();
     renderAll();
-    try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
+    notifyLinkedProjectChanged();
   });
 
   if(el.renameProjectBtn) el.renameProjectBtn.addEventListener("click", () => {
@@ -16564,7 +16288,7 @@ const v = Number.isFinite(raw) ? raw : 0;
     applyProjectSettingsToUI();
     renderAll();
     renderArchiveModal();
-    try{ window.CRP_SRP_onSrpProjectChanged?.(); }catch{}
+    notifyLinkedProjectChanged();
   });
 if(el.uploadAudioBtn){
   el.uploadAudioBtn.addEventListener("click", async () => {
@@ -16668,7 +16392,6 @@ async function init(){
   // Tick visuals + misc
   clearTick();
   applyTick();
-  updateFullIfVisible();
   refreshRhymesFromActive();
   refreshDisplayedNoteCells();
   updateAudioButtonsUI();
@@ -16687,24 +16410,12 @@ async function init(){
   cloud.appMounted = true;
   updateAuthModalUI();
   if(cloud.user){
-    if(cloud.deferInitialMerge){
-      cloud.deferInitialMerge = false;
-      setTimeout(() => {
-        if(!cloud.user) return;
-        mergeCloudIntoLocal().then(() => {
-          setCloudStatus("ok");
-          updateAuthModalUI();
-        }).catch(err => {
-          console.error("Deferred initial cloud merge failed", err);
-          setCloudStatus("error", err?.message || String(err || "Unknown error"));
-          updateAuthModalUI(err?.message || "Cloud sync failed.");
-        });
-      }, 60);
-    }else{
-      scheduleDeferredCloudAudioSync("post-init");
-      scheduleDeferredCloudNoteImageSync("post-init");
-      queueCloudSync("post-init");
-    }
+    // Reconcile with the cloud (including recordings / note photos) right after first paint.
+    setTimeout(() => {
+      syncWithCloud("startup", { media:true }).then(() => updateAuthModalUI()).catch(err => {
+        updateAuthModalUI(err?.message || "Cloud sync failed.");
+      });
+    }, 60);
   }
 
   stopBeatClock();
@@ -16741,825 +16452,386 @@ init().catch(showBootError);
 
 /***********************
 KEEP RHYME UI ABOVE KEYBOARD
-- simple layout-viewport anchoring for Android Chrome
-- portals rhyme dock + floating R to body so parent transforms cannot trap them
-- when a text editor is focused, pin the R and dock to the bottom of the resized viewport
-- no visualViewport top math (that was lifting the R too high on this device)
+- The rhyme dock and the floating R button live directly in <body> so no transformed
+  ancestor can trap their fixed position (static styles are in index.html).
+- Their vertical position follows the visual viewport, so they sit just above the
+  on-screen keyboard. It is recomputed once per frame when something that can move it
+  happens: viewport resize/scroll, focus moving in or out of an editor, and the dock or
+  Notes opening/closing (see scheduleKeyboardDockLayout callers).
 ***********************/
-{
-  const dock = document.getElementById("rhymeDock");
-  const rBtn = document.getElementById("rBtn");
-  const hideBtn = document.getElementById("hideRhymeBtn");
-  const notesBtn = document.getElementById("notesBtn");
-  const notesCloseBtn = document.getElementById("notesCloseBtn");
-  const notesModal = document.getElementById("notesModal");
-
-  const BASE_BTN_BOTTOM = 12;
-  const BASE_DOCK_BOTTOM = 8;
-  const KB_GAP = 8;
-
-  let rafId = 0;
-  let settleTimer = 0;
-  let pulseUntil = 0;
-
-  function forceStyle(el, prop, value){
-    if(!el) return;
-    try{ el.style.setProperty(prop, value, 'important'); }catch{ el.style[prop] = value; }
+const keyboardDockLayout = { raf:0 };
+function scheduleKeyboardDockLayout(){
+  if(!keyboardDockLayout.raf) keyboardDockLayout.raf = requestAnimationFrame(applyKeyboardDockLayout);
+}
+function applyKeyboardDockLayout(){
+  keyboardDockLayout.raf = 0;
+  const dock = el.rhymeDock, rBtn = el.rBtn;
+  if(!dock && !rBtn) return;
+  const GAP = 8;
+  const vv = window.visualViewport;
+  const vvBottom = vv ? Math.min(window.innerHeight, vv.offsetTop + vv.height) : window.innerHeight;
+  const keyboardInset = vv ? Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height))) : 0;
+  const a = document.activeElement;
+  const editing = !!(a && a.closest && a.closest('textarea, input[type="text"], input:not([type]), [contenteditable="true"]')) || !!state.notesOpen;
+  const keyboardOpen = editing || !!(vv && (window.innerHeight - vv.height > 120 || vv.offsetTop > 0));
+  const notesOpen = !!el.notesModal?.classList.contains('show');
+  const dockShown = !!(dock && dock.style.display === 'block');
+  const pin = (node, fallbackBottom, height) => {
+    if(!keyboardOpen){ node.style.top = 'auto'; node.style.bottom = fallbackBottom + 'px'; return; }
+    if(notesOpen){ node.style.top = 'auto'; node.style.bottom = Math.max(fallbackBottom, keyboardInset + GAP) + 'px'; return; }
+    node.style.bottom = 'auto';
+    node.style.top = Math.max(8, Math.round(vvBottom - height - GAP)) + 'px';
+  };
+  if(dock){
+    pin(dock, 8, Math.max(48, Math.ceil(dock.getBoundingClientRect().height || 0)));
+    if(keyboardOpen) dock.style.maxHeight = Math.max(180, Math.round((notesOpen ? vvBottom - keyboardInset : vvBottom) * 0.42)) + 'px';
+    else dock.style.removeProperty('max-height');
   }
-
-  function portalToBody(node){
-    if(!node || !document.body) return;
-    if(node.parentElement !== document.body) document.body.appendChild(node);
-  }
-
-  function isEditableTarget(node){
-    if(!node || node.nodeType !== 1) return false;
-    if(node.matches && node.matches('textarea, input[type="text"], input:not([type]), [contenteditable="true"]')) return true;
-    if(node.closest){
-      return !!node.closest('textarea, input[type="text"], input:not([type]), [contenteditable="true"], #notesBody, .lyricsTa, .fullLyricsTa');
-    }
-    return false;
-  }
-
-  function keyboardLikelyOpen(){
-    const a = document.activeElement;
-    const vv = window.visualViewport;
-    const focusedEditable = isEditableTarget(a) || !!(state && state.notesOpen);
-    const vvShort = !!(vv && (window.innerHeight - vv.height > 120 || vv.offsetTop > 0));
-    return focusedEditable || vvShort;
-  }
-
-  function getVisibleViewportBottom(){
-    const vv = window.visualViewport;
-    if(vv){
-      return Math.min(window.innerHeight, vv.offsetTop + vv.height);
-    }
-    return window.innerHeight;
-  }
-
-  function isNotesModalOpen(){
-    return !!(notesModal && notesModal.classList && notesModal.classList.contains('show'));
-  }
-
-  function getKeyboardInset(){
-    const vv = window.visualViewport;
-    if(!vv) return 0;
-    return Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height)));
-  }
-
-  function ensureOverlayRoots(){
-    portalToBody(dock);
-    portalToBody(rBtn);
-
-    if(dock){
-      forceStyle(dock, 'position', 'fixed');
-      forceStyle(dock, 'left', '12px');
-      forceStyle(dock, 'right', '12px');
-      forceStyle(dock, 'width', 'auto');
-      forceStyle(dock, 'max-width', 'none');
-      forceStyle(dock, 'margin', '0');
-      forceStyle(dock, 'transform', 'none');
-      forceStyle(dock, 'z-index', '2147483645');
-    }
-
-    if(rBtn){
-      forceStyle(rBtn, 'position', 'fixed');
-      forceStyle(rBtn, 'right', '12px');
-      forceStyle(rBtn, 'left', 'auto');
-      forceStyle(rBtn, 'margin', '0');
-      forceStyle(rBtn, 'transform', 'none');
-      forceStyle(rBtn, 'z-index', '2147483646');
-    }
-  }
-
-  function applyBottomAnchors(){
-    rafId = 0;
-    ensureOverlayRoots();
-
-    const kbOpen = keyboardLikelyOpen();
-    const dockShown = !!(dock && dock.style.display === 'block');
-    const vvBottom = getVisibleViewportBottom();
-    const keyboardInset = getKeyboardInset();
-    const notesOpenNow = isNotesModalOpen();
-
-    if(dock){
-      const dockH = Math.max(48, Math.ceil(dock.getBoundingClientRect().height || 0));
-      if(kbOpen){
-        if(notesOpenNow){
-          forceStyle(dock, 'top', 'auto');
-          forceStyle(dock, 'bottom', Math.max(BASE_DOCK_BOTTOM, keyboardInset + KB_GAP) + 'px');
-          forceStyle(dock, 'max-height', Math.max(180, Math.round((vvBottom - Math.max(0, keyboardInset)) * 0.42)) + 'px');
-        }else{
-          const dockTop = Math.max(8, Math.round(vvBottom - dockH - KB_GAP));
-          forceStyle(dock, 'bottom', 'auto');
-          forceStyle(dock, 'top', dockTop + 'px');
-          forceStyle(dock, 'max-height', Math.max(180, Math.round(vvBottom * 0.42)) + 'px');
-        }
-      }else{
-        forceStyle(dock, 'top', 'auto');
-        forceStyle(dock, 'bottom', BASE_DOCK_BOTTOM + 'px');
-        try{ dock.style.removeProperty('max-height'); }catch{}
-      }
-    }
-
-    if(rBtn){
-      if(kbOpen){
-        if(notesOpenNow){
-          forceStyle(rBtn, 'top', 'auto');
-          forceStyle(rBtn, 'bottom', Math.max(BASE_BTN_BOTTOM, keyboardInset + KB_GAP) + 'px');
-        }else{
-          const btnH = Math.max(52, Math.ceil(rBtn.getBoundingClientRect().height || 52));
-          const btnTop = Math.max(8, Math.round(vvBottom - btnH - KB_GAP));
-          forceStyle(rBtn, 'bottom', 'auto');
-          forceStyle(rBtn, 'top', btnTop + 'px');
-        }
-      }else{
-        forceStyle(rBtn, 'top', 'auto');
-        forceStyle(rBtn, 'bottom', BASE_BTN_BOTTOM + 'px');
-      }
-      if(dockShown){
-        forceStyle(rBtn, 'opacity', '0');
-        forceStyle(rBtn, 'pointer-events', 'none');
-      }else{
-        forceStyle(rBtn, 'opacity', '1');
-        forceStyle(rBtn, 'pointer-events', 'auto');
-      }
-    }
-  }
-
-  function queueApply(){
-    if(rafId) cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(applyBottomAnchors);
-  }
-
-  function pulse(){
-    clearTimeout(settleTimer);
-    if(Date.now() > pulseUntil) return;
-    queueApply();
-    settleTimer = setTimeout(pulse, 50);
-  }
-
-  function settle(ms = 700){
-    pulseUntil = Date.now() + ms;
-    queueApply();
-    setTimeout(queueApply, 60);
-    setTimeout(queueApply, 140);
-    setTimeout(queueApply, 260);
-    setTimeout(queueApply, 420);
-    pulse();
-  }
-
-  ensureOverlayRoots();
-  queueApply();
-
-  window.addEventListener('resize', settle);
-  window.addEventListener('orientationchange', settle);
-  window.addEventListener('scroll', settle, { passive:true });
-  if(window.visualViewport){
-    window.visualViewport.addEventListener('resize', settle);
-    window.visualViewport.addEventListener('scroll', settle);
-  }
-  document.addEventListener('focusin', settle, true);
-  document.addEventListener('focusout', settle, true);
-  document.addEventListener('click', settle, true);
-  document.addEventListener('touchend', settle, { passive:true, capture:true });
-
   if(rBtn){
-    rBtn.addEventListener('click', settle);
-    rBtn.addEventListener('touchstart', settle, { passive:true });
-    rBtn.addEventListener('pointerdown', settle, { passive:true });
+    pin(rBtn, 12, Math.max(52, Math.ceil(rBtn.getBoundingClientRect().height || 52)));
+    rBtn.classList.toggle('srpDockOpen', dockShown);
   }
-  if(hideBtn) hideBtn.addEventListener('click', settle);
-  if(notesBtn) notesBtn.addEventListener('click', settle);
-  if(notesCloseBtn) notesCloseBtn.addEventListener('click', settle);
-
-  if(dock && window.MutationObserver){
-    new MutationObserver(settle).observe(dock, { attributes:true, attributeFilter:['style','class'] });
+}
+{
+  for(const node of [el.rhymeDock, el.rBtn]){
+    if(node && node.parentElement !== document.body) document.body.appendChild(node);
   }
-  if(notesModal && window.MutationObserver){
-    new MutationObserver(settle).observe(notesModal, { attributes:true, attributeFilter:['style','class','aria-hidden'] });
-  }
+  window.addEventListener('resize', scheduleKeyboardDockLayout);
+  window.addEventListener('orientationchange', scheduleKeyboardDockLayout);
+  window.visualViewport?.addEventListener('resize', scheduleKeyboardDockLayout);
+  window.visualViewport?.addEventListener('scroll', scheduleKeyboardDockLayout);
+  document.addEventListener('focusin', scheduleKeyboardDockLayout, true);
+  document.addEventListener('focusout', scheduleKeyboardDockLayout, true);
+  scheduleKeyboardDockLayout();
 }
 
 
 
-/* CRP / SRP integration bridge. In v2.1 the CRP-integrated Song Rider runs as a real page,
-   not inside an iframe. This eliminates Android/iOS nested-scroll gesture conflicts. */
+/* CRP / SRP integration bridge.
+   Song Rider Pro runs as its own page next to Chord Rider Pro / Baby DAW (same origin). One SRP
+   song can be linked to one CRP project; the pair then shares BPM / capo / step / key, and the CRP
+   chord rows are merged into PAGE 1 of the SRP song.
+
+   Shared localStorage keys (root app.js is unchanged and keeps using all of them):
+     crp-srp-links-v1                persistent links: CRP id -> {srpProjectId, srpName, linkedAt}
+     crp-srp-link-session-v3         the pair that is open right now (CRP only syncs with this pair)
+     crp-srp-active-link-id-v1       raw CRP id of that pair
+     crp-srp-handoff-v2              CRP's last handoff payload (fallback when crp-projects lacks it)
+     song-rider-suite-transport-v6   live BPM / capo / octave / pitch mode of the pair (read first)
+     crp-srp-canonical-v1:<crpId>    per-project transport + key / transpose (CRP reads key here)
+     crp-srp-meta-v1:<crpId>         per-project shared meta (base record)
+   Older generations (crp-srp-live-meta-v3, crp-srp-unified-meta-v1:<id>, crp-srp-hard-sync-v1) are
+   still read as fallbacks but no longer written.
+
+   Updates are event driven: storage events and the transport BroadcastChannel, plus one re-read at
+   startup, pageshow, focus and when the tab becomes visible. SRP writes carry source:'srp' and a
+   rev, and values are compared before applying or publishing, so neither side re-applies, re-saves
+   or re-publishes an echo of its own change. */
 (function(){
   const q=new URLSearchParams(location.search);
-  const embedded=q.get('embedded')==='1';
-  const integrated=q.get('crpMode')==='1';
+  const integrated=q.get('crpMode')==='1'||document.documentElement.classList.contains('crp-integrated');
   const lyricsOverlay=q.get('lyricsOverlay')==='1';
   if(lyricsOverlay)document.documentElement.classList.add('srp-lyrics-overlay-mode');
-  if(!embedded && !integrated) return;
+  if(!integrated) return;
+  const insideFrame=!!(window.parent&&window.parent!==window);
+
   const HANDOFF_KEY='crp-srp-handoff-v2';
   const LINKS_KEY='crp-srp-links-v1';
-  const SHARED_META_PREFIX='crp-srp-meta-v1:';
-  // v2.5.0: CRP/BD/SRP share one authoritative live metadata record.
-  // This deliberately does not depend on the CRP project being present in SRP's local project cache.
-  const LIVE_META_KEY='crp-srp-live-meta-v3';
-  // v2.5.1: use one project-scoped metadata record for the exact CRP project linked to SRP.
-  // This removes the previous ambiguity between active CRP id, handoff id, link-map id and a
-  // single global live-meta record.
-  const ACTIVE_LINK_KEY='crp-srp-active-link-id-v1';
-  const UNIFIED_META_PREFIX='crp-srp-unified-meta-v1:';
-  const HARD_SYNC_KEY='crp-srp-hard-sync-v1';
-  // v2.6.0: exact linked-project transport state. One authority for BPM/CAPO/STEP.
-  const CANONICAL_PREFIX='crp-srp-canonical-v1:';
-  // v2.7.0: explicit pair link. Merely opening SRP is never a link.
   const LINK_SESSION_KEY='crp-srp-link-session-v3';
-  // v3.3.0 LINK-SCOPED TRANSPORT: the same-origin BPM/CAPO/STEP record is shared
-  // only by the exact CRP/BD <-> SRP project pair that is actively linked. Unlinked SRP
-  // projects keep independent transport values and must neither publish to nor consume this bus.
-  const SRS_TRANSPORT_KEY='song-rider-suite-transport-v6';
-  function readSuiteTransport(){
-    try{const m=readJson(SRS_TRANSPORT_KEY,null);return m&&typeof m==='object'?m:null}catch{return null}
-  }
-  function writeSuiteTransport(id,meta,source='srp'){
-    try{
-      const sid=String(id||'');
-      if(!sid)return null;
-      const prev=readSuiteTransport()||{};
-      const session=readLinkSession?.();
-      const next={
-        bpm:Math.max(40,Math.min(240,Number(meta?.bpm ?? prev.bpm ?? state.bpm)||95)),
-        capo:Math.max(0,Math.min(12,Number(meta?.capo ?? prev.capo ?? state.capo)||0)),
-        octave:Math.max(-2,Math.min(3,Number(meta?.octave ?? prev.octave ?? state.steps)||0)),
-        pitchMode:(meta?.pitchMode==='step'||meta?.pitchMode==='capo')?meta.pitchMode:(prev.pitchMode==='step'?'step':'capo'),
-        crpProjectId:sid,
-        source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()
-      };
-      writeJson(SRS_TRANSPORT_KEY,next);
-      try{window.__SRS_TRANSPORT_CHANNEL?.postMessage(next)}catch{}
-      return next;
-    }catch{return null}
-  }
-  function sharedMetaKey(id){return SHARED_META_PREFIX+String(id||'')}
-  function unifiedMetaKey(id){return UNIFIED_META_PREFIX+String(id||'')}
-  function canonicalMetaKey(id){return CANONICAL_PREFIX+String(id||'')}
-  function readLinkSession(){try{const x=readJson(LINK_SESSION_KEY,null);return x&&x.linked===true?x:null}catch{return null}}
-  function writeLinkSession(crpProjectId,srpProjectId){const prev=readJson(LINK_SESSION_KEY,{})||{};const next={linked:true,crpProjectId:String(crpProjectId||''),srpProjectId:String(srpProjectId||''),rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};writeJson(LINK_SESSION_KEY,next);return next}
-  function clearLinkSession(){try{localStorage.removeItem(LINK_SESSION_KEY)}catch{}}
+  const ACTIVE_LINK_KEY='crp-srp-active-link-id-v1';
+  const TRANSPORT_KEY='song-rider-suite-transport-v6';
+  const CANONICAL_PREFIX='crp-srp-canonical-v1:';
+  const SHARED_META_PREFIX='crp-srp-meta-v1:';
+  const LEGACY_LIVE_META_KEY='crp-srp-live-meta-v3';
+  const LEGACY_UNIFIED_PREFIX='crp-srp-unified-meta-v1:';
+  const LEGACY_HARD_SYNC_KEY='crp-srp-hard-sync-v1';
+  let transportChannel=null;
+  try{transportChannel=new BroadcastChannel(TRANSPORT_KEY);}catch{}
 
-  // v3.2.9 PROJECT-SCOPED LINKING
-  // The link map is persistent truth (CRP id -> SRP id). LINK_SESSION_KEY is only the
-  // currently loaded SRP project's active pair. This prevents a link from visually or
-  // behaviorally following every SRP project as the user switches projects.
-  function persistentLinkForSrpProject(project=state.project, repair=true){
-    try{
-      const sid=String(project?.id||'');
-      if(!sid)return null;
-      const all=links();
-      const matches=Object.entries(all).filter(([,rec])=>String(rec?.srpProjectId||'')===sid);
-      const projectCrpId=String(project?.linkedCrpProjectId||'');
-      let chosen=null;
-      if(matches.length){
-        chosen=matches.find(([crpId])=>String(crpId)===projectCrpId) ||
-          matches.slice().sort((a,b)=>(Number(b[1]?.linkedAt)||0)-(Number(a[1]?.linkedAt)||0))[0];
-        if(repair && matches.length>1){
-          for(const [crpId] of matches){ if(String(crpId)!==String(chosen[0])) delete all[crpId]; }
-          setLinks(all);
-        }
-      }else if(projectCrpId){
-        const occupying=all[projectCrpId];
-        if(!occupying){
-          // Migrate a valid legacy per-project link into the link map once.
-          const rec={srpProjectId:sid,srpName:project?.name||'Song Rider project',linkedAt:Date.now()};
-          all[projectCrpId]=rec;
-          if(repair)setLinks(all);
-          chosen=[projectCrpId,rec];
-        }else if(repair){
-          // The CRP project is owned by another SRP project. This field is stale.
-          project.linkedCrpProjectId='';
-          project.linkedOctave=0;
-          project.linkedTranspose=false;
-          upsertProject(project);
-        }
-      }
-      if(!chosen)return null;
-      const crpId=String(chosen[0]);
-      const rec=chosen[1]||{};
-      if(repair && String(project.linkedCrpProjectId||'')!==crpId){
-        project.linkedCrpProjectId=crpId;
-        upsertProject(project);
-      }
-      return {crpProjectId:crpId,srpProjectId:sid,srpName:rec.srpName||project?.name||'Song Rider project',linkedAt:Number(rec.linkedAt)||0};
-    }catch{return null}
+  function readJson(key,fallback){
+    try{const raw=localStorage.getItem(key);return raw?(JSON.parse(raw)??fallback):fallback;}
+    catch(err){console.warn('Unreadable linked-workspace record',key,err);return fallback;}
   }
+  function writeJson(key,value){
+    try{localStorage.setItem(key,JSON.stringify(value));return true;}
+    catch(err){console.warn('Could not save linked-workspace record',key,err);return false;}
+  }
+  const handoff=()=>readJson(HANDOFF_KEY,{})||{};
+  const links=()=>readJson(LINKS_KEY,{})||{};
+  const setLinks=(v)=>writeJson(LINKS_KEY,v||{});
+  function readLinkSession(){const x=readJson(LINK_SESSION_KEY,null);return x&&x.linked===true?x:null;}
+  function writeLinkSession(crpProjectId,srpProjectId){
+    const prev=readJson(LINK_SESSION_KEY,{})||{};
+    writeJson(LINK_SESSION_KEY,{linked:true,crpProjectId:String(crpProjectId||''),srpProjectId:String(srpProjectId||''),rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()});
+  }
+  function clearLinkSession(){try{localStorage.removeItem(LINK_SESSION_KEY);}catch{}}
+  function setActiveLinkId(id){try{if(id)localStorage.setItem(ACTIVE_LINK_KEY,String(id));else localStorage.removeItem(ACTIVE_LINK_KEY);}catch{}}
+
+  // The link map is the persistent truth (CRP id -> SRP id); the session is only the pair open now.
+  // repair=true fixes stale per-project link fields (bookkeeping, never a content edit).
+  function persistentLinkForSrpProject(project=state.project, repair=true){
+    const sid=String(project?.id||'');
+    if(!sid)return null;
+    const all=links();
+    const matches=Object.entries(all).filter(([,rec])=>String(rec?.srpProjectId||'')===sid);
+    const projectCrpId=String(project?.linkedCrpProjectId||'');
+    let chosen=null;
+    if(matches.length){
+      chosen=matches.find(([crpId])=>String(crpId)===projectCrpId)||
+        matches.slice().sort((a,b)=>(Number(b[1]?.linkedAt)||0)-(Number(a[1]?.linkedAt)||0))[0];
+      if(repair&&matches.length>1){
+        for(const [crpId] of matches){if(String(crpId)!==String(chosen[0]))delete all[crpId];}
+        setLinks(all);
+      }
+    }else if(projectCrpId){
+      if(!all[projectCrpId]){
+        // Migrate a valid legacy per-project link into the link map once.
+        const rec={srpProjectId:sid,srpName:project?.name||'Song Rider project',linkedAt:Date.now()};
+        all[projectCrpId]=rec;
+        if(repair)setLinks(all);
+        chosen=[projectCrpId,rec];
+      }else if(repair){
+        // That CRP project now belongs to another SRP song; this field is stale.
+        project.linkedCrpProjectId='';project.linkedOctave=0;project.linkedTranspose=false;
+        upsertProject(project,{bump:false,select:false});
+      }
+    }
+    if(!chosen)return null;
+    const crpId=String(chosen[0]),rec=chosen[1]||{};
+    if(repair&&String(project.linkedCrpProjectId||'')!==crpId){
+      project.linkedCrpProjectId=crpId;
+      upsertProject(project,{bump:false,select:false});
+    }
+    return {crpProjectId:crpId,srpProjectId:sid,srpName:rec.srpName||project?.name||'Song Rider project',linkedAt:Number(rec.linkedAt)||0};
+  }
+  function activeLinkedCrpId(){
+    const rec=persistentLinkForSrpProject(state.project,false);
+    if(rec?.crpProjectId)return String(rec.crpProjectId);
+    const x=readLinkSession(),sid=String(state.project?.id||'');
+    return (x?.crpProjectId&&sid&&String(x.srpProjectId||'')===sid)?String(x.crpProjectId):'';
+  }
+  function exactLinkForCurrentProject(){
+    const rec=persistentLinkForSrpProject(state.project,false),x=readLinkSession();
+    return !!(rec&&x&&String(x.crpProjectId||'')===String(rec.crpProjectId||'')&&String(x.srpProjectId||'')===String(rec.srpProjectId||''));
+  }
+  function isCurrentCrpSrpLinked(){
+    return exactLinkForCurrentProject()&&String(readLinkSession()?.srpProjectId||'')===String(state.project?.id||'');
+  }
+  window.CRP_SRP_isCurrentProjectLinked=isCurrentCrpSrpLinked;
 
   function activateLinkForCurrentSrpProject(){
-    const p=state.project;
-    const rec=persistentLinkForSrpProject(p,true);
+    const rec=persistentLinkForSrpProject(state.project,true);
     if(rec){
       const x=readLinkSession();
-      if(!x || String(x.crpProjectId||'')!==rec.crpProjectId || String(x.srpProjectId||'')!==rec.srpProjectId){
-        writeLinkSession(rec.crpProjectId,rec.srpProjectId);
-      }
-      try{localStorage.setItem(ACTIVE_LINK_KEY,rec.crpProjectId)}catch{}
+      if(!x||String(x.crpProjectId||'')!==rec.crpProjectId||String(x.srpProjectId||'')!==rec.srpProjectId)writeLinkSession(rec.crpProjectId,rec.srpProjectId);
+      setActiveLinkId(rec.crpProjectId);
     }else{
-      clearLinkSession();
-      try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}
+      if(readLinkSession())clearLinkSession();
+      setActiveLinkId('');
     }
-    try{refreshCrpLinkUi();}catch{}
-    try{renderSheetTitleBar();}catch{}
+    refreshCrpLinkUi();
+    renderSheetTitleBar();
     return rec;
   }
   window.CRP_SRP_onSrpProjectChanged=()=>{
     const rec=activateLinkForCurrentSrpProject();
-    if(rec)setTimeout(()=>{try{syncFromHandoff(false);applyLiveMetaToSrp();}catch{}},0);
+    if(rec)setTimeout(reconcileLinkedWorkspace,0);
     return rec;
   };
 
-  function exactLinkForCurrentProject(){
-    const rec=persistentLinkForSrpProject(state.project,false);
-    const x=readLinkSession();
-    return !!(rec && x &&
-      String(x.crpProjectId||'')===String(rec.crpProjectId||'') &&
-      String(x.srpProjectId||'')===String(rec.srpProjectId||''));
-  }
-  function readCanonicalMeta(id){try{const sid=String(id||activeUnifiedCrpId()||'');if(!sid)return null;const m=readJson(canonicalMetaKey(sid),null);return m&&String(m.projectId||'')===sid?m:null}catch{return null}}
-  function writeCanonicalMeta(id,meta,source='srp'){
+  // ---------------------------------------------------------------- transport (BPM / capo / step / key)
+  function readLinkedMeta(crpId){
+    const id=String(crpId||'');
     if(!id)return null;
-    try{const sid=String(id),prev=readCanonicalMeta(sid)||{};const next={...prev,...meta,projectId:sid,source,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};writeJson(canonicalMetaKey(sid),next);try{window.__CRP_SRP_CANONICAL_CHANNEL?.postMessage(next)}catch{}return next}catch{return null}
+    const matching=(m,...fields)=>m&&fields.some(f=>String(m[f]||'')===id)?m:null;
+    const legacy=matching(readJson(CANONICAL_PREFIX+id,null),'projectId')||
+      matching(readJson(LEGACY_UNIFIED_PREFIX+id,null),'crpProjectId')||
+      matching(readJson(LEGACY_LIVE_META_KEY,null),'crpProjectId')||
+      matching(readJson(LEGACY_HARD_SYNC_KEY,null),'projectId','crpProjectId');
+    const transport=matching(readJson(TRANSPORT_KEY,null),'crpProjectId');
+    return transport?{...(legacy||{}),...transport}:legacy;
   }
-  function activeUnifiedCrpId(){
-    try{
-      const rec=persistentLinkForSrpProject(state.project,false);
-      if(rec?.crpProjectId)return String(rec.crpProjectId);
-      const x=readLinkSession();
-      const sid=String(state.project?.id||'');
-      if(x?.crpProjectId && sid && String(x.srpProjectId||'')===sid)return String(x.crpProjectId);
-      return String(state.project?.linkedCrpProjectId||'');
-    }catch{return String(state.project?.linkedCrpProjectId||'')}
+  function transportFromMeta(m,p){
+    return {
+      bpm:clamp(Number(m.bpm)||Number(p.bpm)||95,40,240),
+      capo:clamp(Number(m.capo)||0,0,12),
+      steps:clamp(Number(m.octave)||0,-2,3),
+      transposeMode:m.pitchMode==='step'?'step':'capo',
+      crpKey:m.key!=null?String(m.key||''):String(p.crpKey||''),
+      linkedTranspose:typeof m.transpose==='boolean'?m.transpose:!!p.linkedTranspose
+    };
   }
-  function readLiveMeta(){
-    const id=activeUnifiedCrpId();
-    if(!id || !exactLinkForCurrentProject())return null;
-    const canonical=readCanonicalMeta(id);
-    const unified=readJson(unifiedMetaKey(id),null);
-    const globalLive=readJson(LIVE_META_KEY,null);
-    const legacy=(canonical?{...canonical,crpProjectId:id}:(unified&&String(unified.crpProjectId||'')===id?unified:(globalLive&&String(globalLive.crpProjectId||'')===id?globalLive:null)));
-    const suite=readSuiteTransport();
-    const suiteForPair=(suite&&String(suite.crpProjectId||'')===String(id))?suite:null;
-    return suiteForPair?{...(legacy||{}),...suiteForPair,crpProjectId:String(id)}:legacy;
+  // CRP's values -> the open SRP song. Settings that came from the other app are saved without
+  // counting as an edit of the song, and nothing happens when the values are already the same.
+  function applyCrpMetaToSrp(){
+    if(!exactLinkForCurrentProject())return false;
+    const p=state.project,crpId=activeLinkedCrpId();
+    const m=crpId?readLinkedMeta(crpId):null;
+    if(!p||!m)return false;
+    const active=document.activeElement;
+    if(active===el?.bpmInput||active===el?.capoInput)return false; // the user is typing a value
+    const next=transportFromMeta(m,p);
+    const pitchChanged=next.capo!==Number(p.capo)||next.steps!==Number(p.steps)||next.transposeMode!==p.transposeMode||next.crpKey!==String(p.crpKey||'');
+    if(!pitchChanged&&next.bpm===Number(p.bpm)&&next.linkedTranspose===!!p.linkedTranspose)return false;
+    Object.assign(p,next,{linkedCrpProjectId:crpId,linkedOctave:next.steps});
+    upsertProject(p,{bump:false});
+    applyProjectSettingsToUI();
+    if(pitchChanged)renderAll();
+    else if(shouldClockRun())startBeatClock();
+    return true;
   }
-  function writeLiveMeta(id,meta){
-    if(!id)return null;
-    const sid=String(id);
-    writeCanonicalMeta(sid,meta,String(meta?.source||'srp'));
-    // ACTIVE_LINK_KEY is intentionally a raw string for easy use from the CRP page too.
-    try{localStorage.setItem(ACTIVE_LINK_KEY,sid)}catch{}
-    const old=readJson(unifiedMetaKey(sid),null);
-    const prev=(old&&String(old.crpProjectId||'')===sid)?old:{};
-    const next={...prev,...meta,crpProjectId:sid,rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
-    writeJson(unifiedMetaKey(sid),next);
-    writeJson(LIVE_META_KEY,next);
-    try{window.__CRP_SRP_META_CHANNEL?.postMessage(next)}catch{}
+  function sameTransport(a,b){
+    return !!(a&&b)&&Number(a.bpm)===Number(b.bpm)&&Number(a.capo)===Number(b.capo)&&Number(a.octave)===Number(b.octave)&&
+      (a.pitchMode==='step'?'step':'capo')===(b.pitchMode==='step'?'step':'capo')&&String(a.key??'')===String(b.key??'')&&!!a.transpose===!!b.transpose;
+  }
+  function writeRecord(key,meta,extra){
+    const prev=readJson(key,{})||{};
+    const next={...prev,...meta,...extra,source:'srp',rev:(Number(prev.rev)||0)+1,updatedAt:Date.now()};
+    writeJson(key,next);
     return next;
   }
-  function readHardSync(){
+  // The open SRP song's values -> the linked CRP project (only when they actually changed).
+  function publishSrpTransport(){
     if(!exactLinkForCurrentProject())return null;
-    const id=String(activeUnifiedCrpId()||'');
-    if(!id)return null;
-    const suite=readSuiteTransport();
-    if(suite&&String(suite.crpProjectId||'')===id)return suite;
-    const canonical=readCanonicalMeta(id);
-    if(canonical)return canonical;
-    const legacy=readJson(HARD_SYNC_KEY,null);
-    return legacy&&String(legacy.projectId||legacy.crpProjectId||'')===id?legacy:null;
-  }
-  function writeHardSyncFromSrp(){
-    try{
-      if(!exactLinkForCurrentProject())return null;
-      const projectId=String(activeLinkedCrpId()||'');
-      if(!projectId)return null;
-      const mode=state.transposeMode==='step'?'step':'capo';
-      const raw=Number(el?.capoInput?.value);
-      const bpm=Math.max(40,Math.min(240,Number(el?.bpmInput?.value)||Number(state.bpm)||95));
-      let capo=Math.max(0,Math.min(12,Number(state.capo)||0));
-      let octave=Math.max(-2,Math.min(3,Number(state.steps)||0));
-      if(Number.isFinite(raw)){
-        if(mode==='capo'){capo=Math.max(0,Math.min(12,Math.round(raw)));state.capo=capo;if(state.project)state.project.capo=capo;}
-        else{octave=Math.max(-2,Math.min(3,raw));state.steps=octave;if(state.project){state.project.steps=octave;state.project.linkedOctave=octave;}}
-      }
-      state.bpm=bpm;if(state.project){state.project.bpm=bpm;state.project.transposeMode=mode;}
-      const next=writeSuiteTransport(projectId,{bpm,capo,octave,pitchMode:mode},'srp');
-      // Legacy records are mirrors only, retained for key/chord-link compatibility.
-      writeCanonicalMeta(projectId,{bpm,capo,octave,pitchMode:mode},'srp');
-      writeJson(HARD_SYNC_KEY,next||{bpm,capo,octave,pitchMode:mode,projectId,source:'srp',rev:1,updatedAt:Date.now()});
-      return next;
-    }catch{return null}
-  }
-  window.CRP_SRP_writeHardSyncFromSrp=writeHardSyncFromSrp;
-  let __hardSyncRev=-1;
-  function applyHardSyncToSrp(){
-    try{
-      if(!exactLinkForCurrentProject())return false;
-      const m=readHardSync();if(!m)return false;
-      const linkedId=String(activeLinkedCrpId()||'');
-      if(!linkedId)return false;
-      const metaId=String(m.crpProjectId||m.projectId||'');
-      if(metaId&&metaId!==linkedId)return false;
-      // Do not let the background sync poll fight the user's active BPM/CAPO/STEP edit.
-      // Crucially, do not mark this revision applied until the field is no longer focused.
-      const active=document.activeElement;
-      if(active===el?.bpmInput||active===el?.capoInput)return false;
-      const rev=Number(m.rev)||0;if(rev===__hardSyncRev)return false;__hardSyncRev=rev;
-      state.bpm=Math.max(40,Math.min(240,Number(m.bpm)||state.bpm||95));
-      state.capo=Math.max(0,Math.min(12,Number(m.capo)||0));
-      state.steps=Math.max(-2,Math.min(3,Number(m.octave)||0));
-      state.transposeMode=m.pitchMode==='step'?'step':'capo';
-      if(state.project){state.project.bpm=state.bpm;state.project.capo=state.capo;state.project.steps=state.steps;state.project.transposeMode=state.transposeMode;upsertProject(state.project);}
-      if(el?.bpmInput)el.bpmInput.value=String(state.bpm);
-      if(el?.capoInput)el.capoInput.value=String(state.transposeMode==='step'?state.steps:state.capo);
-      applyProjectSettingsToUI();renderAll();
-      return true;
-    }catch{return false}
-  }
-  function readSharedMeta(id){
-    if(!id)return null;
-    const sid=String(id), base=readJson(sharedMetaKey(sid),null);
-    const session=readLinkSession();
-    const explicitlyLinked=!!(session&&String(session.crpProjectId||'')===sid);
-    if(!explicitlyLinked)return base;
-    const canonical=readCanonicalMeta(sid);
-    const live=readLiveMeta();
-    const legacy=(canonical?{...(base||{}),...canonical,crpProjectId:sid}:(live&&String(live.crpProjectId||'')===sid?{...(base||{}),...live}:base));
-    const suite=readSuiteTransport();
-    const suiteForPair=(suite&&String(suite.crpProjectId||'')===sid)?suite:null;
-    return suiteForPair?{...(legacy||{}),...suiteForPair,crpProjectId:sid}:legacy;
-  }
-  function writeSharedMeta(id,meta){if(!id)return;const base=readJson(sharedMetaKey(id),{})||{};writeJson(sharedMetaKey(id),{...base,...meta,projectId:String(id),updatedAt:Date.now()});}
-
-  // Native SRP is a separate page, so the original CRP/BD audio engine would otherwise
-  // be gone after navigation. Keep a tiny hidden same-origin copy of the main workspace
-  // alive strictly as the linked playback engine. Calling its CRPParts methods directly
-  // from the user's tap preserves browser audio permission and plays the actual saved parts.
-  let linkedPlaybackFrame=null;
-  let linkedPlaybackReady=false;
-  let linkedPlaybackWatch=0;
-  function watchLinkedPlaybackState(){
-    clearInterval(linkedPlaybackWatch);
-    linkedPlaybackWatch=setInterval(()=>{
-      try{
-        const actual=!!linkedPlaybackFrame?.contentWindow?.CRPParts?.isPlaying?.();
-        if(actual!==!!window.__SRP_LINKED_PLAYING){
-          window.__SRP_LINKED_PLAYING=actual;
-          renderSheetTitleBar();
-        }
-      }catch{}
-    },250);
-  }
-  function ensureLinkedPlaybackBridge(){
-    if(!integrated || lyricsOverlay || (window.parent&&window.parent!==window)) return null;
-    if(linkedPlaybackFrame?.isConnected) return linkedPlaybackFrame;
-    const f=document.createElement('iframe');
-    f.id='crpLinkedPlaybackBridge';
-    f.title='Linked Chord Rider playback engine';
-    f.setAttribute('aria-hidden','true');
-    f.tabIndex=-1;
-    Object.assign(f.style,{position:'fixed',width:'1px',height:'1px',left:'-10000px',top:'-10000px',opacity:'0',pointerEvents:'none',border:'0'});
-    f.src='../index.html?playbackBridge=1';
-    f.addEventListener('load',()=>{linkedPlaybackReady=true;watchLinkedPlaybackState();});
-    document.body.appendChild(f);
-    linkedPlaybackFrame=f;
-    return f;
-  }
-  function refreshLinkedPlaybackProject(w){
-    try{
-      if(!exactLinkForCurrentProject()) return false;
-      const session=readLinkSession();
-      const linkedId=String(session?.crpProjectId||'');
-      if(linkedId && typeof w?.CRPCore?.loadProjectById==='function'){
-        w.CRPCore.loadProjectById(linkedId);
-        return true;
-      }
-    }catch(err){console.warn('Could not refresh linked CRP playback project',err)}
-    return false;
-  }
-  window.CRP_SRP_getLinkedPlaybackTiming=function(){
-    try{
-      const f=ensureLinkedPlaybackBridge();
-      const parts=f?.contentWindow?.CRPParts;
-      return parts?.getPlaybackTiming?.() || null;
-    }catch{return null;}
-  };
-
-  window.CRP_SRP_linkedPlaybackCommand=function(command){
-    // Only the exact SRP<->CRP pair may use the hidden CRP/Baby DAW audio engine.
-    // Unlinked SRP songs play their own parsed chords locally instead.
-    if(!exactLinkForCurrentProject()){
-      window.__SRP_LINKED_PLAYING=false;
-      return false;
-    }
-    const f=ensureLinkedPlaybackBridge();
-    const w=f?.contentWindow;
-    if(!w){ return false; }
-    try{
-      // Reload the active saved project immediately before Play so BPM, capo, drums,
-      // chord parts, lead/bass parts, enabled states and volumes are current.
-      if(command==='play') refreshLinkedPlaybackProject(w);
-      const parts=w.CRPParts;
-      if(!parts){
-        // The bridge is preloaded on SRP entry. If a very fast tap beats initialization,
-        // leave the UI stopped rather than pretending audio started.
-        window.__SRP_LINKED_PLAYING=false;
-        setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);
-        return false;
-      }
-      if(command==='play') parts.startPlayback?.();
-      else if(command==='pause'||command==='stop') parts.stopPlayback?.();
-      const on=command==='play';
-      window.__SRP_LINKED_PLAYING=on;
-      setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);
-      return true;
-    }catch(err){
-      console.error('Linked CRP/BD playback failed',err);
-      window.__SRP_LINKED_PLAYING=false;
-      setTimeout(()=>{try{renderSheetTitleBar();}catch{}},0);
-      return false;
-    }
-  };
-
-  function readJson(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'')||fallback}catch{return fallback}}
-  function writeJson(key,v){try{localStorage.setItem(key,JSON.stringify(v))}catch{}}
-  function handoff(){return readJson(HANDOFF_KEY,{})||{}}
-  function links(){return readJson(LINKS_KEY,{})||{}}
-  function setLinks(v){writeJson(LINKS_KEY,v||{})}
-  function recoverCrpPayload(preferredCrpId=''){
-    try{
-      const projects=readJson('crp-projects',[])||[];
-      const h=handoff();
-      const session=readLinkSession();
-      // Explicit Link SRP targets the CRP/Baby DAW project actually open right now.
-      // Background sync for an already-linked SRP project instead asks for that project's
-      // persisted CRP partner via preferredCrpId, so the link never follows another project.
-      const activeId=String(preferredCrpId||localStorage.getItem('crp-active-project-id')||h?.payload?.crpProjectId||session?.crpProjectId||'');
-      let p=(activeId&&projects.find(x=>String(x?.id||'')===activeId)) ||
-        (!preferredCrpId&&h?.payload?.crpProjectId&&projects.find(x=>String(x?.id||'')===String(h.payload.crpProjectId))) || null;
-      if(p?.id){
-        // v2.4.8: shared meta is the single authority for BPM/capo/octave.
-        // This prevents a page reload or cloud/current-project restore from resurrecting stale values.
-        const activeSession=readLinkSession();
-        const shared=(activeSession&&String(activeSession.crpProjectId||'')===String(p.id))?readSharedMeta(p.id):null;
-        if(shared){
-          p={...p,
-            bpm:Number.isFinite(Number(shared.bpm))?Number(shared.bpm):p.bpm,
-            capo:Number.isFinite(Number(shared.capo))?Number(shared.capo):p.capo,
-            octave:Number.isFinite(Number(shared.octave))?Number(shared.octave):p.octave,
-            transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,
-            key:String(shared.key ?? p.key ?? '')
-          };
-          const idx=projects.findIndex(x=>String(x?.id||'')===String(p.id));
-          if(idx>=0){projects[idx]={...projects[idx],bpm:p.bpm,capo:p.capo,octave:p.octave,transpose:p.transpose,key:p.key};writeJson('crp-projects',projects);}
-        }
-        const payload={
-          crpProjectId:p.id,name:p.name||'Untitled',bpm:Number(p.bpm)||92,beats:Number(p.beats)||4,
-          key:String(p.key||''),capo:Number(p.capo)||0,octave:Number(p.octave)||0,transpose:!!p.transpose,pitchMode:(shared?.pitchMode==='step'?'step':'capo'),
-          rows:(Array.isArray(p.rows)?p.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))
-        };
-        writeJson(HANDOFF_KEY,{payload,rec:links()[p.id]||h?.rec||null,ts:Date.now()});
-        return payload;
-      }
-      if(h?.payload?.crpProjectId && (!preferredCrpId || String(h.payload.crpProjectId)===String(preferredCrpId))) return h.payload;
-      return null;
-    }catch(err){ console.error('Could not recover CRP project for SRP link',err); return handoff()?.payload||null; }
-  }
-
-  function reportLink(payload,p){
-    if(!payload?.crpProjectId||!p)return;
-    if(integrated){
-      const all=links();
-      all[payload.crpProjectId]={srpProjectId:p.id,srpName:p.name||payload.name||'Song Rider project',linkedAt:Date.now()};
-      setLinks(all);
-      writeLinkSession(payload.crpProjectId,p.id);
-      try{localStorage.setItem(ACTIVE_LINK_KEY,String(payload.crpProjectId))}catch{}
-      refreshCrpLinkUi();
-    }else{
-      try{parent.postMessage({type:'srp-link-result',crpProjectId:payload.crpProjectId,srpProjectId:p.id,srpName:p.name},location.origin)}catch{}
-    }
-  }
-
-  function importCrpStructure(payload, forceCreate, requestedId){
-    if(!payload?.crpProjectId) return null;
-    try{
-      persistActiveProjectState?.();
-      let all=loadAllProjects().map(normalizeProject).filter(Boolean);
-      let p=null;
-      if(forceCreate){
-        // A tap on Link SRP always links the SRP project currently on screen.
-        // Never jump to an older SRP project that happened to be linked to this CRP before.
-        p=state.project?normalizeProject(deepClone(state.project)):defaultProject('New Song');
-
-        // Keep links one-to-one. Detach stale records that point either side at another project.
-        const linkMap=links();
-        for(const [oldCrpId,rec] of Object.entries(linkMap)){
-          const oldSrpId=String(rec?.srpProjectId||'');
-          if(String(oldCrpId)===String(payload.crpProjectId) || oldSrpId===String(p.id||'')){
-            delete linkMap[oldCrpId];
-            if(oldSrpId && oldSrpId!==String(p.id||'')){
-              const oldProj=all.find(x=>String(x.id||'')===oldSrpId);
-              if(oldProj && String(oldProj.linkedCrpProjectId||'')===String(oldCrpId)){
-                oldProj.linkedCrpProjectId='';
-                oldProj.linkedOctave=0;
-                oldProj.linkedTranspose=false;
-                upsertProject(oldProj);
-              }
-            }
-          }
-        }
-        setLinks(linkMap);
-      }else{
-        if(requestedId)p=all.find(x=>String(x.id)===String(requestedId));
-        if(!p)p=all.find(x=>String(x.linkedCrpProjectId||'')===String(payload.crpProjectId));
-      }
-      if(!p)return null;
-      p.linkedCrpProjectId=payload.crpProjectId;
-      // SRP owns its own project name. Linking/syncing must never rename it to the CRP name.
-      p.bpm=Number(payload.bpm)||p.bpm||95;
-      p.crpKey=String(payload.key||'');
-      p.capo=Math.max(0,Math.min(12,Number(payload.capo)||0));
-      p.transposeMode=payload.pitchMode==='step'?'step':'capo';
-      p.steps=Math.max(-2,Math.min(3,Number(payload.octave)||0));
-      p.linkedOctave=p.steps;
-      p.linkedTranspose=!!payload.transpose;
-      p.crpBeatsPerChord=Number(payload.beats)||4;
-      p.crpChordRows=payload.rows||[];
-      const sec='PAGE 1';
-      const old=Array.isArray(p.sections?.[sec])?p.sections[sec]:[];
-      const rows=Array.isArray(payload.rows)?payload.rows:[];
-      p.sections=p.sections||{};
-      p.sections[sec]=rows.length?rows.map((r,i)=>{
-        const prev=old[i]||newLine();
-        const chords=(r.cards||[]).filter(c=>c.type==='chord').map(c=>String(c.value||'')).filter(Boolean);
-        const slots=Array(8).fill('');
-        if(chords.length)chords.forEach((ch,j)=>{slots[Math.min(7,Math.floor(j*8/chords.length))]=ch});
-        return {...prev,id:prev.id||String(r.lineId||uuid()),notes:slots,lyrics:String(prev.lyrics||''),beats:Array.isArray(prev.beats)?prev.beats:Array(4).fill('')};
-      }):[old[0]||newLine()];
-      p.enabledSections=Array.from(new Set(['PAGE 1',...(p.enabledSections||[])]));
-      p.updatedAt=now();
+    const p=state.project,crpId=activeLinkedCrpId();
+    if(!p||!crpId)return null;
+    const mode=state.transposeMode==='step'?'step':'capo';
+    const bpm=clamp(Number(el?.bpmInput?.value)||Number(state.bpm)||95,40,240);
+    let capo=clamp(Number(state.capo)||0,0,12),octave=clamp(Number(state.steps)||0,-2,3);
+    const raw=Number(el?.capoInput?.value);
+    if(Number.isFinite(raw)){if(mode==='capo')capo=clamp(Math.round(raw),0,12);else octave=clamp(raw,-2,3);}
+    Object.assign(state,{bpm,capo,steps:octave,transposeMode:mode});
+    if(Number(p.bpm)!==bpm||Number(p.capo)!==capo||Number(p.steps)!==octave||p.transposeMode!==mode){
+      Object.assign(p,{bpm,capo,steps:octave,linkedOctave:octave,transposeMode:mode});
       upsertProject(p);
-      state.project=normalizeProject(p);
-      state.bpm=p.bpm;
-      setCurrentProjectIdForScope(getStorageScope(),p.id);
-      applyProjectSettingsToUI();
-      renderAll();
-      reportLink(payload,p);
-      return p;
-    }catch(err){console.error('CRP/SRP link sync failed',err);return null}
+    }
+    const meta={bpm,capo,octave,pitchMode:mode,key:String(p.crpKey||el?.keyOutput?.value||'').trim(),transpose:!!p.linkedTranspose};
+    if(sameTransport(readLinkedMeta(crpId),meta))return null; // already there (e.g. it came from CRP)
+    const transport=writeRecord(TRANSPORT_KEY,{bpm,capo,octave,pitchMode:mode},{crpProjectId:crpId});
+    try{transportChannel?.postMessage(transport);}catch{}
+    writeRecord(CANONICAL_PREFIX+crpId,meta,{projectId:crpId});
+    writeRecord(SHARED_META_PREFIX+crpId,meta,{projectId:crpId});
+    // Keep CRP's local copy in step for its hidden playback engine. Not a CRP edit: no timestamp bump.
+    const projects=readJson('crp-projects',[])||[];
+    const i=projects.findIndex(x=>String(x?.id||'')===crpId);
+    if(i>=0){
+      const cp=projects[i],upd={bpm,capo,octave,transpose:meta.transpose,...(meta.key?{key:meta.key}:{})};
+      if(Object.keys(upd).some(k=>cp[k]!==upd[k])){projects[i]={...cp,...upd};writeJson('crp-projects',projects);}
+    }
+    return transport;
   }
-
-  function activeLinkedCrpId(){
-    const rec=persistentLinkForSrpProject(state.project,false);
-    if(rec?.crpProjectId)return String(rec.crpProjectId);
-    const x=readLinkSession();
-    const sid=String(state.project?.id||'');
-    return (x?.crpProjectId && sid && String(x.srpProjectId||'')===sid)?String(x.crpProjectId):'';
-  }
-  function syncMetaToCrp(){
-    try{
-      let p=state.project;if(!p)return;
-      const crpId=activeLinkedCrpId();if(!crpId)return;
-      // Never change the SRP project selection from background link sync.
-      const session=readLinkSession();
-      // Project-level metadata only belongs to the exact pair on screen.
-      // Global BPM/CAPO/STEP sync is handled separately by the suite transport bus.
-      if(!session || String(session.srpProjectId||'')!==String(p.id||'') || String(session.crpProjectId||'')!==String(crpId)) return;
-      p.linkedCrpProjectId=crpId;
-      const liveBpm=Number(el?.bpmInput?.value);
-      const rawAmount=Number(el?.capoInput?.value);
-      const mode=(state.transposeMode==='step'?'step':'capo');
-      p.transposeMode=mode;
-      if(Number.isFinite(liveBpm)){state.bpm=Math.max(40,Math.min(240,liveBpm));p.bpm=state.bpm;}
-      if(Number.isFinite(rawAmount)){
-        if(mode==='capo'){state.capo=Math.max(0,Math.min(12,Math.round(rawAmount)));p.capo=state.capo;}
-        else{state.steps=Math.max(-2,Math.min(3,rawAmount));p.steps=state.steps;p.linkedOctave=state.steps;}
-      }
-      upsertProject(p);
-
-      const bpm=Math.max(40,Math.min(240,Number(state.bpm ?? p.bpm)||92));
-      const capo=Math.max(0,Math.min(12,Number(state.capo ?? p.capo)||0));
-      const octave=Math.max(-2,Math.min(3,Number(state.steps ?? p.steps ?? p.linkedOctave)||0));
-      const key=String(p.crpKey||el?.keyOutput?.value||'').trim();
-      const transpose=!!p.linkedTranspose;
-
-      // WRITE FIRST. This is the key v2.5.0 change: SRP no longer needs to find a local CRP
-      // project record before BPM/capo/STEP can reach CRP/BD.
-      const meta={bpm,capo,octave,transpose,key,pitchMode:mode,source:'srp'};
-      writeHardSyncFromSrp();
-      writeLiveMeta(crpId,meta);
-      writeSharedMeta(crpId,meta);
-
-      // Update the local CRP backup too when it exists, but its absence is no longer a sync failure.
-      const projects=readJson('crp-projects',[])||[];
-      const i=projects.findIndex(x=>String(x?.id||'')===String(crpId));
-      let cp=i>=0?{...projects[i]}:null;
-      if(cp){
-        cp.bpm=bpm;cp.capo=capo;cp.octave=octave;cp.transpose=transpose;
-        if(key)cp.key=key;
-        cp.updatedAt=Date.now();projects[i]=cp;writeJson('crp-projects',projects);
-      }
-
-      const h=handoff();
-      const oldPayload=h?.payload||{};
-      const payload={...oldPayload,crpProjectId:crpId,name:cp?.name||oldPayload.name||p.name||'Untitled',bpm,beats:Number(cp?.beats??oldPayload.beats)||4,key:key||String(cp?.key||oldPayload.key||''),capo,octave,transpose,pitchMode:mode,rows:oldPayload.rows||[]};
-      writeJson(HANDOFF_KEY,{payload,rec:links()[crpId]||h?.rec||null,ts:Date.now()});
-    }catch(err){console.warn('Could not sync SRP metadata back to CRP',err)}
-  }
-  window.CRP_SRP_syncMetaToCrp=syncMetaToCrp;
-  // v2.5.4: number fields are editing buffers. Do not hard-sync on every keystroke.
-  // Mobile number keyboards emit intermediate values (e.g. 1 -> 12 -> 120), and the old
-  // 250 ms reconciliation loop could clamp/write those partial values back into the box.
-  // Commit only when the user finishes the edit (change/blur/Enter).
-  const commitSrpLinkedNumber=()=>{ syncMetaToCrp(); writeHardSyncFromSrp(); };
+  window.CRP_SRP_syncMetaToCrp=publishSrpTransport;
+  // Number fields are editing buffers: publish only when the user finishes (change/blur/Enter).
   [el?.bpmInput,el?.capoInput].filter(Boolean).forEach(node=>{
-    ['change','blur'].forEach(type=>node.addEventListener(type,commitSrpLinkedNumber,true));
-    node.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitSrpLinkedNumber();node.blur();}},true);
+    ['change','blur'].forEach(type=>node.addEventListener(type,publishSrpTransport,true));
+    node.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();publishSrpTransport();node.blur();}},true);
   });
 
-  let __lastAppliedLiveRev=-1;
-  function applyLiveMetaToSrp(){
-    try{
-      if(!integrated||!exactLinkForCurrentProject())return false;
-      const crpId=activeLinkedCrpId();
-      if(!crpId)return false;
-      const live=readLiveMeta();
-      if(!live||String(live.crpProjectId||'')!==String(crpId))return false;
-      const rev=Number(live.rev)||0;
-      if(rev===__lastAppliedLiveRev)return false;
-      __lastAppliedLiveRev=rev;
-
-      const session=readLinkSession();
-      let p=state.project;
-      if(!p || !session || String(session.srpProjectId||'')!==String(p.id||'')) return false;
-      p.linkedCrpProjectId=crpId;
-      p.bpm=Math.max(40,Math.min(240,Number(live.bpm)||p.bpm||95));
-      p.capo=Math.max(0,Math.min(12,Number(live.capo)||0));
-      p.steps=Math.max(-2,Math.min(3,Number(live.octave)||0));
+  // ---------------------------------------------------------------- CRP chord rows -> PAGE 1
+  function crpPayloadFor(preferredCrpId=''){
+    const projects=readJson('crp-projects',[])||[];
+    const h=handoff(),session=readLinkSession();
+    // Linking targets the CRP/Baby DAW project open right now; background sync asks for the
+    // song's saved partner (preferredCrpId) so the link never follows another project.
+    const activeId=String(preferredCrpId||localStorage.getItem('crp-active-project-id')||h?.payload?.crpProjectId||session?.crpProjectId||'');
+    const p=(activeId&&projects.find(x=>String(x?.id||'')===activeId))||
+      (!preferredCrpId&&h?.payload?.crpProjectId&&projects.find(x=>String(x?.id||'')===String(h.payload.crpProjectId)))||null;
+    if(p?.id){
+      const shared=(session&&String(session.crpProjectId||'')===String(p.id))?readLinkedMeta(p.id):null;
+      const src={...p,...(shared?{bpm:shared.bpm??p.bpm,capo:shared.capo??p.capo,octave:shared.octave??p.octave,transpose:typeof shared.transpose==='boolean'?shared.transpose:p.transpose,key:String(shared.key??p.key??'')}:{})};
+      return {
+        crpProjectId:p.id,name:p.name||'Untitled',bpm:Number(src.bpm)||92,beats:Number(p.beats)||4,
+        key:String(src.key||''),capo:Number(src.capo)||0,octave:Number(src.octave)||0,transpose:!!src.transpose,pitchMode:shared?.pitchMode==='step'?'step':'capo',
+        rows:(Array.isArray(p.rows)?p.rows:[]).map((row,rowIndex)=>({lineId:`crp-line-${rowIndex+1}`,cards:(Array.isArray(row)?row:[]).map(c=>({type:c?.type||'chord',value:c?.value||''}))}))
+      };
+    }
+    if(h?.payload?.crpProjectId&&(!preferredCrpId||String(h.payload.crpProjectId)===String(preferredCrpId)))return h.payload;
+    return null;
+  }
+  function crpRowChords(row){
+    return (Array.isArray(row?.cards)?row.cards:[]).filter(c=>(c?.type||'chord')==='chord').map(c=>String(c?.value||'').trim()).filter(Boolean);
+  }
+  function crpRowsFingerprint(rows){
+    const text=JSON.stringify((Array.isArray(rows)?rows:[]).map(crpRowChords));
+    let h=2166136261;
+    for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}
+    return `${(h>>>0).toString(36)}-${text.length}`;
+  }
+  // Put each CRP row's chords on the matching PAGE 1 card, in order. Lyrics, beats and any
+  // extra cards stay. A row with more than 8 chords continues on the next card(s).
+  function mergeCrpRowsIntoPage1(project,rows){
+    const cards=Array.isArray(project.sections?.['PAGE 1'])?project.sections['PAGE 1']:[];
+    let at=0;
+    for(const row of rows){
+      const chords=crpRowChords(row);
+      for(let start=0;start===0||start<chords.length;start+=8){
+        const chunk=chords.slice(start,start+8);
+        if(at>=cards.length)cards.push(newLine());
+        const slots=Array(8).fill('');
+        chunk.forEach((ch,j)=>{slots[Math.floor(j*8/chunk.length)]=ch;});
+        cards[at].notes=slots;
+        at++;
+      }
+    }
+    project.sections['PAGE 1']=cards;
+    project.enabledSections=Array.from(new Set(['PAGE 1',...(project.enabledSections||[])]));
+  }
+  // Link (forceCreate) or refresh the open song from its CRP partner. The chord merge only runs
+  // when CRP's rows actually changed, goes through editProject (so Undo works) and rewrites the
+  // Full text from the cards so both views agree.
+  function importCrpStructure(payload,forceCreate){
+    const p=state.project;
+    if(!payload?.crpProjectId||!p)return null;
+    const crpId=String(payload.crpProjectId);
+    persistActiveProjectState();
+    if(forceCreate){
+      // Keep links one-to-one: detach records pointing either side at another project.
+      const linkMap=links();
+      for(const [oldCrpId,rec] of Object.entries(linkMap)){
+        const oldSrpId=String(rec?.srpProjectId||'');
+        if(String(oldCrpId)!==crpId&&oldSrpId!==String(p.id))continue;
+        delete linkMap[oldCrpId];
+        const oldProj=oldSrpId&&oldSrpId!==String(p.id)?libraryProject(oldSrpId):null;
+        if(oldProj&&String(oldProj.linkedCrpProjectId||'')===String(oldCrpId)){
+          oldProj.linkedCrpProjectId='';oldProj.linkedOctave=0;oldProj.linkedTranspose=false;
+          upsertProject(oldProj,{bump:false,select:false});
+        }
+      }
+      setLinks(linkMap);
+    }
+    const rows=Array.isArray(payload.rows)?payload.rows:[];
+    const sig=crpRowsFingerprint(rows);
+    if(forceCreate||p.crpRowsSig!==sig){
+      editProject('linkCrpChords',()=>{
+        mergeCrpRowsIntoPage1(p,rows);
+        syncFullTextFromSections();
+      });
+    }
+    p.linkedCrpProjectId=crpId;
+    p.crpRowsSig=sig;
+    p.crpChordRows=rows;
+    p.crpBeatsPerChord=Number(payload.beats)||4;
+    if(forceCreate){
+      // Linking adopts CRP's transport. SRP keeps its own song name.
+      Object.assign(p,transportFromMeta({bpm:payload.bpm,capo:payload.capo,octave:payload.octave,pitchMode:payload.pitchMode,key:payload.key,transpose:payload.transpose},p));
       p.linkedOctave=p.steps;
-      p.transposeMode=live.pitchMode==='step'?'step':'capo';
-      p.linkedTranspose=!!live.transpose;
-      if(live.key!=null)p.crpKey=String(live.key||'');
-      state.project=normalizeProject(p);
-      state.bpm=p.bpm;state.capo=p.capo;state.steps=p.steps;state.transposeMode=p.transposeMode;
-      upsertProject(state.project);
-      setCurrentProjectIdForScope(getStorageScope(),state.project.id);
-      applyProjectSettingsToUI();
-      renderAll();
-      return true;
-    }catch(err){console.warn('Could not apply live CRP/SRP metadata',err);return false;}
-  }
-
-  function isCurrentCrpSrpLinked(){
-    const rec=persistentLinkForSrpProject(state.project,false);
-    const x=readLinkSession();
-    return !!(rec&&x&&state.project&&
-      String(x.crpProjectId||'')===String(rec.crpProjectId||'')&&
-      String(x.srpProjectId||'')===String(state.project.id||'')&&
-      String(rec.srpProjectId||'')===String(state.project.id||''));
-  }
-  window.CRP_SRP_isCurrentProjectLinked=()=>isCurrentCrpSrpLinked();
-
-  function unlinkCurrentCrpSrp(){
-    const currentId=String(state.project?.id||'');
-    const rec=persistentLinkForSrpProject(state.project,false);
-    const crpId=String(rec?.crpProjectId||'');
-    // Stop the linked arrangement before removing the pair so no hidden CRP/BD audio
-    // can continue after the UI says this SRP project is unlinked.
-    if(window.__SRP_LINKED_PLAYING && exactLinkForCurrentProject()){
-      try{ window.CRP_SRP_linkedPlaybackCommand?.('stop'); }catch{}
     }
-    window.__SRP_LINKED_PLAYING=false;
-    if(crpId){
-      const all=links();
-      if(String(all[crpId]?.srpProjectId||'')===currentId){delete all[crpId];setLinks(all);}
-    }
-    if(state.project){
-      state.project.linkedCrpProjectId='';
-      state.project.linkedOctave=0;
-      state.project.linkedTranspose=false;
-      upsertProject(state.project);
-    }
-    const x=readLinkSession();
-    if(!x || String(x.srpProjectId||'')===currentId)clearLinkSession();
-    try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}
-    refreshCrpLinkUi();
-    try{renderSheetTitleBar();}catch{}
+    upsertProject(p,{bump:false});
+    applyProjectSettingsToUI();
+    renderAll();
+    return p;
   }
+  window.CRP_SRP_importCrpStructure=importCrpStructure;
 
+  // ---------------------------------------------------------------- link UI
   function crpProjectNameForLink(crpId,payload=null){
     const id=String(crpId||'');
     if(!id)return '';
     if(payload&&String(payload.crpProjectId||'')===id&&String(payload.name||'').trim())return String(payload.name).trim();
-    try{
-      const projects=readJson('crp-projects',[])||[];
-      const found=projects.find(x=>String(x?.id||'')===id);
-      if(String(found?.name||'').trim())return String(found.name).trim();
-    }catch{}
-    try{
-      const h=handoff();
-      if(String(h?.payload?.crpProjectId||'')===id&&String(h?.payload?.name||'').trim())return String(h.payload.name).trim();
-    }catch{}
+    const found=(readJson('crp-projects',[])||[]).find(x=>String(x?.id||'')===id);
+    if(String(found?.name||'').trim())return String(found.name).trim();
+    const h=handoff();
+    if(String(h?.payload?.crpProjectId||'')===id&&String(h?.payload?.name||'').trim())return String(h.payload.name).trim();
     return 'Linked CRP / BD';
   }
   function setCrpLinkButtonContent(button,{linked=false,name='',busy=false}={}){
@@ -17580,134 +16852,202 @@ KEEP RHYME UI ABOVE KEYBOARD
       button.setAttribute('aria-label',busy?'Linking Song Rider Pro project':'Link SRP project');
     }
   }
-
   function refreshCrpLinkUi(){
-    if(!integrated)return;
     const rec=persistentLinkForSrpProject(state.project,false);
-    const payload=recoverCrpPayload(rec?.crpProjectId||'');
+    const payload=rec?null:crpPayloadFor('');
     const st=document.getElementById('crpSrpLinkStatus');
     const b=document.getElementById('crpSrpLinkBtn');
-    if(!rec && !payload?.crpProjectId){
+    if(!b&&!st)return;
+    if(!rec&&!payload?.crpProjectId){
       if(st)st.textContent='Save this CRP project first';
-      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});b.classList.remove('is-linked');b.title='Link this project to Song Rider Pro'}
+      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});b.classList.remove('is-linked');b.title='Link this project to Song Rider Pro';}
       return;
     }
-    const linked=!!rec;
-    const crpName=linked?crpProjectNameForLink(rec.crpProjectId,payload):'';
-    if(st)st.textContent=linked?`Linked • ${crpName}`:'Not linked';
+    const crpName=rec?crpProjectNameForLink(rec.crpProjectId,null):'';
+    if(st)st.textContent=rec?`Linked • ${crpName}`:'Not linked';
     if(b){
       b.disabled=false;
-      setCrpLinkButtonContent(b,{linked,name:crpName});
-      b.title=linked?`Unlink this SRP project from ${crpName}`:'Link this SRP project to the CRP/Baby DAW project currently open';
-      b.classList.toggle('is-linked',linked);
+      setCrpLinkButtonContent(b,{linked:!!rec,name:crpName});
+      b.title=rec?`Unlink this SRP project from ${crpName}`:'Link this SRP project to the CRP/Baby DAW project currently open';
+      b.classList.toggle('is-linked',!!rec);
     }
   }
-
+  function unlinkCurrentCrpSrp(){
+    const currentId=String(state.project?.id||'');
+    const rec=persistentLinkForSrpProject(state.project,false);
+    const crpId=String(rec?.crpProjectId||'');
+    // Stop the linked arrangement before removing the pair so no hidden CRP/BD audio keeps playing.
+    if(window.__SRP_LINKED_PLAYING&&exactLinkForCurrentProject())window.CRP_SRP_linkedPlaybackCommand?.('stop');
+    window.__SRP_LINKED_PLAYING=false;
+    if(crpId){
+      const all=links();
+      if(String(all[crpId]?.srpProjectId||'')===currentId){delete all[crpId];setLinks(all);}
+    }
+    if(state.project){
+      state.project.linkedCrpProjectId='';state.project.linkedOctave=0;state.project.linkedTranspose=false;
+      upsertProject(state.project,{bump:false});
+    }
+    const x=readLinkSession();
+    if(!x||String(x.srpProjectId||'')===currentId)clearLinkSession();
+    setActiveLinkId('');
+    refreshCrpLinkUi();
+    renderSheetTitleBar();
+  }
+  // forceCreate: the user tapped Link SRP. Otherwise refresh the open song from its saved partner.
   function syncFromHandoff(forceCreate=false){
     const savedRec=persistentLinkForSrpProject(state.project,false);
-    // A user tap links to the CRP/BD project currently open. Automatic/background sync
-    // must stay pinned to this SRP project's already-saved CRP partner.
-    const payload=recoverCrpPayload(forceCreate?'':(savedRec?.crpProjectId||''));
+    const payload=crpPayloadFor(forceCreate?'':(savedRec?.crpProjectId||''));
     const b=document.getElementById('crpSrpLinkBtn');
     const st=document.getElementById('crpSrpLinkStatus');
     if(!payload?.crpProjectId){
-      if(st)st.textContent='No saved CRP project was handed off. Return to Chord Rider, save it once, then open Song Rider again.';
-      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false})}
+      if(forceCreate){
+        if(st)st.textContent='No saved CRP project was handed off. Return to Chord Rider, save it once, then open Song Rider again.';
+        if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});}
+      }
       return null;
     }
-    const rec=forceCreate?null:savedRec;
-    if(!forceCreate && (!rec || !state.project || String(rec.srpProjectId||'')!==String(state.project.id||''))){refreshCrpLinkUi();return null}
-    if(b){b.disabled=true;setCrpLinkButtonContent(b,{busy:true})}
-    const linked=importCrpStructure(payload,forceCreate,rec?.srpProjectId||'');
-    if(linked){
+    if(!forceCreate&&(!savedRec||!state.project||String(savedRec.srpProjectId||'')!==String(state.project.id||''))){refreshCrpLinkUi();return null;}
+    const linked=importCrpStructure(payload,forceCreate);
+    if(!linked){
+      if(st)st.textContent='Link failed — tap Link SRP to try again.';
+      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});}
+      return null;
+    }
+    if(forceCreate){
       const all=links();
-      const recNow=all[payload.crpProjectId]||{
-        srpProjectId:linked.id,
-        srpName:linked.name||payload.name||'Song Rider project',
-        linkedAt:Date.now()
-      };
-      all[payload.crpProjectId]=recNow;
+      const rec={srpProjectId:linked.id,srpName:linked.name||payload.name||'Song Rider project',linkedAt:Date.now()};
+      all[payload.crpProjectId]=rec;
       setLinks(all);
       writeLinkSession(payload.crpProjectId,linked.id);
-      writeJson(HANDOFF_KEY,{payload,rec:recNow,ts:Date.now()});
-      // Seed the shared transport immediately from the just-linked project. This makes
-      // refresh deterministic before either workspace has a chance to restore an older snapshot.
-      syncMetaToCrp();
-      writeHardSyncFromSrp();
-      const linkedCrpName=crpProjectNameForLink(payload.crpProjectId,payload);
-      if(st)st.textContent=`Linked • ${linkedCrpName}`;
-      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:true,name:linkedCrpName});b.classList.add('is-linked');b.title=`Unlink this SRP project from ${linkedCrpName}`}
-      setTimeout(refreshCrpLinkUi,900);
-    }else{
-      if(st)st.textContent='Link failed — tap Link SRP to try again.';
-      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false})}
+      setActiveLinkId(payload.crpProjectId);
+      writeJson(HANDOFF_KEY,{payload,rec,ts:Date.now()});
+      // Seed the shared transport from the just-linked song so both apps start from the same values.
+      publishSrpTransport();
+      ensureLinkedPlaybackBridge();
     }
+    refreshCrpLinkUi();
     return linked;
   }
 
-  if(embedded){
-    window.addEventListener('message',e=>{if(e.origin!==location.origin)return;const d=e.data||{};if(d.type==='crp-srp-link-sync')importCrpStructure(d.payload,!!d.forceCreate,d.linkedSrpProjectId||'');});
+  // ---------------------------------------------------------------- hidden CRP playback engine
+  // SRP is a separate page, so the CRP/BD audio engine is gone after navigation. A tiny hidden
+  // same-origin copy of the main workspace is kept as the linked playback engine; calling its
+  // CRPParts from the user's tap preserves browser audio permission.
+  let linkedPlaybackFrame=null;
+  function setLinkedPlaying(on){
+    if(!!on===!!window.__SRP_LINKED_PLAYING)return;
+    window.__SRP_LINKED_PLAYING=!!on;
+    renderSheetTitleBar();
   }
-  if(integrated){
-    if(!readLinkSession()){try{localStorage.removeItem(ACTIVE_LINK_KEY)}catch{}}
-    window.CRP_SRP_importCrpStructure=importCrpStructure;
-    if(!lyricsOverlay && !(window.parent&&window.parent!==window)) setTimeout(()=>{if(isCurrentCrpSrpLinked())ensureLinkedPlaybackBridge();},0);
-    document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{
-      e.preventDefault();
-      e.stopPropagation();
-      const b=e.currentTarget;
-      if(persistentLinkForSrpProject(state.project,false)){
-        b.disabled=true;
-        b.textContent='Unlinking…';
-        unlinkCurrentCrpSrp();
-        return;
+  // Follow the engine's own play/stop (e.g. when it stops by itself) without polling.
+  function observeLinkedPlayback(frame){
+    const core=frame.contentWindow?.CRPCore;
+    if(!core||typeof core.setPlaying!=='function'||core.__srpObserved)return;
+    const setPlaying=core.setPlaying;
+    core.setPlaying=function(on){const r=setPlaying.apply(this,arguments);setLinkedPlaying(on);return r;};
+    core.__srpObserved=true;
+  }
+  function ensureLinkedPlaybackBridge(){
+    if(lyricsOverlay||insideFrame)return null;
+    if(linkedPlaybackFrame?.isConnected)return linkedPlaybackFrame;
+    const f=document.createElement('iframe');
+    f.id='crpLinkedPlaybackBridge';
+    f.title='Linked Chord Rider playback engine';
+    f.setAttribute('aria-hidden','true');
+    f.tabIndex=-1;
+    Object.assign(f.style,{position:'fixed',width:'1px',height:'1px',left:'-10000px',top:'-10000px',opacity:'0',pointerEvents:'none',border:'0'});
+    f.src='../index.html?playbackBridge=1';
+    f.addEventListener('load',()=>{try{observeLinkedPlayback(f);}catch(err){console.warn('Could not observe linked playback',err);}});
+    document.body.appendChild(f);
+    linkedPlaybackFrame=f;
+    return f;
+  }
+  window.CRP_SRP_getLinkedPlaybackTiming=function(){
+    try{return ensureLinkedPlaybackBridge()?.contentWindow?.CRPParts?.getPlaybackTiming?.()||null;}
+    catch{return null;}
+  };
+  window.CRP_SRP_linkedPlaybackCommand=function(command){
+    // Only the exact SRP<->CRP pair may use the hidden engine; unlinked songs play SRP's own chords.
+    if(!exactLinkForCurrentProject()){setLinkedPlaying(false);return false;}
+    const w=ensureLinkedPlaybackBridge()?.contentWindow;
+    if(!w)return false;
+    try{
+      if(command==='play'){
+        // Reload the saved CRP project right before Play so parts, BPM, drums and volumes are current.
+        const linkedId=String(readLinkSession()?.crpProjectId||'');
+        if(linkedId&&typeof w.CRPCore?.loadProjectById==='function')w.CRPCore.loadProjectById(linkedId);
       }
-      b.disabled=true;
-      b.textContent='Linking…';
-      const st=document.getElementById('crpSrpLinkStatus');
-      if(st)st.textContent='Linking CRP project…';
-      setTimeout(()=>syncFromHandoff(true),0);
-    });
-    try{window.__CRP_SRP_META_CHANNEL=new BroadcastChannel('crp-srp-live-meta-v3');window.__CRP_SRP_META_CHANNEL.onmessage=()=>setTimeout(applyLiveMetaToSrp,0);}catch{}
-    try{window.__CRP_SRP_CANONICAL_CHANNEL=new BroadcastChannel('crp-srp-canonical-v1');window.__CRP_SRP_CANONICAL_CHANNEL.onmessage=()=>setTimeout(applyHardSyncToSrp,0);}catch{}
-    try{window.__SRS_TRANSPORT_CHANNEL=new BroadcastChannel('song-rider-suite-transport-v6');window.__SRS_TRANSPORT_CHANNEL.onmessage=()=>setTimeout(applyHardSyncToSrp,0);}catch{}
-    window.addEventListener('storage',e=>{if(e.key===HARD_SYNC_KEY||String(e.key||'').startsWith(CANONICAL_PREFIX)||e.key===SRS_TRANSPORT_KEY)setTimeout(applyHardSyncToSrp,0);});
-    window.addEventListener('pageshow',()=>setTimeout(applyHardSyncToSrp,0));
-    window.addEventListener('focus',()=>setTimeout(applyHardSyncToSrp,0));
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(applyHardSyncToSrp,0);});
-    setInterval(applyHardSyncToSrp,250);
-    window.addEventListener('storage',e=>{if(e.key===LIVE_META_KEY||String(e.key||'').startsWith(UNIFIED_META_PREFIX)){applyLiveMetaToSrp();return;}if(e.key===HANDOFF_KEY||e.key===LINKS_KEY||e.key===LINK_SESSION_KEY||String(e.key||'').startsWith(SHARED_META_PREFIX)){refreshCrpLinkUi();syncFromHandoff(false);applyLiveMetaToSrp();}});
-    const reconcileLinkedWorkspace=()=>{try{activateLinkForCurrentSrpProject();syncFromHandoff(false);applyLiveMetaToSrp();if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}}catch{}};
-    // init() is async and used to overwrite the linked project after the early 80ms import.
-    // Reconcile after init, and again on browser restore/focus.
-    window.addEventListener('srp-init-done',reconcileLinkedWorkspace);
-    window.addEventListener('pageshow',()=>{normalizeWorkspaceLinks();setTimeout(reconcileLinkedWorkspace,0)});
-    window.addEventListener('focus',()=>setTimeout(reconcileLinkedWorkspace,0));
-    normalizeWorkspaceLinks();
-    setTimeout(reconcileLinkedWorkspace,80);
-    setTimeout(reconcileLinkedWorkspace,700);
-    // A lightweight revision poll closes the last Android/WebView timing gap where a storage/focus
-    // event can be skipped during page navigation. It does nothing unless the live revision changed.
-    setInterval(applyLiveMetaToSrp,500);
-    if(window.__SRP_INIT_DONE)setTimeout(reconcileLinkedWorkspace,0);
-    // Flush the live number fields SYNCHRONOUSLY before leaving SRP for CRP/BD.
-    // The actual header uses absolute /index.html links; the old ../index.html selector matched nothing.
-    const flushSrpTransport=()=>{
-      try{
-        if(el?.bpmInput)commitBpm();
-        if(el?.capoInput)commitCapoStepFromInput();
-        syncMetaToCrp();
-        writeHardSyncFromSrp();
-      }catch{}
-    };
-    document.querySelectorAll('a.workspace-mode-btn').forEach(a=>{
-      if(!String(a.getAttribute('href')||'').includes('/song-rider/'))a.addEventListener('pointerdown',flushSrpTransport,true);
-    });
-    document.getElementById('srpTrackMasterBtn')?.addEventListener('pointerdown',flushSrpTransport,true);
-    window.addEventListener('pagehide',flushSrpTransport);
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSrpTransport();});
-    window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='srp-show-full-song'){try{goToSection('Full');}catch{}}if(e.data?.type==='crp-playback-state'){window.__SRP_LINKED_PLAYING=!!e.data.playing;try{renderSheetTitleBar();}catch{}}});
+      const parts=w.CRPParts;
+      if(!parts){setLinkedPlaying(false);return false;} // engine still starting: stay stopped, don't pretend
+      observeLinkedPlayback(linkedPlaybackFrame);
+      if(command==='play')parts.startPlayback?.();
+      else if(command==='pause'||command==='stop')parts.stopPlayback?.();
+      setLinkedPlaying(command==='play');
+      return true;
+    }catch(err){
+      console.error('Linked CRP/BD playback failed',err);
+      setLinkedPlaying(false);
+      return false;
+    }
+  };
+
+  // ---------------------------------------------------------------- wiring
+  function reconcileLinkedWorkspace(){
+    activateLinkForCurrentSrpProject();
+    syncFromHandoff(false);
+    applyCrpMetaToSrp();
+    if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}
   }
+  if(!readLinkSession())setActiveLinkId('');
+  document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    const b=e.currentTarget;
+    b.disabled=true;
+    if(persistentLinkForSrpProject(state.project,false)){
+      b.textContent='Unlinking…';
+      unlinkCurrentCrpSrp();
+      return;
+    }
+    setCrpLinkButtonContent(b,{busy:true});
+    const st=document.getElementById('crpSrpLinkStatus');
+    if(st)st.textContent='Linking CRP project…';
+    setTimeout(()=>syncFromHandoff(true),0);
+  });
+  if(transportChannel)transportChannel.onmessage=()=>applyCrpMetaToSrp();
+  window.addEventListener('storage',e=>{
+    const k=String(e.key||'');
+    if(k===TRANSPORT_KEY||k.startsWith(CANONICAL_PREFIX)||k===LEGACY_LIVE_META_KEY||k.startsWith(LEGACY_UNIFIED_PREFIX)||k===LEGACY_HARD_SYNC_KEY||k.startsWith(SHARED_META_PREFIX)){applyCrpMetaToSrp();return;}
+    if(k===LINKS_KEY||k===LINK_SESSION_KEY){refreshCrpLinkUi();renderSheetTitleBar();return;}
+    if(k==='crp-projects'||k===HANDOFF_KEY)syncFromHandoff(false); // CRP rows may have changed
+  });
+  const onAppReady=()=>{
+    reconcileLinkedWorkspace();
+    if(isCurrentCrpSrpLinked())ensureLinkedPlaybackBridge();
+  };
+  if(window.__SRP_INIT_DONE)setTimeout(onAppReady,0);
+  else window.addEventListener('srp-init-done',onAppReady,{once:true});
+  window.addEventListener('pageshow',e=>{normalizeWorkspaceLinks();if(e.persisted&&window.__SRP_INIT_DONE)reconcileLinkedWorkspace();});
+  window.addEventListener('focus',()=>{if(window.__SRP_INIT_DONE)reconcileLinkedWorkspace();});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&window.__SRP_INIT_DONE)reconcileLinkedWorkspace();});
+  normalizeWorkspaceLinks();
+  // Publish the live number fields and save synchronously before leaving SRP for CRP/BD.
+  const flushSrpTransport=()=>{
+    if(!state.project)return;
+    publishSrpTransport();
+    flushLibrary();
+  };
+  document.querySelectorAll('a.workspace-mode-btn').forEach(a=>{
+    if(!String(a.getAttribute('href')||'').includes('/song-rider/'))a.addEventListener('pointerdown',flushSrpTransport,true);
+  });
+  document.getElementById('srpTrackMasterBtn')?.addEventListener('pointerdown',flushSrpTransport,true);
+  window.addEventListener('pagehide',flushSrpTransport);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSrpTransport();});
+  window.addEventListener('message',e=>{
+    if(e.origin!==location.origin)return;
+    if(e.data?.type==='srp-show-full-song')goToSection('Full');
+    if(e.data?.type==='crp-playback-state')setLinkedPlaying(!!e.data.playing);
+  });
 })();
 
 // v3.0.0: end Song Rider Pro main application IIFE. Transport sync is owned by the bridge above.
