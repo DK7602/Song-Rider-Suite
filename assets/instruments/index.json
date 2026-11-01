@@ -1,0 +1,80 @@
+{
+ "version": 1,
+ "generated": "2026-11-01",
+ "format": "Each folder <id>/ holds manifest.json plus MP3 samples (44.1 kHz, LAME VBR V2; the stereo piano uses V3 to stay under 4 MB). Mono unless the manifest name says stereo (piano and vibraphone are stereo). Decoders that honour the LAME gapless header (Chrome, Firefox, ffmpeg) return sample-accurate audio, so loopStart/loopEnd (seconds) line up exactly; a decoder that ignores the header would add about 25 ms of leading silence.",
+ "manifestFields": {
+  "samples[].midi": "MIDI note the file sounds at (A440 equal temperament, verified within +-20 cents; piano keeps its natural stretch tuning)",
+  "samples[].vel": "velocity layer the file represents; only the piano has two layers (48 soft, 96 loud)",
+  "samples[].loopStart/loopEnd": "seamless sustain loop in seconds (crossfade already baked in, audio after loopEnd continues the loop so stopping the loop on note-off is click-free); null for one-shots",
+  "release": "recommended release time in seconds",
+  "sustained": "true for winds/brass: hold the loop while the key is down",
+  "gain": "linear gain that matches this set's perceived loudness to the piano (piano = 1.0; K-weighted loudness of the first second, sustained sets 0.3-2 s)",
+  "notes": "per-set details for the engine"
+ },
+ "delivered": [
+  "acoustic_grand_piano",
+  "electric_grand_piano",
+  "electric_piano_1",
+  "electric_bass_finger",
+  "acoustic_guitar_steel",
+  "acoustic_guitar_nylon",
+  "electric_guitar_clean",
+  "tenor_sax",
+  "alto_sax",
+  "trumpet",
+  "trombone",
+  "french_horn",
+  "tuba",
+  "flute",
+  "vibraphone",
+  "marimba"
+ ],
+ "derived": {
+  "bright_acoustic_piano": {
+   "from": "acoustic_grand_piano",
+   "suggestion": "Use the acoustic_grand_piano samples with a high-shelf boost (about +4 to +6 dB above 2.5 kHz) and a slightly faster release."
+  },
+  "electric_guitar_jazz": {
+   "from": "electric_guitar_clean",
+   "suggestion": "Dry DI source: clean amp/cab voicing with a darker EQ (low-pass ~2.5-3 kHz, slight mid scoop) and a softer attack."
+  },
+  "electric_guitar_muted": {
+   "from": "electric_guitar_clean",
+   "suggestion": "Clean voicing plus a fast amplitude decay (~0.15-0.3 s to silence) and a low-pass ~1.5-2 kHz for palm muting."
+  },
+  "overdriven_guitar": {
+   "from": "electric_guitar_clean",
+   "suggestion": "Crunch: moderate waveshaper / soft clip before a 4x12-style cab EQ (HPF ~90 Hz, LPF ~5 kHz)."
+  },
+  "distortion_guitar": {
+   "from": "electric_guitar_clean",
+   "suggestion": "Drive: heavier pre-gain + clip before the cab EQ; the long natural sustain of the DI files suits high gain."
+  },
+  "wah_wah_guitar": {
+   "from": "electric_guitar_clean",
+   "suggestion": "Clean or crunch voicing through a resonant band-pass swept 400 Hz-2 kHz (envelope- or LFO-driven)."
+  }
+ },
+ "notDelivered": {
+  "brass_section": {
+   "reason": "No properly licensed (CC0 / CC-BY / free-for-any-use) recorded brass-section multisample was found. VSCO-2 CE, VCSL and the University of Iowa MIS only have solo brass; the free section libraries found are NonCommercial, 'no redistribution' or have no clear license.",
+   "suggestion": "Layer the delivered trumpet + trombone + french_horn sets (e.g. trumpet at the played pitch, trombone an octave below, horn at the played pitch; detune the layers 3-8 cents and offset their attacks by 5-15 ms)."
+  },
+  "clavinet": {
+   "reason": "No properly licensed recorded clavinet multisample was found: the free clavinet SoundFonts found have no license statement, and the sampled-clavinet libraries found (Scarbee, Soniccouture, Acousticsamples Clavi D9, Rhodes Clav Pro) are commercial. The Discord SFZ GM Bank's clavinet slot is an empty placeholder.",
+   "suggestion": "Synthesize it (plucked-string / Karplus-Strong or a bright pulse wave with a fast-decaying resonant low-pass and a short 'clack' noise at note-on; release must mute quickly, 60-100 ms)."
+  }
+ },
+ "engineSynthesized": [
+  "synth_strings_1",
+  "pad_2_warm",
+  "pad_3_polysynth",
+  "lead_2_sawtooth",
+  "funky_worm",
+  "whistle",
+  "synth_brass_1",
+  "drawbar_organ",
+  "electric_piano_2"
+ ],
+ "credits": "docs/SOUND-CREDITS.md"
+}

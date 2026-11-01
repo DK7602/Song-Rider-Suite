@@ -1,0 +1,84 @@
+{
+ "id": "trumpet",
+ "name": "VSCO-2 CE Trumpet (sustain)",
+ "source": "https://github.com/sgossner/VSCO-2-CE",
+ "license": "CC0 1.0",
+ "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+ "attribution": "VS Chamber Orchestra: Community Edition (VSCO-2 CE) by Versilian Studios LLC (Sam Gossner, Simon Dalzell)",
+ "samples": [
+  {
+   "midi": 53,
+   "file": "F3.mp3",
+   "vel": 90,
+   "loopStart": 3.767528,
+   "loopEnd": 4.339569
+  },
+  {
+   "midi": 57,
+   "file": "A3.mp3",
+   "vel": 90,
+   "loopStart": 2.618027,
+   "loopEnd": 4.810295
+  },
+  {
+   "midi": 60,
+   "file": "C4.mp3",
+   "vel": 90,
+   "loopStart": 3.314694,
+   "loopEnd": 5.69
+  },
+  {
+   "midi": 63,
+   "file": "Ds4.mp3",
+   "vel": 90,
+   "loopStart": 3.328209,
+   "loopEnd": 5.68932
+  },
+  {
+   "midi": 67,
+   "file": "G4.mp3",
+   "vel": 90,
+   "loopStart": 4.38678,
+   "loopEnd": 5.690181
+  },
+  {
+   "midi": 70,
+   "file": "As4.mp3",
+   "vel": 90,
+   "loopStart": 3.940703,
+   "loopEnd": 5.690317
+  },
+  {
+   "midi": 74,
+   "file": "D5.mp3",
+   "vel": 90,
+   "loopStart": 3.442993,
+   "loopEnd": 5.690159
+  },
+  {
+   "midi": 77,
+   "file": "F5.mp3",
+   "vel": 90,
+   "loopStart": 3.570862,
+   "loopEnd": 5.689637
+  },
+  {
+   "midi": 81,
+   "file": "A5.mp3",
+   "vel": 90,
+   "loopStart": 4.344422,
+   "loopEnd": 5.690363
+  },
+  {
+   "midi": 84,
+   "file": "C6.mp3",
+   "vel": 90,
+   "loopStart": 3.237574,
+   "loopEnd": 5.690159
+  }
+ ],
+ "release": 0.18,
+ "sustained": true,
+ "gain": 0.99,
+ "notes": "B-flat trumpet, straight sustain, louder of the two VSCO-2 CE layers (mf-f), mono mix of the close/room mics. 10 notes F3-C6 every 3-4 semitones. Each file has a seamless sustain loop (loopStart/loopEnd, crossfade baked in); hold the loop while the key is down, then apply the release. Recommended release 0.15-0.2 s."
+}

@@ -1,0 +1,119 @@
+{
+ "id": "acoustic_guitar_steel",
+ "name": "Martin HD-28 steel-string acoustic (GM version)",
+ "source": "https://github.com/sfzinstruments/Discord-SFZ-GM-Bank/tree/master/Discord%20GM/Melodic/026-Acoustic%20Guitar%20(steel)",
+ "license": "CC0 1.0",
+ "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+ "attribution": "Martin HD28 GM samples by Jeff Learman (Discord SFZ GM Bank)",
+ "samples": [
+  {
+   "midi": 40,
+   "file": "E2.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 43,
+   "file": "G2.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 46,
+   "file": "As2.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 49,
+   "file": "Cs3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 52,
+   "file": "E3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 55,
+   "file": "G3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 58,
+   "file": "As3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 61,
+   "file": "Cs4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 64,
+   "file": "E4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 68,
+   "file": "Gs4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 71,
+   "file": "B4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 74,
+   "file": "D5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 77,
+   "file": "F5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 80,
+   "file": "Gs5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 83,
+   "file": "B5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  }
+ ],
+ "release": 0.3,
+ "sustained": false,
+ "gain": 1.25,
+ "notes": "2017 Martin HD-28 Vintage Series, single plucked notes, one layer, 15 notes E2-B5 every minor third. The source files are shortened to their sustain loop (0.7-4.7 s); tails were continued through the author's loop with a matched exponential decay up to 3-4 s, so files are one-shots. Recommended release 0.25-0.35 s; for strums stagger string onsets by 8-15 ms."
+}

@@ -1,0 +1,91 @@
+{
+ "id": "vibraphone",
+ "name": "VCSL Vibraphone (soft mallets)",
+ "source": "https://github.com/sgossner/VCSL/tree/master/Idiophones/Struck%20Idiophones/Vibraphone",
+ "license": "CC0 1.0",
+ "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+ "attribution": "Versilian Community Sample Library (VCSL) by Versilian Studios LLC",
+ "samples": [
+  {
+   "midi": 53,
+   "file": "F3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 57,
+   "file": "A3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 60,
+   "file": "C4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 64,
+   "file": "E4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 67,
+   "file": "G4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 71,
+   "file": "B4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 74,
+   "file": "D5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 77,
+   "file": "F5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 81,
+   "file": "A5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 84,
+   "file": "C6.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 88,
+   "file": "E6.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  }
+ ],
+ "release": 0.6,
+ "sustained": false,
+ "gain": 0.28,
+ "notes": "Vibraphone with soft mallets, no motor tremolo, bars left ringing, velocity layer 2 of 2, stereo. 11 notes F3-E6 every 3-4 semitones (the full 3-octave range). Natural decay trimmed to 6 s; the release time models the damper pedal (0.4-0.8 s sounds natural). The engine can add a slow amplitude tremolo (~5 Hz) for a motor-on sound."
+}

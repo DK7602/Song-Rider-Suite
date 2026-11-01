@@ -1,0 +1,84 @@
+{
+ "id": "flute",
+ "name": "VSCO-2 CE Flute (sustain, vibrato)",
+ "source": "https://github.com/sgossner/VSCO-2-CE",
+ "license": "CC0 1.0",
+ "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+ "attribution": "VS Chamber Orchestra: Community Edition (VSCO-2 CE) by Versilian Studios LLC (Sam Gossner, Simon Dalzell)",
+ "samples": [
+  {
+   "midi": 60,
+   "file": "C4.mp3",
+   "vel": 80,
+   "loopStart": 3.352358,
+   "loopEnd": 5.690249
+  },
+  {
+   "midi": 64,
+   "file": "E4.mp3",
+   "vel": 80,
+   "loopStart": 4.080159,
+   "loopEnd": 5.689751
+  },
+  {
+   "midi": 69,
+   "file": "A4.mp3",
+   "vel": 80,
+   "loopStart": 3.354104,
+   "loopEnd": 5.689274
+  },
+  {
+   "midi": 72,
+   "file": "C5.mp3",
+   "vel": 80,
+   "loopStart": 4.618617,
+   "loopEnd": 5.690385
+  },
+  {
+   "midi": 76,
+   "file": "E5.mp3",
+   "vel": 80,
+   "loopStart": 3.523333,
+   "loopEnd": 5.690408
+  },
+  {
+   "midi": 81,
+   "file": "A5.mp3",
+   "vel": 80,
+   "loopStart": 4.801429,
+   "loopEnd": 5.689705
+  },
+  {
+   "midi": 84,
+   "file": "C6.mp3",
+   "vel": 80,
+   "loopStart": 3.493991,
+   "loopEnd": 5.690431
+  },
+  {
+   "midi": 88,
+   "file": "E6.mp3",
+   "vel": 80,
+   "loopStart": 2.921723,
+   "loopEnd": 5.159841
+  },
+  {
+   "midi": 93,
+   "file": "A6.mp3",
+   "vel": 80,
+   "loopStart": 3.027687,
+   "loopEnd": 4.490023
+  },
+  {
+   "midi": 96,
+   "file": "C7.mp3",
+   "vel": 80,
+   "loopStart": 2.243424,
+   "loopEnd": 3.809887
+  }
+ ],
+ "release": 0.2,
+ "sustained": true,
+ "gain": 0.39,
+ "notes": "Concert flute, sustained with natural vibrato, mono. 10 notes C4-C7 every 3-5 semitones. Every file has a sustain loop (loopStart/loopEnd, crossfade baked in) chosen to span whole vibrato cycles. Low notes were boosted and the top octave cut by up to 10-12 dB to even out the flute's natural register imbalance. Recommended release 0.2 s."
+}

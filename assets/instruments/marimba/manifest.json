@@ -1,0 +1,161 @@
+{
+ "id": "marimba",
+ "name": "University of Iowa MIS - Marimba (yarn mallets)",
+ "source": "https://theremin.music.uiowa.edu/Mismarimba.html",
+ "license": "Free for any use without restrictions (University of Iowa MIS usage statement)",
+ "licenseUrl": "https://theremin.music.uiowa.edu/MIS.html",
+ "attribution": "University of Iowa Electronic Music Studios, Musical Instrument Samples (Lawrence Fritts)",
+ "samples": [
+  {
+   "midi": 36,
+   "file": "C2.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 39,
+   "file": "Ds2.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 42,
+   "file": "Fs2.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 45,
+   "file": "A2.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 48,
+   "file": "C3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 51,
+   "file": "Ds3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 54,
+   "file": "Fs3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 57,
+   "file": "A3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 60,
+   "file": "C4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 63,
+   "file": "Ds4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 66,
+   "file": "Fs4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 69,
+   "file": "A4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 72,
+   "file": "C5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 75,
+   "file": "Ds5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 78,
+   "file": "Fs5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 81,
+   "file": "A5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 84,
+   "file": "C6.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 87,
+   "file": "Ds6.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 90,
+   "file": "Fs6.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 93,
+   "file": "A6.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 96,
+   "file": "C7.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  }
+ ],
+ "release": 0.25,
+ "sustained": false,
+ "gain": 1.18,
+ "notes": "Five-octave concert marimba, yarn mallets, mezzo-forte, anechoic (dry) mono. 21 notes C2-C7 every minor third, natural decay (about 3-4 s in the bass, about 2 s at the top). The instrument is tuned about 10-24 cents sharp (A442-ish); notes were retuned to A440. Recommended release 0.2-0.3 s (bars ring freely; a longer release sounds more natural than a hard cut)."
+}

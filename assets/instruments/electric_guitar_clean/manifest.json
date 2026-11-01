@@ -1,0 +1,147 @@
+{
+ "id": "electric_guitar_clean",
+ "name": "FreePats FSBS Electric Guitar (direct / DI)",
+ "source": "https://freepats.zenvoid.org/ElectricGuitar/clean-electric-guitar.html",
+ "license": "CC0 1.0",
+ "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+ "attribution": "FSBS Electric Guitar (direct) by FreePats / Roberto (roberto@zenvoid.org)",
+ "samples": [
+  {
+   "midi": 36,
+   "file": "C2.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 40,
+   "file": "E2.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 41,
+   "file": "F2.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 45,
+   "file": "A2.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 48,
+   "file": "C3.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 50,
+   "file": "D3.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 52,
+   "file": "E3.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 55,
+   "file": "G3.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 59,
+   "file": "B3.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 61,
+   "file": "Cs4.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 64,
+   "file": "E4.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 67,
+   "file": "G4.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 71,
+   "file": "B4.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 72,
+   "file": "C5.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 74,
+   "file": "D5.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 77,
+   "file": "F5.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 80,
+   "file": "Gs5.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 82,
+   "file": "As5.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 85,
+   "file": "Cs6.mp3",
+   "vel": 85,
+   "loopStart": null,
+   "loopEnd": null
+  }
+ ],
+ "release": 0.2,
+ "sustained": false,
+ "gain": 0.88,
+ "notes": "Fender electric guitar (basic model), bridge pickup, recorded direct into an instrument input: completely dry, no amp, cab, EQ or effects (FreePats \"FSBS direct\" set; the FreePats \"clean\" set is the same recordings through an amp + stereo FX). 19 notes C2-C#6 (C2/D2 are drop-tuned low string), roughly every 2-4 semitones, natural sustain trimmed to 5 s. Intended as the dry source for the engine's amp/cab simulation: for Clean use a clean amp + 4x12/1x12 cab EQ (HPF ~80 Hz, LPF ~5-6 kHz); Jazz = neck-ish darker EQ; Crunch/Drive = waveshaper before the cab. Recommended release 0.15-0.25 s."
+}

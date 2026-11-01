@@ -1,0 +1,175 @@
+{
+ "id": "tenor_sax",
+ "name": "VCSL Tenor Saxophone (non-vibrato)",
+ "source": "https://github.com/sgossner/VCSL/tree/master/Aerophones/Reed%20Aerophones/Tenor%20Saxophone",
+ "license": "CC0 1.0",
+ "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+ "attribution": "Versilian Community Sample Library (VCSL) by Versilian Studios LLC; tenor sax played by Brett",
+ "samples": [
+  {
+   "midi": 44,
+   "file": "Gs2.mp3",
+   "vel": 80,
+   "loopStart": 2.205805,
+   "loopEnd": 4.690748
+  },
+  {
+   "midi": 46,
+   "file": "As2.mp3",
+   "vel": 80,
+   "loopStart": 2.191905,
+   "loopEnd": 4.689002
+  },
+  {
+   "midi": 48,
+   "file": "C3.mp3",
+   "vel": 80,
+   "loopStart": 2.327528,
+   "loopEnd": 4.68966
+  },
+  {
+   "midi": 50,
+   "file": "D3.mp3",
+   "vel": 80,
+   "loopStart": 2.190612,
+   "loopEnd": 4.690181
+  },
+  {
+   "midi": 52,
+   "file": "E3.mp3",
+   "vel": 80,
+   "loopStart": 2.188776,
+   "loopEnd": 4.688662
+  },
+  {
+   "midi": 54,
+   "file": "Fs3.mp3",
+   "vel": 80,
+   "loopStart": 2.311587,
+   "loopEnd": 4.690023
+  },
+  {
+   "midi": 56,
+   "file": "Gs3.mp3",
+   "vel": 80,
+   "loopStart": 2.281837,
+   "loopEnd": 4.690023
+  },
+  {
+   "midi": 58,
+   "file": "As3.mp3",
+   "vel": 80,
+   "loopStart": 2.457687,
+   "loopEnd": 4.688685
+  },
+  {
+   "midi": 60,
+   "file": "C4.mp3",
+   "vel": 80,
+   "loopStart": 2.225692,
+   "loopEnd": 4.69068
+  },
+  {
+   "midi": 62,
+   "file": "D4.mp3",
+   "vel": 80,
+   "loopStart": 2.395011,
+   "loopEnd": 4.690431
+  },
+  {
+   "midi": 64,
+   "file": "E4.mp3",
+   "vel": 80,
+   "loopStart": 2.193333,
+   "loopEnd": 4.689909
+  },
+  {
+   "midi": 66,
+   "file": "Fs4.mp3",
+   "vel": 80,
+   "loopStart": 2.193878,
+   "loopEnd": 4.691224
+  },
+  {
+   "midi": 68,
+   "file": "Gs4.mp3",
+   "vel": 80,
+   "loopStart": 2.192494,
+   "loopEnd": 4.689524
+  },
+  {
+   "midi": 70,
+   "file": "As4.mp3",
+   "vel": 80,
+   "loopStart": 2.345102,
+   "loopEnd": 4.68966
+  },
+  {
+   "midi": 72,
+   "file": "C5.mp3",
+   "vel": 80,
+   "loopStart": 2.283832,
+   "loopEnd": 4.690136
+  },
+  {
+   "midi": 74,
+   "file": "D5.mp3",
+   "vel": 80,
+   "loopStart": 2.378118,
+   "loopEnd": 4.690272
+  },
+  {
+   "midi": 76,
+   "file": "E5.mp3",
+   "vel": 80,
+   "loopStart": 2.54102,
+   "loopEnd": 4.690204
+  },
+  {
+   "midi": 78,
+   "file": "Fs5.mp3",
+   "vel": 80,
+   "loopStart": 3.784104,
+   "loopEnd": 4.690272
+  },
+  {
+   "midi": 80,
+   "file": "Gs5.mp3",
+   "vel": 80,
+   "loopStart": 2.257868,
+   "loopEnd": 4.689683
+  },
+  {
+   "midi": 82,
+   "file": "As5.mp3",
+   "vel": 80,
+   "loopStart": 3.588345,
+   "loopEnd": 4.689751
+  },
+  {
+   "midi": 84,
+   "file": "C6.mp3",
+   "vel": 80,
+   "loopStart": 2.406463,
+   "loopEnd": 4.690317
+  },
+  {
+   "midi": 86,
+   "file": "D6.mp3",
+   "vel": 80,
+   "loopStart": 2.770907,
+   "loopEnd": 4.689751
+  },
+  {
+   "midi": 88,
+   "file": "E6.mp3",
+   "vel": 80,
+   "loopStart": 1.287506,
+   "loopEnd": 2.359955
+  }
+ ],
+ "release": 0.15,
+ "sustained": true,
+ "gain": 0.51,
+ "notes": "Tenor saxophone, straight tone (no vibrato), middle VCSL layer (mf), mono. Whole-tone sampled: G#2-E6 (top notes are altissimo). Every file has a seamless sustain loop (C4 needed a slight level-drift correction). Add delayed vibrato (5-6 Hz, ~15 cents) in the engine for a jazzier sound. Recommended release 0.12-0.18 s."
+}

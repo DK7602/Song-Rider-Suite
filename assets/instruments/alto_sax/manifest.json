@@ -1,0 +1,98 @@
+{
+ "id": "alto_sax",
+ "name": "Karoryfer Weresax (alto saxophone)",
+ "source": "https://github.com/sfzinstruments/karoryfer.weresax",
+ "license": "CC0 1.0",
+ "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+ "attribution": "Weresax by Karoryfer Samples",
+ "samples": [
+  {
+   "midi": 49,
+   "file": "Cs3.mp3",
+   "vel": 90,
+   "loopStart": 3.271474,
+   "loopEnd": 5.190907
+  },
+  {
+   "midi": 52,
+   "file": "E3.mp3",
+   "vel": 90,
+   "loopStart": 2.452585,
+   "loopEnd": 4.67941
+  },
+  {
+   "midi": 55,
+   "file": "G3.mp3",
+   "vel": 90,
+   "loopStart": 1.761134,
+   "loopEnd": 4.159161
+  },
+  {
+   "midi": 58,
+   "file": "As3.mp3",
+   "vel": 90,
+   "loopStart": 2.936803,
+   "loopEnd": 5.189252
+  },
+  {
+   "midi": 61,
+   "file": "Cs4.mp3",
+   "vel": 90,
+   "loopStart": 2.892404,
+   "loopEnd": 5.190544
+  },
+  {
+   "midi": 64,
+   "file": "E4.mp3",
+   "vel": 90,
+   "loopStart": 2.707642,
+   "loopEnd": 5.189297
+  },
+  {
+   "midi": 67,
+   "file": "G4.mp3",
+   "vel": 90,
+   "loopStart": 4.166803,
+   "loopEnd": 5.189841
+  },
+  {
+   "midi": 70,
+   "file": "As4.mp3",
+   "vel": 90,
+   "loopStart": 2.522948,
+   "loopEnd": 4.990363
+  },
+  {
+   "midi": 73,
+   "file": "Cs5.mp3",
+   "vel": 90,
+   "loopStart": 2.705442,
+   "loopEnd": 5.189342
+  },
+  {
+   "midi": 76,
+   "file": "E5.mp3",
+   "vel": 90,
+   "loopStart": 2.762358,
+   "loopEnd": 5.189773
+  },
+  {
+   "midi": 79,
+   "file": "G5.mp3",
+   "vel": 90,
+   "loopStart": 3.283923,
+   "loopEnd": 5.189751
+  },
+  {
+   "midi": 80,
+   "file": "Gs5.mp3",
+   "vel": 90,
+   "loopStart": 3.048299,
+   "loopEnd": 5.190159
+  }
+ ],
+ "release": 0.15,
+ "sustained": true,
+ "gain": 0.42,
+ "notes": "Alto saxophone, straight tone, forte layer, clean condenser mic, mono. 12 notes C#3-G#5 every minor third (one whole step at the top); A#3 uses round-robin 2 because round-robin 1 has no loopable stretch. Every file has a seamless sustain loop. Vibrato is not baked in: the engine can add 5-6 Hz pitch vibrato (10-20 cents) after ~0.3 s. Recommended release 0.15 s."
+}

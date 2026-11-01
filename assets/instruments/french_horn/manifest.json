@@ -1,0 +1,112 @@
+{
+ "id": "french_horn",
+ "name": "French horn (VSCO-2 CE + University of Iowa MIS)",
+ "source": "https://github.com/sgossner/VSCO-2-CE ; https://theremin.music.uiowa.edu/MISFrenchhorn.html",
+ "license": "CC0 1.0 (VSCO-2 CE, C2-C4) + University of Iowa MIS free-use statement (D#4-F5)",
+ "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/ ; https://theremin.music.uiowa.edu/MIS.html",
+ "attribution": "VSCO-2 CE by Versilian Studios LLC (horn C2-C4); University of Iowa Electronic Music Studios Musical Instrument Samples, horn played by Jessica Wiskus (D#4-F5)",
+ "samples": [
+  {
+   "midi": 36,
+   "file": "C2.mp3",
+   "vel": 80,
+   "loopStart": 3.028095,
+   "loopEnd": 3.5939
+  },
+  {
+   "midi": 39,
+   "file": "Ds2.mp3",
+   "vel": 80,
+   "loopStart": 2.587846,
+   "loopEnd": 4.729955
+  },
+  {
+   "midi": 43,
+   "file": "G2.mp3",
+   "vel": 80,
+   "loopStart": 2.936417,
+   "loopEnd": 4.031134
+  },
+  {
+   "midi": 46,
+   "file": "As2.mp3",
+   "vel": 80,
+   "loopStart": 4.780317,
+   "loopEnd": 5.690068
+  },
+  {
+   "midi": 50,
+   "file": "D3.mp3",
+   "vel": 80,
+   "loopStart": 3.191655,
+   "loopEnd": 5.691293
+  },
+  {
+   "midi": 53,
+   "file": "F3.mp3",
+   "vel": 80,
+   "loopStart": 3.286689,
+   "loopEnd": 5.690159
+  },
+  {
+   "midi": 57,
+   "file": "A3.mp3",
+   "vel": 80,
+   "loopStart": 3.200136,
+   "loopEnd": 5.689773
+  },
+  {
+   "midi": 60,
+   "file": "C4.mp3",
+   "vel": 80,
+   "loopStart": 4.510431,
+   "loopEnd": 5.690907
+  },
+  {
+   "midi": 63,
+   "file": "Ds4.mp3",
+   "vel": 80,
+   "loopStart": 1.856644,
+   "loopEnd": 2.610363
+  },
+  {
+   "midi": 66,
+   "file": "Fs4.mp3",
+   "vel": 80,
+   "loopStart": 0.596417,
+   "loopEnd": 2.171179
+  },
+  {
+   "midi": 69,
+   "file": "A4.mp3",
+   "vel": 80,
+   "loopStart": 0.442766,
+   "loopEnd": 2.130522
+  },
+  {
+   "midi": 72,
+   "file": "C5.mp3",
+   "vel": 80,
+   "loopStart": 0.342698,
+   "loopEnd": 2.050385
+  },
+  {
+   "midi": 75,
+   "file": "Ds5.mp3",
+   "vel": 80,
+   "loopStart": 0.426281,
+   "loopEnd": 2.150635
+  },
+  {
+   "midi": 77,
+   "file": "F5.mp3",
+   "vel": 80,
+   "loopStart": 0.38254,
+   "loopEnd": 2.049955
+  }
+ ],
+ "release": 0.25,
+ "sustained": true,
+ "gain": 0.99,
+ "notes": "French horn, straight sustain, mf, mono. C2-C4 come from VSCO-2 CE (8 notes, room mics); D#4-F5 come from the University of Iowa MIS (6 notes, anechoic, notes ~2.5 s long) because VSCO-2 CE has no horn sustain samples between C4 and D5. Both halves are loudness-matched; the upper half is drier and a little brighter, so a touch of reverb on the whole patch blends them. Every file has a sustain loop (the F5 loop needed a slight level-drift correction). Recommended release 0.25 s."
+}

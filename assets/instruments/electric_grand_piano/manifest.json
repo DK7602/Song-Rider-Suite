@@ -1,0 +1,168 @@
+{
+ "id": "electric_grand_piano",
+ "name": "Yamaha CP80 Electric Grand (Greg Sullivan)",
+ "source": "http://www.sullivang.net/yamaha-cp80-electric-grand-instrument-for-gigasamplergigastudio",
+ "license": "CC-BY 4.0",
+ "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+ "attribution": "Yamaha CP80 Electric Grand samples by Greg Sullivan (sullivang.net); SFZ/FLAC conversion by kinwie",
+ "samples": [
+  {
+   "midi": 27,
+   "file": "Ds1.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 35,
+   "file": "B1.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 42,
+   "file": "Fs2.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 46,
+   "file": "As2.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 50,
+   "file": "D3.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 53,
+   "file": "F3.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 57,
+   "file": "A3.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 60,
+   "file": "C4.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 63,
+   "file": "Ds4.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 65,
+   "file": "F4.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 68,
+   "file": "Gs4.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 72,
+   "file": "C5.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 76,
+   "file": "E5.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 80,
+   "file": "Gs5.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 82,
+   "file": "As5.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 85,
+   "file": "Cs6.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 88,
+   "file": "E6.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 91,
+   "file": "G6.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 95,
+   "file": "B6.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 97,
+   "file": "Cs7.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 102,
+   "file": "Fs7.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 107,
+   "file": "B7.mp3",
+   "vel": 90,
+   "loopStart": null,
+   "loopEnd": null
+  }
+ ],
+ "release": 0.4,
+ "sustained": false,
+ "gain": 0.68,
+ "notes": "Yamaha CP80 electric grand, forte layer (3rd of 4), mono, tone controls neutral, 22 notes D#1-B7 roughly every 3-4 semitones (one 8-semitone gap D#1-B1). Natural decay trimmed to 6 s (bass) .. 3 s (top). The original instrument used a 7 Hz tremolo; none is baked in. Recommended release 0.35-0.45 s."
+}

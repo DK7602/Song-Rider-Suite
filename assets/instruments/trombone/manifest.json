@@ -1,0 +1,91 @@
+{
+ "id": "trombone",
+ "name": "VSCO-2 CE Tenor Trombone (sustain)",
+ "source": "https://github.com/sgossner/VSCO-2-CE",
+ "license": "CC0 1.0",
+ "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+ "attribution": "VS Chamber Orchestra: Community Edition (VSCO-2 CE) by Versilian Studios LLC (Sam Gossner, Simon Dalzell)",
+ "samples": [
+  {
+   "midi": 34,
+   "file": "As1.mp3",
+   "vel": 80,
+   "loopStart": 0.977982,
+   "loopEnd": 2.968776
+  },
+  {
+   "midi": 37,
+   "file": "Cs2.mp3",
+   "vel": 80,
+   "loopStart": 1.364467,
+   "loopEnd": 3.586712
+  },
+  {
+   "midi": 39,
+   "file": "Ds2.mp3",
+   "vel": 80,
+   "loopStart": 3.961565,
+   "loopEnd": 5.170159
+  },
+  {
+   "midi": 41,
+   "file": "F2.mp3",
+   "vel": 80,
+   "loopStart": 3.318526,
+   "loopEnd": 5.689773
+  },
+  {
+   "midi": 46,
+   "file": "As2.mp3",
+   "vel": 80,
+   "loopStart": 3.364195,
+   "loopEnd": 5.689615
+  },
+  {
+   "midi": 50,
+   "file": "D3.mp3",
+   "vel": 80,
+   "loopStart": 3.437029,
+   "loopEnd": 5.691361
+  },
+  {
+   "midi": 53,
+   "file": "F3.mp3",
+   "vel": 80,
+   "loopStart": 3.243832,
+   "loopEnd": 5.689274
+  },
+  {
+   "midi": 60,
+   "file": "C4.mp3",
+   "vel": 80,
+   "loopStart": 3.205442,
+   "loopEnd": 5.689864
+  },
+  {
+   "midi": 61,
+   "file": "Cs4.mp3",
+   "vel": 80,
+   "loopStart": 3.424694,
+   "loopEnd": 5.690385
+  },
+  {
+   "midi": 63,
+   "file": "Ds4.mp3",
+   "vel": 80,
+   "loopStart": 3.391451,
+   "loopEnd": 5.689569
+  },
+  {
+   "midi": 65,
+   "file": "F4.mp3",
+   "vel": 80,
+   "loopStart": 4.195805,
+   "loopEnd": 5.69059
+  }
+ ],
+ "release": 0.2,
+ "sustained": true,
+ "gain": 1.01,
+ "notes": "Tenor trombone, straight sustain, middle VSCO-2 CE layer (mf), mono. 11 notes A#1 (pedal) - F4; spacing is 2-4 semitones except one 7-semitone gap F3-C4 (G3-B3 are pitch-shifted up to 3.5 semitones). Seamless sustain loops in every file. Recommended release 0.2 s."
+}

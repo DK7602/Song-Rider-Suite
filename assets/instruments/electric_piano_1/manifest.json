@@ -1,0 +1,119 @@
+{
+ "id": "electric_piano_1",
+ "name": "jRhodes (GM version) - 1977 Rhodes Mark I Stage 73",
+ "source": "https://github.com/sfzinstruments/Discord-SFZ-GM-Bank/tree/master/Discord%20GM/Melodic/005-Electric%20Piano%201",
+ "license": "CC0 1.0",
+ "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+ "attribution": "jRhodes GM version by Jeff Learman (Discord SFZ GM Bank)",
+ "samples": [
+  {
+   "midi": 29,
+   "file": "F1.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 35,
+   "file": "B1.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 40,
+   "file": "E2.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 45,
+   "file": "A2.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 50,
+   "file": "D3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 55,
+   "file": "G3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 59,
+   "file": "B3.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 62,
+   "file": "D4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 65,
+   "file": "F4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 71,
+   "file": "B4.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 76,
+   "file": "E5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 81,
+   "file": "A5.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 86,
+   "file": "D6.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 91,
+   "file": "G6.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  },
+  {
+   "midi": 96,
+   "file": "C7.mp3",
+   "vel": 80,
+   "loopStart": null,
+   "loopEnd": null
+  }
+ ],
+ "release": 0.35,
+ "sustained": false,
+ "gain": 0.52,
+ "notes": "Rhodes Mark I Stage 73 (1977), one velocity layer (the GM bank uses jRhodes layer 3 up to F4 and layer 4 from B4 up), 15 notes F1-C7 sampled every 4-6 semitones (fourths), so the engine pitch-shifts up to +-3 semitones. The GM-bank files are shortened at their sustain loop; the tails of short upper notes were continued through the author's own loop with a matched exponential decay, so every file is a self-contained one-shot (no loop points needed). Add tremolo/chorus in the engine if wanted. Recommended release 0.3-0.4 s."
+}
