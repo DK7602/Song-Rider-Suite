@@ -12,6 +12,25 @@
 - On phones the Song Rider Suite banner spans the whole top line, and the Chord Rider Pro / Song
   Rider Pro titles fill their row up to the Hide button.
 
+### Better instrument sounds (every instrument)
+- **Real recordings** for 16 instruments, from free sample libraries that allow use and sharing
+  (credits under "Sound credits" in the sound picker):
+  - Piano (Salamander Grand, a Yamaha C5) and Electric Grand (Yamaha CP-80)
+  - Electric Piano (a 1977 Rhodes) and Bass
+  - Acoustic (Martin HD-28), Acoustic Nylon and Electric (a Fender, recorded clean)
+  - Sax, Alto Sax, Trumpet, Trombone, Horn, Tuba and Flute; the winds and brass hold notes for as long
+    as you hold them
+  - Vibraphone and Marimba
+- **Built from the recordings:** Bright Grand; Jazz, Muted, Crunch, Drive and Wah Wah Electric (through
+  an amp simulation); Brass Section (trumpet, trombone and horn played together).
+- **New synthesized sounds:** Vintage E-Piano (FM), Synth (string ensemble), Warm Synth Pad, Poly Synth,
+  Saw Synth, Synth Brass, Clavinet, Funk Organ (drawbar organ with a rotating-speaker shimmer), and the
+  Funky Worm and G-Funk Whistle, which now glide between notes.
+- **Every instrument plays at the same loudness**, so switching sounds no longer jumps in volume.
+- Used everywhere instruments play: Chord Rider, Baby DAW, Track Master and WAV exports.
+- The sounds are served by the app itself and kept on the device after first use, so they load faster
+  and work offline. The old General MIDI sounds remain as an automatic backup.
+
 ### Fixes
 - **Link SRP works again in every situation.** With a Chord Rider project open it links at once;
   with none open it lists your Chord Rider projects to pick from (or explains how to make one);
