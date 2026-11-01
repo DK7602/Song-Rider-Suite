@@ -2057,32 +2057,18 @@ html.crp-integrated .panelTop .left .srp-green{
 }
 </style>
 
-<style id="srpEmbeddedOverrides">
-html.srp-embedded,html.srp-embedded body{height:auto!important;min-height:0!important;overflow:visible!important;}
-html.srp-embedded body{display:block!important;min-height:0!important;}
-html.srp-embedded header{position:relative!important;top:auto!important;}
-html.srp-embedded .horseWrap{display:none!important;}
-html.srp-embedded main{display:block!important;flex:none!important;min-height:0!important;height:auto!important;padding-bottom:20px!important;}
-html.srp-embedded .sheet{display:block!important;flex:none!important;min-height:0!important;height:auto!important;overflow:visible!important;}
-html.srp-embedded .sheetHeader{position:relative!important;top:auto!important;}
-html.srp-embedded #sheetBody{display:block!important;flex:none!important;min-height:0!important;height:auto!important;overflow:visible!important;overscroll-behavior:auto!important;}
-html.srp-embedded #sheetInner{display:block!important;flex:none!important;min-height:0!important;height:auto!important;}
-html.srp-embedded .cards{padding-bottom:32px!important;}
-html.srp-embedded .fullPerf,html.srp-embedded .fullPerfScroll{display:block!important;flex:none!important;min-height:0!important;height:auto!important;overflow:visible!important;}
-html.srp-embedded #drumSelect,html.srp-embedded #mDrumSelect,html.srp-embedded #instrumentSelect,html.srp-embedded #mInstrumentSelect{display:none!important;}
-html.srp-embedded [title="Drums"],html.srp-embedded [title="Instrument"]{display:none!important;}
-html.srp-embedded .fullBoxWrap,html.srp-embedded .fullPreviewBlock{display:block!important;flex:none!important;min-height:0!important;height:auto!important;}
-html.srp-embedded textarea.fullBox,html.srp-embedded textarea.fullPreview{display:block!important;flex:none!important;min-height:140px!important;height:140px!important;}
-html.srp-embedded #editorRoot{display:block!important;flex:none!important;min-height:0!important;height:auto!important;}
-html.srp-embedded .fullSectionEditor{padding:16px 12px 24px!important;overscroll-behavior:auto!important;}
-html.srp-embedded .fullSectionCard:last-child{margin-bottom:0!important;}
-html.srp-embedded #rBtn{position:absolute!important;bottom:8px!important;}
-</style>
 <script>
+// Song Rider Pro always runs in the suite layout (crpMode=1). Old bookmarks and home-screen
+// icons open /song-rider/index.html without it, which showed an unstyled page with a giant
+// wordmark, so normalize the URL before app.js reads it.
 (function(){
-  const q=new URLSearchParams(location.search);
-  if(q.get('embedded')==='1') document.documentElement.classList.add('srp-embedded');
-  if(q.get('crpMode')==='1') document.documentElement.classList.add('crp-integrated');
+  const url=new URL(location.href);
+  if(url.searchParams.get('crpMode')!=='1'){
+    url.searchParams.delete('embedded');
+    url.searchParams.set('crpMode','1');
+    try{history.replaceState(history.state,'',url.pathname+url.search+url.hash);}catch(err){console.warn('Could not normalize the Song Rider URL',err);}
+  }
+  document.documentElement.classList.add('crp-integrated');
 })();
 </script>
 
@@ -2860,7 +2846,6 @@ html.crp-integrated .crp-srp-mode:nth-child(2) img{
 }
 </style>
 
-  <link rel="stylesheet" href="./suite-header.css?v=2.9.3" />
 
 <style id="babyStickerOnlyV288">
 html.crp-integrated .crp-srp-mode:nth-child(2) img{
@@ -2984,6 +2969,383 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
 @media(max-width:700px){html.crp-integrated .track-master-nav-row{margin:5px 0 8px;padding:0 10px}html.crp-integrated .track-master-gold-btn{width:100%;max-width:none;min-height:38px;padding:7px 18px;border-radius:12px;font-size:.78rem}}
 </style>
   <link rel="stylesheet" href="../skins.css?v=3.3.128-BLOOD-LIGHT-STATE">
+<!-- Styles below load after skins.css (they were previously after </body>; same cascade order).
+     app.js inserts its runtime <style> elements before #srp241WorkflowPolish, as before. -->
+<style id="srp241WorkflowPolish">
+html.crp-integrated #srpTransposeLinkBtn{display:none!important;}
+html.crp-integrated #topControlsRow{align-items:center!important;}
+html.crp-integrated #topControlsRow #crpSrpLinkBtn{margin:0!important;}
+html.crp-integrated .sheetHeader input.headingPill{
+  display:block!important;min-height:40px!important;height:40px!important;padding:0 16px!important;
+  background:#efc85d!important;background-image:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;
+  color:#111!important;-webkit-text-fill-color:#111!important;border:1px solid #d6aa3f!important;border-radius:999px!important;
+  font-weight:1000!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.25)!important;
+}
+html.crp-integrated .sheetHeader input.headingPill::placeholder{color:#55420f!important;-webkit-text-fill-color:#55420f!important;opacity:.78!important;}
+html.crp-integrated #srpHeaderAutoScroll,html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedPlayBtn,html.crp-integrated #srpLinkedStopBtn{
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;width:44px!important;height:40px!important;min-width:44px!important;padding:0!important;border-radius:12px!important;font-weight:1000!important;font-size:18px!important;
+}
+html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedStopBtn{background:#252b33!important;color:#f3f5f7!important;border:1px solid #414b57!important;}
+html.crp-integrated #srpLinkedPlayBtn{background:linear-gradient(180deg,#f7d774,#dda93a)!important;color:#111!important;border:1px solid #d6aa3f!important;}
+html.crp-integrated #srpHeaderAutoScroll.on{background:linear-gradient(180deg,#f7d774,#dda93a)!important;color:#111!important;}
+@media(max-width:430px){
+ html.crp-integrated .sheetHeader{padding-left:10px!important;padding-right:10px!important;}
+ html.crp-integrated .sheetHeader>div:last-child{gap:6px!important;}
+ html.crp-integrated #srpHeaderAutoScroll,html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedPlayBtn,html.crp-integrated #srpLinkedStopBtn{width:40px!important;min-width:40px!important;height:38px!important;}
+}
+</style>
+<style id="srpLightSkinWindowParityV3383">
+/* Keep Full Song View + Card View lyric windows aligned with each light skin. */
+html.crp-integrated[data-skin="studio-pastel"],
+html.crp-integrated[data-skin="black-label-light"],
+html.crp-integrated[data-skin="royal-wave"],
+html.crp-integrated[data-skin="candy-pop"],
+html.crp-integrated[data-skin="rider-light"],
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]){
+  --srp-light-text:#2b3035;
+  --srp-light-muted:#68717a;
+  --srp-light-line:#d7d3cb;
+  --srp-light-panel:#fffdf8;
+  --srp-light-panel2:#f5f1ea;
+  --srp-light-input:#fffdfa;
+}
+html.crp-integrated[data-skin="studio-pastel"]{--srp-light-panel:#fff8ef;--srp-light-panel2:#f2e8dc;--srp-light-input:#fffdf8;--srp-light-line:#d8cbbb;}
+html.crp-integrated[data-skin="black-label-light"]{--srp-light-panel:#ffffff;--srp-light-panel2:#efefec;--srp-light-input:#ffffff;--srp-light-line:#d0cec7;}
+html.crp-integrated[data-skin="royal-wave"]{--srp-light-panel:#EEE8C6;--srp-light-panel2:#98D6FF;--srp-light-input:#fff9df;--srp-light-line:#005CF7;--srp-light-text:#12244e;--srp-light-muted:#47617d;}
+html.crp-integrated[data-skin="candy-pop"]{--srp-light-panel:#FFB2F6;--srp-light-panel2:#EFEAD7;--srp-light-input:#fffdf2;--srp-light-line:#87FFF5;--srp-light-text:#263337;--srp-light-muted:#665866;}
+html.crp-integrated[data-skin="rider-light"]{--srp-light-panel:#f5f5f1;--srp-light-panel2:#ebede9;--srp-light-input:#ffffff;--srp-light-line:#d2d6d0;}
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]){--srp-light-panel:#efe8cf;--srp-light-panel2:#fffdf7;--srp-light-input:#fffdf7;--srp-light-line:#d7a63c;--srp-light-text:#261b16;--srp-light-muted:#72665a;}
+
+html.crp-integrated[data-skin="studio-pastel"] .sheet,
+html.crp-integrated[data-skin="black-label-light"] .sheet,
+html.crp-integrated[data-skin="royal-wave"] .sheet,
+html.crp-integrated[data-skin="candy-pop"] .sheet,
+html.crp-integrated[data-skin="rider-light"] .sheet,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheet,
+html.crp-integrated[data-skin="studio-pastel"] .fullSectionCard,
+html.crp-integrated[data-skin="black-label-light"] .fullSectionCard,
+html.crp-integrated[data-skin="royal-wave"] .fullSectionCard,
+html.crp-integrated[data-skin="candy-pop"] .fullSectionCard,
+html.crp-integrated[data-skin="rider-light"] .fullSectionCard,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullSectionCard,
+html.crp-integrated[data-skin="studio-pastel"] .card,
+html.crp-integrated[data-skin="black-label-light"] .card,
+html.crp-integrated[data-skin="royal-wave"] .card,
+html.crp-integrated[data-skin="candy-pop"] .card,
+html.crp-integrated[data-skin="rider-light"] .card,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .card{
+  background:var(--srp-light-panel)!important;
+  color:var(--srp-light-text)!important;
+  border-color:var(--srp-light-line)!important;
+  box-shadow:0 10px 28px rgba(58,49,35,.10)!important;
+}
+html.crp-integrated[data-skin="studio-pastel"] .sheetHeader,
+html.crp-integrated[data-skin="black-label-light"] .sheetHeader,
+html.crp-integrated[data-skin="royal-wave"] .sheetHeader,
+html.crp-integrated[data-skin="candy-pop"] .sheetHeader,
+html.crp-integrated[data-skin="rider-light"] .sheetHeader,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader{
+  background:var(--srp-light-panel2)!important;
+  color:var(--srp-light-text)!important;
+  border-color:var(--srp-light-line)!important;
+}
+html.crp-integrated[data-skin="studio-pastel"] textarea.fullSectionText,
+html.crp-integrated[data-skin="black-label-light"] textarea.fullSectionText,
+html.crp-integrated[data-skin="royal-wave"] textarea.fullSectionText,
+html.crp-integrated[data-skin="candy-pop"] textarea.fullSectionText,
+html.crp-integrated[data-skin="rider-light"] textarea.fullSectionText,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) textarea.fullSectionText,
+html.crp-integrated[data-skin="studio-pastel"] textarea.lyrics,
+html.crp-integrated[data-skin="black-label-light"] textarea.lyrics,
+html.crp-integrated[data-skin="royal-wave"] textarea.lyrics,
+html.crp-integrated[data-skin="candy-pop"] textarea.lyrics,
+html.crp-integrated[data-skin="rider-light"] textarea.lyrics,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) textarea.lyrics,
+html.crp-integrated[data-skin="studio-pastel"] textarea.fullBox,
+html.crp-integrated[data-skin="black-label-light"] textarea.fullBox,
+html.crp-integrated[data-skin="royal-wave"] textarea.fullBox,
+html.crp-integrated[data-skin="candy-pop"] textarea.fullBox,
+html.crp-integrated[data-skin="rider-light"] textarea.fullBox,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) textarea.fullBox,
+html.crp-integrated[data-skin="studio-pastel"] textarea.fullPreview,
+html.crp-integrated[data-skin="black-label-light"] textarea.fullPreview,
+html.crp-integrated[data-skin="royal-wave"] textarea.fullPreview,
+html.crp-integrated[data-skin="candy-pop"] textarea.fullPreview,
+html.crp-integrated[data-skin="rider-light"] textarea.fullPreview,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) textarea.fullPreview{
+  background:var(--srp-light-input)!important;
+  color:var(--srp-light-text)!important;
+  border-color:var(--srp-light-line)!important;
+}
+html.crp-integrated[data-skin="studio-pastel"] .fullPerf,
+html.crp-integrated[data-skin="studio-pastel"] .fullPerfScroll,
+html.crp-integrated[data-skin="black-label-light"] .fullPerf,
+html.crp-integrated[data-skin="black-label-light"] .fullPerfScroll,
+html.crp-integrated[data-skin="royal-wave"] .fullPerf,
+html.crp-integrated[data-skin="royal-wave"] .fullPerfScroll,
+html.crp-integrated[data-skin="candy-pop"] .fullPerf,
+html.crp-integrated[data-skin="candy-pop"] .fullPerfScroll,
+html.crp-integrated[data-skin="rider-light"] .fullPerf,
+html.crp-integrated[data-skin="rider-light"] .fullPerfScroll,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerf,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerfScroll{
+  background:var(--srp-light-panel)!important;
+  color:var(--srp-light-text)!important;
+}
+html.crp-integrated[data-skin="studio-pastel"] .fullPerfChordRow,
+html.crp-integrated[data-skin="black-label-light"] .fullPerfChordRow,
+html.crp-integrated[data-skin="royal-wave"] .fullPerfChordRow,
+html.crp-integrated[data-skin="candy-pop"] .fullPerfChordRow,
+html.crp-integrated[data-skin="rider-light"] .fullPerfChordRow,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerfChordRow{color:var(--srp-light-muted)!important;}
+
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheet,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullSectionCard,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .card{
+  background-color:#fffdf7!important;
+  background-image:url('../assets/rider-blood-light-pattern.jpg')!important;
+  background-size:220px auto!important;
+  background-repeat:repeat!important;
+}
+</style>
+<style id="srp230RemoveLegacyNoteLength">
+html.crp-integrated #noteLenSelect,
+html.crp-integrated #mNoteLenSelect{display:none!important;}
+</style>
+<style id="srp240LinkedWorkflow">
+html.crp-integrated #recordBtn,html.crp-integrated #mRecordBtn{display:none!important;}
+html.crp-integrated #panelBody > .controlSelectRow{display:none!important;}
+html.crp-integrated .sheetHeader #srpHeaderAutoScroll{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:38px!important;flex:0 0 42px!important;border-radius:11px!important;border:1px solid #d8ae52!important;background:#252b33!important;color:#f4d47d!important;font-weight:1000!important;font-size:19px!important;}
+html.crp-integrated .sheetHeader #srpHeaderAutoScroll.on{background:linear-gradient(180deg,#f7d774,#dda93a)!important;color:#111!important;}
+html.crp-integrated #autoPlayBtn,html.crp-integrated #autoStopBtn,html.crp-integrated #mScrollBtn,html.crp-integrated #mAutoStopBtn{display:none!important;}
+html.crp-integrated input.headingPill{background:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;color:#111!important;-webkit-text-fill-color:#111!important;border:1px solid #d6aa3f!important;border-radius:999px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.24)!important;}
+html.crp-integrated #srpTransposeLinkBtn{width:23px!important;min-width:23px!important;height:38px!important;padding:0!important;border-radius:999px!important;font-size:11px!important;font-weight:1000!important;}
+html.crp-integrated #srpTransposeLinkBtn.on{background:#efc85d!important;color:#111!important;}
+html.srp-lyrics-overlay-mode .crp-srp-app-header,html.srp-lyrics-overlay-mode header{display:none!important;}
+html.srp-lyrics-overlay-mode main{padding:0 0 86px!important;}
+html.srp-lyrics-overlay-mode .sheet{border:0!important;border-radius:0!important;margin:0!important;}
+html.srp-lyrics-overlay-mode .sheetHeader{position:sticky!important;top:0!important;z-index:20!important;background:#151a21!important;}
+</style>
+<style id="srp282CardPageTransport">
+/* v2.9.3 — keep SRP card-page title + AutoScroll + Play/Pause + Stop on one mobile row. */
+html.crp-integrated .sheetHeader > div:first-child{
+  min-width:0!important;
+  flex:1 1 auto!important;
+}
+html.crp-integrated .sheetHeader input.headingPill{
+  flex:0 1 210px!important;
+  width:min(210px,100%)!important;
+  max-width:210px!important;
+  min-width:105px!important;
+}
+@media(max-width:430px){
+  html.crp-integrated .sheetHeader input.headingPill{
+    flex:0 1 145px!important;
+    width:145px!important;
+    max-width:145px!important;
+    min-width:105px!important;
+    padding-left:12px!important;
+    padding-right:12px!important;
+  }
+  html.crp-integrated .sheetHeader > div:last-child{
+    gap:5px!important;
+  }
+  html.crp-integrated #srpHeaderAutoScroll,
+  html.crp-integrated #srpHeaderAutoStop,
+  html.crp-integrated #srpLinkedPlayBtn,
+  html.crp-integrated #srpLinkedStopBtn{
+    width:38px!important;
+    min-width:38px!important;
+    height:38px!important;
+    flex:0 0 38px!important;
+  }
+  html.crp-integrated .sheetHeader .sheetAddBtn,
+  html.crp-integrated .sheetHeader .sheetDeleteBtn{
+    width:36px!important;
+    min-width:36px!important;
+    height:38px!important;
+    flex:0 0 36px!important;
+  }
+}
+</style>
+<style id="srp3385RiderBloodLightFullWindowPattern">
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheet,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullSectionCard,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .card,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerf,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerfScroll{
+  background-color:#FFFDF7!important;
+  background-image:linear-gradient(rgba(255,253,247,.10),rgba(255,253,247,.10)),url('../assets/rider-blood-light-pattern.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#201B16!important;
+  border-color:#D8CAA8!important;
+}
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader a.workspace-mode-btn.active,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader button[aria-pressed="true"],
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #srpHeaderAutoScroll.on,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #srpTransposeLinkBtn.on{
+  background:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
+  color:#FFF!important;
+  border-color:#9F0000!important;
+}
+</style>
+<style id="srp3386RiderBloodLightPatternAuditFix">
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .panel,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheet,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullSectionCard,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .card,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .archiveAddPanel,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .archiveCard,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .archiveModal,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .projectModal,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerf,
+html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerfScroll{
+  background-color:#FFFDF7!important;
+  background-image:url('../assets/rider-blood-light-pattern.jpg')!important;
+  background-repeat:repeat!important;
+  background-size:270px auto!important;
+  background-position:center top!important;
+  color:#201B16!important;
+  border-color:#D8CAA8!important;
+}
+</style>
+<style id="srp33109RiderBloodLightOgRepair">
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .panel,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .sheet,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .sheetHeader,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .fullSectionCard,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .card,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .archiveAddPanel,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .archiveCard,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .archiveModal,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .projectModal,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .fullPerf,
+html.crp-integrated[data-skin-choice="rider-blood-light-og"] .fullPerfScroll{
+  background-color:#fffdf7!important;
+  background-image:linear-gradient(rgba(255,253,247,.08),rgba(255,253,247,.08)),url('../assets/rider-blood-light-og-pattern.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#201b16!important;
+  border-color:#d8caa8!important;
+}
+</style>
+<style id="srp33117SapphirePaisleyParity">
+/* v3.3.117 — bring Sapphire Paisley / Light into integrated SRP with the
+   same full-window background treatment used by the other pattern skins. */
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"]{
+  --srp-light-text:#F4F7FF;
+  --srp-light-muted:#C4D3F5;
+  --srp-light-line:#456CB7;
+  --srp-light-panel:#0C1220;
+  --srp-light-panel2:#101A2D;
+  --srp-light-input:#101A2D;
+}
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"]{
+  --srp-light-text:#102B4F;
+  --srp-light-muted:#556E8F;
+  --srp-light-line:#9FC4E8;
+  --srp-light-panel:#FFFFFF;
+  --srp-light-panel2:#F6FBFF;
+  --srp-light-input:#FFFFFF;
+}
+
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .panel,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .sheet,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .sheetHeader,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .fullSectionCard,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .card,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .archiveAddPanel,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .archiveCard,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .archiveModal,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .projectModal,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .fullPerf,
+html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .fullPerfScroll{
+  background-color:#0C1220!important;
+  background-image:linear-gradient(rgba(4,7,13,.10),rgba(4,7,13,.10)),url('../assets/sapphire-paisley-dark.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#F4F7FF!important;
+  border-color:#456CB7!important;
+}
+
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .panel,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .sheet,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .sheetHeader,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .fullSectionCard,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .card,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .archiveAddPanel,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .archiveCard,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .archiveModal,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .projectModal,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .fullPerf,
+html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .fullPerfScroll{
+  background-color:#FFFFFF!important;
+  background-image:linear-gradient(rgba(255,255,255,.24),rgba(255,255,255,.24)),url('../assets/sapphire-paisley-light.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+  color:#102B4F!important;
+  border-color:#9FC4E8!important;
+}
+</style>
+<style id="srpStudioPastelPatternParityV3384">
+/* SRP Studio Pastel: preserve the same supplied cream pattern used by CRP/BD.
+   This intentionally comes after SRP light-window parity, whose background
+   shorthand otherwise clears the Studio Pastel background-image. */
+html.crp-integrated[data-skin="studio-pastel"] .sheet,
+html.crp-integrated[data-skin="studio-pastel"] .fullSectionCard,
+html.crp-integrated[data-skin="studio-pastel"] .card,
+html.crp-integrated[data-skin="studio-pastel"] .sheetHeader,
+html.crp-integrated[data-skin="studio-pastel"] .fullPerf,
+html.crp-integrated[data-skin="studio-pastel"] .fullPerfScroll{
+  background-color:#fffaf4!important;
+  background-image:linear-gradient(rgba(255,250,244,.18),rgba(255,250,244,.18)),url('../assets/studio-pastel-pattern.jpg')!important;
+  background-size:auto,700px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+}
+html.crp-integrated[data-skin="studio-pastel"] .sheetHeader{
+  background-color:#f4e9df!important;
+}
+</style>
+<style id="srpRiderLightOgMintPaisley">
+/* Rider Light OG: use the supplied mint paisley on both SRP windows. */
+html.crp-integrated[data-skin-choice="rider-light-og"] :is(.panel,#panelBody,.sheet,.sheetHeader,.fullSectionCard,.card,.fullPerf,.fullPerfScroll){
+  background-color:#f4f4f2!important;
+  background-image:linear-gradient(rgba(255,255,255,.12),rgba(255,255,255,.12)),url('../assets/rider-light-og-pattern.jpg')!important;
+  background-size:auto,270px auto!important;
+  background-repeat:repeat,repeat!important;
+  background-position:0 0,center top!important;
+}
+</style>
+<style id="srpOutlineMicButton">
+/* White outline microphone on black, consistent across skins. */
+html .fullSectionActions button.fullLyricsMic{
+  width:44px!important;height:44px!important;min-width:44px!important;
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  padding:8px!important;border:1px solid #555!important;border-radius:12px!important;
+  background:#050505!important;background-image:none!important;color:#eee!important;
+  font-size:0!important;box-shadow:0 3px 8px rgba(0,0,0,.22)!important;
+}
+html .fullSectionActions button.fullLyricsMic::before{
+  content:""!important;display:block!important;width:26px!important;height:26px!important;
+  background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23eeeeee' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='2' width='6' height='12' rx='3'/%3E%3Cpath d='M5 10v1a7 7 0 0 0 14 0v-1M7 22h10'/%3E%3C/svg%3E") center/contain no-repeat!important;
+}
+html .fullSectionActions button.fullLyricsMic::after{display:none!important;}
+html .fullSectionActions button.fullLyricsMic[aria-pressed="true"]{
+  background:#050505!important;border-color:#e53935!important;
+  box-shadow:0 0 0 2px #e53935,0 3px 8px rgba(0,0,0,.22)!important;
+}
+html .fullSectionActions button.fullLyricsMic:focus-visible{outline:2px solid #efc85d!important;outline-offset:3px!important;}
+</style>
+<!-- Shared compact phone header (owned by the CRP side). Keep this the LAST stylesheet. -->
+<link rel="stylesheet" href="../suite-compact.css">
 </head>
 
 <body>
@@ -3394,391 +3756,5 @@ html.crp-integrated .track-master-gold-btn:focus-visible{outline:2px solid #fff0
 })();
 </script>
 
-<style id="srp241WorkflowPolish">
-html.crp-integrated #srpTransposeLinkBtn{display:none!important;}
-html.crp-integrated #topControlsRow{align-items:center!important;}
-html.crp-integrated #topControlsRow #crpSrpLinkBtn{margin:0!important;}
-html.crp-integrated .sheetHeader input.headingPill{
-  display:block!important;min-height:40px!important;height:40px!important;padding:0 16px!important;
-  background:#efc85d!important;background-image:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;
-  color:#111!important;-webkit-text-fill-color:#111!important;border:1px solid #d6aa3f!important;border-radius:999px!important;
-  font-weight:1000!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.25)!important;
-}
-html.crp-integrated .sheetHeader input.headingPill::placeholder{color:#55420f!important;-webkit-text-fill-color:#55420f!important;opacity:.78!important;}
-html.crp-integrated #srpHeaderAutoScroll,html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedPlayBtn,html.crp-integrated #srpLinkedStopBtn{
- display:inline-flex!important;align-items:center!important;justify-content:center!important;width:44px!important;height:40px!important;min-width:44px!important;padding:0!important;border-radius:12px!important;font-weight:1000!important;font-size:18px!important;
-}
-html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedStopBtn{background:#252b33!important;color:#f3f5f7!important;border:1px solid #414b57!important;}
-html.crp-integrated #srpLinkedPlayBtn{background:linear-gradient(180deg,#f7d774,#dda93a)!important;color:#111!important;border:1px solid #d6aa3f!important;}
-html.crp-integrated #srpHeaderAutoScroll.on{background:linear-gradient(180deg,#f7d774,#dda93a)!important;color:#111!important;}
-@media(max-width:430px){
- html.crp-integrated .sheetHeader{padding-left:10px!important;padding-right:10px!important;}
- html.crp-integrated .sheetHeader>div:last-child{gap:6px!important;}
- html.crp-integrated #srpHeaderAutoScroll,html.crp-integrated #srpHeaderAutoStop,html.crp-integrated #srpLinkedPlayBtn,html.crp-integrated #srpLinkedStopBtn{width:40px!important;min-width:40px!important;height:38px!important;}
-}
-</style>
 </body>
-
-<style id="srpLightSkinWindowParityV3383">
-/* Keep Full Song View + Card View lyric windows aligned with each light skin. */
-html.crp-integrated[data-skin="studio-pastel"],
-html.crp-integrated[data-skin="black-label-light"],
-html.crp-integrated[data-skin="royal-wave"],
-html.crp-integrated[data-skin="candy-pop"],
-html.crp-integrated[data-skin="rider-light"],
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]){
-  --srp-light-text:#2b3035;
-  --srp-light-muted:#68717a;
-  --srp-light-line:#d7d3cb;
-  --srp-light-panel:#fffdf8;
-  --srp-light-panel2:#f5f1ea;
-  --srp-light-input:#fffdfa;
-}
-html.crp-integrated[data-skin="studio-pastel"]{--srp-light-panel:#fff8ef;--srp-light-panel2:#f2e8dc;--srp-light-input:#fffdf8;--srp-light-line:#d8cbbb;}
-html.crp-integrated[data-skin="black-label-light"]{--srp-light-panel:#ffffff;--srp-light-panel2:#efefec;--srp-light-input:#ffffff;--srp-light-line:#d0cec7;}
-html.crp-integrated[data-skin="royal-wave"]{--srp-light-panel:#EEE8C6;--srp-light-panel2:#98D6FF;--srp-light-input:#fff9df;--srp-light-line:#005CF7;--srp-light-text:#12244e;--srp-light-muted:#47617d;}
-html.crp-integrated[data-skin="candy-pop"]{--srp-light-panel:#FFB2F6;--srp-light-panel2:#EFEAD7;--srp-light-input:#fffdf2;--srp-light-line:#87FFF5;--srp-light-text:#263337;--srp-light-muted:#665866;}
-html.crp-integrated[data-skin="rider-light"]{--srp-light-panel:#f5f5f1;--srp-light-panel2:#ebede9;--srp-light-input:#ffffff;--srp-light-line:#d2d6d0;}
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]){--srp-light-panel:#efe8cf;--srp-light-panel2:#fffdf7;--srp-light-input:#fffdf7;--srp-light-line:#d7a63c;--srp-light-text:#261b16;--srp-light-muted:#72665a;}
-
-html.crp-integrated[data-skin="studio-pastel"] .sheet,
-html.crp-integrated[data-skin="black-label-light"] .sheet,
-html.crp-integrated[data-skin="royal-wave"] .sheet,
-html.crp-integrated[data-skin="candy-pop"] .sheet,
-html.crp-integrated[data-skin="rider-light"] .sheet,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheet,
-html.crp-integrated[data-skin="studio-pastel"] .fullSectionCard,
-html.crp-integrated[data-skin="black-label-light"] .fullSectionCard,
-html.crp-integrated[data-skin="royal-wave"] .fullSectionCard,
-html.crp-integrated[data-skin="candy-pop"] .fullSectionCard,
-html.crp-integrated[data-skin="rider-light"] .fullSectionCard,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullSectionCard,
-html.crp-integrated[data-skin="studio-pastel"] .card,
-html.crp-integrated[data-skin="black-label-light"] .card,
-html.crp-integrated[data-skin="royal-wave"] .card,
-html.crp-integrated[data-skin="candy-pop"] .card,
-html.crp-integrated[data-skin="rider-light"] .card,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .card{
-  background:var(--srp-light-panel)!important;
-  color:var(--srp-light-text)!important;
-  border-color:var(--srp-light-line)!important;
-  box-shadow:0 10px 28px rgba(58,49,35,.10)!important;
-}
-html.crp-integrated[data-skin="studio-pastel"] .sheetHeader,
-html.crp-integrated[data-skin="black-label-light"] .sheetHeader,
-html.crp-integrated[data-skin="royal-wave"] .sheetHeader,
-html.crp-integrated[data-skin="candy-pop"] .sheetHeader,
-html.crp-integrated[data-skin="rider-light"] .sheetHeader,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader{
-  background:var(--srp-light-panel2)!important;
-  color:var(--srp-light-text)!important;
-  border-color:var(--srp-light-line)!important;
-}
-html.crp-integrated[data-skin="studio-pastel"] textarea.fullSectionText,
-html.crp-integrated[data-skin="black-label-light"] textarea.fullSectionText,
-html.crp-integrated[data-skin="royal-wave"] textarea.fullSectionText,
-html.crp-integrated[data-skin="candy-pop"] textarea.fullSectionText,
-html.crp-integrated[data-skin="rider-light"] textarea.fullSectionText,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) textarea.fullSectionText,
-html.crp-integrated[data-skin="studio-pastel"] textarea.lyrics,
-html.crp-integrated[data-skin="black-label-light"] textarea.lyrics,
-html.crp-integrated[data-skin="royal-wave"] textarea.lyrics,
-html.crp-integrated[data-skin="candy-pop"] textarea.lyrics,
-html.crp-integrated[data-skin="rider-light"] textarea.lyrics,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) textarea.lyrics,
-html.crp-integrated[data-skin="studio-pastel"] textarea.fullBox,
-html.crp-integrated[data-skin="black-label-light"] textarea.fullBox,
-html.crp-integrated[data-skin="royal-wave"] textarea.fullBox,
-html.crp-integrated[data-skin="candy-pop"] textarea.fullBox,
-html.crp-integrated[data-skin="rider-light"] textarea.fullBox,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) textarea.fullBox,
-html.crp-integrated[data-skin="studio-pastel"] textarea.fullPreview,
-html.crp-integrated[data-skin="black-label-light"] textarea.fullPreview,
-html.crp-integrated[data-skin="royal-wave"] textarea.fullPreview,
-html.crp-integrated[data-skin="candy-pop"] textarea.fullPreview,
-html.crp-integrated[data-skin="rider-light"] textarea.fullPreview,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) textarea.fullPreview{
-  background:var(--srp-light-input)!important;
-  color:var(--srp-light-text)!important;
-  border-color:var(--srp-light-line)!important;
-}
-html.crp-integrated[data-skin="studio-pastel"] .fullPerf,
-html.crp-integrated[data-skin="studio-pastel"] .fullPerfScroll,
-html.crp-integrated[data-skin="black-label-light"] .fullPerf,
-html.crp-integrated[data-skin="black-label-light"] .fullPerfScroll,
-html.crp-integrated[data-skin="royal-wave"] .fullPerf,
-html.crp-integrated[data-skin="royal-wave"] .fullPerfScroll,
-html.crp-integrated[data-skin="candy-pop"] .fullPerf,
-html.crp-integrated[data-skin="candy-pop"] .fullPerfScroll,
-html.crp-integrated[data-skin="rider-light"] .fullPerf,
-html.crp-integrated[data-skin="rider-light"] .fullPerfScroll,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerf,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerfScroll{
-  background:var(--srp-light-panel)!important;
-  color:var(--srp-light-text)!important;
-}
-html.crp-integrated[data-skin="studio-pastel"] .fullPerfChordRow,
-html.crp-integrated[data-skin="black-label-light"] .fullPerfChordRow,
-html.crp-integrated[data-skin="royal-wave"] .fullPerfChordRow,
-html.crp-integrated[data-skin="candy-pop"] .fullPerfChordRow,
-html.crp-integrated[data-skin="rider-light"] .fullPerfChordRow,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerfChordRow{color:var(--srp-light-muted)!important;}
-
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheet,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullSectionCard,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .card{
-  background-color:#fffdf7!important;
-  background-image:url('../assets/rider-blood-light-pattern.jpg')!important;
-  background-size:220px auto!important;
-  background-repeat:repeat!important;
-}
-</style>
-</html><style id="srp230RemoveLegacyNoteLength">
-html.crp-integrated #noteLenSelect,
-html.crp-integrated #mNoteLenSelect{display:none!important;}
-</style>
-
-<style id="srp240LinkedWorkflow">
-html.crp-integrated #recordBtn,html.crp-integrated #mRecordBtn{display:none!important;}
-html.crp-integrated #panelBody > .controlSelectRow{display:none!important;}
-html.crp-integrated .sheetHeader #srpHeaderAutoScroll{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:38px!important;flex:0 0 42px!important;border-radius:11px!important;border:1px solid #d8ae52!important;background:#252b33!important;color:#f4d47d!important;font-weight:1000!important;font-size:19px!important;}
-html.crp-integrated .sheetHeader #srpHeaderAutoScroll.on{background:linear-gradient(180deg,#f7d774,#dda93a)!important;color:#111!important;}
-html.crp-integrated #autoPlayBtn,html.crp-integrated #autoStopBtn,html.crp-integrated #mScrollBtn,html.crp-integrated #mAutoStopBtn{display:none!important;}
-html.crp-integrated input.headingPill{background:linear-gradient(180deg,#f7d774 0%,#efc85d 58%,#dda93a 100%)!important;color:#111!important;-webkit-text-fill-color:#111!important;border:1px solid #d6aa3f!important;border-radius:999px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px rgba(0,0,0,.24)!important;}
-html.crp-integrated #srpTransposeLinkBtn{width:23px!important;min-width:23px!important;height:38px!important;padding:0!important;border-radius:999px!important;font-size:11px!important;font-weight:1000!important;}
-html.crp-integrated #srpTransposeLinkBtn.on{background:#efc85d!important;color:#111!important;}
-html.srp-lyrics-overlay-mode .crp-srp-app-header,html.srp-lyrics-overlay-mode header{display:none!important;}
-html.srp-lyrics-overlay-mode main{padding:0 0 86px!important;}
-html.srp-lyrics-overlay-mode .sheet{border:0!important;border-radius:0!important;margin:0!important;}
-html.srp-lyrics-overlay-mode .sheetHeader{position:sticky!important;top:0!important;z-index:20!important;background:#151a21!important;}
-</style>
-
-
-<style id="srp282CardPageTransport">
-/* v2.9.3 — keep SRP card-page title + AutoScroll + Play/Pause + Stop on one mobile row. */
-html.crp-integrated .sheetHeader > div:first-child{
-  min-width:0!important;
-  flex:1 1 auto!important;
-}
-html.crp-integrated .sheetHeader input.headingPill{
-  flex:0 1 210px!important;
-  width:min(210px,100%)!important;
-  max-width:210px!important;
-  min-width:105px!important;
-}
-@media(max-width:430px){
-  html.crp-integrated .sheetHeader input.headingPill{
-    flex:0 1 145px!important;
-    width:145px!important;
-    max-width:145px!important;
-    min-width:105px!important;
-    padding-left:12px!important;
-    padding-right:12px!important;
-  }
-  html.crp-integrated .sheetHeader > div:last-child{
-    gap:5px!important;
-  }
-  html.crp-integrated #srpHeaderAutoScroll,
-  html.crp-integrated #srpHeaderAutoStop,
-  html.crp-integrated #srpLinkedPlayBtn,
-  html.crp-integrated #srpLinkedStopBtn{
-    width:38px!important;
-    min-width:38px!important;
-    height:38px!important;
-    flex:0 0 38px!important;
-  }
-  html.crp-integrated .sheetHeader .sheetAddBtn,
-  html.crp-integrated .sheetHeader .sheetDeleteBtn{
-    width:36px!important;
-    min-width:36px!important;
-    height:38px!important;
-    flex:0 0 36px!important;
-  }
-}
-</style>
-
-
-<style id="srp3385RiderBloodLightFullWindowPattern">
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheet,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullSectionCard,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .card,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerf,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerfScroll{
-  background-color:#FFFDF7!important;
-  background-image:linear-gradient(rgba(255,253,247,.10),rgba(255,253,247,.10)),url('../assets/rider-blood-light-pattern.jpg')!important;
-  background-size:auto,270px auto!important;
-  background-repeat:repeat,repeat!important;
-  background-position:0 0,center top!important;
-  color:#201B16!important;
-  border-color:#D8CAA8!important;
-}
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader a.workspace-mode-btn.active,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader button[aria-pressed="true"],
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #srpHeaderAutoScroll.on,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) #srpTransposeLinkBtn.on{
-  background:linear-gradient(180deg,#FF2A2A 0%,#E60000 58%,#B40000 100%)!important;
-  color:#FFF!important;
-  border-color:#9F0000!important;
-}
-</style>
-
-<style id="srp3386RiderBloodLightPatternAuditFix">
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .panel,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheet,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .sheetHeader,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullSectionCard,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .card,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .archiveAddPanel,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .archiveCard,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .archiveModal,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .projectModal,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerf,
-html.crp-integrated:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .fullPerfScroll{
-  background-color:#FFFDF7!important;
-  background-image:url('../assets/rider-blood-light-pattern.jpg')!important;
-  background-repeat:repeat!important;
-  background-size:270px auto!important;
-  background-position:center top!important;
-  color:#201B16!important;
-  border-color:#D8CAA8!important;
-}
-</style>
-
-
-<style id="srp33109RiderBloodLightOgRepair">
-html.crp-integrated[data-skin-choice="rider-blood-light-og"] .panel,
-html.crp-integrated[data-skin-choice="rider-blood-light-og"] .sheet,
-html.crp-integrated[data-skin-choice="rider-blood-light-og"] .sheetHeader,
-html.crp-integrated[data-skin-choice="rider-blood-light-og"] .fullSectionCard,
-html.crp-integrated[data-skin-choice="rider-blood-light-og"] .card,
-html.crp-integrated[data-skin-choice="rider-blood-light-og"] .archiveAddPanel,
-html.crp-integrated[data-skin-choice="rider-blood-light-og"] .archiveCard,
-html.crp-integrated[data-skin-choice="rider-blood-light-og"] .archiveModal,
-html.crp-integrated[data-skin-choice="rider-blood-light-og"] .projectModal,
-html.crp-integrated[data-skin-choice="rider-blood-light-og"] .fullPerf,
-html.crp-integrated[data-skin-choice="rider-blood-light-og"] .fullPerfScroll{
-  background-color:#fffdf7!important;
-  background-image:linear-gradient(rgba(255,253,247,.08),rgba(255,253,247,.08)),url('../assets/rider-blood-light-og-pattern.jpg')!important;
-  background-size:auto,270px auto!important;
-  background-repeat:repeat,repeat!important;
-  background-position:0 0,center top!important;
-  color:#201b16!important;
-  border-color:#d8caa8!important;
-}
-</style>
-
-<style id="srp33117SapphirePaisleyParity">
-/* v3.3.117 — bring Sapphire Paisley / Light into integrated SRP with the
-   same full-window background treatment used by the other pattern skins. */
-html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"]{
-  --srp-light-text:#F4F7FF;
-  --srp-light-muted:#C4D3F5;
-  --srp-light-line:#456CB7;
-  --srp-light-panel:#0C1220;
-  --srp-light-panel2:#101A2D;
-  --srp-light-input:#101A2D;
-}
-html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"]{
-  --srp-light-text:#102B4F;
-  --srp-light-muted:#556E8F;
-  --srp-light-line:#9FC4E8;
-  --srp-light-panel:#FFFFFF;
-  --srp-light-panel2:#F6FBFF;
-  --srp-light-input:#FFFFFF;
-}
-
-html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .panel,
-html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .sheet,
-html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .sheetHeader,
-html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .fullSectionCard,
-html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .card,
-html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .archiveAddPanel,
-html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .archiveCard,
-html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .archiveModal,
-html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .projectModal,
-html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .fullPerf,
-html.crp-integrated[data-skin="black-label"][data-skin-choice="sapphire-paisley"] .fullPerfScroll{
-  background-color:#0C1220!important;
-  background-image:linear-gradient(rgba(4,7,13,.10),rgba(4,7,13,.10)),url('../assets/sapphire-paisley-dark.jpg')!important;
-  background-size:auto,270px auto!important;
-  background-repeat:repeat,repeat!important;
-  background-position:0 0,center top!important;
-  color:#F4F7FF!important;
-  border-color:#456CB7!important;
-}
-
-html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .panel,
-html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .sheet,
-html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .sheetHeader,
-html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .fullSectionCard,
-html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .card,
-html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .archiveAddPanel,
-html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .archiveCard,
-html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .archiveModal,
-html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .projectModal,
-html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .fullPerf,
-html.crp-integrated[data-skin="black-label-light"][data-skin-choice="sapphire-paisley-light"] .fullPerfScroll{
-  background-color:#FFFFFF!important;
-  background-image:linear-gradient(rgba(255,255,255,.24),rgba(255,255,255,.24)),url('../assets/sapphire-paisley-light.jpg')!important;
-  background-size:auto,270px auto!important;
-  background-repeat:repeat,repeat!important;
-  background-position:0 0,center top!important;
-  color:#102B4F!important;
-  border-color:#9FC4E8!important;
-}
-</style>
-
-<style id="srpStudioPastelPatternParityV3384">
-/* SRP Studio Pastel: preserve the same supplied cream pattern used by CRP/BD.
-   This intentionally comes after SRP light-window parity, whose background
-   shorthand otherwise clears the Studio Pastel background-image. */
-html.crp-integrated[data-skin="studio-pastel"] .sheet,
-html.crp-integrated[data-skin="studio-pastel"] .fullSectionCard,
-html.crp-integrated[data-skin="studio-pastel"] .card,
-html.crp-integrated[data-skin="studio-pastel"] .sheetHeader,
-html.crp-integrated[data-skin="studio-pastel"] .fullPerf,
-html.crp-integrated[data-skin="studio-pastel"] .fullPerfScroll{
-  background-color:#fffaf4!important;
-  background-image:linear-gradient(rgba(255,250,244,.18),rgba(255,250,244,.18)),url('../assets/studio-pastel-pattern.jpg')!important;
-  background-size:auto,700px auto!important;
-  background-repeat:repeat,repeat!important;
-  background-position:0 0,center top!important;
-}
-html.crp-integrated[data-skin="studio-pastel"] .sheetHeader{
-  background-color:#f4e9df!important;
-}
-</style>
-
-
-<style id="srpRiderLightOgMintPaisley">
-/* Rider Light OG: use the supplied mint paisley on both SRP windows. */
-html.crp-integrated[data-skin-choice="rider-light-og"] :is(.panel,#panelBody,.sheet,.sheetHeader,.fullSectionCard,.card,.fullPerf,.fullPerfScroll){
-  background-color:#f4f4f2!important;
-  background-image:linear-gradient(rgba(255,255,255,.12),rgba(255,255,255,.12)),url('../assets/rider-light-og-pattern.jpg')!important;
-  background-size:auto,270px auto!important;
-  background-repeat:repeat,repeat!important;
-  background-position:0 0,center top!important;
-}
-</style>
-
-<style id="srpOutlineMicButton">
-/* White outline microphone on black, consistent across skins. */
-html .fullSectionActions button.fullLyricsMic{
-  width:44px!important;height:44px!important;min-width:44px!important;
-  display:inline-flex!important;align-items:center!important;justify-content:center!important;
-  padding:8px!important;border:1px solid #555!important;border-radius:12px!important;
-  background:#050505!important;background-image:none!important;color:#eee!important;
-  font-size:0!important;box-shadow:0 3px 8px rgba(0,0,0,.22)!important;
-}
-html .fullSectionActions button.fullLyricsMic::before{
-  content:""!important;display:block!important;width:26px!important;height:26px!important;
-  background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23eeeeee' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='2' width='6' height='12' rx='3'/%3E%3Cpath d='M5 10v1a7 7 0 0 0 14 0v-1M7 22h10'/%3E%3C/svg%3E") center/contain no-repeat!important;
-}
-html .fullSectionActions button.fullLyricsMic::after{display:none!important;}
-html .fullSectionActions button.fullLyricsMic[aria-pressed="true"]{
-  background:#050505!important;border-color:#e53935!important;
-  box-shadow:0 0 0 2px #e53935,0 3px 8px rgba(0,0,0,.22)!important;
-}
-html .fullSectionActions button.fullLyricsMic:focus-visible{outline:2px solid #efc85d!important;outline-offset:3px!important;}
-</style>
+</html>

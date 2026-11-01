@@ -240,6 +240,15 @@ function uuid(){
   });
 }
 
+// Runtime <style> elements keep their historical cascade position: after the head styles
+// and skins.css, but before the late SRP blocks (#srp241WorkflowPolish onward) and the
+// shared compact header sheet, which must stay last.
+function appendAppStyle(style){
+  const anchor = document.getElementById("srp241WorkflowPolish");
+  if(anchor && anchor.parentNode) anchor.parentNode.insertBefore(style, anchor);
+  else document.head.appendChild(style);
+}
+
 function escapeHtml(s){
   return String(s ?? "")
     .replace(/&/g,"&amp;")
@@ -482,7 +491,7 @@ function injectBspCardLook(){
     }
 `;
 
-  document.head.appendChild(style);
+  appendAppStyle(style);
 }
 function injectHeaderMiniIconBtnStyle(){
   const old = document.getElementById("srpMiniIconBtnStyle");
@@ -518,7 +527,7 @@ function injectHeaderMiniIconBtnStyle(){
       box-shadow: 0 0 0 6px rgba(34,197,94,.18);
     }
   `;
-  document.head.appendChild(style);
+  appendAppStyle(style);
 }
 function injectHeaderControlTightStyle(){
   const old = document.getElementById("srpHeaderControlTightStyle");
@@ -610,7 +619,7 @@ style.textContent = `
   }
   #capoStepToggle.on{ background:#fff !important; color:#090a0c !important; -webkit-text-fill-color:#090a0c !important; }
 `;
-  document.head.appendChild(style);
+  appendAppStyle(style);
 }
 
 
@@ -636,7 +645,7 @@ function injectChordCopyModeStyle(){
       border-radius: 18px;
     }
   `;
-  document.head.appendChild(style);
+  appendAppStyle(style);
 }
 
 const chordDragCopy = {
@@ -14212,7 +14221,7 @@ function injectNotesCropStyles(){
       background:#f5f5f6;
     }
   `;
-  document.head.appendChild(style);
+  appendAppStyle(style);
 }
 
 function ensureNotesCropModal(){
@@ -16499,7 +16508,7 @@ function applyKeyboardDockLayout(){
    or re-publishes an echo of its own change. */
 (function(){
   const q=new URLSearchParams(location.search);
-  const integrated=q.get('crpMode')==='1';
+  const integrated=q.get('crpMode')==='1'||document.documentElement.classList.contains('crp-integrated');
   const lyricsOverlay=q.get('lyricsOverlay')==='1';
   if(lyricsOverlay)document.documentElement.classList.add('srp-lyrics-overlay-mode');
   if(!integrated) return;
