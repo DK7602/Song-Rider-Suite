@@ -35,6 +35,14 @@
   found a pause and sent nothing while you talked. Pause detection now follows the room's noise
   level, a live level meter shows the mic is hearing you, and a blocked microphone explains how
   to allow it.
+- **Dictation works every time, not just the first.** A second or third dictation session lost
+  its status line after the screen refreshed, and on some Android phones the microphone opened
+  but no sound arrived. Dictation now records through an audio engine opened after the
+  microphone, and rebuilds it once by itself if no sound comes through.
+- **No more crackling.** Loud peaks were hitting the very top of the output and clicking on
+  phone speakers. Playback now keeps 3 dB of headroom, uses the browser's smooth playback mode
+  (fewer audio dropouts on Android), and removes inaudible deep bass that only made speakers
+  strain.
 
 ## v3.4.0 — reliability release
 
