@@ -1485,7 +1485,6 @@
   function contentFingerprint(p){return p?hashString(stableJson(p,CONTENT_SKIP)):'';}
   function isDirty(p,m,legacyPending=readLegacyPending()){
     if(!m)return true;
-    if(m.legacy)return m.fp!==projectFingerprint(p);
     return !!legacyPending[String(p.id)]||m.fp!==projectFingerprint(p);
   }
 
