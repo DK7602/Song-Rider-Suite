@@ -2400,6 +2400,7 @@
   function resetProjectSession(){
     stopPlayback();stopPreview();
     vocalBufferCache.clear();vocalBuffers.clear();voxWaveformPeakCache.clear();
+    voxUndoStack=[];voxRedoStack=[];updateVoxHistoryButtons();
   }
   function loadProject(project){
     resetProjectSession();
@@ -2692,10 +2693,12 @@
   function updateVoxEventReadout(el,event){if(!el||!event)return;const b=voxEventBounds(event),time=el.querySelector('.vox-event-time');if(time)time.textContent=`${b.start.toFixed(2)}–${b.end.toFixed(2)}b`;}
 
   function voxSnapshot(){
-    return {parts:clone(parts),beat:window.CRPBeatMaker?.getBeat?.()||null,drumEvents:clone(drumEvents),drumArrangementInitialized,songStartBeat,effectiveSongEndBeat:songEndBeat,activePartId,loadedChordPartId,voxTargetPartId,voxPlayheadBeat,voxInstrumentTrackFocus:voxInstrumentTrackFocus?clone(voxInstrumentTrackFocus):null,voxToolMode,voxRangeMode,voxRangeSelection:voxRangeSelection?clone(voxRangeSelection):null};
+    return {parts:clone(parts),beat:window.CRPBeatMaker?.getBeat?.()||null,drumEvents:clone(drumEvents),drumArrangementInitialized,songStartBeat,effectiveSongEndBeat:songEndBeat,activePartId,loadedChordPartId,voxTargetPartId,voxPlayheadBeat,voxInstrumentTrackFocus:voxInstrumentTrackFocus?clone(voxInstrumentTrackFocus):null,voxToolMode,voxRangeMode,voxRangeSelection:voxRangeSelection?clone(voxRangeSelection):null,bpm:songBpm()};
   }
   function updateVoxHistoryButtons(){if($('voxUndoBtn'))$('voxUndoBtn').disabled=!voxUndoStack.length;if($('voxRedoBtn'))$('voxRedoBtn').disabled=!voxRedoStack.length;}
-  function voxCheckpoint(){voxUndoStack.push(voxSnapshot());if(voxUndoStack.length>50)voxUndoStack.shift();voxRedoStack=[];updateVoxHistoryButtons();}
+  // An edit pushes the state from before it; pass a snapshot taken earlier when
+  // the edit is only known to have happened later (renames, drum pattern edits).
+  function voxCheckpoint(before=voxSnapshot()){voxUndoStack.push(before);if(voxUndoStack.length>50)voxUndoStack.shift();voxRedoStack=[];updateVoxHistoryButtons();}
   function restoreVoxSnapshot(snap){
     if(!snap)return;parts=(snap.parts||[]).map((p,i)=>normalizePart(p,i)).filter(Boolean);ensureInitial();
     activePartId=parts.some(p=>String(p.id)===String(snap.activePartId))?snap.activePartId:(parts[0]?.id||null);
@@ -2703,6 +2706,7 @@
     if(snap.beat)window.CRPBeatMaker?.setBeat?.(snap.beat,{persist:true});drumEvents=Array.isArray(snap.drumEvents)?snap.drumEvents.map(normalizeDrumEvent).filter(Boolean):drumEvents;drumArrangementInitialized=snap.drumArrangementInitialized!==false;songStartBeat=Math.max(0,Number(snap.songStartBeat)||0);songEndBeat=Number.isFinite(Number(snap.effectiveSongEndBeat))?Number(snap.effectiveSongEndBeat):songEndBeat;
     voxTargetPartId=parts.some(p=>p.type==='vocal'&&String(p.id)===String(snap.voxTargetPartId))?snap.voxTargetPartId:(allVocalParts()[0]?.id||null);voxPlayheadBeat=Math.max(0,Number(snap.voxPlayheadBeat)||0);voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=snap.voxInstrumentTrackFocus?clone(snap.voxInstrumentTrackFocus):null;voxToolMode=snap.voxToolMode||voxToolMode;voxRangeMode=!!snap.voxRangeMode;voxRangeSelection=snap.voxRangeSelection?clone(snap.voxRangeSelection):null;
     const c=parts.find(p=>p.type==='chord'&&String(p.id)===String(loadedChordPartId));if(c)core.apply(c.data);
+    if(Number.isFinite(Number(snap.bpm))&&Math.round(Number(snap.bpm))!==Math.round(songBpm()))setProjectBpm(Number(snap.bpm));
     renderParts();persistVoxEdits();renderVoxBox();
   }
   function voxUndo(){if(!voxUndoStack.length)return;voxRedoStack.push(voxSnapshot());restoreVoxSnapshot(voxUndoStack.pop());updateVoxHistoryButtons();voxStatus('Undo.');}
@@ -3010,7 +3014,15 @@
     drumArrangementInitialized=true;voxCheckpoint();const start=Math.max(0,quantizeVoxBeat(beat)),event=normalizeDrumEvent({id:uid(),startBeat:start,durationBeats:4,patternOffsetBeats:0,pattern:blankDrumPattern()});drumEvents.push(event);drumEvents.sort((a,b)=>a.startBeat-b.startBeat);const sel={kind:'drum',key:`drum:${event.id}`,event,startBeat:event.startBeat,dur:event.durationBeats,name:'Drums'};voxInstrumentSelections=[sel];voxInstrumentSelection=sel;voxInstrumentTrackFocus={kind:'drum',name:'Drums',key:'drum-map',explicitTarget:true};persistVoxEdits();renderVoxBox();voxStatus(`Empty 4-beat drum region added at beat ${start.toFixed(2)}. Double-tap the region to edit its pattern.`);
   }
   function openDrumEventEditor(sel){
-    const live=resolveVoxInstrumentSelection(sel);if(!live?.event||!window.CRPBeatMaker?.editBeatEvent)return;setVoxInstrumentSelection(live);window.CRPBeatMaker.editBeatEvent(live.event.pattern,{onCommit:pattern=>{const ev=drumEvents.find(x=>String(x.id)===String(live.event.id));if(!ev)return;ev.pattern=clone(pattern);markPartsDirty();core.scheduleAutoSave();},onClose:()=>{persistVoxEdits();renderVoxBox();voxStatus('Drum region pattern updated.');}});
+    const live=resolveVoxInstrumentSelection(sel);if(!live?.event||!window.CRPBeatMaker?.editBeatEvent)return;setVoxInstrumentSelection(live);
+    // One undo step per editing session, from the state before it opened (Beat
+    // Maker shows the region's pattern while editing).
+    const before=voxSnapshot();let checkpointed=false;
+    window.CRPBeatMaker.editBeatEvent(live.event.pattern,{onCommit:pattern=>{
+      const ev=drumEvents.find(x=>String(x.id)===String(live.event.id));if(!ev||JSON.stringify(ev.pattern)===JSON.stringify(pattern))return;
+      if(!checkpointed){voxCheckpoint(before);checkpointed=true;}
+      ev.pattern=clone(pattern);markPartsDirty();core.scheduleAutoSave();
+    },onClose:()=>{persistVoxEdits();renderVoxBox();voxStatus('Drum region pattern updated.');}});
   }
   function wireDrumLaneDoubleAdd(lane,clickBeat){
     if(!lane)return;
@@ -3427,8 +3439,10 @@
         const row=document.createElement('div');row.className='vox-track-row'+(String(part.id)===String(voxTargetPartId)?' is-target':'');row.style.width=`${width}px`;row.dataset.voxPartId=part.id;row.dataset.voxKind='vocal';row.dataset.voxTrackKey=voxTrackTokenForPart(part);
         const label=document.createElement('div');label.className='vox-track-label';label.dataset.voxPartId=String(part.id);label.dataset.voxPartType='vocal';
         const nameInput=document.createElement('input');nameInput.type='text';nameInput.className='vox-track-name';nameInput.value=part.name||'Vocal Track';nameInput.setAttribute('aria-label','Vocal track name');nameInput.title='Rename vocal track';
-        nameInput.onclick=e=>e.stopPropagation();nameInput.onfocus=()=>{voxCheckpoint();voxTargetPartId=part.id;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=null;renderVoxInspector();};
-        nameInput.oninput=()=>{part.name=String(nameInput.value||'');markPartsDirty();core.scheduleAutoSave();};nameInput.onblur=()=>{part.name=String(nameInput.value||'').trim()||`Vocals ${allVocalParts().indexOf(part)+1}`;nameInput.value=part.name;renderParts();markPartsDirty();core.scheduleAutoSave();};
+        // A rename is one undo step, recorded once the name actually changes.
+        let beforeRename=null;
+        nameInput.onclick=e=>e.stopPropagation();nameInput.onfocus=()=>{beforeRename=voxSnapshot();voxTargetPartId=part.id;voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=null;renderVoxInspector();};
+        nameInput.oninput=()=>{if(beforeRename){voxCheckpoint(beforeRename);beforeRename=null;}part.name=String(nameInput.value||'');markPartsDirty();core.scheduleAutoSave();};nameInput.onblur=()=>{beforeRename=null;part.name=String(nameInput.value||'').trim()||`Vocals ${allVocalParts().indexOf(part)+1}`;nameInput.value=part.name;renderParts();markPartsDirty();core.scheduleAutoSave();};
         const meta=document.createElement('span');meta.className='vox-track-meta';meta.textContent=`${Math.round((Number(part.volume)||0)*100)}% • ${(part.voxEvents||[]).length} event${(part.voxEvents||[]).length===1?'':'s'}`;
         const menu=document.createElement('button');menu.type='button';menu.className='vox-track-menu-btn';menu.textContent='⋮';menu.title='Track actions';menu.setAttribute('aria-label',`${part.name} track actions`);menu.onclick=e=>{e.preventDefault();e.stopPropagation();const r=menu.getBoundingClientRect();openVoxTrackContextMenu(part,label,r.right,r.bottom);};label.append(nameInput,meta);appendVoxTrackVolume(label,{part});label.append(menu);appendVoxMuteSolo(label,{part});
         label.onclick=e=>{if(e.target.closest('input,button'))return;focusVoxVocalTrack(part,{announce:true});};
@@ -3601,13 +3615,18 @@
     if(String(box.value)!==String(bpm))box.value=String(bpm);
   }
   function commitVoxBpm(){
-    const box=$('voxBpmInput'),main=$('bpmInput');if(!box||!main)return;
+    const box=$('voxBpmInput');if(!box||!$('bpmInput'))return;
     const raw=Number(box.value);if(!Number.isFinite(raw)){syncVoxBpmInput();return;}
-    const bpm=Math.max(40,Math.min(240,Math.round(raw)));box.value=String(bpm);main.value=String(bpm);
-    // Reuse the Suite's existing BPM live-audio refresh + canonical sync path so
-    // CRP, Baby DAW and linked SRP all receive the same committed tempo.
+    const bpm=Math.max(40,Math.min(240,Math.round(raw)));box.value=String(bpm);
+    if(bpm===Math.round(songBpm()))return;
+    voxCheckpoint();setProjectBpm(bpm);voxStatus(`BPM set to ${bpm}.`);
+  }
+  // Reuses the Suite's BPM input path so CRP, Baby DAW and linked SRP all
+  // receive the same committed tempo.
+  function setProjectBpm(bpm){
+    const main=$('bpmInput');if(!main)return;main.value=String(bpm);
     main.dispatchEvent(new Event('input',{bubbles:true}));main.dispatchEvent(new Event('change',{bubbles:true}));
-    updateMediaMetadata();voxStatus(`BPM set to ${bpm}.`);
+    syncVoxBpmInput();updateMediaMetadata();
   }
   function updateVoxTransportState(){
     syncVoxBpmInput();
