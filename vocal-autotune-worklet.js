@@ -283,8 +283,8 @@ registerProcessor('crp-vocal-autotune',CRPVocalAutotuneProcessor);
 
 // Vocal capture: streams the mic input back to the main thread in blocks
 // stamped with their first frame (this context's currentFrame), so parts.js can
-// cut the take at exact times. {type:'stop'} ends the stream after a final
-// partial block.
+// cut the take at exact times. {type:'stop'} ends the stream: a final partial
+// block, then {type:'done'}.
 class CRPVocalRecorderProcessor extends AudioWorkletProcessor {
   constructor(){
     super();
@@ -301,7 +301,7 @@ class CRPVocalRecorderProcessor extends AudioWorkletProcessor {
     this.fill=0;
   }
   process(inputs){
-    if(this.stopped){this.flush();return false;}
+    if(this.stopped){this.flush();this.port.postMessage({type:'done'});return false;}
     const src=inputs[0]?.[0],frames=src?src.length:128;
     for(let i=0;i<frames;i++){
       if(!this.fill)this.blockFrame=currentFrame+i;

@@ -42,23 +42,24 @@
   // and placement carry-over all address cards by it. Repeated ids come from
   // older builds (the v3.3.35/36 blank-card bug appended one card twice; track
   // duplication and cross-track moves copied ids) and from CRP's Duplicate Line,
-  // which deep-copies cards. A repeated card gets a fresh id instead of being
-  // dropped. Only at load (dropPhantoms) is an exact positioned copy of an
+  // which deep-copies cards. A repeated card gets a new id derived from the
+  // original (so re-syncing the same CRP rows gives the same ids) instead of
+  // being dropped. Only at load (dropPhantoms) is an exact positioned copy of an
   // earlier card treated as the old phantom and removed. A CRP copy also loses
   // the copied Track Master start (dropCopiedPlacement), so it lands after its
   // original instead of on top of it.
   function uniquifyCardIds(data,{dropPhantoms=false,dropCopiedPlacement=false}={}){
     if(!data)return;
     if(!Array.isArray(data.rows)||!data.rows.length){data.rows=[[]];return;}
-    const seen=new Map();
+    const cards=data.rows.flat().filter(c=>c&&typeof c==='object'&&c.voxId),taken=new Set(cards.map(c=>String(c.voxId))),first=new Map();
     data.rows=data.rows.map(raw=>(Array.isArray(raw)?raw:[]).filter(card=>{
       if(!card||typeof card!=='object'||!card.voxId)return true;
-      const id=String(card.voxId),json=JSON.stringify(card);
-      if(!seen.has(id)){seen.set(id,json);return true;}
-      if(dropPhantoms&&seen.get(id)===json&&hasTrackMasterStart(card))return false;
-      card.voxId=uid();
+      const id=String(card.voxId);
+      if(!first.has(id)){first.set(id,card);return true;}
+      if(dropPhantoms&&hasTrackMasterStart(card)&&JSON.stringify(first.get(id))===JSON.stringify(card))return false;
+      let n=1;while(taken.has(`${id}-copy${n}`))n++;
+      card.voxId=`${id}-copy${n}`;taken.add(card.voxId);first.set(card.voxId,card);
       if(dropCopiedPlacement)delete card.voxStartBeat;
-      seen.set(card.voxId,JSON.stringify(card));
       return true;
     }));
   }
@@ -223,20 +224,23 @@
     for(const p of allVocalParts())for(const e of p.voxEvents||[])if(String(e.takeId)===String(take.id)){const a=Math.max(0,(Number(e.startBeat)||0)-(Number(e.trimStartSec)||0)*beatsPerSec);anchor=anchor==null?a:Math.min(anchor,a);}
     return anchor??0;
   }
-  // "Use" makes a take the one this track plays: the clips of the previously
-  // active take switch to it, shifted by the difference between where the two
-  // were recorded so they stay in sync. If the track has no such clip, the take
-  // is placed where it was recorded.
+  // "Use" makes a take the one this track plays: each clip of the previously
+  // active take stays where it is and plays the same moment of the song from the
+  // chosen take (its trims shift by the difference between where the two takes
+  // were recorded; a clip that ran to the end of its take still does). If the
+  // track has no such clip, the take is placed where it was recorded.
   function useTake(p,take){
     const prior=p.recordings.find(r=>r.id===p.activeTakeId&&r.id!==take.id)||null;
     p.activeTakeId=take.id;p.transcript=take.transcript||'';p.transcriptWords=take.transcriptWords||[];
     if(prior){
-      const shift=takeAnchorBeat(take)-takeAnchorBeat(prior),beatsPerSec=songBpm()/60;let moved=0;
+      const beatsPerSec=songBpm()/60,shiftSec=(takeAnchorBeat(prior)-takeAnchorBeat(take))/beatsPerSec;let moved=0;
       for(const e of p.voxEvents){
         if(String(e.takeId)!==String(prior.id))continue;
-        let start=(Number(e.startBeat)||0)+shift,trimStart=Number(e.trimStartSec)||0;
-        if(start<0){trimStart-=start/beatsPerSec;start=0;}
-        Object.assign(e,{takeId:take.id,sourcePartId:p.id,startBeat:start,trimStartSec:trimStart});moved++;
+        let start=Number(e.startBeat)||0,trimStart=(Number(e.trimStartSec)||0)+shiftSec;
+        const trimEnd=e.trimEndSec==null?null:Number(e.trimEndSec)+shiftSec;
+        // Song time before the chosen take began: start the clip where it does.
+        if(trimStart<0){start-=trimStart*beatsPerSec;trimStart=0;}
+        Object.assign(e,{takeId:take.id,sourcePartId:p.id,startBeat:start,trimStartSec:trimStart,trimEndSec:trimEnd!=null&&trimEnd<=trimStart?trimStart+.001:trimEnd});moved++;
       }
       if(moved)return;
     }
@@ -1187,8 +1191,15 @@
   // offset, clock jitter), so recently rejected audio is kept to recover from.
   function createTakeGate(sampleRate){
     const kept=[],recent=[],lookBack=sampleRate;
-    let openFrame=Infinity,closeFrame=Infinity,isOpen=false,endFrame=0;
-    const keep=(frame,samples)=>{if(samples.length)kept.push({frame,samples});};
+    let openFrame=Infinity,closeFrame=Infinity,isOpen=false,endFrame=0,nextFrame=Infinity;
+    // Frames the gate never received (before capture began, a dropped block)
+    // become silence, so every kept sample stays at its time in the take.
+    const keep=(frame,samples)=>{
+      if(!samples.length)return;
+      const gap=Math.min(lookBack,frame-nextFrame);
+      if(gap>0)kept.push({frame:frame-gap,samples:new Float32Array(gap)});
+      kept.push({frame,samples});nextFrame=frame+samples.length;
+    };
     const reject=(frame,samples)=>{
       if(samples.length)recent.push({frame,samples});
       while(recent.length&&recent[0].frame+recent[0].samples.length<endFrame-lookBack)recent.shift();
@@ -1205,7 +1216,7 @@
         }
       },
       open(at){
-        openFrame=Math.round(at*sampleRate);closeFrame=Infinity;isOpen=true;
+        openFrame=Math.round(at*sampleRate);closeFrame=Infinity;isOpen=true;nextFrame=openFrame;
         for(const {frame,samples} of recent.splice(0)){
           const cut=Math.max(0,Math.min(samples.length,openFrame-frame));
           if(cut)recent.push({frame,samples:samples.subarray(0,cut)});
@@ -1238,9 +1249,15 @@
     if(await ensureVocalWorklet(micCtx)){
       try{
         const node=new AudioWorkletNode(micCtx,'crp-vocal-recorder',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1]});
-        node.port.onmessage=e=>{if(e.data?.type==='audio')gate.add(e.data.frame,e.data.samples);};
+        let streamEnded=()=>{};
+        node.port.onmessage=e=>{if(e.data?.type==='audio')gate.add(e.data.frame,e.data.samples);else if(e.data?.type==='done')streamEnded();};
         micSource.connect(node);node.connect(sink);
-        stopStream=()=>{node.port.postMessage({type:'stop'});node.port.onmessage=null;try{micSource.disconnect(node);node.disconnect();}catch{}};
+        stopStream=async()=>{
+          // The final partial block arrives just before 'done'.
+          const ended=new Promise(r=>{streamEnded=r;});node.port.postMessage({type:'stop'});
+          await Promise.race([ended,delay(500)]);
+          node.port.onmessage=null;try{micSource.disconnect(node);node.disconnect();}catch{}
+        };
       }catch(err){console.warn('Recorder worklet unavailable; using ScriptProcessor',err);}
     }
     if(!stopStream){
@@ -1256,7 +1273,7 @@
         gate.close(at);
         const deadline=performance.now()+Math.max(0,at-micCtx.currentTime)*1000+1500;
         while(gate.endTime<at&&performance.now()<deadline)await delay(30);
-        stopStream();try{sink.disconnect();}catch{}
+        await stopStream();try{sink.disconnect();}catch{}
         return gate.samples();
       }
     };
@@ -1265,15 +1282,19 @@
   function recordedSeconds(){return recordedSec+(recordOpenedAtPerf!=null?Math.max(0,(performance.now()-recordOpenedAtPerf)/1000):0);}
   // Starts the backing at `beat` (muted per the recording scope, which only
   // affects what is heard) and opens the gate where that beat is sung. Returns
-  // the beat the take starts on.
+  // false if recording was stopped meanwhile.
   async function startBackingAndCapture(beat){
     // Past the song end there is no backing left; the take just continues.
     if(beat<mediaDurationBeats()-.001)await startPlayback({fromBeat:beat,scope:clone(recordScope)});
-    const backing=!!((playing||starting)&&audioCtx&&playbackClockStartAudioTime);
+    if(!recording||!recorder)return false;
+    let backing=!!((playing||starting)&&audioCtx&&playbackClockStartAudioTime);
+    // The chosen backing parts may end before `beat`; playback would then wrap
+    // to the song start, which is not where this take is.
+    if(backing&&Math.abs(playbackClockStartBeat-beat)>1e-6){stopPlayback();backing=false;}
     const openAt=backing?micTimeForPlaybackTime(playbackClockStartAudioTime):micTimeSungNow();
     recorder.open(openAt);
     recordOpenedAtPerf=performance.now()+Math.max(0,openAt-micCtx.currentTime)*1000;
-    return backing?playbackClockStartBeat:beat;
+    return true;
   }
   function stopCaptureClock(){if(recordOpenedAtPerf!=null){recordedSec=recordedSeconds();recordOpenedAtPerf=null;}}
   async function beginRecording(options={}){
@@ -1293,8 +1314,8 @@
       if($('vocalSpeechStatus'))$('vocalSpeechStatus').textContent='Recording clean WAV. Cloud transcription runs after the take is saved.';
       if($('vocalRecordBtn')){$('vocalRecordBtn').classList.add('recording');$('vocalRecordBtn').disabled=true;}
       if($('vocalStopBtn'))$('vocalStopBtn').disabled=false;
-      recordInsertBeat=await startBackingAndCapture(Math.max(effectiveSongStartBeat(),Number(options?.fromBeat)||0));
-      recordResumeBeat=recordInsertBeat;
+      recordInsertBeat=recordResumeBeat=Math.max(effectiveSongStartBeat(),Number(options?.fromBeat)||0);
+      if(!await startBackingAndCapture(recordInsertBeat))return;
       recordTimer=setInterval(()=>{if($('vocalTimer'))$('vocalTimer').textContent=fmtTime(recordedSeconds());updateVoxTransportState();},100);
       if(fromVox){voxTargetPartId=p.id;updateVoxPlayhead(recordInsertBeat,true);voxStatus(`Recording into ${p.name} from beat ${recordInsertBeat.toFixed(2)}…`);}
       core.status('Recording dry WAV in beat sync. Use headphones so the backing does not bleed into the mic.');updateVoxTransportState();
@@ -1353,12 +1374,10 @@
       recordingResuming=true;
       core.status('Resuming recording on the backing downbeat…');
       try{
-        await startBackingAndCapture(Math.max(0,Number(recordResumeBeat)||0));
-        core.status('Recording resumed in beat sync.');
+        if(await startBackingAndCapture(Math.max(0,Number(recordResumeBeat)||0)))core.status('Recording resumed in beat sync.');
       }catch(e){
         console.warn('Could not resume backing playback',e);
-        recorder.open(micTimeSungNow());recordOpenedAtPerf=performance.now();
-        core.status('Recording resumed without backing.');
+        if(recorder){recorder.open(micTimeSungNow());recordOpenedAtPerf=performance.now();core.status('Recording resumed without backing.');}
       }finally{recordingPaused=false;recordingResuming=false;}
     }
     updateVoxTransportState();
@@ -2930,7 +2949,13 @@
   // pointerup the button itself receives, and ignore the click that follows.
   function wireTrackMenuButton(btn,openMenu){
     let touchOpenedAt=0;
-    btn.addEventListener('pointerup',e=>{if(e.pointerType!=='touch')return;e.stopPropagation();touchOpenedAt=performance.now();openMenu();});
+    btn.addEventListener('pointerup',e=>{
+      if(e.pointerType!=='touch')return;
+      e.stopPropagation();touchOpenedAt=performance.now();openMenu();
+      // The tap's click may land on the label or on the menu that just opened.
+      const swallow=c=>{document.removeEventListener('click',swallow,true);if(performance.now()-touchOpenedAt<700){c.preventDefault();c.stopPropagation();}};
+      document.addEventListener('click',swallow,true);
+    });
     btn.onclick=e=>{e.preventDefault();e.stopPropagation();if(performance.now()-touchOpenedAt>700)openMenu();};
   }
   function makeVoxTrackLabel({name,meta,checked=null,onChecked=null,kind='vocal',part=null}){
