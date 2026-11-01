@@ -16887,7 +16887,8 @@ function applyKeyboardDockLayout(){
     }
     const rows=Array.isArray(payload.rows)?payload.rows:[];
     const sig=crpRowsFingerprint(rows);
-    if(forceCreate||p.crpRowsSig!==sig){
+    const merge=forceCreate||p.crpRowsSig!==sig;
+    if(merge){
       editProject('linkCrpChords',()=>{
         mergeCrpRowsIntoPage1(p,rows);
         syncFullTextFromSections();
@@ -16903,8 +16904,12 @@ function applyKeyboardDockLayout(){
       p.linkedOctave=p.steps;
     }
     upsertProject(p,{bump:false});
-    applyProjectSettingsToUI();
-    renderAll();
+    // Nothing visible changed on a background refresh (focus, storage event): do not re-render
+    // the editors under the user (it would drop the caret and restart the Full view).
+    if(merge){
+      applyProjectSettingsToUI();
+      renderAll();
+    }
     return p;
   }
   window.CRP_SRP_importCrpStructure=importCrpStructure;
@@ -16938,23 +16943,32 @@ function applyKeyboardDockLayout(){
       button.setAttribute('aria-label',busy?'Linking Song Rider Pro project':'Link SRP project');
     }
   }
+  // The CRP / Baby DAW project open in Chord Rider right now ('' when its editor is empty).
+  function openCrpProjectId(){
+    let id='';
+    try{id=String(localStorage.getItem('crp-active-project-id')||'').trim();}catch{}
+    return id&&(readJson('crp-projects',[])||[]).some(x=>String(x?.id??'')===id)?id:'';
+  }
+  // SRP song (other than the open one) that a CRP project is linked to, or null.
+  function otherSongLinkedTo(crpId){
+    const rec=links()[String(crpId||'')];
+    const sid=String(rec?.srpProjectId||'');
+    if(!sid||sid===String(state.project?.id||''))return null;
+    const song=libraryProject(sid);
+    return {id:sid,name:String(song?.name||rec.srpName||'').trim()||'another song'};
+  }
   function refreshCrpLinkUi(){
     const rec=persistentLinkForSrpProject(state.project,false);
-    const payload=rec?null:crpPayloadFor('');
     const st=document.getElementById('crpSrpLinkStatus');
     const b=document.getElementById('crpSrpLinkBtn');
     if(!b&&!st)return;
-    if(!rec&&!payload?.crpProjectId){
-      if(st)st.textContent='Save this CRP project first';
-      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});b.classList.remove('is-linked');b.title='Link this project to Song Rider Pro';}
-      return;
-    }
     const crpName=rec?crpProjectNameForLink(rec.crpProjectId,null):'';
-    if(st)st.textContent=rec?`Linked • ${crpName}`:'Not linked';
+    const openId=rec?'':openCrpProjectId();
+    if(st)st.textContent=rec?`Linked • ${crpName}`:(openId?'Not linked':'No Chord Rider project is open');
     if(b){
       b.disabled=false;
       setCrpLinkButtonContent(b,{linked:!!rec,name:crpName});
-      b.title=rec?`Unlink this SRP project from ${crpName}`:'Link this SRP project to the CRP/Baby DAW project currently open';
+      b.title=rec?`Unlink this song from ${crpName}`:(openId?`Link this song to the Chord Rider / Baby DAW project open now (${crpProjectNameForLink(openId,null)})`:'Choose a Chord Rider / Baby DAW project to link this song to');
       b.classList.toggle('is-linked',!!rec);
     }
   }
@@ -16978,39 +16992,199 @@ function applyKeyboardDockLayout(){
     setActiveLinkId('');
     refreshCrpLinkUi();
     renderSheetTitleBar();
+    return crpId?crpProjectNameForLink(crpId,null):'';
   }
-  // forceCreate: the user tapped Link SRP. Otherwise refresh the open song from its saved partner.
-  function syncFromHandoff(forceCreate=false){
-    const savedRec=persistentLinkForSrpProject(state.project,false);
-    const payload=crpPayloadFor(forceCreate?'':(savedRec?.crpProjectId||''));
+  // The user chose a CRP / Baby DAW project: link the song on screen to it (one-to-one; a song
+  // previously linked to that project is detached). Its chords are merged into PAGE 1 (undoable)
+  // and the pair shares BPM / capo / step / key from now on.
+  function linkToCrpProject(crpId){
+    const id=String(crpId||'');
+    if(!state.project)return {ok:false,error:'Open a song first, then tap Link SRP.'};
+    const payload=id?crpPayloadFor(id):null;
+    if(!payload?.crpProjectId||String(payload.crpProjectId)!==id)return {ok:false,error:'That Chord Rider project is not on this device any more. Open it in Chord Rider, then tap Link SRP again.'};
+    const moved=otherSongLinkedTo(id);
+    const wasOpenInCrp=openCrpProjectId();
+    const linked=importCrpStructure(payload,true);
+    if(!linked)return {ok:false,error:'Linking failed. Tap Link SRP to try again.'};
+    const all=links();
+    const rec={srpProjectId:linked.id,srpName:linked.name||payload.name||'Song Rider project',linkedAt:Date.now()};
+    all[id]=rec;
+    setLinks(all);
+    writeLinkSession(id,linked.id);
+    setActiveLinkId(id);
+    writeJson(HANDOFF_KEY,{payload,rec,ts:Date.now()});
+    // Chord Rider had nothing open: open the linked project there next time (never over unsaved work).
+    if(!wasOpenInCrp){
+      let draft=null;
+      try{draft=localStorage.getItem('crp-unsaved-draft-v1');}catch{}
+      if(!draft){try{localStorage.setItem('crp-active-project-id',id);}catch{}}
+    }
+    // Seed the shared transport from the just-linked song so both apps start from the same values.
+    publishSrpTransport();
+    ensureLinkedPlaybackBridge();
+    refreshCrpLinkUi();
+    renderSheetTitleBar();
+    return {ok:true,name:crpProjectNameForLink(id,payload),moved};
+  }
+
+  // ---------------------------------------------------------------- link feedback
+  // The old status line (#crpSrpLinkStatus) is hidden in the suite layout, so results are shown
+  // in a small notice: success fades after a few seconds, problems stay until dismissed.
+  let linkNoticeTimer=0;
+  function showLinkNotice(message,{sticky=false}={}){
+    let box=document.getElementById('srpLinkNotice');
+    if(!box){
+      box=document.createElement('div');
+      box.id='srpLinkNotice';
+      box.className='srpNotice';
+      box.setAttribute('role','status');
+      box.setAttribute('aria-live','polite');
+      const text=document.createElement('div');
+      text.className='srpNoticeText';
+      const ok=document.createElement('button');
+      ok.type='button';ok.className='srpNoticeClose';ok.textContent='OK';
+      ok.addEventListener('click',()=>{box.hidden=true;});
+      box.append(text,ok);
+      document.body.appendChild(box);
+    }
+    box.querySelector('.srpNoticeText').textContent=message;
+    box.hidden=false;
+    clearTimeout(linkNoticeTimer);
+    if(!sticky)linkNoticeTimer=setTimeout(()=>{box.hidden=true;},6000);
+  }
+  function runLink(crpId){
     const b=document.getElementById('crpSrpLinkBtn');
-    const st=document.getElementById('crpSrpLinkStatus');
-    if(!payload?.crpProjectId){
-      if(forceCreate){
-        if(st)st.textContent='No saved CRP project was handed off. Return to Chord Rider, save it once, then open Song Rider again.';
-        if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});}
+    if(b){b.disabled=true;setCrpLinkButtonContent(b,{busy:true});}
+    let result;
+    try{result=linkToCrpProject(crpId);}
+    catch(err){console.error('Linking to the Chord Rider project failed',err);result={ok:false,error:'Linking failed ('+(err?.message||err)+'). Tap Link SRP to try again.'};}
+    refreshCrpLinkUi();
+    const song=String(state.project?.name||'').trim()||'This song';
+    if(!result.ok){showLinkNotice(result.error,{sticky:true});return false;}
+    showLinkNotice(`“${song}” is linked to the Chord Rider / Baby DAW project “${result.name}”. Its chords are on PAGE 1 (Undo removes them) and BPM, capo and key now stay in sync.`+(result.moved?` “${result.moved.name}” is no longer linked to it.`:''));
+    return true;
+  }
+
+  // ---------------------------------------------------------------- project chooser
+  // Shown when Chord Rider has no project open (or the open one belongs to another song).
+  let linkChooser=null;
+  function chooserKeydown(e){if(e.key==='Escape'){e.preventDefault();closeLinkChooser();}}
+  function closeLinkChooser(){
+    if(!linkChooser)return;
+    linkChooser.remove();
+    linkChooser=null;
+    document.removeEventListener('keydown',chooserKeydown,true);
+    unlockBodyScroll();
+  }
+  function crpProjectsForLink(){
+    const openId=openCrpProjectId(),lastId=String(handoff()?.payload?.crpProjectId||'');
+    return (readJson('crp-projects',[])||[])
+      .filter(p=>p&&String(p.id??'')&&(!p.archived||String(p.id)===openId))
+      .map(p=>{
+        const id=String(p.id);
+        return {id,name:String(p.name||'').trim()||'Untitled',updatedAt:Number(p.updatedAt)||0,open:id===openId,last:id===lastId,linkedTo:otherSongLinkedTo(id)};
+      })
+      .sort((a,b)=>(b.open-a.open)||(b.last-a.last)||(b.updatedAt-a.updatedAt)||a.name.localeCompare(b.name));
+  }
+  function openChordRider(){
+    closeLinkChooser();
+    location.href=new URL(canonicalSuiteRoot()+'index.html?workspace=chord-rider',location.origin).href;
+  }
+  function openLinkChooser(){
+    closeLinkChooser();
+    const song=String(state.project?.name||'').trim()||'this song';
+    const items=crpProjectsForLink();
+    const modal=document.createElement('div');
+    modal.id='srpLinkChooser';
+    modal.className='archiveModal show';
+    modal.setAttribute('role','dialog');
+    modal.setAttribute('aria-modal','true');
+    modal.setAttribute('aria-labelledby','srpLinkChooserTitle');
+    const card=document.createElement('div');
+    card.className='archiveCard';
+    // Same look as the app's other pickers; the text colour is set here because the dark skins
+    // give modal text a light colour (skins that restyle .archiveCard still win: no !important).
+    card.style.cssText='background:#15191f;color:#f4f0e7;border:1px solid rgba(233,196,106,.55);';
+    const head=document.createElement('div');
+    head.className='archiveHead';
+    const title=document.createElement('div');
+    title.className='archiveTitle';title.id='srpLinkChooserTitle';
+    title.textContent='Link to a Chord Rider / Baby DAW project';
+    const close=document.createElement('button');
+    close.type='button';close.className='authClose';close.setAttribute('aria-label','Close');close.textContent='×';
+    close.addEventListener('click',closeLinkChooser);
+    head.append(title,close);
+    const intro=document.createElement('div');
+    intro.className='archiveControls srpLinkChooserIntro';
+    intro.style.cssText='display:block;font-size:14px;font-weight:800;line-height:1.35;';
+    const signedIn=typeof cloudSignedIn==='function'&&cloudSignedIn();
+    const openItem=items.find(it=>it.open);
+    const why=openItem?.linkedTo?`“${openItem.name}”, open in Chord Rider, is linked to “${openItem.linkedTo.name}”; picking it moves the link to this song.`:'Chord Rider has no project open right now.';
+    intro.textContent=items.length
+      ?`${why} Pick the project to link with “${song}”. Its chords go onto PAGE 1 (your lyrics stay; Undo removes them) and BPM, capo and key stay in sync.`
+      :`There are no Chord Rider / Baby DAW projects on this device yet. Open Chord Rider, build or open a project and save it, then come back to “${song}” and tap Link SRP.`+(signedIn?' Projects saved in your account download when Chord Rider opens.':'');
+    const list=document.createElement('div');
+    list.className='archiveList';
+    if(items.length){
+      for(const it of items){
+        const row=document.createElement('button');
+        row.type='button';row.className='archiveRow srpLinkChoice';row.dataset.crpProjectId=it.id;
+        const name=document.createElement('span');
+        name.className='archiveRowName';name.textContent=it.name;
+        const meta=document.createElement('span');
+        meta.className='archiveRowMeta';
+        meta.textContent=[it.open?'Open in Chord Rider':(it.last?'Last opened':''),it.linkedTo?`Linked to “${it.linkedTo.name}”`:''].filter(Boolean).join(' · ');
+        row.append(name,meta);
+        row.addEventListener('click',()=>{closeLinkChooser();runLink(it.id);});
+        list.appendChild(row);
       }
-      return null;
+    }else{
+      const empty=document.createElement('div');
+      empty.className='archiveEmpty';
+      empty.textContent='No Chord Rider projects yet';
+      list.appendChild(empty);
     }
-    if(!forceCreate&&(!savedRec||!state.project||String(savedRec.srpProjectId||'')!==String(state.project.id||''))){refreshCrpLinkUi();return null;}
-    const linked=importCrpStructure(payload,forceCreate);
-    if(!linked){
-      if(st)st.textContent='Link failed — tap Link SRP to try again.';
-      if(b){b.disabled=false;setCrpLinkButtonContent(b,{linked:false});}
-      return null;
+    const foot=document.createElement('div');
+    foot.className='archiveControls srpLinkChooserActions';
+    const cancel=document.createElement('button');
+    cancel.type='button';cancel.className='authBtn secondary';cancel.textContent='Cancel';
+    cancel.addEventListener('click',closeLinkChooser);
+    const crp=document.createElement('button');
+    crp.type='button';crp.className='authBtn';crp.textContent='Open Chord Rider';
+    crp.addEventListener('click',openChordRider);
+    foot.append(cancel,crp);
+    card.append(head,intro,list,foot);
+    modal.appendChild(card);
+    modal.addEventListener('click',e=>{if(e.target===modal)closeLinkChooser();});
+    document.body.appendChild(modal);
+    linkChooser=modal;
+    lockBodyScroll();
+    wireModalInnerScroller(modal,list);
+    document.addEventListener('keydown',chooserKeydown,true);
+    try{(list.querySelector('button')||crp).focus({preventScroll:true});}catch{}
+  }
+  // Link SRP / Unlink SRP button.
+  function onLinkButton(){
+    if(!state.project){showLinkNotice('Open a song first, then tap Link SRP.',{sticky:true});return;}
+    if(persistentLinkForSrpProject(state.project,false)){
+      const name=unlinkCurrentCrpSrp();
+      showLinkNotice(`“${String(state.project?.name||'').trim()||'This song'}” is no longer linked${name?` to “${name}”`:''}. Its lyrics and chords stay as they are.`);
+      return;
     }
-    if(forceCreate){
-      const all=links();
-      const rec={srpProjectId:linked.id,srpName:linked.name||payload.name||'Song Rider project',linkedAt:Date.now()};
-      all[payload.crpProjectId]=rec;
-      setLinks(all);
-      writeLinkSession(payload.crpProjectId,linked.id);
-      setActiveLinkId(payload.crpProjectId);
-      writeJson(HANDOFF_KEY,{payload,rec,ts:Date.now()});
-      // Seed the shared transport from the just-linked song so both apps start from the same values.
-      publishSrpTransport();
-      ensureLinkedPlaybackBridge();
-    }
+    // The project open in Chord Rider / Baby DAW is linked straight away, unless it already
+    // belongs to another song: then the user picks (so a link is never moved by surprise).
+    const openId=openCrpProjectId();
+    if(openId&&!otherSongLinkedTo(openId)){runLink(openId);return;}
+    openLinkChooser();
+  }
+  // Background refresh of the open song from its saved CRP partner (storage event, focus,
+  // startup). Linking itself only happens from the button (linkToCrpProject).
+  function syncFromHandoff(){
+    const savedRec=persistentLinkForSrpProject(state.project,false);
+    if(!savedRec||!state.project||String(savedRec.srpProjectId||'')!==String(state.project.id||'')){refreshCrpLinkUi();return null;}
+    const payload=crpPayloadFor(savedRec.crpProjectId);
+    if(!payload?.crpProjectId)return null;
+    const linked=importCrpStructure(payload,false);
     refreshCrpLinkUi();
     return linked;
   }
@@ -17080,7 +17254,7 @@ function applyKeyboardDockLayout(){
   // ---------------------------------------------------------------- wiring
   function reconcileLinkedWorkspace(){
     activateLinkForCurrentSrpProject();
-    syncFromHandoff(false);
+    syncFromHandoff();
     applyCrpMetaToSrp();
     if(lyricsOverlay){goToSection('Full');setAutoScroll(false);}
   }
@@ -17088,24 +17262,19 @@ function applyKeyboardDockLayout(){
   document.getElementById('crpSrpLinkBtn')?.addEventListener('click',(e)=>{
     e.preventDefault();
     e.stopPropagation();
-    const b=e.currentTarget;
-    b.disabled=true;
-    if(persistentLinkForSrpProject(state.project,false)){
-      b.textContent='Unlinking…';
-      unlinkCurrentCrpSrp();
-      return;
+    try{onLinkButton();}
+    catch(err){
+      console.error('Link SRP failed',err);
+      refreshCrpLinkUi();
+      showLinkNotice('Link SRP failed ('+(err?.message||err)+'). Tap it to try again.',{sticky:true});
     }
-    setCrpLinkButtonContent(b,{busy:true});
-    const st=document.getElementById('crpSrpLinkStatus');
-    if(st)st.textContent='Linking CRP project…';
-    setTimeout(()=>syncFromHandoff(true),0);
   });
   if(transportChannel)transportChannel.onmessage=()=>applyCrpMetaToSrp();
   window.addEventListener('storage',e=>{
     const k=String(e.key||'');
     if(k===TRANSPORT_KEY||k.startsWith(CANONICAL_PREFIX)||k===LEGACY_LIVE_META_KEY||k.startsWith(LEGACY_UNIFIED_PREFIX)||k===LEGACY_HARD_SYNC_KEY||k.startsWith(SHARED_META_PREFIX)){applyCrpMetaToSrp();return;}
     if(k===LINKS_KEY||k===LINK_SESSION_KEY){refreshCrpLinkUi();renderSheetTitleBar();return;}
-    if(k==='crp-projects'||k===HANDOFF_KEY)syncFromHandoff(false); // CRP rows may have changed
+    if(k==='crp-projects'||k===HANDOFF_KEY)syncFromHandoff(); // CRP rows may have changed
   });
   const onAppReady=()=>{
     reconcileLinkedWorkspace();

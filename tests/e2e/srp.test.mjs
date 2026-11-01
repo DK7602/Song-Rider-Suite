@@ -83,6 +83,25 @@ const selectSong = (page, name) => page.evaluate((n) => {
   s.dispatchEvent(new Event('change'));
 }, name);
 const blur = (page) => page.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur());
+// Calls the API from a signed-in page (the session cookie is Secure: only the browser sends it here).
+const api = (page, path, body) => page.evaluate(async ({ path, body }) => {
+  const r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  return { status: r.status, data: await r.json().catch(() => null) };
+}, { path, body });
+const crpRows = (...lines) => lines.map((l) => l.split(' ').map((value) => ({ type: 'chord', value })));
+// What a user does on a phone: open Chord Rider (signed in, it pulls the account's projects),
+// then go to Song Rider through the suite navigation.
+async function chordRiderThenSongRider(page) {
+  await page.goto(`${BASE}/index.html?workspace=chord-rider`, { waitUntil: 'load' });
+  await page.waitForFunction(() => !!window.CRPCore, null, { timeout: 20000 });
+  await sleep(2500);
+  await page.tap('#songRiderModeBtn');
+  await page.waitForURL(/song-rider/);
+  await page.waitForFunction(() => window.__SRP_INIT_DONE === true, null, { timeout: 20000 });
+  await sleep(1500);
+}
+const linkNotice = (page) => page.evaluate(() => { const b = document.getElementById('srpLinkNotice'); return b && !b.hidden ? b.innerText : ''; });
+const chooserRows = (page) => page.evaluate(() => Array.from(document.querySelectorAll('#srpLinkChooser .srpLinkChoice')).map((r) => r.innerText.replace(/\s+/g, ' ').trim()));
 
 console.log(`SRP e2e tests against ${BASE}`);
 const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
@@ -270,6 +289,106 @@ await test('CRP link merges chords into PAGE 1, keeps every card and lyric, and 
   await page.click('#undoBtn'); await sleep(300);
   for (let i = 0; i < 6 && (await page1Cards(page)).some((c) => c[1]); i++) { await page.click('#undoBtn'); await sleep(300); }
   assert.ok((await page1Cards(page)).every((c) => !c[1]), 'link import could not be undone');
+  noErrors(page);
+  await ctx.close();
+});
+
+await test('Link SRP signed in on a phone, coming from an empty Chord Rider: explains, lists the projects, links, follows into CRP, unlinks', async () => {
+  const user = await newUser();
+  const songId = `song-${uniq()}`;
+  const song = {
+    id: songId, name: '1) Don 2026 (Dec 15)', createdAt: 1000, updatedAt: 1000, notesUpdatedAt: 1000,
+    fullText: '__________\n\nverse one\n\nverse two\n', enabledSections: ['PAGE 1'],
+    sections: { 'PAGE 1': [{ id: 'c1', notes: Array(8).fill(''), lyrics: 'verse one', beats: ['', '', '', ''] }, { id: 'c2', notes: Array(8).fill(''), lyrics: 'verse two', beats: ['', '', '', ''] }] }
+  };
+  const A = await device(browser, user);
+  await A.page.goto(`${BASE}/song-rider/manifest.webmanifest`);
+  assert.equal((await api(A.page, '/api/srp/projects', { project: { project_id: songId, name: song.name, data: song, updated_at: 1000 }, baseRev: 0 })).status, 200);
+
+  const P = await device(browser, user, { phone: true });
+  await P.page.route('**/index.html?playbackBridge=1', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html>' }));
+  // 1. No Chord Rider projects at all: the tap explains what to do and offers Chord Rider.
+  await chordRiderThenSongRider(P.page);
+  assert.deepEqual(await names(P.page), [song.name], 'songs did not come down from the cloud');
+  await P.page.tap('#crpSrpLinkBtn'); await sleep(600);
+  assert.ok(await P.page.isVisible('#srpLinkChooser'), 'Link SRP did nothing (no CRP projects)');
+  assert.match(await P.page.innerText('#srpLinkChooser'), /no Chord Rider \/ Baby DAW projects on this device yet/);
+  assert.ok(await P.page.isVisible('#srpLinkChooser button:has-text("Open Chord Rider")'));
+  await P.page.tap('#srpLinkChooser button:has-text("Cancel")'); await sleep(300);
+  assert.ok(!(await P.page.isVisible('#srpLinkChooser')));
+  assert.match(await P.page.textContent('#crpSrpLinkBtn'), /^Link SRP/);
+
+  // 2. Projects in the account, none open in Chord Rider: the tap lists them; picking one links.
+  const beatId = `crp-beat-${uniq()}`; // project ids are unique across accounts
+  for (const [id, name, rows, t] of [[`crp-old-${uniq()}`, 'Old Beat', crpRows('C F'), 2000], [beatId, 'Beat One', crpRows('G D Em C', 'Am'), 3000]]) {
+    assert.equal((await api(A.page, '/api/projects', { project: { id, name, rows, bpm: 100, beats: 4, key: 'G', updatedAt: t }, baseRev: 0 })).status, 200);
+  }
+  await chordRiderThenSongRider(P.page);
+  assert.equal(await P.page.evaluate(() => localStorage.getItem('crp-active-project-id')), null, 'Chord Rider should have nothing open');
+  await P.page.tap('#crpSrpLinkBtn'); await sleep(600);
+  assert.ok(await P.page.isVisible('#srpLinkChooser'), 'Link SRP did nothing (CRP projects exist, none open)');
+  const rows = await chooserRows(P.page);
+  assert.deepEqual(rows.map((r) => r.split(' ').slice(0, 2).join(' ')), ['Beat One', 'Old Beat'], JSON.stringify(rows));
+  await P.page.locator('#srpLinkChooser .srpLinkChoice', { hasText: 'Beat One' }).tap(); await sleep(800);
+  assert.ok(!(await P.page.isVisible('#srpLinkChooser')));
+  assert.match(await P.page.textContent('#crpSrpLinkBtn'), /Unlink SRP.*Beat One/);
+  assert.match(await linkNotice(P.page), /linked to the Chord Rider \/ Baby DAW project “Beat One”/);
+  assert.deepEqual(await page1Cards(P.page), [['verse one', 'G D Em C'], ['verse two', 'Am']]);
+  assert.equal(await P.page.evaluate((id) => JSON.parse(localStorage.getItem('crp-srp-links-v1'))[id].srpProjectId, beatId), songId);
+
+  // 3. Chord Rider / Baby DAW now opens the linked project, and the pair stays linked on return.
+  await P.page.tap('a.workspace-mode-btn[href*="workspace=chord-rider"]');
+  await P.page.waitForURL(/workspace=chord-rider/);
+  await P.page.waitForFunction(() => !!window.CRPCore, null, { timeout: 20000 });
+  await sleep(1500);
+  assert.equal(await P.page.inputValue('#projectName'), 'Beat One', 'Chord Rider did not open the linked project');
+  await P.page.tap('#songRiderModeBtn');
+  await P.page.waitForURL(/song-rider/);
+  await P.page.waitForFunction(() => window.__SRP_INIT_DONE === true, null, { timeout: 20000 });
+  await sleep(1500);
+  assert.match(await P.page.textContent('#crpSrpLinkBtn'), /Unlink SRP.*Beat One/);
+
+  // 4. Tapping again unlinks, with feedback; the chords stay.
+  await P.page.tap('#crpSrpLinkBtn'); await sleep(600);
+  assert.match(await P.page.textContent('#crpSrpLinkBtn'), /^Link SRP/);
+  assert.match(await linkNotice(P.page), /no longer linked to “Beat One”/);
+  assert.deepEqual(await P.page.evaluate(() => localStorage.getItem('crp-srp-links-v1')), '{}');
+  assert.deepEqual((await page1Cards(P.page))[0], ['verse one', 'G D Em C']);
+  await sleep(3500);
+  const row = (await server(P.page)).find((r) => r.project_id === songId);
+  assert.match(row.data.fullText, /verse one/);
+  noErrors(A.page, P.page);
+  await A.ctx.close(); await P.ctx.close();
+});
+
+await test('Link SRP asks before moving a link: the CRP project open now belongs to another song', async () => {
+  const card = (id, lyrics) => ({ id, notes: Array(8).fill(''), lyrics, beats: ['', '', '', ''] });
+  const songs = [
+    { id: 'song-a', name: 'Song A', createdAt: 1, updatedAt: 1, fullText: '__________\n\na lyric\n', sections: { 'PAGE 1': [card('a1', 'a lyric')] }, enabledSections: ['PAGE 1'], linkedCrpProjectId: 'crp-x' },
+    { id: 'song-b', name: 'Song B', createdAt: 2, updatedAt: 2, fullText: '__________\n\nb lyric\n', sections: { 'PAGE 1': [card('b1', 'b lyric')] }, enabledSections: ['PAGE 1'] }
+  ];
+  const { ctx, page } = await device(browser, null, {
+    init: ({ songs, rows }) => {
+      if (sessionStorage.getItem('seeded')) return; sessionStorage.setItem('seeded', '1');
+      localStorage.setItem('songrider_v25_projects::guest', JSON.stringify(songs));
+      localStorage.setItem('songrider_v25_currentProjectId::guest', 'song-b');
+      localStorage.setItem('crp-projects', JSON.stringify([{ id: 'crp-x', name: 'Beat X', bpm: 90, beats: 4, key: 'C', rows, updatedAt: 5 }]));
+      localStorage.setItem('crp-active-project-id', 'crp-x');
+      localStorage.setItem('crp-srp-links-v1', JSON.stringify({ 'crp-x': { srpProjectId: 'song-a', srpName: 'Song A', linkedAt: 1 } }));
+    }, initArg: { songs, rows: crpRows('C G') }
+  });
+  await page.route('**/index.html?playbackBridge=1', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html>' }));
+  await open(page);
+  assert.match(await page.textContent('#crpSrpLinkBtn'), /^Link SRP/);
+  await page.click('#crpSrpLinkBtn'); await sleep(500);
+  assert.ok(await page.isVisible('#srpLinkChooser'), 'the link was moved without asking');
+  assert.deepEqual(await chooserRows(page), ['Beat X Open in Chord Rider · Linked to “Song A”']);
+  assert.match(await page.innerText('#srpLinkChooser'), /“Beat X”, open in Chord Rider, is linked to “Song A”; picking it moves the link/);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('crp-srp-links-v1'))['crp-x'].srpProjectId), 'song-a');
+  await page.click('#srpLinkChooser .srpLinkChoice'); await sleep(600);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('crp-srp-links-v1'))['crp-x'].srpProjectId), 'song-b');
+  assert.match(await linkNotice(page), /“Song A” is no longer linked to it/);
+  assert.equal((await stored(page)).find((p) => p.id === 'song-a').linkedCrpProjectId, '');
   noErrors(page);
   await ctx.close();
 });
