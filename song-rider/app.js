@@ -2379,7 +2379,7 @@ function wireLibraryAndCloudEvents(){
       flushLibrary();
       return;
     }
-    const merged = mergeStoredLibrary(e.newValue, new Set(), new Set());
+    const merged = mergeStoredLibrary(e.newValue, new Set(library.ownSinceWrite), new Set());
     library.lastRaw = e.newValue;
     if(merged.changed) refreshAfterLibraryChange(merged);
   });
@@ -2651,6 +2651,7 @@ const library = {
   pending: new Set(),     // ids changed in memory since the last write
   bump: new Set(),        // pending ids whose change may count as a content edit
   removed: new Set(),     // ids deleted in memory since the last write
+  ownSinceWrite: new Set(), // ids whose in-memory copy wins over another tab's write until we write
   lastRaw: null,          // the exact string we last read/wrote, to spot other tabs' writes
   writeFailed: false,
   legacyNoteKeys: [],     // old notes backup keys to drop after the next good write
@@ -2715,6 +2716,7 @@ function ensureLibrary(){
   library.pending.clear();
   library.bump.clear();
   library.removed.clear();
+  library.ownSinceWrite.clear();
   library.legacyNoteKeys = [];
   library.writeFailed = false;
   library.syncMetaFallback = null;
@@ -2783,6 +2785,7 @@ function replaceProjectFromCloud(remote){
   lib.pending.delete(remote.id);
   lib.bump.delete(remote.id);
   lib.removed.delete(remote.id);
+  lib.ownSinceWrite.add(remote.id);
   library.forceWrite = true;
   rememberWritten(remote);
   scheduleLibrarySave();
@@ -2888,8 +2891,9 @@ function flushLibrary(opts={}){
     lib.written.set(id, json);
     lib.content.set(id, contentSignature(p));
     changedIds.push(id);
+    lib.ownSinceWrite.add(id);
   }
-  const keep = new Set([...lib.pending]);
+  const keep = new Set(lib.ownSinceWrite);
   const dropped = new Set([...lib.removed]);
   lib.pending.clear();
   lib.bump.clear();
@@ -2909,6 +2913,7 @@ function flushLibrary(opts={}){
     localStorage.setItem(key, text);
     lib.lastRaw = text;
     lib.writeFailed = false;
+    lib.ownSinceWrite.clear();
     reportStorageError(null);
     if(lib.legacyNoteKeys.length){
       for(const k of lib.legacyNoteKeys){ try{ localStorage.removeItem(k); }catch{} }
