@@ -533,7 +533,8 @@
     const data=chord?.data||core.snapshot();
     const cards=(data?.rows||[]).flat().filter(Boolean);
     const key=harmonyKey(data,cards);
-    if(!key)return {allowedPcs:[],label:'Song key: set a key/chord first'};
+    // No key yet: tune to the nearest note (all 12) rather than not at all.
+    if(!key)return {allowedPcs:[0,1,2,3,4,5,6,7,8,9,10,11],label:'No song key yet: tuning to the nearest note (set a key to tune to its scale)'};
     const ints=key.minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
     const allowedPcs=ints.map(i=>(key.rootIndex+i)%12);
     return {allowedPcs,label:`Song key: ${keyTonicLabel(key)} ${key.minor?'minor':'major'}`};
@@ -547,7 +548,7 @@
     if(!ctx?.audioWorklet||typeof AudioWorkletNode==='undefined')return Promise.resolve(false);
     let promise=vocalWorkletLoads.get(ctx);
     if(!promise){
-      promise=ctx.audioWorklet.addModule('./vocal-autotune-worklet.js?v=3.4.0').then(()=>{vocalWorkletReady.add(ctx);return true;},err=>{console.warn('Vocal worklet unavailable',err);return false;});
+      promise=ctx.audioWorklet.addModule('./vocal-autotune-worklet.js?v=3.5.0').then(()=>{vocalWorkletReady.add(ctx);return true;},err=>{console.warn('Vocal worklet unavailable',err);return false;});
       vocalWorkletLoads.set(ctx,promise);
     }
     return promise;
@@ -555,8 +556,11 @@
   function makeAutotuneNode(ctx,amount){
     if(!(amount>0)||!vocalWorkletReady.has(ctx))return null;
     try{
-      const node=new AudioWorkletNode(ctx,'crp-vocal-autotune',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1],processorOptions:{minDelay:AUTOTUNE_MIN_DELAY,delayRange:AUTOTUNE_DELAY_RANGE}});
-      node.port.postMessage({amount,allowedPcs:vocalAutotuneScale().allowedPcs||[]});
+      // The amount and scale go in at construction: an offline render (WAV export) can finish before a port
+      // message reaches the processor, which left exports untuned. Later changes still go by message.
+      const allowedPcs=vocalAutotuneScale().allowedPcs||[];
+      const node=new AudioWorkletNode(ctx,'crp-vocal-autotune',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1],processorOptions:{minDelay:AUTOTUNE_MIN_DELAY,delayRange:AUTOTUNE_DELAY_RANGE,amount,allowedPcs}});
+      node.port.postMessage({amount,allowedPcs});
       return node;
     }catch(err){console.warn('Could not create Auto-Tune node',err);return null;}
   }
@@ -1952,45 +1956,117 @@
   }
   function forgetTakeBuffer(takeId){vocalBufferCache.delete(String(takeId));vocalBuffers.delete(String(takeId));}
   function preloadVocalBuffers(p){return Promise.all(voxTrackEvents(p).map(e=>vocalBufferForTake(e.takeId,e.sourcePartId)));}
+  // ---- Vocal effects ------------------------------------------------------------------------------
+  // EQ presets, in the order a vocal engineer would set them: a low cut for rumble and breath pops, a low-mid
+  // band (mud or warmth), presence and air.
+  const VOCAL_EQ={
+    flat:{hp:70,low:['peaking',300,1,0],pres:[3200,.9,0],air:[10000,0]},
+    clear:{hp:100,low:['peaking',300,1,-2],pres:[3200,.9,2.5],air:[10000,2]},
+    warm:{hp:80,low:['lowshelf',220,.7,2.5],pres:[3000,.9,-1],air:[9000,-1.5]},
+    bright:{hp:110,low:['peaking',280,1,-2.5],pres:[4500,.8,2.5],air:[8000,4]},
+  };
+  // Compression presets. The browser's compressor adds its own make-up gain (+4 to +7 dB here); `makeup` brings
+  // each preset back to the uncompressed loudness (measured on a sung vowel at -24 dBFS RMS, a typical recorded
+  // level), so switching presets changes the dynamics, not the volume.
+  const VOCAL_COMP={
+    off:{threshold:0,ratio:1,knee:0,attack:.01,release:.15,makeup:1},
+    light:{threshold:-16,ratio:2,knee:6,attack:.01,release:.16,makeup:.635},
+    medium:{threshold:-22,ratio:3.5,knee:6,attack:.005,release:.13,makeup:.463},
+    heavy:{threshold:-30,ratio:6,knee:6,attack:.003,release:.1,makeup:.521},
+  };
+  // Reverb rooms: decay time (RT60), pre-delay, and how fast the highs die away. The stored setting is the
+  // send level (Small .12, Medium .22, Large .34), which also picks the room.
+  const VOCAL_ROOMS={small:{rt:.7,pre:.008,hiStart:9000,hiEnd:3200},medium:{rt:1.4,pre:.015,hiStart:8500,hiEnd:2600},large:{rt:2.4,pre:.024,hiStart:8000,hiEnd:2000}};
+  // Send level per room so each reverb sits at about the old level (calibrated against the previous reverb).
+  const REVERB_WET_SCALE={small:.57,medium:.51,large:.38};
+  const roomForReverb=v=>!(v>0)?null:v<.17?'small':v<.28?'medium':'large';
   const reverbImpulses=new WeakMap();
-  // One deterministic 1.25 s impulse per context, shared by every reverb.
-  function reverbImpulse(ctx){
-    let buffer=reverbImpulses.get(ctx);if(buffer)return buffer;
-    const length=Math.floor(ctx.sampleRate*1.25);buffer=ctx.createBuffer(2,length,ctx.sampleRate);
-    let seed=0x2f6b1d;const noise=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/2147483648-1;};
-    for(let c=0;c<2;c++){const d=buffer.getChannelData(c);for(let i=0;i<length;i++)d[i]=noise()*Math.pow(1-i/length,2.4);}
-    reverbImpulses.set(ctx,buffer);return buffer;
+  // A room impulse per context and size, built once: early reflections, then a decaying, darkening tail, with
+  // left and right different so the reverb is wide. Deterministic, so playback and export sound the same.
+  function reverbImpulse(ctx,size='small'){
+    let byCtx=reverbImpulses.get(ctx);if(!byCtx)reverbImpulses.set(ctx,byCtx=new Map());
+    let buffer=byCtx.get(size);if(buffer)return buffer;
+    const R=VOCAL_ROOMS[size]||VOCAL_ROOMS.small,sr=ctx.sampleRate,length=Math.floor(sr*(R.pre+R.rt*1.1));
+    buffer=ctx.createBuffer(2,length,sr);
+    let seed=0x2f6b1d+size.length*7919;const noise=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/2147483648-1;};
+    const pre=Math.floor(R.pre*sr),decay=6.91/(R.rt*sr),T=length-pre;
+    for(let c=0;c<2;c++){
+      const d=buffer.getChannelData(c);
+      // Early reflections: a few distinct echoes in the first ~60 ms, different on each side.
+      for(let k=0;k<7;k++){const at=pre+Math.floor((.004+.055*((k+1)/7)**1.3+.004*noise())*sr);if(at<length)d[at]+=(.55-.06*k)*(k%2?-1:1)*(c?.9:1);}
+      // Late tail: noise, exponential decay, a one-pole low-pass that closes over time, and a 20 ms fade-in.
+      let lp=0;
+      for(let i=0;i<T;i++){
+        const t=i/T,fc=R.hiStart*Math.pow(R.hiEnd/R.hiStart,t),a=1-Math.exp(-2*Math.PI*fc/sr);
+        lp+=a*(noise()-lp);
+        d[pre+i]+=lp*Math.exp(-decay*i)*Math.min(1,i/(.02*sr))*.9;
+      }
+      // Fade the last 5% to true zero.
+      const f0=Math.floor(length*.95);for(let i=f0;i<length;i++)d[i]*=(length-i)/(length-f0);
+    }
+    byCtx.set(size,buffer);return buffer;
   }
-  // Vocal FX chain: input → EQ → compressor → [Auto-Tune] → dry + reverb + delay → out.
-  // Playback builds one per vocal part (plus one per clip that has its own FX)
-  // and reuses it for every clip and loop; take preview and export use the same.
+  // Delay: Slap is one quick echo; 1/8 and 1/4 follow the song tempo, with repeats that darken as they fade.
+  function vocalDelaySpec(v){
+    v=Number(v)||0;if(!(v>0))return null;
+    const beat=60/(Number(songBpm())||92);
+    if(v<.14)return {time:.095,feedback:0,wet:.2};
+    if(v<.23)return {time:Math.min(1.9,beat/2),feedback:.32,wet:.2};
+    return {time:Math.min(1.9,beat),feedback:.3,wet:.18};
+  }
+  // Vocal FX chain: input → [Auto-Tune] → low cut → low-mid → presence → air → compressor → make-up → post;
+  // post → out (dry), post → filtered reverb send → room → out, post → tempo delay (with filtered feedback) → out.
+  // Playback builds one per vocal part (plus one per clip that has its own FX) and reuses it for every clip and
+  // loop; take preview and export use the same.
   function buildVocalChain(ctx,destination,fx){
-    const input=ctx.createGain(),eq=ctx.createBiquadFilter(),comp=ctx.createDynamicsCompressor(),post=ctx.createGain(),rev=ctx.createConvolver(),wet=ctx.createGain(),delay=ctx.createDelay(1),delayGain=ctx.createGain(),out=ctx.createGain();
-    rev.buffer=reverbImpulse(ctx);comp.attack.value=.008;comp.release.value=.12;
-    input.connect(eq);eq.connect(comp);comp.connect(post);
-    post.connect(out);post.connect(rev);rev.connect(wet);wet.connect(out);post.connect(delay);delay.connect(delayGain);delayGain.connect(out);out.connect(destination);
-    const chain={ctx,input,eq,comp,post,rev,wet,delay,delayGain,out,tune:null,latency:0};
+    const bq=(type,f,q,g)=>{const b=ctx.createBiquadFilter();b.type=type;b.frequency.value=f;if(q!=null)b.Q.value=q;if(g!=null)b.gain.value=g;return b;};
+    const chain={ctx,input:ctx.createGain(),hp:bq('highpass',80,.7),low:bq('peaking',300,1,0),pres:bq('peaking',3200,.9,0),air:bq('highshelf',10000,null,0),
+      comp:ctx.createDynamicsCompressor(),makeup:ctx.createGain(),post:ctx.createGain(),
+      revHp:bq('highpass',180,.7),revLp:bq('lowpass',8500,.7),rev:null,revSize:null,wet:ctx.createGain(),
+      delay:ctx.createDelay(2),fb:ctx.createGain(),fbHp:bq('highpass',250,.7),fbLp:bq('lowpass',4500,.7),delayGain:ctx.createGain(),
+      out:ctx.createGain(),tune:null,latency:0};
+    const c=chain;
+    c.input.connect(c.hp);c.hp.connect(c.low);c.low.connect(c.pres);c.pres.connect(c.air);c.air.connect(c.comp);c.comp.connect(c.makeup);c.makeup.connect(c.post);
+    c.post.connect(c.out);
+    c.post.connect(c.revHp);c.revHp.connect(c.revLp);c.wet.connect(c.out);
+    c.post.connect(c.delay);c.delay.connect(c.delayGain);c.delayGain.connect(c.out);
+    c.delay.connect(c.fb);c.fb.connect(c.fbHp);c.fbHp.connect(c.fbLp);c.fbLp.connect(c.delay);c.fb.gain.value=0;
+    c.out.connect(destination);
     setVocalChainFx(chain,fx,null,true);
     if(fx.autotune>0)insertChainTune(chain,fx.autotune);
     return chain;
   }
+  // Auto-Tune goes first, on the raw voice, where pitch detection is most reliable.
   function insertChainTune(chain,amount){
     const tune=makeAutotuneNode(chain.ctx,amount);if(!tune)return false;
-    chain.comp.disconnect();chain.comp.connect(tune);tune.connect(chain.post);
+    chain.input.disconnect();chain.input.connect(tune);tune.connect(chain.hp);
     chain.tune=tune;chain.latency=AUTOTUNE_LATENCY_SAMPLES/chain.ctx.sampleRate;
     return true;
   }
+  function setRoom(chain,size){
+    if(chain.revSize===size)return;
+    const old=chain.rev;
+    if(size){const rev=chain.ctx.createConvolver();rev.buffer=reverbImpulse(chain.ctx,size);chain.revLp.connect(rev);rev.connect(chain.wet);chain.rev=rev;}
+    else chain.rev=null;
+    if(old){try{chain.revLp.disconnect(old);}catch{}const o=old;setTimeout(()=>{try{o.disconnect();}catch{}},(VOCAL_ROOMS[chain.revSize]?.rt||1)*1200);}
+    chain.revSize=size;
+  }
   function setVocalChainFx(chain,fx,scale=null,immediate=false){
     const now=chain.ctx.currentTime,set=(param,value,tc=.02)=>{if(immediate)param.value=value;else param.setTargetAtTime(value,now,tc);};
-    const c=fx.comp;
-    chain.eq.type=fx.eq==='warm'?'lowshelf':fx.eq==='bright'?'highshelf':'peaking';
-    set(chain.eq.frequency,fx.eq==='warm'?180:fx.eq==='bright'?4500:2800);
-    set(chain.eq.gain,fx.eq==='flat'?0:fx.eq==='warm'?2:fx.eq==='bright'?2.5:1.5);
-    set(chain.comp.threshold,c==='off'?0:c==='light'?-12:c==='heavy'?-24:-18);
-    set(chain.comp.ratio,c==='off'?1:c==='light'?2:c==='heavy'?6:3.5);
-    set(chain.wet.gain,Number(fx.reverb)||0,.03);
-    set(chain.delay.delayTime,Number(fx.delay)||0,.03);
-    set(chain.delayGain.gain,fx.delay?.22:0,.03);
+    const E=VOCAL_EQ[fx.eq]||VOCAL_EQ.clear,C=VOCAL_COMP[fx.comp]||VOCAL_COMP.medium;
+    set(chain.hp.frequency,E.hp);
+    chain.low.type=E.low[0];set(chain.low.frequency,E.low[1]);set(chain.low.Q,E.low[2]);set(chain.low.gain,E.low[3]);
+    set(chain.pres.frequency,E.pres[0]);set(chain.pres.Q,E.pres[1]);set(chain.pres.gain,E.pres[2]);
+    set(chain.air.frequency,E.air[0]);set(chain.air.gain,E.air[1]);
+    set(chain.comp.threshold,C.threshold);set(chain.comp.ratio,C.ratio);set(chain.comp.knee,C.knee);set(chain.comp.attack,C.attack);set(chain.comp.release,C.release);
+    set(chain.makeup.gain,C.makeup);
+    const reverb=Number(fx.reverb)||0,size=roomForReverb(reverb);
+    if(size)setRoom(chain,size);
+    set(chain.wet.gain,size?reverb*REVERB_WET_SCALE[size]:0,.03);
+    const D=vocalDelaySpec(fx.delay);
+    if(D)set(chain.delay.delayTime,D.time,immediate?.02:.05);
+    set(chain.fb.gain,D?D.feedback:0,.03);
+    set(chain.delayGain.gain,D?D.wet:0,.03);
     chain.tune?.port.postMessage({amount:fx.autotune,allowedPcs:(scale||vocalAutotuneScale()).allowedPcs||[]});
   }
   function setVocalChainLevel(chain,level,immediate=false){
@@ -1999,7 +2075,7 @@
   }
   function disconnectVocalChain(chain){
     if(!chain)return;
-    for(const n of [chain.input,chain.eq,chain.comp,chain.tune,chain.post,chain.rev,chain.wet,chain.delay,chain.delayGain,chain.out])try{n?.disconnect();}catch{}
+    for(const n of [chain.input,chain.tune,chain.hp,chain.low,chain.pres,chain.air,chain.comp,chain.makeup,chain.post,chain.revHp,chain.revLp,chain.rev,chain.wet,chain.delay,chain.fb,chain.fbHp,chain.fbLp,chain.delayGain,chain.out])try{n?.disconnect();}catch{}
     chain.tune?.port.postMessage({type:'release'});
   }
   function vocalChainKey(p,e){return e?.fx?`${p.id}:${e.id}`:String(p.id);}

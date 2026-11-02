@@ -5,7 +5,9 @@
 // tests do not need the network.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:8787';
@@ -238,7 +240,48 @@ async function offlineExportLength(page) {
   assert.ok(peak > 30, 'the mix is not silent');
 }
 
-browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
+// The fake microphone "sings" a vowel 40 cents sharp of A3 (A3 = 220 Hz), so Auto-Tune has something to correct.
+const FAKE_MIC = join(tmpdir(), `srs-offkey-vowel-${process.pid}.wav`);
+{
+  const sr = 48000, n = sr * 3, f0 = 220 * 2 ** (40 / 1200), pcm = Buffer.alloc(44 + n * 2);
+  const formant = f => [[730, 90, 1], [1090, 110, .5], [2440, 160, .25]].reduce((a, [fc, bw, g]) => a + g / (1 + ((f - fc) / bw) ** 2), .02);
+  const amps = []; for (let k = 1; k * f0 < 9000; k++) amps.push(formant(k * f0) / k);
+  pcm.write('RIFF', 0); pcm.writeUInt32LE(36 + n * 2, 4); pcm.write('WAVEfmt ', 8); pcm.writeUInt32LE(16, 16); pcm.writeUInt16LE(1, 20); pcm.writeUInt16LE(1, 22);
+  pcm.writeUInt32LE(sr, 24); pcm.writeUInt32LE(sr * 2, 28); pcm.writeUInt16LE(2, 32); pcm.writeUInt16LE(16, 34); pcm.write('data', 36); pcm.writeUInt32LE(n * 2, 40);
+  const norm = amps.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < n; i++) { let v = 0; for (let k = 0; k < amps.length; k++) v += amps[k] * Math.sin(2 * Math.PI * (k + 1) * f0 * i / sr); pcm.writeInt16LE(Math.round(v / norm * .5 * 32767), 44 + i * 2); }
+  writeFileSync(FAKE_MIC, pcm);
+}
+// Records the (off-key) fake mic into a vocal part, exports only that part at the given Auto-Tune amount and
+// returns the pitch of the exported vocal in cents relative to A3.
+async function exportedVocalCents(page, amount) {
+  const wav = await (async () => {
+    await page.evaluate(([amount]) => { const s = document.getElementById('vocalFxAutotune'); s.value = String(amount); s.dispatchEvent(new Event('input', { bubbles: true })); s.dispatchEvent(new Event('change', { bubbles: true })); }, [amount]);
+    await page.evaluate(() => window.CRPParts.openAudioExport());
+    await page.evaluate(() => { for (const b of document.querySelectorAll('#audioExportModal [data-audio-part]')) { const vocal = window.CRPParts.capture().items.find(p => p.id === b.dataset.audioPart)?.type === 'vocal'; b.checked = vocal; } const d = document.getElementById('audioExportDrums'); if (d) d.checked = false; });
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), tap(page, '#audioExportGo')]);
+    return readFileSync(await download.path());
+  })();
+  // Loudest 0.4 s of the left channel, then autocorrelation pitch (parabolic refined).
+  const sr = wav.readUInt32LE(24), ch = wav.readUInt16LE(22), frames = (wav.length - 44) / (2 * ch), x = new Float64Array(frames);
+  for (let i = 0; i < frames; i++) x[i] = wav.readInt16LE(44 + i * 2 * ch) / 32768;
+  const W = Math.round(.4 * sr); let best = 0, at = 0;
+  for (let s = 0; s + W < frames; s += Math.round(sr / 20)) { let e = 0; for (let i = s; i < s + W; i += 4) e += x[i] * x[i]; if (e > best) { best = e; at = s; } }
+  const seg = x.subarray(at, at + W), lo = Math.floor(sr / 260), hi = Math.ceil(sr / 190), r = t => { let v = 0; for (let i = 0; i + t < seg.length; i++) v += seg[i] * seg[i + t]; return v; };
+  let bt = lo, bv = -Infinity; for (let t = lo; t <= hi; t++) { const v = r(t); if (v > bv) { bv = v; bt = t; } }
+  const a = r(bt - 1), b = r(bt), c = r(bt + 1), shift = (a - c) / (2 * (a - 2 * b + c));
+  return 1200 * Math.log2(sr / (bt + shift) / 220);
+}
+async function autotuneInExport(page) {
+  await setChords(page, ['C', 'F', 'G']); // key: C major (A is in the scale)
+  await addPart(page, 'vocal');
+  await recordTake(page, 1500);
+  const raw = await exportedVocalCents(page, 0), tuned = await exportedVocalCents(page, 100);
+  assert.ok(raw > 25 && raw < 55, `the recorded vocal should be about 40 cents sharp, measured ${raw.toFixed(1)}`);
+  assert.ok(Math.abs(tuned) < 10, `with Auto-Tune at 100% the exported vocal should be on A3, measured ${tuned.toFixed(1)} cents`);
+}
+
+browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${FAKE_MIC}`, '--autoplay-policy=no-user-gesture-required'] });
 console.log(`Baby DAW / Track Master e2e tests against ${BASE}`);
 try {
   await test('desktop: take 2 becomes the clip that plays; Use switches it', () => withPage(DESKTOP, takeTwoPlays));
@@ -249,6 +292,7 @@ try {
   await test('desktop: repeated play/stop and looping do not grow the audio graph', () => withPage(DESKTOP, playStopDoesNotGrowGraph));
   await test('desktop: offline WAV export has the song-range length', () => withPage(DESKTOP, offlineExportLength));
   await test('phone: offline WAV export has the song-range length', () => withPage(PHONE, offlineExportLength));
+  await test('desktop: Auto-Tune is applied in the exported WAV (a sharp vocal lands on the note)', () => withPage(DESKTOP, autotuneInExport));
 } finally { await browser.close(); }
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

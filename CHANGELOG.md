@@ -80,6 +80,18 @@
   its status line after the screen refreshed, and on some Android phones the microphone opened
   but no sound arrived. Dictation now records through an audio engine opened after the
   microphone, and rebuilds it once by itself if no sound comes through.
+- **Vocal Auto-Tune and effects, rebuilt.**
+  - Auto-Tune now shifts pitch in step with the voice, so it no longer sounds "phasey" (on a test vowel the
+    tone wobble dropped from 2.9 to 0.8 dB at 100% and from 4.8 to 1.8 dB at 50%). It lands within about
+    5 cents and also tunes high voices up to F6.
+  - **Auto-Tune is now in exported WAVs.** Exports used to come out untuned (a vocal 40 cents sharp stayed
+    40 cents sharp).
+  - With no song key yet, Auto-Tune tunes to the nearest note instead of doing nothing.
+  - Reverb: Small, Medium and Large are real rooms (0.7, 1.4 and 2.4 s) with pre-delay, early reflections and
+    natural high-frequency fade, instead of one noise burst at three volumes.
+  - Delay: 1/8 and 1/4 follow the song's tempo and repeat, fading and darkening; Slap is one quick echo.
+  - EQ presets now include a low cut and shape low-mids, presence and air; compression presets keep the same
+    loudness.
 - **Chords typed in capitals work.** The chord and Key boxes asked phone keyboards for all capitals, so
   "em" arrived as "EM" (not recognised) and "am7" as "AM7" (played as A major 7). They no longer force
   capitals, and a line typed entirely in capitals is read as meant (EM = Em, AM7 = Am7, BB = Bb). Track
