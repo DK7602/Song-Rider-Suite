@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.4.18';
+const CACHE = 'song-rider-suite-v3.4.19';
 // Recorded instrument audio (assets/instruments/<id>/*.mp3) never changes under the same name, so it lives in
 // its own cache that survives app updates and is served from there first. Bump this to drop the old audio.
 const INSTRUMENT_CACHE = 'srs-instruments-v2';
@@ -9,7 +9,7 @@ const ASSETS = [
   './vocal-autotune-worklet.js','./styles.css','./scale-rider.css','./crp-layout-lock.css',
   './suite-shell-lock.css','./branding-shell.css','./suite-header.css','./skins.css',
   './suite-brand.css','./suite-compact.css','./assets/brand/icon-chord-rider-pro-256.webp','./assets/brand/icon-baby-daw-256.webp',
-  './assets/brand/icon-song-rider-pro-256.webp','./instruments.js','./sound-credits.html','./vendor/soundfont-player.js','./vendor/html2canvas.min.js','./vendor/jspdf.umd.min.js',
+  './assets/brand/icon-song-rider-pro-256.webp','./instruments.js','./sound-credits.html','./manual.html','./vendor/soundfont-player.js','./vendor/html2canvas.min.js','./vendor/jspdf.umd.min.js',
   './assets/rider-blood-light-pattern.jpg','./assets/light-diamond-pattern.jpg','./assets/studio-pastel-pattern.jpg','./assets/rider-dark-gold-pattern.jpg',
   './assets/rider-og-pattern.jpg','./assets/rider-blood-pattern.jpg','./assets/rider-light-og-pattern.jpg','./assets/rider-blood-light-og-pattern.jpg',
   './assets/sapphire-paisley-dark.jpg','./assets/sapphire-paisley-light.jpg','./assets/suite-header-new.webp','./assets/chord-rider-pro-wordmark-hq2.webp',

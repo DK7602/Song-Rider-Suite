@@ -154,7 +154,17 @@
       const close=authHead.querySelector('.authClose'); authHead.insertBefore(b,close||null); b.addEventListener('click',openModal);
     }
   }
-  function init(){ addModeIcons(); buildModal(); addGear(); applySkin(readSkin(),false); setTimeout(()=>syncCloudSkin({seedIfMissing:true,force:true}),0); }
+  // "📖 Manual" in the top-right corner of the Song Rider Suite banner, on every module. It is a link, not a
+  // button, so the skins' button styles leave it alone. Opens in a new tab so the song stays where it was.
+  function addManualLink(){
+    const header=$('.suite-master-header'); if(!header||$('.srs-manual-link'))return;
+    const me=document.querySelector('script[src*="skins.js"]');
+    const a=document.createElement('a'); a.className='srs-manual-link'; a.target='_blank'; a.rel='noopener';
+    a.href=new URL('manual.html',me?.src||location.href).href; a.title='Song Rider Suite manual'; a.setAttribute('aria-label','Manual');
+    a.innerHTML='<span aria-hidden="true">📖</span> Manual';
+    header.appendChild(a);
+  }
+  function init(){ addModeIcons(); buildModal(); addGear(); addManualLink(); applySkin(readSkin(),false); setTimeout(()=>syncCloudSkin({seedIfMissing:true,force:true}),0); }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true}); else init();
   window.addEventListener('storage',e=>{ if(e.key===KEY)applySkin(readSkin(),false); });
   window.addEventListener('srs-auth-changed',e=>{if(e.detail?.loggedIn)syncCloudSkin({seedIfMissing:true,force:true});});

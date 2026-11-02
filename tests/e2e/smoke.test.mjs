@@ -81,6 +81,25 @@ await test('every skin renders both apps without errors or overflow (phone + des
   assert.deepEqual(problems, []);
 });
 
+await test('the manual opens from the banner on both apps and reads well on phone and desktop', async () => {
+  for (const path of ['/index.html', '/song-rider/index.html?crpMode=1']) {
+    const { ctx, page } = await open('phone', path);
+    const href = await page.locator('.suite-master-header a.srs-manual-link').getAttribute('href');
+    assert.ok(href && new URL(href, BASE).pathname === '/manual.html', `${path}: banner link points to ${href}`);
+    await ctx.close();
+  }
+  for (const vp of Object.keys(VIEWPORTS)) {
+    const { ctx, page, errors } = await open(vp, '/manual.html');
+    assert.deepEqual(errors, []);
+    await noOverflow(page);
+    assert.match(await page.title(), /Manual/);
+    // Every contents link and in-page link lands on a section that exists.
+    const missing = await page.evaluate(() => [...document.querySelectorAll('a[href^="#"]')].map(a => a.getAttribute('href')).filter(h => h.length > 1 && !document.getElementById(h.slice(1))));
+    assert.deepEqual(missing, []);
+    await ctx.close();
+  }
+});
+
 await test('after one online visit, both apps open offline (service worker)', async () => {
   const ctx = await browser.newContext({ ...VIEWPORTS.phone });
   const page = await ctx.newPage();

@@ -11,6 +11,7 @@ A songwriting studio that runs in the browser on phone, tablet and PC, and insta
 | **Track Master** | Multitrack timeline to arrange chords, parts, drums and vocal clips, and export a mix. | `parts.js` |
 | **Song Rider Pro** | Write lyrics with chords, dictate lyrics by voice, attach recordings and notes, print/export. | `song-rider/index.html`, `song-rider/app.js` |
 
+The user manual is `manual.html` (linked from the banner by `skins.js`); update it when features change.
 Skins live in `skins.js` / `skins.css`; the shared header/shell styles are `suite-*.css` and `branding-shell.css`.
 
 ## How it runs

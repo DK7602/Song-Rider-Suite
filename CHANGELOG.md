@@ -3,6 +3,8 @@
 ## v3.4.1 — new look, Link SRP, dictation, drums
 
 ### New look
+- **A user manual** (`manual.html`): every module, step by step, with tips and troubleshooting. Open it
+  from **📖 Manual** in the corner of the Song Rider Suite banner (a round 📖 on phones). It works offline.
 - **New Song Rider Suite logo** (gold rider and sound wave in a gold ring): app icon on phones,
   tablets and computers, the splash screen when the installed app opens, a short loading screen
   the first time the suite opens in a visit, Chord Rider PDF/PNG exports and the lock-screen

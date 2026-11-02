@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#000000">
+<title>Manual · Song Rider Suite</title>
+<link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" type="image/png">
+<style>
+  :root{color-scheme:dark;--bg:#0b0f14;--panel:#121a23;--panel2:#16202b;--line:#2a3746;--text:#eef3f7;--muted:#aab7c4;--gold:#f1c655;--gold2:#d4a53a;--link:#9fd0ff;--ok:#7ee2a0;--warn:#ffd36b;}
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;scroll-padding-top:12px;}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+  main{max-width:960px;margin:0 auto;padding:22px 16px 64px;}
+  a{color:var(--link);}
+  .back{display:inline-block;margin-bottom:16px;}
+  header.top{display:flex;align-items:center;gap:14px;margin-bottom:8px;}
+  header.top img{width:64px;height:64px;flex:none;}
+  h1{margin:0;font-size:clamp(1.5rem,4.6vw,2.1rem);color:var(--gold);line-height:1.15;}
+  .lede{color:var(--muted);margin:6px 0 20px;}
+  nav.toc{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:12px 16px;margin:0 0 30px;}
+  nav.toc strong{color:var(--gold);font-size:.82rem;text-transform:uppercase;letter-spacing:.06em;}
+  nav.toc ol{margin:8px 0 0;padding-left:1.3em;columns:2;column-gap:28px;}
+  nav.toc li{break-inside:avoid;margin:2px 0;}
+  @media (max-width:600px){nav.toc ol{columns:1;}}
+  section.mod{margin:0 0 40px;}
+  h2{display:flex;align-items:center;gap:12px;margin:0 0 6px;padding-top:6px;font-size:clamp(1.3rem,3.6vw,1.65rem);color:var(--gold);border-top:1px solid var(--line);padding-top:22px;}
+  h2 img{width:42px;height:42px;flex:none;}
+  h3{margin:26px 0 6px;font-size:1.08rem;color:var(--text);}
+  h4{margin:16px 0 4px;font-size:.98rem;color:var(--gold);}
+  p{margin:6px 0 10px;}
+  ul,ol{margin:6px 0 12px;padding-left:1.35em;}
+  li{margin:3px 0;}
+  .ui{display:inline-block;padding:0 .4em;border:1px solid #4b5b6c;border-radius:6px;background:var(--panel2);color:#fff;font-weight:600;font-size:.92em;white-space:nowrap;}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:0 .3em;}
+  pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9rem;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;overflow-x:auto;line-height:1.45;}
+  .tip,.note{border-left:4px solid var(--gold2);background:var(--panel);border-radius:0 10px 10px 0;padding:8px 14px;margin:12px 0;}
+  .note{border-left-color:#5aa9e6;}
+  .tip strong:first-child,.note strong:first-child{color:var(--gold);}
+  .note strong:first-child{color:#8cc8f2;}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:10px 0 14px;}
+  .card{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:10px 14px;}
+  .card h4{margin-top:2px;}
+  table{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:.95rem;}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top;}
+  th{color:var(--gold);background:var(--panel);font-size:.85rem;text-transform:uppercase;letter-spacing:.04em;}
+  .wrap{overflow-x:auto;}
+  .top-link{font-size:.85rem;}
+  footer{color:var(--muted);font-size:.88rem;border-top:1px solid var(--line);margin-top:40px;padding-top:16px;}
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="./">← Back to Song Rider Suite</a>
+  <header class="top"><img src="assets/brand/song-rider-suite-logo-256.png" alt=""><h1>Song Rider Suite Manual</h1></header>
+  <p class="lede">Everything the suite does, in one place: write chords, build beats, add lead, bass and vocals, arrange and mix, and write lyrics with chords. Use the contents below to jump to a section.</p>
+
+  <nav class="toc" aria-label="Contents">
+    <strong>Contents</strong>
+    <ol>
+      <li><a href="#start">Getting started</a></li>
+      <li><a href="#crp">Chord Rider Pro</a></li>
+      <li><a href="#scale">Scale Rider</a></li>
+      <li><a href="#beat">Beat Maker</a></li>
+      <li><a href="#bd">Baby DAW</a></li>
+      <li><a href="#vocals">Recording vocals</a></li>
+      <li><a href="#tm">Track Master</a></li>
+      <li><a href="#export">Exporting</a></li>
+      <li><a href="#srp">Song Rider Pro</a></li>
+      <li><a href="#sounds">Sounds</a></li>
+      <li><a href="#account">Account, saving and sync</a></li>
+      <li><a href="#help">Tips and troubleshooting</a></li>
+    </ol>
+  </nav>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="start">
+    <h2><img src="assets/brand/song-rider-suite-logo-256.png" alt="">Getting started</h2>
+    <h3>What's in the suite</h3>
+    <div class="grid2">
+      <div class="card"><h4>Chord Rider Pro</h4>Write a chord progression line by line, hear it on 34 instruments, add a drum beat and export chord sheets.</div>
+      <div class="card"><h4>Baby DAW</h4>Add more parts to the same song: extra chord parts, lead and bass lines, and vocal recordings with effects and Auto-Tune.</div>
+      <div class="card"><h4>Track Master</h4>See every part on a timeline: move, trim, split and copy clips, mix the tracks and record vocals from any point.</div>
+      <div class="card"><h4>Song Rider Pro</h4>Write lyrics with chords, count syllables, find rhymes, dictate lyrics by voice and play along with AutoScroll.</div>
+    </div>
+    <p>Switch between them with the three buttons under the banner, <span class="ui">Chord Rider</span> <span class="ui">Baby DAW</span> <span class="ui">Song Rider</span>, and the gold <span class="ui">TRACK MASTER</span> bar. Chord Rider Pro, Baby DAW and Track Master all work on the same song (a <em>project</em>). Song Rider Pro has its own songs, which you can link to a project (see <a href="#srp-link">Link SRP</a>).</p>
+    <p>This manual is always one tap away: <span class="ui">📖 Manual</span> in the top-right corner of the Song Rider Suite banner (a round 📖 on phones).</p>
+
+    <h3>Install it like an app</h3>
+    <ul>
+      <li><strong>iPhone/iPad (Safari):</strong> Share → <em>Add to Home Screen</em>.</li>
+      <li><strong>Android (Chrome):</strong> ⋮ menu → <em>Install app</em> or <em>Add to Home screen</em>.</li>
+      <li><strong>Computer (Chrome/Edge):</strong> the install icon at the right of the address bar.</li>
+    </ul>
+    <p>After one visit the suite also opens without an internet connection. A few things need the internet: signing in and syncing, voice-to-text, rhymes, and the first download of each instrument sound.</p>
+
+    <h3>Your first song in two minutes</h3>
+    <ol>
+      <li>In <strong>Chord Rider Pro</strong>, type chords in <span class="ui">Enter chords, e.g. Em A7 Cmaj7 B7</span> (for example <code>C G Am F</code>) and tap <span class="ui">Build</span>.</li>
+      <li>Tap <span class="ui">▶ Play</span> to hear it. Tap <span class="ui">Beat</span> to add drums.</li>
+      <li>Tap <span class="ui">Save</span> in the Projects panel and give the song a name. From then on it saves itself.</li>
+      <li>Open <strong>Song Rider Pro</strong>, tap <span class="ui">Link SRP</span>, and write your lyrics under the chords.</li>
+    </ol>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="crp">
+    <h2><img src="assets/brand/icon-chord-rider-pro-256.webp" alt="">Chord Rider Pro</h2>
+
+    <h3>Building a progression</h3>
+    <ul>
+      <li>Type chords in the chord box and tap <span class="ui">Build</span> (or press Enter). Separate chords with spaces, commas or <code>|</code>.</li>
+      <li><strong>Build replaces the selected line</strong> with what's in the box. The box always shows the selected line, so tap a line first to edit it.</li>
+      <li><span class="ui">＋ Add blank line</span> adds a new empty line at the end and selects it.</li>
+      <li>Each line has <span class="ui">⧉</span> (duplicate, placed right below) and <span class="ui">×</span> (delete).</li>
+      <li><strong>Cards:</strong> tap a chord card to hear it, <span class="ui">×</span> on the card removes it.</li>
+      <li><strong>Move a card:</strong> on a computer, drag and drop it. On a phone, hold it for about half a second ("Card selected to move"), then tap another card (it goes before that card) or a line (it goes to the end of that line).</li>
+      <li><strong>Move a line:</strong> hold its "Line N" badge and drag it. On a computer you can drag it straight away.</li>
+      <li><strong>Keyboard:</strong> Tab to a card; Enter or Space plays it, Delete or Backspace removes it, ← → move between cards.</li>
+      <li>On phones, lines become a swipeable row ("Line 2 / 5"). Swipe left and right to move between lines.</li>
+    </ul>
+    <div class="tip"><strong>Tip:</strong> turn <span class="ui">↕</span> auto scroll off before moving cards or lines. Moving is paused while it follows playback.</div>
+
+    <h3>Chords it understands</h3>
+    <ul>
+      <li>Roots A–G (lowercase is fine) with <code>#</code> or <code>b</code>. Your spelling is kept, so Bb stays Bb.</li>
+      <li>Types: major (no suffix), <code>m</code>, <code>5</code>, <code>6</code>, <code>m6</code>, <code>7</code>, <code>maj7</code>, <code>m7</code>, <code>mMaj7</code>, <code>9</code>, <code>maj9</code>, <code>m9</code>, <code>add9</code>, <code>madd9</code>, <code>add11</code>, <code>madd11</code>, <code>sus2</code>, <code>sus4</code>, <code>7sus2</code>, <code>7sus4</code>, <code>dim</code>, <code>dim7</code>, <code>m7b5</code>, <code>aug</code>, <code>7b5</code>, <code>7#5</code>, <code>7b9</code>, <code>7#9</code>, <code>maj7#11</code>.</li>
+      <li>Also accepted: <code>min</code>, <code>-</code> (minor), <code>M7</code>, <code>ø7</code>, <code>°</code>/<code>o</code>, <code>+</code>. They're shown in the standard form (Cmin7 becomes Cm7).</li>
+      <li><strong>Slash chords</strong> like <code>G/B</code>, <code>D/F#</code>, <code>Am7/G</code> play the bass note underneath.</li>
+      <li>Anything it can't read is skipped and listed: "Skipped unrecognized: …".</li>
+    </ul>
+    <div class="tip"><strong>Tip for phones:</strong> phone keyboards often capitalise the first letter. Type the <code>m</code> of minor chords and the <code>b</code> of flats in lowercase, for example <code>Am7</code> and <code>Bb</code>, not <code>AM7</code> or <code>BB</code>.</div>
+
+    <h3>Instruments and sound</h3>
+    <ul>
+      <li><span class="ui">Piano</span> <span class="ui">Guitar</span> <span class="ui">Misc</span> each open a list of sounds. Nothing changes until you tap a sound; tap outside the list (or press Esc) to close it. The full list is in <a href="#sounds">Sounds</a>.</li>
+      <li><span class="ui">Chord</span> / <span class="ui">Note</span>: Note mode makes single-note cards (type notes like <code>E F# A B</code>), and "Chords that fit" becomes "Notes that fit".</li>
+      <li><span class="ui">Octave − +</span> moves the sound and the diagrams from −2 to +3 octaves.</li>
+      <li><span class="ui">Sustain</span> lets notes ring past their slot.</li>
+      <li><strong>Guitar only:</strong> <em>Capo</em> (none or 1–12), <em>Chord Shape</em> (Open / Easy, Triad, Barre Chord, Power Chord, Shell Voicing, Inversion, Color / Extended) and <em>Capo mode</em>:
+        <ul>
+          <li><strong>Transpose OFF:</strong> type the chord you want to <em>hear</em>, and the diagram shows the shape to finger ("Play D shape → sounds E").</li>
+          <li><strong>Transpose ON:</strong> type the shape you <em>finger</em>, and the card shows the chord that sounds.</li>
+        </ul>
+      </li>
+      <li>Piano cards show a keyboard with the notes highlighted; guitar cards show the six strings (× not played, ○ open).</li>
+    </ul>
+
+    <h3>Chords that fit and the Key box</h3>
+    <ul>
+      <li>Type a key in <span class="ui">Key</span> (for example <code>F</code>, <code>F#m</code>, <code>Bb</code> or <code>C minor</code>). If you leave it empty, the key is guessed from your first line.</li>
+      <li>The chips show the key's chords, their sevenths and some colour chords. <strong>Tap a chip to add it to the end of the selected line.</strong></li>
+    </ul>
+
+    <h3>Playing</h3>
+    <ul>
+      <li><span class="ui">▶ Play</span> / <span class="ui">■ Stop</span> plays from the selected line (on phones, the line in view), with the drums and every Baby DAW part that's switched on.</li>
+      <li><span class="ui">Repeat</span> (on by default) loops the song; off, playback stops at the end.</li>
+      <li><span class="ui">BPM</span> sets the tempo (40–240). It takes effect when you press Enter or leave the box.</li>
+      <li><span class="ui">Beats/chord</span> (1, 2, 4 or 8) sets how long each card lasts, unless you've given a card its own length in MIDI View.</li>
+      <li><span class="ui">↕</span> auto scroll follows the playing card. Scrolling or tapping turns it off.</li>
+    </ul>
+
+    <h3>MIDI View</h3>
+    <p><span class="ui">MIDI View</span> turns each line into a note grid; the button then reads <span class="ui">Diagram View</span> to go back.</p>
+    <ul>
+      <li>Tap a cell to add or remove a note; tap the chord name to hear the chord.</li>
+      <li>Drag a card's gold right edge to change its length (in quarter-beat steps).</li>
+      <li><span class="ui">⧉</span> repeats the card, <span class="ui">↺</span> returns it to its automatic notes, <span class="ui">×</span> removes it.</li>
+    </ul>
+    <div class="note"><strong>Good to know:</strong> once you drag a card's length (or press Play or Save while in MIDI View), card lengths are fixed and Beats/chord no longer changes them. Notes you edit by hand also stay as they are when you change instrument, octave or capo, until you tap <span class="ui">↺</span>.</div>
+
+    <h3>Projects and Archive</h3>
+    <ul>
+      <li><span class="ui">New</span> starts a new song; if the current one has unsaved work it asks <em>Save this project?</em></li>
+      <li><span class="ui">Save</span> saves and names the song. After the first save it saves itself shortly after every change and when you leave the page. A song you never saved is kept as a draft and comes back after a reload.</li>
+      <li><span class="ui">Rename</span> renames the open song.</li>
+      <li>The <span class="ui">Projects</span> list shows each song with <em>Open</em>, <em>Rename</em>, <em>Archive</em> and <em>Delete</em> (Delete asks first). <span class="ui">Archive</span> just moves a finished song out of the way into the Archive tab, where <em>Restore</em> brings it back.</li>
+      <li>If saving fails (device full or offline), a "Not saved" banner with <span class="ui">Retry</span> appears until it succeeds.</li>
+    </ul>
+
+    <h3>Undo and Redo</h3>
+    <p><span class="ui">↶ Undo</span> / <span class="ui">↷ Redo</span> keep 50 steps (Ctrl/⌘+Z, and Ctrl/⌘+Shift+Z or Ctrl+Y). They cover building, chips, Scale Rider, adding/duplicating/deleting/moving lines and cards, MIDI View edits, and Beat Maker's Randomize, Fill, Clear, Paste and Duplicate. They don't cover single drum-step taps or settings such as instrument, octave, capo, BPM and key. Opening a project or tapping New clears the history.</p>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="scale">
+    <h2><img src="assets/brand/icon-chord-rider-pro-256.webp" alt="">Scale Rider</h2>
+    <p>Progression ideas by genre, in your song's key. Tap <span class="ui">SCALE RIDER</span>.</p>
+    <ol>
+      <li>Choose a genre: Classical, Country, Cultural, EDM, Metal, Pop, Rap, Rock or Worship. Then choose a style (Pop has Ballad, Contemporary and Dance; Worship has Gospel, Contemporary Worship, Black Gospel, Hymns and more).</li>
+      <li>Each progression comes as <em>Core</em>, <em>7th color</em> and <em>Color</em> versions. <span class="ui">▶</span> plays it, <span class="ui">☆</span> adds it to ★ Favorites.</li>
+      <li>Tap a progression to use it. It fills the selected line if that line is empty, otherwise it adds a new line.</li>
+    </ol>
+    <ul>
+      <li><strong>With a Key set,</strong> progressions appear in that key. A major-style progression in a minor key uses the relative major, for example "C major (relative of A minor)".</li>
+      <li><strong>With no Key,</strong> all 12 keys are listed, and picking one also fills in the Key box.</li>
+      <li><span class="ui">Scales</span> lists 31 scales. Picking one shows its notes under the chips (tap them in Note mode), and it's saved with the song.</li>
+    </ul>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="beat">
+    <h2><img src="assets/brand/icon-chord-rider-pro-256.webp" alt="">Beat Maker</h2>
+    <p>Tap <span class="ui">Beat</span> (it reads "Beat (N bars)" once there's a pattern) to open 🥁 Beat Maker.</p>
+    <ul>
+      <li><strong>Top row:</strong> <em>Bars</em> (1–16), <em>Grid</em> (1/8, 1/16, 1/32, 1/64) and <em>Volume</em>.</li>
+      <li><strong>The grid:</strong> one tab per bar and 19 drum rows (Kick 1–3, Snare 1–5, Closed Hat, Open Hat, High/Mid/Low Tom, Clap, Rim, Shaker, Tambourine, Cowbell, Conga). Tap a step to turn it on or off; <span class="ui">▶</span> beside a row plays that drum.</li>
+      <li><strong>🎲 Beat Generator:</strong> pick a Style (Rock, Pop, Rap, Trap, Boom Bap, G-Funk) and Complexity (Simple, Medium, Busy). <span class="ui">🎲 Randomize Beat</span> writes a new beat into every bar; <span class="ui">🥁 Fill Last Bar</span> adds a fill to the last bar.</li>
+      <li><strong>Bottom row:</strong> <span class="ui">▶ Preview</span>, <span class="ui">Copy</span> / <span class="ui">Paste</span> / <span class="ui">Duplicate</span> / <span class="ui">Clear</span> (each lets you pick bars and drums), <span class="ui">↶ Undo</span>, and <span class="ui">OK</span> / <span class="ui">Save Beat</span>.</li>
+    </ul>
+    <p>Back in Chord Rider, the <span class="ui">Drums</span> checkbox and <span class="ui">Vol</span> slider only change how loud the drums are (or switch them off); they never change the pattern.</p>
+    <div class="note"><strong>Good to know:</strong> each step tap is saved straight away, so <span class="ui">✕</span> closes Beat Maker rather than cancelling. A coarser Grid hides finer hits but doesn't delete them.</div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="bd">
+    <h2><img src="assets/brand/icon-baby-daw-256.webp" alt="">Baby DAW</h2>
+    <p>Baby DAW adds parts to the song open in Chord Rider. The parts strip shows each part with a checkbox (include it in playback), its name (tap to edit it), ✎ rename and × delete. The slider under the strip sets the selected part's volume.</p>
+
+    <h3>Adding parts</h3>
+    <p><span class="ui">Add Part</span> offers three kinds:</p>
+    <ul>
+      <li><strong>Chord / Note:</strong> another full Chord Rider line editor (for example a second instrument playing the same or different chords).</li>
+      <li><strong>Lead / Bass:</strong> a note grid for melodies and bass lines.</li>
+      <li><strong>Vocals:</strong> for recording your voice (see <a href="#vocals">Recording vocals</a>).</li>
+    </ul>
+    <p><span class="ui">Hide Setup</span> (shown for chord parts) folds the instrument and chord controls to give you more room.</p>
+
+    <h3>Writing a lead or bass line</h3>
+    <ul>
+      <li>The grid shows one octave at a time. Choose it with <em>Grid octave</em> (1–6); notes in other octaves are kept.</li>
+      <li><em>Resolution</em>: 1/8, 1/16, 1/32 or 1/64. <em>Bars</em>: 1, 2, 4, 8, 16 or "Length of Song".</li>
+      <li>Tap an empty cell to add a note (you'll hear it), tap a note to remove it, drag a note's right edge to make it longer.</li>
+      <li>Move between bars with <span class="ui">‹</span> <span class="ui">›</span>. <em>Chords Used</em> and <em>Notes that fit</em> show the bar's chords and good notes to use.</li>
+      <li><span class="ui">Copy</span> / <span class="ui">Paste</span> / <span class="ui">Clear</span> work on chosen bars; Paste can fill several bars at once or move a phrase to another octave.</li>
+      <li>Choose the part's sound with <span class="ui">Piano</span> <span class="ui">Guitar</span> <span class="ui">Misc</span>. The <em>Bass</em> sound plays an octave below the written notes.</li>
+    </ul>
+    <div class="note"><strong>Good to know:</strong> lowering <em>Bars</em> deletes notes past the new end, and edits on the lead grid can't be undone, so copy a phrase before big changes.</div>
+
+    <h3>How the parts play together</h3>
+    <ul>
+      <li>Every <span class="ui">▶ Play</span> (Chord Rider, the lead grid and Track Master) plays all the parts that are switched on, plus the drums, in time.</li>
+      <li><span class="ui">Repeat</span> loops the whole song. Lead and bass parts also loop over their own length while it's on. A vocal part repeats only if you tick its own <em>Repeat this part</em>.</li>
+    </ul>
+
+    <h3>Notes</h3>
+    <p>The <strong>Notes</strong> panel (one per project) has <span class="ui">B</span> <span class="ui">I</span> <span class="ui">U</span> <span class="ui">• List</span> <span class="ui">1. List</span> and <span class="ui">Clear</span> (asks first). Notes can be included in PDF/PNG exports.</p>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="vocals">
+    <h2><img src="assets/brand/icon-baby-daw-256.webp" alt="">Recording vocals</h2>
+    <ol>
+      <li><strong>Wear headphones.</strong> The mic records exactly what it hears, including the backing from speakers.</li>
+      <li>Add a <strong>Vocals</strong> part. Under <em>🎧 Backing while recording</em>, tick the parts (and Drums) you want to hear and set the <em>Playback level</em>.</li>
+      <li>Under <em>🎙 Mic</em>, tap <span class="ui">Mic check</span> to see your input level.</li>
+      <li>Tap <span class="ui">Record</span>. The backing starts straight away from the START marker (there's no count-in), and the take is placed at START. Tap <span class="ui">■ Stop</span> to finish.</li>
+    </ol>
+    <div class="tip"><strong>Record from the middle of the song:</strong> open Track Master, put the playhead where you want, select the vocal track and tap <span class="ui">●</span>. <span class="ui">Ⅱ</span> pauses, <span class="ui">▶</span> resumes on the beat, <span class="ui">■</span> finishes.</div>
+
+    <h3>Takes</h3>
+    <ul>
+      <li>Each recording is a take ("Take 1", "Take 2" …, newest first) with a badge: ☁ Cloud, Device, or ⚠ Not saved.</li>
+      <li><span class="ui">Use</span> puts a take in the song, <span class="ui">▶</span> previews it, <span class="ui">↓ WAV</span> downloads it, <span class="ui">×</span> deletes it. Older takes stay in the list, so you can switch back.</li>
+      <li>If recordings are on the device but not in any project, a banner offers <span class="ui">Recover takes</span>; <em>Attach</em> adds them to a vocal part.</li>
+    </ul>
+
+    <h3>Timing (latency)</h3>
+    <ul>
+      <li>The app automatically shifts each take by the delay your device reports.</li>
+      <li>If takes still land late or early, adjust <em>Recording offset (ms)</em> in the Mic panel: raise it if vocals are late, lower it if they're early. It applies to new recordings and is saved for this device.</li>
+      <li>Bluetooth headphones add extra delay; wired headphones give the tightest timing.</li>
+      <li>Recorded audio doesn't stretch with tempo, so set the BPM before you record.</li>
+    </ul>
+
+    <h3>Vocal effects and Auto-Tune</h3>
+    <ul>
+      <li><strong>EQ:</strong> Natural, Clear, Warm or Bright.</li>
+      <li><strong>Compression:</strong> Off, Light, Medium or Heavy.</li>
+      <li><strong>Reverb:</strong> Off, Small, Medium or Large.</li>
+      <li><strong>Delay:</strong> Off, Slap, 1/8 or 1/4.</li>
+      <li><strong>Auto-Tune:</strong> 0–100%. It tunes to the song's Key (or the first chord if no key is set); a higher amount corrects faster.</li>
+      <li>Effects never change the original recording, so you can change them at any time.</li>
+    </ul>
+    <p>When you're signed in and the project is saved, takes upload to your account and get a lyrics transcript automatically (<span class="ui">Transcribe active take</span> tries again). <span class="ui">▶ Play Mix</span> plays the vocal part with its backing.</p>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="tm">
+    <h2><img src="assets/brand/icon-baby-daw-256.webp" alt="">Track Master</h2>
+    <p>Tap the gold <span class="ui">TRACK MASTER</span> bar to see the whole song on a timeline. <span class="ui">Done</span> closes it.</p>
+
+    <h3>Tracks</h3>
+    <ul>
+      <li>Chord and lead/bass tracks come first, then Drums, then vocal tracks. Hold a track name and drag to reorder.</li>
+      <li>Each track has an on checkbox, a volume slider, <span class="ui">M</span> (mute) and <span class="ui">S</span> (solo).</li>
+      <li><span class="ui">⋮</span> (or right-click on a computer) offers: Edit This Track, Duplicate Track, Add Chord / Note Track, Add Lead / Bass Track, Add Vocal Track and Delete Track.</li>
+    </ul>
+
+    <h3>Editing</h3>
+    <ul>
+      <li><strong>Select:</strong> tap a clip or event.</li>
+      <li><strong>Move:</strong> drag it (on a phone, hold about half a second, then drag). You can drag chord/lead events to another chord/lead track, and vocal clips to another vocal track.</li>
+      <li><strong>Trim:</strong> drag either edge. Trimming a vocal clip never changes the recording itself.</li>
+      <li><strong>Add:</strong> double-tap an empty spot on a chord/lead track to add an event, then type a chord (<code>Bm7</code>) or note (<code>F#4</code>). Double-tap an event to change it. On the Drums track, double-tap to add a 4-beat region; double-tap a region to edit it in Beat Maker.</li>
+      <li><span class="ui">Split</span> cuts the selected vocal or drum clips at the playhead.</li>
+      <li><span class="ui">Copy</span> <span class="ui">Cut</span> <span class="ui">Paste</span> <span class="ui">Delete</span>: Paste starts at the playhead.</li>
+      <li><span class="ui">Select</span> (Range Select) picks a stretch of time on one track. Drag across it on a computer, or tap the start then the end on a phone. Adjust it with the blue handles; Copy, Cut and Delete then affect only that stretch.</li>
+      <li><span class="ui">Multi Select</span>: tap several events to select them together. <em>All</em> selects everything on the track.</li>
+      <li><span class="ui">Snap to Beat</span> with <em>Grid</em> (1/4 to 1/64) lines everything up to the beat; turn it off to place freely.</li>
+      <li><span class="ui">Undo</span> / <span class="ui">Redo</span> keep 50 Track Master steps. The history starts fresh each time Track Master opens.</li>
+    </ul>
+
+    <h3>Ruler, markers and transport</h3>
+    <ul>
+      <li>Tap the ruler to move the playhead. Drag the <strong>START</strong> and <strong>FINISH</strong> markers to set what plays, loops and exports.</li>
+      <li><span class="ui">|◀</span> to START, <span class="ui">◀◀</span> / <span class="ui">▶▶</span> move 4 beats, <span class="ui">▶|</span> to the end, <span class="ui">■</span> stop, <span class="ui">▶</span> play from the playhead, <span class="ui">Ⅱ</span> pause, <span class="ui">●</span> record into the selected vocal track.</li>
+      <li><span class="ui">→</span> AutoScroll follows the playhead (touching the timeline turns it off). <span class="ui">⠿</span> lets you drag the transport bar out of the way.</li>
+      <li><span class="ui">Lyrics</span> opens your lyrics in Song Rider Pro with small record buttons, so you can read while you record.</li>
+    </ul>
+
+    <h3>Track Effects</h3>
+    <p><span class="ui">Show</span> opens the effects panel for vocal tracks: volume (0–150%), EQ, Compression, Reverb, Delay and Auto-Tune. <em>Apply to</em> chooses the whole track or just the selected clips; <em>Reset Event FX to Track</em> removes a clip's own settings.</p>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="export">
+    <h2><img src="assets/brand/icon-baby-daw-256.webp" alt="">Exporting</h2>
+    <p>In the Projects panel, tap <span class="ui">Export ▾</span>:</p>
+    <div class="wrap"><table>
+      <tr><th>Item</th><th>What you get</th></tr>
+      <tr><td><strong>PDF chord sheet</strong></td><td>A printable chord sheet. Choose the parts, drums and project notes to include, then <em>Create PDF</em>.</td></tr>
+      <tr><td><strong>PNG image</strong></td><td>The same, as an image to share.</td></tr>
+      <tr><td><strong>Audio mix (WAV)…</strong></td><td>A finished stereo mix of the ticked parts and drums, from START to FINISH, with the same effects and loudness you hear. Rendering is fast and keeps going with the screen locked.</td></tr>
+      <tr><td><strong>Studio package…</strong></td><td>A ZIP for other music software: a MIDI file per part, the drums as MIDI, your dry vocal recordings and the project data.</td></tr>
+    </table></div>
+    <div class="note"><strong>Good to know:</strong> the WAV export ignores Mute and Solo; untick parts in the export dialog to leave them out.</div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="srp">
+    <h2><img src="assets/brand/icon-song-rider-pro-256.webp" alt="">Song Rider Pro</h2>
+
+    <h3>Views</h3>
+    <ul>
+      <li><strong>Full Song View</strong> shows the whole song as song parts. Each part has a gold <em>Section title</em>, a <em>Lyrics / chords</em> box, and buttons to add (<span class="ui">+</span>) or delete (<span class="ui">×</span>) song parts, plus 🎤 dictation.</li>
+      <li><strong>Card pages:</strong> swipe left or right on the song to switch between Full Song View and one page per song part (on a computer, ← → when you're not typing). Each lyric line becomes a card with 8 chord boxes (two per beat), the lyric, 4 beat boxes and a syllable count.</li>
+      <li>Card buttons: ⧉ copy chord row, 📋 paste chord row, ↻ repeat the previous card's chords, + add a card below, × delete the card. Edits in either view show up in the other.</li>
+      <li><span class="ui">Hide</span> folds the control panel (it then reads <span class="ui">Show</span>).</li>
+    </ul>
+
+    <h3>Writing chords with lyrics</h3>
+    <p>All of these work in a lyrics box:</p>
+<pre>  G           D/F#        Em7
+Amazing grace how sweet the sound
+
+[G]Amazing [D]grace       (inline brackets)
+
+Am | G | F                (a chord-only line)
+
+1Am 5Dm                   (a number forces the chord box, 1–8)</pre>
+    <ul>
+      <li>A chord line above a lyric places each chord by its position over the words.</li>
+      <li>On a card, typing <code>G D Em</code> into one chord box spreads them across the next boxes. Hold a chord box for about half a second to copy its row, then tap a box on another card to paste it.</li>
+      <li>In a chord box, <code>_</code> strums the last chord again and <code>...</code> plays a single note of it.</li>
+      <li>A lyric line that starts with <code>_</code> (for example <code>_Chorus</code>) starts a new song part.</li>
+    </ul>
+
+    <h3>Syllables, beats and the key</h3>
+    <ul>
+      <li>Each line shows its syllable count: <span style="color:var(--ok)">green</span> 8–13, <span style="color:var(--warn)">yellow</span> 6–7 or 14–15, <span style="color:#ff8a8a">red</span> 1–5 or 16+. Faint dividers split the line into 4 beats; put <code>/</code> in a line to split the beats yourself, e.g. <code>I was / made for / more than / this</code>.</li>
+      <li>The key box works out the key from your chords (for example "A min").</li>
+      <li><span class="ui">CAPO</span>: tap it to switch between <strong>CAPO</strong> (0–12 semitones) and <strong>STEP</strong> (−2 to +3, two semitones per step). It changes the chord names on screen, the key, playback and export; your lyrics and the chords as written are kept.</li>
+    </ul>
+
+    <h3>Playing and AutoScroll</h3>
+    <ul>
+      <li><span class="ui">▶</span> plays the chords at the song's BPM (8 boxes = 8 eighth notes per bar). On a card page it plays the card in view; in Full Song View it plays along with AutoScroll. For a linked song it plays the whole Chord Rider / Baby DAW arrangement.</li>
+      <li><span class="ui">↕</span> AutoScroll turns Full Song View into a play-along screen: each lyric line becomes 4 beat boxes, one lights up per beat, and it moves on every 4 beats, looping at the end. Tap it again to pause and resume; <span class="ui">■</span> goes back to editing. The speed is set by BPM.</li>
+    </ul>
+
+    <h3 id="srp-dictation">Voice to text (🎤)</h3>
+    <ol>
+      <li>Sign in (☁︎) and be online. Pick a style from the menu next to 🎤 (Hip-hop/Rap, Worship/Gospel, Country, Pop/Rock, R&amp;B or General); it helps spell lyrics in that genre.</li>
+      <li>Tap <span class="ui">🎤</span>. The voice meter shows "Getting the microphone ready", then "Listening ▮▮▯▯▯ go ahead."</li>
+      <li>Speak. Your words appear after each short pause. Say <strong>"new bar"</strong> or <strong>"next bar"</strong> to leave a blank line between bars.</li>
+      <li>Tap <span class="ui">⏹</span> to stop. Whatever was already said is still written in.</li>
+    </ol>
+    <ul>
+      <li>It stops by itself if you lock the screen, switch apps or change view. Nothing is lost; if the song was closed, the text appears in a notice so you can paste it.</li>
+      <li>If transcription fails, "Your audio is kept" appears with <span class="ui">Download recording</span> and <span class="ui">Retry transcription</span>.</li>
+    </ul>
+
+    <h3>Rhymes (the round R button)</h3>
+    <p>Tap <span class="ui">R</span> (bottom right) for rhymes on the last word of the previous bar (or the previous card): <em>Perfect Rhymes</em> and <em>Near Rhymes</em> (yellow). Tap a word to insert it where your cursor is. <span class="ui">Hide</span> closes the list. Rhymes need the internet.</p>
+
+    <h3 id="srp-link">Link SRP</h3>
+    <ul>
+      <li><span class="ui">Link SRP</span> connects this song to a Chord Rider / Baby DAW project. If the project open in Chord Rider is free it links straight away; otherwise you choose one from a list.</li>
+      <li>The project's chords go onto the PAGE 1 cards in order (your lyrics are kept). The song takes the project's BPM, capo and key, and they stay in sync from then on. <span class="ui">↶</span> Undo removes the imported chords.</li>
+      <li>When the chords change in Chord Rider, PAGE 1's chord boxes are updated to match.</li>
+      <li>The button then reads <span class="ui">Unlink SRP</span>; tap it to unlink (lyrics and chords stay).</li>
+    </ul>
+
+    <h3>Notes, files and export</h3>
+    <ul>
+      <li><span class="ui">📝</span> <strong>Project Notes:</strong> a page of notes per song with text styles, lists, a checklist and photos (drag, resize, crop).</li>
+      <li><span class="ui">⬆️</span> <strong>Upload audio or PDF:</strong>
+        <ul>
+          <li>A PDF or .txt replaces the song's lyrics (it asks first if there are lyrics, and Undo reverses it). Scanned PDFs without text can't be read.</li>
+          <li>Audio files (mp3, wav, m4a, aac, ogg) are attached to the song, each with rename, play/pause, stop, download and delete.</li>
+        </ul>
+      </li>
+      <li><span class="ui">⬇️</span> <strong>Export</strong> downloads a printable, coloured page of the song (chords in red over the lyrics, with BPM, capo and key) to open, print or save as PDF.</li>
+      <li><span class="ui">📁</span> <strong>Completed Projects Archive:</strong> ＋ adds songs from your projects; tap an archived song to open it, or hold it to move it back to Projects.</li>
+    </ul>
+
+    <h3>Songs, saving and undo</h3>
+    <ul>
+      <li>The song picker (<span class="ui">New Song ▾</span>) lists your songs (Recent or A–Z). <span class="ui">＋</span> new, <span class="ui">✏️</span> rename, <span class="ui">Ⓧ</span> delete (asks first).</li>
+      <li>Everything saves automatically as you type; <span class="ui">💾</span> saves straight away.</li>
+      <li><span class="ui">↶</span> <span class="ui">↷</span> undo and redo up to 80 song edits (lyrics, chords, titles, parts, imports, linking).</li>
+      <li>Pasting text when no box is selected imports it like a .txt file.</li>
+    </ul>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="sounds">
+    <h2><img src="assets/brand/icon-chord-rider-pro-256.webp" alt="">Sounds</h2>
+    <p>Pick a sound with <span class="ui">Piano</span> <span class="ui">Guitar</span> <span class="ui">Misc</span> in Chord Rider or on any Baby DAW part.</p>
+    <div class="wrap"><table>
+      <tr><th>Tab</th><th>Sounds</th></tr>
+      <tr><td>Piano</td><td>Piano, Bright Grand, Electric Grand, Electric Piano, Vintage E-Piano, Synth, Warm Synth Pad, Poly Synth, Saw Synth, Bass</td></tr>
+      <tr><td>Guitar</td><td>Acoustic, Acoustic Nylon, Electric, Jazz Electric, Muted Electric, Crunch Electric, Drive Electric, Wah Wah Electric, Bass</td></tr>
+      <tr><td>Misc</td><td>Sax, Alto Sax, Horn, Brass Section, Trumpet, Trombone, Tuba, Flute, Clavinet, Funky Worm, Funk Organ, Vibraphone, Marimba, G-Funk Whistle, Synth Brass</td></tr>
+    </table></div>
+    <ul>
+      <li>Most instruments are real recordings; the synths, organ, clavinet, worm and whistle are made by the app. Every sound plays at the same loudness, so switching sounds doesn't jump in volume. Funky Worm and G-Funk Whistle sit a little above the rest as lead sounds, and the whistle plays an octave above the written note, like a real whistle.</li>
+      <li>The first time you use a sound it downloads (up to about 2 MB); after that it's stored on the device and works offline.</li>
+      <li>Who recorded the instruments: <a href="sound-credits.html">Sound credits</a> (also linked at the bottom of every sound list).</li>
+    </ul>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="account">
+    <h2><img src="assets/brand/song-rider-suite-logo-256.png" alt="">Account, saving and sync</h2>
+    <ul>
+      <li><strong>Sign in</strong> in the <em>☁ Cloud Account</em> panel (Chord Rider and Baby DAW) or with <span class="ui">☁︎</span> in Song Rider Pro.</li>
+      <li><strong>New account:</strong> <em>Create account</em> needs your email, a password (8+ characters) and the private invite code from whoever shared the app with you.</li>
+      <li><strong>What syncs:</strong> your songs, beats, Baby DAW parts, notes, vocal recordings, Song Rider lyrics and attachments, and your chosen look, across all your devices. Syncing happens by itself; <span class="ui">↻ Sync Now</span> does it straight away.</li>
+      <li><strong>Offline:</strong> everything keeps working on the device and uploads when you're back online.</li>
+      <li><strong>"(conflict copy …)":</strong> if the same song was changed on two devices before they synced, both versions are kept, and yours becomes "<em>Song</em> (conflict copy …)". Nothing is lost; delete the copy you don't want.</li>
+      <li><strong>Log out</strong> uploads first, and your songs stay on the device. <em>Change password</em> is in the same panel.</li>
+      <li><strong>Look:</strong> <span class="ui">⚙</span> in the Cloud Account panel opens Appearance with 15 skins (Rider Original, Black Label, Sapphire Paisley, Royal Wave, Candy Pop, light versions and more). A skin only changes the look.</li>
+    </ul>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="help">
+    <h2><img src="assets/brand/song-rider-suite-logo-256.png" alt="">Tips and troubleshooting</h2>
+    <h4>No sound</h4>
+    <ul>
+      <li>Turn the volume up and, on an iPhone, turn off the silent switch.</li>
+      <li>Tap a chord card once; browsers only start sound after a tap.</li>
+      <li>A sound you haven't used before needs the internet the first time.</li>
+    </ul>
+    <h4>Sound crackles on the phone speaker</h4>
+    <p>A phone speaker at full volume can strain on loud passages. Try headphones, a car or a Bluetooth speaker, or turn the phone down a little.</p>
+    <h4>The microphone doesn't work</h4>
+    <ul>
+      <li>If the mic is blocked, tap the icon left of the web address → Permissions (or Site settings) → Microphone → Allow, then try again.</li>
+      <li>Close other apps that might be using the mic.</li>
+      <li>Voice to text also needs you to be signed in and online.</li>
+    </ul>
+    <h4>A chord isn't recognised</h4>
+    <p>Check the spelling against <a href="#crp">Chords it understands</a>, and type minor <code>m</code> and flat <code>b</code> in lowercase.</p>
+    <h4>Vocals are out of time</h4>
+    <p>Use wired headphones, adjust <em>Recording offset (ms)</em> (see <a href="#vocals">Timing</a>), and set the BPM before recording.</p>
+    <h4>The app looks out of date</h4>
+    <p>Reload the page twice. If it still looks old, open <a href="force-refresh.html">Force refresh</a>: it clears the stored app files and reloads, and your songs are kept.</p>
+    <h4>A song I deleted came back, or there's a copy</h4>
+    <p>A "(conflict copy …)" means two devices changed the song; keep the one you want. Deleting a song on one device removes it everywhere after sync.</p>
+  </section>
+
+  <p class="top-link"><a href="#start">↑ Back to the top</a></p>
+  <footer>Song Rider Suite manual · <a href="sound-credits.html">Sound credits</a> · <a href="./">Open the app</a></footer>
+</main>
+</body>
+</html>
