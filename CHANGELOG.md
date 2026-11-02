@@ -74,6 +74,11 @@
   its status line after the screen refreshed, and on some Android phones the microphone opened
   but no sound arrived. Dictation now records through an audio engine opened after the
   microphone, and rebuilds it once by itself if no sound comes through.
+- **Dictation shows its voice meter the moment you tap 🎤 and keeps your first words.** It used to
+  start recording only after an online check, and someone who started talking right away had their
+  opening words taken as background noise and dropped. The check now runs while the microphone opens,
+  everything from the moment it opens is kept until the first phrase is sent, and each later phrase
+  keeps a short lead-in so a soft first syllable isn't clipped.
 - **No more crackling.** Loud peaks were hitting the very top of the output and clicking on
   phone speakers. Playback now keeps 3 dB of headroom, uses the browser's smooth playback mode
   (fewer audio dropouts on Android), and removes inaudible deep bass that only made speakers

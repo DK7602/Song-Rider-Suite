@@ -634,6 +634,61 @@ await test('dictation sends phrases at each pause even with steady background no
   await ctx.close();
 });
 
+await test('dictation shows its voice meter at once and keeps the first words when you talk straight away', async () => {
+  // Talking from the very first moment set the noise floor with the voice itself, so nothing counted as
+  // speech until a pause, and the audio before it was thrown away: the opening words were lost.
+  const { ctx, page } = await device(browser, null, {
+    init: () => {
+      window.__speak = (on) => { if (window.__micGain) window.__micGain.gain.value = on ? 0.5 : 0; };
+      const OrigAC = window.AudioContext;
+      navigator.mediaDevices.getUserMedia = async () => {
+        const c = new OrigAC(), dest = c.createMediaStreamDestination();
+        // "Voice" from the moment the microphone opens, over quiet room noise.
+        const osc = c.createOscillator(), g = c.createGain(); g.gain.value = 0.5; osc.connect(g); g.connect(dest); osc.start(); window.__micGain = g;
+        const len = c.sampleRate * 2, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * 0.01;
+        const noise = c.createBufferSource(); noise.buffer = buf; noise.loop = true; noise.connect(dest); noise.start();
+        window.__micOpenedAt = performance.now();
+        return dest.stream;
+      };
+      window.__phrases = [];
+      const of = window.fetch;
+      window.fetch = async (url, opts = {}) => {
+        if (!String(url).includes('/api/lyrics-dictation')) return of(url, opts);
+        if ((opts.method || 'GET').toUpperCase() === 'GET') return new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } });
+        const bytes = (await opts.body.arrayBuffer()).byteLength;
+        window.__phrases.push((bytes - 44) / 2 / 16000);
+        return new Response(JSON.stringify({ ok: true, text: 'phrase' + window.__phrases.length }), { headers: { 'Content-Type': 'application/json' } });
+      };
+    }
+  });
+  await open(page);
+  await page.locator('button.fullLyricsMic').first().click();
+  // The meter is on screen straight away, before any sound.
+  await sleep(150);
+  assert.match(await page.locator('.fullLyricsVoiceInfo').first().textContent(), /(Getting the microphone ready|Listening) [▮▯]{5}/);
+  // Talk for about 1.8 s from the moment the microphone opens, then pause.
+  await page.waitForFunction(() => window.__micOpenedAt, null, { timeout: 5000 });
+  const talked = await page.evaluate(async () => { await new Promise(r => setTimeout(r, 1800)); window.__speak(false); return (performance.now() - window.__micOpenedAt) / 1000; });
+  await sleep(2600);
+  const phrases = await page.evaluate(() => window.__phrases);
+  assert.ok(phrases.length >= 1, 'the opening words were never sent');
+  assert.ok(phrases[0] >= talked - 0.5, `the first phrase holds ${phrases[0].toFixed(2)} s of audio but the voice ran ${talked.toFixed(2)} s from the start`);
+  // Talking straight away and stopping without a pause still sends what was said.
+  await page.locator('button.fullLyricsMic').first().click();
+  await sleep(1500);
+  await page.evaluate(() => { window.__phrases = []; });
+  await page.locator('button.fullLyricsMic').first().click();
+  await page.waitForFunction(() => window.__micOpenedAt && window.__micGain && window.__micGain.gain.value > 0, null, { timeout: 5000 }).catch(() => {});
+  await page.evaluate(() => window.__speak(true));
+  await sleep(2200);
+  await page.locator('button.fullLyricsMic').first().click();
+  await sleep(1500);
+  assert.ok((await page.evaluate(() => window.__phrases.length)) >= 1, 'talking from the start and stopping without a pause sent nothing');
+  noErrors(page);
+  await ctx.close();
+});
+
 await test('dictation still shows its status line on later sessions after the view re-rendered mid-session', async () => {
   const { ctx, page } = await device(browser, null, {
     init: () => {

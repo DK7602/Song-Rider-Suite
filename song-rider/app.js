@@ -10158,6 +10158,7 @@ function micErrorMessage(err){
   if(name==='NotReadableError'||name==='AbortError')return 'The microphone is busy (another app or tab may be using it). Close that, then tap 🎤 again.';
   return 'Could not start voice to text: '+msg;
 }
+let dictationServiceCheckedAt=0;
 function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
   const tip='Say “new bar” (or “next bar”) to leave a blank line between bars. Tap the mic to stop. Text appears after a pause.';
   const projectId=String(state.project?.id||'');
@@ -10165,6 +10166,9 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
   let boundProject=state.project; // the copy of the song the textarea was rendered from
   let stopped=false,finished=false,starting=true,stream=null,source=null,processor=null,gain=null;
   let parts=[],samples=0,hasSpeech=false,quiet=0,frames=0,waiting=false,watchdog=0,noiseFloor=1;
+  // The voice meter is on screen from the tap: "Getting the microphone ready" with empty bars, then
+  // "Listening" with live bars as soon as sound flows, so it is clear when to start talking.
+  let level=0,phase='starting',phrasesSent=0,partsRms=[];
   let cursor=ta.selectionStart??ta.value.length,end=ta.selectionEnd??cursor;
   let pendingCommand='',failure=null,pumping=false,held='';
   const segments=[]; // phrases waiting to be transcribed / inserted, oldest first
@@ -10176,6 +10180,14 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
   // until the Full view is rendered again (rebind) or the session ends (notice).
   const canWrite=()=>sameSong()&&state.project===boundProject&&ta.isConnected;
   const setStatus=(text)=>{info.hidden=false;info.textContent=text;};
+  function showMeter(){
+    if(failure||finished||stopped)return;
+    const bars=micLevelBars(level);
+    if(phase==='starting')setStatus(`Getting the microphone ready ${bars} one moment… ${tip}`);
+    else if(phase==='waiting')setStatus(`Waiting for sound from the microphone ${bars} ${tip}`);
+    else if(phase==='sending')setStatus(`Listening ${bars} (transcribing your last phrase…) ${tip}`);
+    else setStatus(`Listening ${bars} go ahead. ${tip}`);
+  }
   const paintMic=()=>{
     const active=fullLyricsDictation===session;
     if(!active&&fullLyricsDictation?.mic===session.mic)return; // a newer session owns this button
@@ -10260,7 +10272,7 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
         if(seg.state==='failed')return; // waits for Retry; later phrases stay behind it
         if(seg.state==='queued'){
           seg.state='sending';
-          setStatus((stopped?'Finishing transcription… ':'Listening / transcribing… ')+tip);
+          if(stopped)setStatus('Finishing transcription… '+tip);else{phase='sending';showMeter();}
           try{seg.text=String((await transcribeLyricsAudio(seg.blob))?.text||'');seg.state='done';}
           catch(err){
             seg.state='failed';
@@ -10274,7 +10286,7 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
         segments.shift();
         try{insert(seg.text);}
         catch(err){console.error('Could not insert dictated text',err);held+=(held?' ':'')+String(seg.text||'');}
-        if(!stopped)setStatus('Listening… '+tip);
+        if(!stopped&&!segments.length){phase='listening';showMeter();}
       }
     }finally{
       pumping=false;
@@ -10286,13 +10298,21 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
   }
   function flush(){
     const audioParts=parts,rate=context?.sampleRate,speech=hasSpeech;
-    parts=[];samples=0;hasSpeech=false;quiet=0;
+    parts=[];partsRms=[];samples=0;hasSpeech=false;quiet=0;
     if(!speech||!audioParts.length||!rate)return;
+    phrasesSent++;
     segments.push({blob:lyricsPcmWav(audioParts,rate),state:'queued',text:''});
     pump();
   }
   function stop(){
     if(stopped)return;
+    // Stopped before anything was sent: someone who talked from the first moment and never paused set the
+    // noise floor with their own voice, so nothing counted as speech. Send what was heard if it holds
+    // clear sound (Whisper's voice detection ignores a recording that is only background noise).
+    if(!hasSpeech&&!phrasesSent&&partsRms.length){
+      const peak=Math.max(...partsRms),low=Math.min(...partsRms);
+      if(peak>0.03||peak>low*3)hasSpeech=true;
+    }
     stopped=true;flush();cleanupCapture();paintMic();
     if(!segments.length)pump();
   }
@@ -10310,7 +10330,8 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
   function onAudio(e){
         if(stopped)return;
         frames++;
-        if(waiting){waiting=false;clearTimeout(watchdog);setStatus('Listening… '+tip);}
+        if(waiting){waiting=false;clearTimeout(watchdog);}
+        if(phase==='starting'||phase==='waiting')phase='listening';
         const data=new Float32Array(e.inputBuffer.getChannelData(0));
         let power=0;for(const x of data)power+=x*x;
         const rms=Math.sqrt(power/data.length);
@@ -10319,14 +10340,29 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
         // (a slowly rising minimum) and count as speech only what is clearly above it.
         noiseFloor=Math.min(noiseFloor*1.015,Math.max(rms,1e-5));
         const speech=rms>Math.max(0.008,noiseFloor*2.8);
-        if(frames%3===0&&info.textContent.startsWith('Listening'))setStatus('Listening '+micLevelBars(rms/Math.max(0.02,noiseFloor*6))+' '+tip);
-        // Retain a short pre-roll, then submit only nonoverlapping phrases.
-        parts.push(data);samples+=data.length;
+        level=rms/Math.max(0.02,noiseFloor*6);
+        if(frames%2===0||frames===1)showMeter();
+        // Keep a lead-in before detected speech, then submit only nonoverlapping phrases.
+        parts.push(data);partsRms.push(rms);samples+=data.length;
         if(speech){hasSpeech=true;quiet=0;}else quiet+=data.length;
+        if(!hasSpeech&&!phrasesSent){
+          // Opening words that set the first noise-floor reading only count as speech once the floor has
+          // dropped (at the first pause): look back through the kept audio with the new floor.
+          const thr=Math.max(0.008,noiseFloor*2.8);
+          let last=-1;for(let i=partsRms.length-1;i>=0;i--)if(partsRms[i]>thr){last=i;break;}
+          if(last>=0){hasSpeech=true;quiet=0;for(let i=last+1;i<parts.length;i++)quiet+=parts[i].length;}
+        }
         const rate=e.inputBuffer.sampleRate||context.sampleRate;
         // A phrase is sent after a short pause, or after 12 s of continuous sound at the latest.
         if(hasSpeech&&((quiet/rate>0.9&&samples/rate>1.5)||samples/rate>12))flush();
-        else if(!hasSpeech&&samples/rate>0.4){parts=parts.slice(-2);samples=parts.reduce((n,p)=>n+p.length,0);}
+        else if(!hasSpeech){
+          // Until the first phrase is sent, keep everything since the microphone opened (up to 8 s): someone
+          // who starts talking at once sets the first noise-floor reading with their own voice, so speech is
+          // only recognised at their first pause, and the opening words must still be there. Later phrases
+          // keep a 0.6 s lead-in so a soft first syllable is not clipped.
+          const keep=(phrasesSent?0.6:8)*rate;
+          while(parts.length>1&&samples-parts[0].length>=keep){samples-=parts[0].length;parts.shift();partsRms.shift();}
+        }
         if(segments.length>8){setStatus('Transcription is falling behind. Finishing captured audio…');stop();}
   }
   function buildCapture(){
@@ -10351,21 +10387,24 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
     if(stopped||frames)return;
     waiting=true;
     if(context&&context.state!=='running')context.resume?.().catch(()=>{});
-    setStatus('Waiting for sound from the microphone… '+tip);
+    phase='waiting';showMeter();
     if(!rebuilt)rebuildCapture();
     watchdog=setTimeout(()=>{
       if(!stopped&&!frames)fail('No sound is reaching voice to text from the microphone. Make sure no other app is using it, then tap 🎤 to try again.');
     },4000);
   }
   paintMic();
-  setStatus('Starting microphone… '+tip+' Audio is transcribed by Cloudflare.');
+  showMeter();
   (async()=>{
     try{
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone recording is unavailable in this browser.');
-      // Authenticate and check the transcription service before asking for the microphone.
-      await suiteCloudApi('/api/lyrics-dictation',{method:'GET'});
-      if(stopped){cleanupCapture();return;}
+      // Check sign-in and the transcription service while the microphone opens (not before it), so
+      // listening starts sooner; a check that passed in the last 10 minutes is not repeated.
+      const check=Date.now()-dictationServiceCheckedAt<600000?Promise.resolve():suiteCloudApi('/api/lyrics-dictation',{method:'GET'}).then(()=>{dictationServiceCheckedAt=Date.now();});
+      check.catch(()=>{});
       stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
+      if(stopped){cleanupCapture();return;}
+      await check;
       if(stopped){cleanupCapture();return;}
       if(!(await waitUntilVisible(1500))){
         starting=false;
@@ -10387,7 +10426,7 @@ function startFullLyricsDictation({ta,mic,info,sectionIndex,context}){
       buildCapture();
       stream.getTracks().forEach(t=>t.addEventListener('ended',()=>{if(!stopped){setStatus('Microphone disconnected. Finishing captured audio…');stop();}}));
       watchdog=setTimeout(checkAudio,2500);
-      if(!stopped)setStatus('Listening… '+tip);
+      showMeter();
     }catch(err){
       starting=false;
       failure=failure||{};
