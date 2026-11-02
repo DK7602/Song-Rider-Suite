@@ -73,7 +73,7 @@
   // used to swap in a wordmark with a red PRO.) Restores the original image if an older version swapped it.
   function updateSkinAssets(){
     document.querySelectorAll('.srp-exact-wordmark').forEach(img=>{
-      const original=img.dataset.srsOriginalSrc||img.getAttribute('src')||'./song-rider-pro-wordmark-hq.webp?v=3.3.12';
+      const original=img.dataset.srsOriginalSrc||img.getAttribute('src')||'./song-rider-pro-wordmark-hq.webp?v=3.5.0';
       if(img.getAttribute('src')!==original)img.setAttribute('src',original);
     });
   }

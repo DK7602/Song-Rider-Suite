@@ -9,6 +9,10 @@
   media controls.
 - **Gold module icons** on the Chord Rider, Baby DAW and Song Rider buttons in every skin.
 - All the old skull art is gone (stickers, icons, Baby DAW button art, skeleton horses).
+- On computers and tablets, Chord Rider Pro, Baby DAW and Song Rider Pro span the screen, lined up with
+  the mode buttons and Track Master bar (they were a narrow 1180 px column).
+- The SONG RIDER PRO title has clean letter edges like CHORD RIDER PRO's (the leftover haze from its
+  cut-out is gone), and its PRO is green in every skin.
 - On phones the Song Rider Suite banner spans the whole top line, and the Chord Rider Pro / Song
   Rider Pro titles fill their row up to the Hide button.
 

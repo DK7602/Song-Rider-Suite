@@ -77,3 +77,12 @@
   :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .srs-theme-mode-icon{display:none!important;}
   :root[data-skin][data-skin-choice] .workspace-mode-switch .workspace-mode-btn .mode-copy strong{font-size:.78rem!important;}
 }
+
+/* Desktop and tablet: Chord Rider Pro, Baby DAW and Song Rider Pro span the screen, lined up with the mode
+   buttons and the Track Master bar above them (the same 2.65vw side margins). They were capped at 1180px. */
+@media (min-width:601px){
+  main.app-shell,body footer{width:100%!important;max-width:none!important;padding-left:2.65vw!important;padding-right:2.65vw!important;box-sizing:border-box!important;}
+  .song-rider-workspace{max-width:none!important;padding-left:2.65vw!important;padding-right:2.65vw!important;}
+  html.crp-integrated body>header{padding-left:2.65vw!important;padding-right:2.65vw!important;box-sizing:border-box!important;}
+  html.crp-integrated main{width:100%!important;max-width:none!important;padding-left:2.65vw!important;padding-right:2.65vw!important;box-sizing:border-box!important;}
+}
