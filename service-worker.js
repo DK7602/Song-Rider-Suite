@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.4.23';
+const CACHE = 'song-rider-suite-v3.4.24';
 // Recorded instrument audio (assets/instruments/<id>/*.mp3) never changes under the same name, so it lives in
 // its own cache that survives app updates and is served from there first. Bump this to drop the old audio.
 const INSTRUMENT_CACHE = 'srs-instruments-v2';

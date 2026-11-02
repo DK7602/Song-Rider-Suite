@@ -784,7 +784,7 @@ html[data-skin="royal-wave"] .workspace-chord-rider .crp-controls-toggle{backgro
 html[data-skin="royal-wave"] body{background:linear-gradient(180deg,#005CF7 0%,#0870ff 42%,#005CF7 100%)!important;color:#12325a!important}
 html[data-skin="royal-wave"] .panel,html[data-skin="royal-wave"] .auth-box{background:linear-gradient(180deg,#EEE8C6,#fff8de)!important;border-color:#FF9700!important;color:#12325a!important;box-shadow:0 0 0 1px rgba(255,151,0,.18),0 10px 26px rgba(0,56,154,.16)!important}
 html[data-skin="royal-wave"] input,html[data-skin="royal-wave"] select,html[data-skin="royal-wave"] textarea,html[data-skin="royal-wave"] .notes-editor,html[data-skin="royal-wave"] .segmented{background:#fffaf0!important;color:#12325a!important;border-color:#66aefc!important}
-html[data-skin="royal-wave"] button:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.crp-midi-cell):not(.lead-cell):not(.lead-note-block):not(.crp-step):not(.vox-drum-cell){background:#98D6FF!important;color:#0d315c!important;border-color:#4ea2f7!important}
+html[data-skin="royal-wave"] button:not([aria-pressed="true"]):not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.crp-midi-cell):not(.lead-cell):not(.lead-note-block):not(.crp-step):not(.vox-drum-cell){background:#98D6FF!important;color:#0d315c!important;border-color:#4ea2f7!important}
 html[data-skin="royal-wave"] button.accent,html[data-skin="royal-wave"] .seg.active,html[data-skin="royal-wave"] .toggle-btn.on{background:#FF9700!important;color:#241400!important;border-color:#d47900!important}
 html[data-skin="royal-wave"] .workspace-mode-switch{background:#005CF7!important;border-bottom-color:#FF9700!important}
 html[data-skin="royal-wave"] .workspace-mode-btn{background:linear-gradient(145deg,#EEE8C6,#fff6d7)!important;border-color:#98D6FF!important;color:#12325a!important}
@@ -817,7 +817,7 @@ html[data-skin="royal-wave"] .vox-drum-cell.bar-start{border-left:2px solid #005
 html[data-skin="candy-pop"] body{background:linear-gradient(180deg,#EFEAD7 0%,#fff8e9 100%)!important;color:#213b3b!important}
 html[data-skin="candy-pop"] .panel,html[data-skin="candy-pop"] .auth-box{background:linear-gradient(180deg,#FFB2F6,#ffd8fa)!important;border-color:#dd7ed3!important;color:#213b3b!important;box-shadow:0 0 0 1px rgba(255,178,246,.32),0 10px 26px rgba(113,55,101,.12)!important}
 html[data-skin="candy-pop"] input,html[data-skin="candy-pop"] select,html[data-skin="candy-pop"] textarea,html[data-skin="candy-pop"] .notes-editor,html[data-skin="candy-pop"] .segmented{background:#EFEAD7!important;color:#213b3b!important;border-color:#d790ce!important}
-html[data-skin="candy-pop"] button:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.crp-midi-cell):not(.lead-cell):not(.lead-note-block):not(.crp-step):not(.vox-drum-cell){background:#87FFF5!important;color:#153735!important;border-color:#55d7ce!important}
+html[data-skin="candy-pop"] button:not([aria-pressed="true"]):not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.crp-midi-cell):not(.lead-cell):not(.lead-note-block):not(.crp-step):not(.vox-drum-cell){background:#87FFF5!important;color:#153735!important;border-color:#55d7ce!important}
 html[data-skin="candy-pop"] button.accent,html[data-skin="candy-pop"] .seg.active,html[data-skin="candy-pop"] .toggle-btn.on{background:#FFF600!important;color:#252400!important;border-color:#d7cf00!important}
 html[data-skin="candy-pop"] .workspace-mode-switch{background:#EFEAD7!important;border-bottom-color:#dd7ed3!important}
 html[data-skin="candy-pop"] .workspace-mode-btn{background:linear-gradient(145deg,#FFB2F6,#ffd6fb)!important;border-color:#d985ce!important;color:#26393a!important}
@@ -1126,9 +1126,10 @@ html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-sk
 html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) .toggle-btn.on *{color:#FFF!important;}
 
 /* Keep general action buttons in Rider Blood Light on the red/dark family so the
-   skin matches the original Rider Blood Light look again. */
-html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) button:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.gold-btn):not(.seg):not(.toggle-btn):not(.btn-primary),
-html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) button:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.gold-btn):not(.seg):not(.toggle-btn):not(.btn-primary){
+   skin matches the original Rider Blood Light look again. Pressed toggles (Mute, Solo,
+   Multi Select, …) are left out so they keep the red "on" look above. */
+html[data-skin="rider-light"]:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) button:not([aria-pressed="true"]):not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.gold-btn):not(.seg):not(.toggle-btn):not(.btn-primary),
+html:is([data-skin-choice="rider-blood-light"],[data-skin-choice="rider-blood-light-og"]) button:not([aria-pressed="true"]):not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.gold-btn):not(.seg):not(.toggle-btn):not(.btn-primary){
   background:#1E2430!important;
   color:#FFF5F5!important;
   border-color:#B3222A!important;
@@ -1437,7 +1438,7 @@ html[data-skin="royal-wave"] .notes-editor,
 html[data-skin="royal-wave"] .segmented{
   background:#FFFBEA!important;color:#0D2E59!important;border-color:#67AAF0!important;
 }
-html[data-skin="royal-wave"] button:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.crp-midi-cell):not(.lead-cell):not(.lead-note-block):not(.crp-step):not(.vox-drum-cell){
+html[data-skin="royal-wave"] button:not([aria-pressed="true"]):not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.crp-midi-cell):not(.lead-cell):not(.lead-note-block):not(.crp-step):not(.vox-drum-cell){
   background:#98D6FF!important;color:#0D2E59!important;border-color:#3E91EC!important;
 }
 html[data-skin="royal-wave"] button.accent,
@@ -1579,7 +1580,7 @@ html[data-skin="candy-pop"] .notes-editor,
 html[data-skin="candy-pop"] .segmented{
   background:#FFFCEF!important;color:#233638!important;border-color:#58D9D0!important;
 }
-html[data-skin="candy-pop"] button:not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.crp-midi-cell):not(.lead-cell):not(.lead-note-block):not(.crp-step):not(.vox-drum-cell){
+html[data-skin="candy-pop"] button:not([aria-pressed="true"]):not(.workspace-mode-btn):not(.track-master-gold-btn):not(.srs-skin-gear):not(.srs-skin-choice):not(.srs-skin-close):not(.crp-midi-cell):not(.lead-cell):not(.lead-note-block):not(.crp-step):not(.vox-drum-cell){
   background:#87FFF5!important;color:#233638!important;border-color:#45CEC4!important;
 }
 html[data-skin="candy-pop"] button.accent,

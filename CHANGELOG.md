@@ -76,6 +76,11 @@
 - Chord Rider's own chord taps play through the loaded chord part's effects.
 - Saved and synced with the song; Track Master Undo/Redo covers every effect change. Older songs open with
   everything Off and sound exactly as before.
+- The effects sliders reach both ends: at 100% the thumb sits at the end of the track on phones (the
+  skins' text-box padding had inset the thumb's travel while Android drew the track edge to edge).
+- **Mute and Solo light up when on in every skin.** In Candy Pop, Royal Wave and Rider Blood Light (both
+  versions) a skin-wide button colour hid every pressed toggle; pressed buttons now show the skin's "on"
+  colour (yellow, orange, red).
 
 ### Fixes
 - **Link SRP works again in every situation.** With a Chord Rider project open it links at once;

@@ -4743,7 +4743,17 @@ html[data-skin-choice="rider-light-og"] .lead-sustain-control .part-repeat-toggl
 .mfx-label{display:flex;align-items:baseline;justify-content:space-between;gap:6px;white-space:nowrap;min-width:0}
 .mfx-label output{color:var(--srs-skin-text,#f1f4f8);font-weight:800;font-size:.72rem}
 .mfx-field select{width:100%;min-width:0;min-height:38px}
-.mfx-field input[type=range]{width:100%;min-width:0;margin:0;height:26px;accent-color:var(--accent,#e9c46a)}
+/* Effects sliders are drawn here, not by the phone: the skins' text-box padding and border would
+   otherwise inset the thumb's travel while Android still draws the track edge to edge (the thumb
+   stopped short of both ends). The track fills to --range-fill (set by paintFxControls). */
+html .mfx-field input[type=range][data-mfx]{-webkit-appearance:none!important;appearance:none!important;width:100%;min-width:0;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;height:26px!important;min-height:0!important;accent-color:var(--accent,#e9c46a);cursor:pointer;touch-action:pan-y}
+html .mfx-field input[type=range]:focus{outline:none}
+html .mfx-field input[type=range]:focus-visible{outline:2px solid var(--accent,#e9c46a);outline-offset:3px;border-radius:999px!important}
+html .mfx-field input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:999px;border:0;background:linear-gradient(to right,var(--accent,#e9c46a) 0,var(--accent,#e9c46a) var(--range-fill,0%),rgba(127,137,150,.45) var(--range-fill,0%),rgba(127,137,150,.45) 100%)}
+html .mfx-field input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;margin-top:-7px;border-radius:50%;background:var(--accent,#e9c46a);border:2px solid #1a2029;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+html .mfx-field input[type=range]::-moz-range-track{height:6px;border-radius:999px;border:0;background:rgba(127,137,150,.45)}
+html .mfx-field input[type=range]::-moz-range-progress{height:6px;border-radius:999px;background:var(--accent,#e9c46a)}
+html .mfx-field input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent,#e9c46a);border:2px solid #1a2029}
 .mfx-field.is-off{opacity:.42}
 .mfx-toggles{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:10px}
 .mfx-check{display:inline-flex;align-items:center;gap:8px;min-height:36px;font-size:.82rem;font-weight:800;color:var(--srs-skin-text,#e3e8ee)}

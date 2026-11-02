@@ -708,6 +708,38 @@ async function babyDawPanels(page) {
   await tap(page, '#drumsFxModal .mfx-modal-close');
 }
 
+// In every skin: Track Master's Mute / Solo buttons look different when on, and the effects sliders have
+// no padding or border insetting the thumb's travel (on Android the track was drawn edge to edge while the
+// thumb stopped short of both ends).
+async function skinsTogglesAndSliders(page) {
+  const data = await chordData(page, [{ value: 'C' }]);
+  await loadSong(page, { items: [{ id: 'chord-1', type: 'chord', name: 'Chords 1', enabled: true, volume: .85, data, solo: true }, { id: 'lead-1', type: 'lead', name: 'Lead 1', enabled: true, volume: .8, muted: true, sound: 'acoustic_grand_piano', resolution: 16, bars: 4, events: [{ step: 0, midi: 45, durationSteps: 4 }] }], loadedChordPartId: 'chord-1', activePartId: 'chord-1' });
+  await page.evaluate(() => window.CRPParts.openTrackMaster());
+  await page.waitForSelector('.vox-track-ms button.is-on');
+  await tap(page, '.vox-instrument-track[data-vox-kind="chord"] .vox-track-label strong');
+  const r = await page.evaluate(() => {
+    const before = window.SRSSkins.current(), out = [];
+    const look = b => { const cs = getComputedStyle(b); return `${cs.backgroundColor} ${cs.backgroundImage} ${cs.color}`; };
+    for (const { id } of window.SRSSkins.skins) {
+      window.SRSSkins.apply(id, false);
+      const btns = [...document.querySelectorAll('.vox-track-ms button')];
+      const on = new Set(btns.filter(b => b.classList.contains('is-on')).map(look)), off = new Set(btns.filter(b => !b.classList.contains('is-on')).map(look));
+      const sliders = [...document.querySelectorAll('.mfx-field input[type=range]')].map(el => { const cs = getComputedStyle(el); return { inset: ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce((s, k) => s + parseFloat(cs[k]), 0), bg: cs.backgroundColor, app: cs.appearance }; });
+      out.push({ id, onCount: btns.filter(b => b.classList.contains('is-on')).length, overlap: [...on].filter(x => off.has(x)), sliders: sliders.length, inset: Math.max(...sliders.map(s => s.inset)), opaque: sliders.filter(s => s.bg !== 'rgba(0, 0, 0, 0)').length, native: sliders.filter(s => s.app !== 'none').length });
+    }
+    window.SRSSkins.apply(before, false);
+    return out;
+  });
+  assert.ok(r.length >= 15, `every skin checked (${r.length})`);
+  for (const s of r) {
+    assert.equal(s.onCount, 2, `${s.id}: the soloed and the muted button are on`);
+    assert.deepEqual(s.overlap, [], `${s.id}: Mute/Solo look different when on`);
+    assert.ok(s.sliders >= 14, `${s.id}: effects sliders found (${s.sliders})`);
+    assert.equal(s.inset, 0, `${s.id}: effects sliders have no padding/border (${s.inset}px)`);
+    assert.equal(s.opaque + s.native, 0, `${s.id}: effects sliders are drawn by the app, with no box behind them`);
+  }
+}
+
 browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${FAKE_MIC}`, '--autoplay-policy=no-user-gesture-required'] });
 console.log(`Music effects e2e tests against ${BASE}`);
 try {
@@ -732,6 +764,7 @@ try {
   await test('phone: Track Master FX edits save, undo/redo and survive a reload', () => withPage(PHONE, fxSaveUndoReload));
   await test('phone: Baby DAW Effects, Song FX and Drums FX panels; Chord Rider taps use the track FX', () => withPage(PHONE, babyDawPanels));
   await test('desktop: Baby DAW Effects, Song FX and Drums FX panels; Chord Rider taps use the track FX', () => withPage(DESKTOP, babyDawPanels));
+  await test('phone: in every skin, Mute/Solo light up when on and the effects sliders reach both ends', () => withPage(PHONE, skinsTogglesAndSliders));
 } finally { await browser.close(); }
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);
