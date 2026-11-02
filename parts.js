@@ -3204,7 +3204,7 @@
     const prior=document.querySelector('.vox-inline-event-input');if(prior&&prior!==el.querySelector('.vox-inline-event-input'))prior.blur();
     el.querySelector('.vox-inline-event-input')?.remove();const input=document.createElement('input');input.className='vox-inline-event-input';input.type='text';input.autocomplete='off';input.autocapitalize='off';input.enterKeyHint='done';input.spellcheck=false;const noteCard=sel.kind==='chord'&&sel.card?.type==='note',blank=sel.kind==='lead'?sel.event?.voxBlank===true:sel.card?.voxBlank===true;input.value=blank?'':(sel.kind==='lead'?midiName(sel.event.midi):(noteCard&&Number.isFinite(Number(sel.card?.midiNotes?.[0]))?midiName(Number(sel.card.midiNotes[0])):String(sel.card?.value||'')));input.placeholder=sel.kind==='lead'||noteCard?'Type note (ex. F#4)':'Type chord (ex. Bm7)';el.appendChild(input);
     requestAnimationFrame(()=>{if(!input.isConnected)return;try{input.focus({preventScroll:true});}catch{input.focus();}try{input.setSelectionRange(0,input.value.length);}catch{}});
-    let finished=false;const finish=async(commit=true)=>{if(finished)return;finished=true;const txt=input.value.trim();input.remove();if(!commit||!txt){renderVoxBox();return;}
+    let finished=false;const finish=async(commit=true)=>{if(finished)return;finished=true;const txt=(core.decapsChordText?core.decapsChordText(input.value):input.value).trim();input.remove();if(!commit||!txt){renderVoxBox();return;}
       // Re-resolve by stable voxId at commit time. Autosave / history / other UI work
       // must never leave the editor mutating a detached card object.
       const live=resolveVoxInstrumentSelection(sel)||sel;voxCheckpoint();

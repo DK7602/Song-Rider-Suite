@@ -252,6 +252,17 @@
   }
   function parseNote(raw){const r=parseRoot(raw);return r&&r in NOTE_INDEX?r:null;}
   function tokens(text){return text.split(/[\s,|]+/).map(x=>x.trim()).filter(Boolean);}
+  // Phone keyboards set to capitals (or Caps Lock) turn "em am7 bb" into "EM AM7 BB". Text typed entirely in
+  // capitals is read as it was meant: M is minor (MAJ is major) and a B right after the root is a flat, so
+  // EM = Em, AM7 = Am7, BB = Bb, CMAJ7 = Cmaj7, D/F# stays D/F#. Text with any lowercase letter keeps the
+  // usual reading (CM7 = Cmaj7).
+  function decapsChordText(text){
+    const s=String(text??'');
+    if(/[a-z]/.test(s)||!/[A-Z]/.test(s))return s;
+    const part=p=>{const m=p.match(/^([A-G])([#B♯♭]?)(.*)$/);if(!m)return p.toLowerCase();return m[1]+(m[2]==='B'?'b':m[2])+m[3].toLowerCase().replace(/^mmaj/,'mMaj');};
+    return s.replace(/[^\s,|]+/g,tok=>tok.split('/').map(part).join('/'));
+  }
+  const entryTokens=()=>tokens(decapsChordText($('chordInput')?.value||''));
   // Transposed names keep the source's accidental style (Bb up 2 = C, D/F# up 2 = E/G#).
   function transposeRoot(root,semi){
     const n=NOTE_INDEX[root];if(n==null)return root;
@@ -348,7 +359,7 @@
   function inferredKey(){return inferKeyFromCards(allCards())||{root:'C',minor:false};}
   function enteredKey(){
     const el=$('keyInput');if(!el)return null;
-    const raw=el.value.trim().replace(/♭/g,'b').replace(/♯/g,'#');if(!raw)return null;
+    const raw=decapsChordText(el.value.trim()).replace(/♭/g,'b').replace(/♯/g,'#');if(!raw)return null;
     const m=raw.match(/^([A-Ga-g])([#b]?)(?:\s*(m|minor|maj|major))?$/i);if(!m)return null;
     const root=m[1].toUpperCase()+m[2];if(!(root in NOTE_INDEX))return null;
     const quality=(m[3]||'').toLowerCase();return{root,minor:quality==='m'||quality==='minor'};
@@ -361,7 +372,7 @@
   }
   function parseBuildInput(){
     const vals=[],bad=[];
-    tokens($('chordInput')?.value||'').forEach(x=>{
+    entryTokens().forEach(x=>{
       const v=state.mode==='chord'?parseChord(x)?.display:parseNote(x);
       v?vals.push({type:state.mode,value:v}):bad.push(x);
     });
@@ -440,7 +451,7 @@
     return best?{root:keyTonicName(NOTE_INDEX[best.root],best.minor,style),minor:best.minor}:null;
   }
   function cardsFromEntry(){
-    return tokens($('chordInput')?.value||'').map(x=>{
+    return entryTokens().map(x=>{
       if(state.mode==='chord'){
         const c=parseChord(x);return c?{type:'chord',value:c.display}:null;
       }
@@ -2979,7 +2990,7 @@
     snapshot:coreSnapshot,apply:coreApply,notesFor:coreNotesFor,sounds:SOUNDS,cardDurationBeats,soundPreset,soundOutputGain,instrumentProvider,isBassSound,loadSoundfontInstrument,createInstrumentFxChain,normalizeInstrument,
     scheduleAutoSave,flushAutoSaveNow,renderAll,syncBuildInput,publishSrpHandoff,loadProjectById:loadProject,
     recordUndo,undo:undoEdit,redo:redoEdit,get canUndo(){return undoHistory.undo.length>0;},
-    keyTonicName,spellInKey,
+    keyTonicName,spellInKey,decapsChordText,
     get beats(){return +$('beatsSelect').value||4},get bpm(){return clampBpm($('bpmInput').value)},get loop(){return $('loopToggle').checked},
     get currentProjectId(){return state.currentProjectId||null},get loggedIn(){return !!accountUser},get projectName(){return $('projectName').value.trim()||'Untitled Project'},get projectNotes(){return $('notesEditor').innerHTML},
     startBeat(){const ri=playbackStartRow();return state.rows.slice(0,ri).flat().reduce((n,c)=>n+storedCardDurationBeats(c),0);},

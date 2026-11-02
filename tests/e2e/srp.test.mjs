@@ -131,6 +131,30 @@ await test('opening /song-rider/index.html directly uses the suite layout (crpMo
   await ctx.close();
 });
 
+await test('capo moves slash-chord bass notes too; BPM up to 240 survives a reload; export says what it downloads', async () => {
+  const { ctx, page } = await device(browser, null, {});
+  await open(page);
+  await typeFull(page, 'D/F#  Am7/G\nI was made for more');
+  await sleep(500);
+  // Capo 2: every chord moves up 2 semitones, bass notes included (D/F# -> E/G#, Am7/G -> Bm7/A).
+  await page.fill('#capoInput', '2'); await page.dispatchEvent('#capoInput', 'change'); await sleep(600);
+  const shown = await fullText(page);
+  assert.match(shown, /E\/G#/, `capo 2 shows: ${shown}`);
+  assert.match(shown, /Bm7\/A/, `capo 2 shows: ${shown}`);
+  assert.doesNotMatch(shown, /E\/F#|Bm7\/G\b/, 'a bass note was left behind');
+  // Back to capo 0: the chords as written.
+  await page.fill('#capoInput', '0'); await page.dispatchEvent('#capoInput', 'change'); await sleep(600);
+  assert.match(await fullText(page), /^D\/F#\s+Am7\/G/);
+  // BPM 240 (the box allows 40-240) is kept when the song is opened again.
+  await page.fill('#bpmInput', '240'); await page.dispatchEvent('#bpmInput', 'change'); await page.dispatchEvent('#bpmInput', 'blur'); await sleep(800);
+  await open(page);
+  assert.equal(await page.inputValue('#bpmInput'), '240');
+  // The export button describes what it downloads: a printable page.
+  assert.match(await page.getAttribute('#exportBtn', 'title'), /printable page/i);
+  noErrors(page);
+  await ctx.close();
+});
+
 await test('stale device: newer cloud work is never overwritten (conflict copy + notice)', async () => {
   const user = await newUser();
   const A = await device(browser, user), B = await device(browser, user);

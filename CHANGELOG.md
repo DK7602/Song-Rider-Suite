@@ -80,6 +80,13 @@
   its status line after the screen refreshed, and on some Android phones the microphone opened
   but no sound arrived. Dictation now records through an audio engine opened after the
   microphone, and rebuilds it once by itself if no sound comes through.
+- **Chords typed in capitals work.** The chord and Key boxes asked phone keyboards for all capitals, so
+  "em" arrived as "EM" (not recognised) and "am7" as "AM7" (played as A major 7). They no longer force
+  capitals, and a line typed entirely in capitals is read as meant (EM = Em, AM7 = Am7, BB = Bb). Track
+  Master's chord box too.
+- **Song Rider Pro: capo moves slash-chord bass notes.** With capo 2, D/F# now shows E/G# (it showed E/F#),
+  on screen and in the export. BPM up to 240 is kept when a song is reopened (it was cut to 220). The ⬇️
+  button now says what it does: download a printable page of the song.
 - **Dictation shows its voice meter the moment you tap 🎤 and keeps your first words.** It used to
   start recording only after an online check, and someone who started talking right away had their
   opening words taken as background noise and dropped. The check now runs while the microphone opens,

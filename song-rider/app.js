@@ -3898,7 +3898,7 @@ function triggerHorseRun(){
 
   if(!el.horseRight || !el.horseLeft) return;
 
-  const bpm = clamp(state.bpm || 95, 40, 220);
+  const bpm = clamp(state.bpm || 95, 40, 240);
   const barMs = Math.round((240000 / bpm)); // 4 beats per bar
 
   // alternate direction each bar
@@ -4978,7 +4978,7 @@ function transposeNoteName(note, semitones){
   return PC_TO_NAME[t];
 }
 
-// transpose chord root only, preserve suffix
+// Transpose a chord's root and, for a slash chord, its bass note (D/F# up 2 = E/G#); the suffix is kept.
 function transposeChordName(chord, semis){
   const s0 = String(chord||"").trim();
   if(!s0) return "";
@@ -4988,6 +4988,8 @@ function transposeChordName(chord, semis){
   const root = (m[1].toUpperCase() + (m[2]||""));
   const rest = String(m[3]||"");
   const tRoot = transposeNoteName(root, semis);
+  const slash = rest.match(/^(.*)\/\s*([A-Ga-g])\s*([#b])?\s*$/);
+  if(slash) return (tRoot + slash[1] + "/" + transposeNoteName(slash[2].toUpperCase() + (slash[3]||""), semis)).trim();
   return (tRoot + rest).trim();
 }
 
@@ -7520,7 +7522,7 @@ updateAudioButtonsUI();
 }
 
 function audioTickFromTimeSec(tSec){
-  const bpm = clamp(state.bpm || 95, 40, 220);
+  const bpm = clamp(state.bpm || 95, 40, 240);
   const rel = (tSec - (state.audioSyncOffsetSec || 0));
   if(rel < 0) return -1;
   const beatPos = (rel * bpm) / 60; // quarter-note beats
@@ -7594,7 +7596,7 @@ function tapBpm(){
     const beats = state.tapTimes.length - 1;
     const sec = (last - first) / 1000;
     if(sec > 0.2){
-      const bpm = clamp(Math.round((beats * 60) / sec), 40, 220);
+      const bpm = clamp(Math.round((beats * 60) / sec), 40, 240);
       state.bpm = bpm;
       if(el.bpmInput) el.bpmInput.value = String(bpm);
       if(state.project){
@@ -7641,7 +7643,7 @@ function startBeatClock(){
 
   if(state.audioSyncOn) return;
   stopBeatClock();
-  const bpm = clamp(state.bpm || 95, 40, 220);
+  const bpm = clamp(state.bpm || 95, 40, 240);
   const eighthMs = Math.round((60000 / bpm) / 2);
   state.eighthMs = eighthMs;
 
@@ -7718,7 +7720,7 @@ function stopPendingDrumQuantize(){
 }
 
 function getMsUntilNextBarBoundary(){
-  const bpm = clamp(state.bpm || 95, 40, 220);
+  const bpm = clamp(state.bpm || 95, 40, 240);
   const eighthMs = Math.round((60000 / bpm) / 2);
   const barMs = eighthMs * 8;
 
@@ -7785,7 +7787,7 @@ function startDrums(){
 
   resetAutoScrollToFirstCardOfActivePage();
 
-  const bpm = clamp(state.bpm || 95, 40, 220);
+  const bpm = clamp(state.bpm || 95, 40, 240);
   const stepMs = Math.round((60000 / bpm) / 4);
   let step = 0;
 
@@ -9331,7 +9333,7 @@ function buildFullPreviewText(){
 
 function buildFullPreviewHtmlDoc(title){
   const projectName = String(state.project?.name || "Song Rider Pro").trim() || "Song Rider Pro";
-  const bpmVal  = clamp(parseInt(state.bpm ?? el?.bpmInput?.value ?? 0, 10) || 0, 40, 220);
+  const bpmVal  = clamp(parseInt(state.bpm ?? el?.bpmInput?.value ?? 0, 10) || 0, 40, 240);
   const capoRaw = parseInt(state.capo ?? el?.capoInput?.value ?? 0, 10);
   const capoVal = isNaN(capoRaw) ? 0 : capoRaw;
   const keyVal  = String(el?.keyOutput?.value || "").trim();
@@ -12534,7 +12536,7 @@ function renderArchiveModal(){
 function applyProjectSettingsToUI(){
   if(!state.project) return;
 
-  state.bpm = clamp(parseInt(state.project.bpm,10) || 95, 40, 220);
+  state.bpm = clamp(parseInt(state.project.bpm,10) || 95, 40, 240);
   state.capo = clamp(parseInt(state.project.capo,10) || 0, 0, 12);
   state.transposeMode = state.project.transposeMode || "capo";
 state.steps = clamp(Math.round(parseFloat(state.project.steps) || 0), -2, 3);

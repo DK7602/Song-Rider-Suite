@@ -86,6 +86,21 @@ async function main() {
     assert.ok(f.includes('Bb') && !f.includes('A#'), `F major chips: ${f.join(' ')}`);
   });
 
+  await test('chords typed in capitals (phone keyboard, Caps Lock) are read as meant', async open => {
+    const page = await open();
+    // The chord and key boxes no longer ask phone keyboards for all capitals.
+    assert.equal(await page.getAttribute('#chordInput', 'autocapitalize'), 'off');
+    assert.equal(await page.getAttribute('#keyInput', 'autocapitalize'), 'off');
+    await build(page, 'EM AM7 BB CMAJ7 F#M7B5 D/F#');
+    assert.deepEqual(await cards(page), ['Em', 'Am7', 'Bb', 'Cmaj7', 'F#m7b5', 'D/F#']);
+    // A line with any lowercase keeps the usual reading: CM7 is C major 7.
+    await addLine(page, 'Am CM7 F');
+    assert.deepEqual((await cards(page)).slice(-3), ['Am', 'Cmaj7', 'F']);
+    // The Key box too: BBM is B flat minor.
+    await page.fill('#keyInput', 'BBM'); await page.dispatchEvent('#keyInput', 'input'); await page.dispatchEvent('#keyInput', 'change'); await sleep(300);
+    assert.match(await page.textContent('#keyHint'), /Bb minor/);
+  });
+
   await test('slash chords are accepted, shown and voiced with the bass note', async open => {
     const page = await open();
     await build(page, 'G G/B C D/F#');
