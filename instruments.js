@@ -27,7 +27,7 @@
 // this engine serves.
 (() => {
   'use strict';
-  const VERSION = '1.3.0';
+  const VERSION = '1.4.0';
   const preset = (typeof window !== 'undefined' && window.CRP_INSTRUMENTS_CONFIG) || {};
   const config = { basePath: String(preset.basePath || 'assets/instruments/'), disabled: !!preset.disabled };
 
@@ -264,17 +264,16 @@
         return lp;
       },
     },
-    // Poly synth (80s Juno-style pad): saw + square + a sub-octave saw through a gentle, darker low-pass that
-    // swells open, soft attack, long release and a wide stereo chorus on the player (chain 'juno'). No vibrato.
+    // Poly synth (Prophet/Oberheim-style "brass pad"): two detuned saws + a square through a resonant low-pass
+    // that sweeps open on every chord (the "wow") and settles medium-bright; quick attack, medium release, wide
+    // stereo chorus on the player (chain 'juno'). Brighter and quicker than the warm pad, softer than the saw lead.
     poly_pad: {
-      levelDb: -9.6, peak: .22, maxVoices: 12, chain: 'juno', amp: { attack: .14, decay: 1.4, sustain: .82, release: 1.2 },
+      levelDb: -10.0, peak: .2, maxVoices: 12, chain: 'juno', amp: { attack: .06, decay: .9, sustain: .85, release: .6 },
       build(a) {
-        const { f, t, nyq } = a, x = a.osc('sawtooth', 1, -4), q = a.osc('square', 1, 5), sub = a.osc('sawtooth', .5);
-        const qg = a.gain(.6), sg = a.gain(.25), lp = a.filter('lowpass', 800, .9);
-        q.connect(qg); sub.connect(sg); x.connect(lp); qg.connect(lp); sg.connect(lp);
-        lp.frequency.setValueAtTime(clamp(f + 300, 20, nyq), t);
-        lp.frequency.setTargetAtTime(clamp(f * 2.2 + 900, 20, nyq), t, .3);
-        lp.frequency.setTargetAtTime(clamp(f * 1.8 + 800, 20, nyq), t + 1, 1.5);
+        const { f, vel, t, nyq } = a, x = a.osc('sawtooth', 1, -7), y = a.osc('sawtooth', 1, 7), q = a.osc('square', 1);
+        const qg = a.gain(.35), lp = a.filter('lowpass', 1200, 4);
+        q.connect(qg); x.connect(lp); y.connect(lp); qg.connect(lp);
+        filterEnv(lp.frequency, t, f * 1.5 + 500, f * 9 + 3500 + 1500 * vel, .08, f * 3.2 + 1400, .5, nyq);
         return lp;
       },
     },

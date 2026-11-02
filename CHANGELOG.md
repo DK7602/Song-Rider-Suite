@@ -37,8 +37,9 @@
   is clean and clear.
 - **Vintage E-Piano fixed.** Every note carried a drifting offset that thumped and made the volume pump,
   and its tone swirled; it now rings and decays cleanly.
-- **Poly Synth and Saw Synth no longer sound alike.** Saw Synth is a bright, cutting lead; Poly Synth is
-  a warm, wide 80s pad that swells in.
+- **Saw Synth, Poly Synth and Warm Synth Pad each sound distinct.** Saw Synth is a bright, cutting lead;
+  Poly Synth a classic polysynth pad whose filter sweeps open on every chord ("wow"), with a wide chorus;
+  Warm Synth Pad a slow, soft, dark swell.
 - **Funky Worm and G-Funk Whistle are clearly audible on phones.** The worm has a brighter, Moog-style
   tone a phone speaker can play, the whistle sounds an octave above the written note like a real
   whistle, and both sit 2 dB above the other sounds as lead sounds.

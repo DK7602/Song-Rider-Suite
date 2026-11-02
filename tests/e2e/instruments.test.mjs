@@ -179,13 +179,17 @@ const PAGE_LIB = `(() => {
     const sr = 44100, ctx = new OfflineAudioContext(1, sr * 2.5, sr), inst = await window.CRPInstruments.load(ctx, id, ctx.destination);
     inst.play(midi, 0, { duration: 2.2, gain: .95 });
     const x = (await ctx.startRendering()).getChannelData(0), end = Math.round(2.2 * sr), lv = []; let dc = 0;
-    for (let s = 0, B = Math.round(.05 * sr); s + B <= end; s += B) { let q = 0; for (let i = s; i < s + B; i++) q += x[i] * x[i]; lv.push(10 * Math.log10(q / B + 1e-24)); }
+    const bright = [];
+    for (let s = 0, B = Math.round(.05 * sr); s + B <= end; s += B) {
+      let q = 0, d = 0; for (let i = Math.max(1, s); i < s + B; i++) { q += x[i] * x[i]; const e = x[i] - x[i - 1]; d += e * e; }
+      lv.push(10 * Math.log10(q / B + 1e-24)); bright.push(q > 1e-12 ? Math.sqrt(d / q) * sr / (2 * Math.PI) : 0);
+    }
     for (let s = Math.round(.05 * sr), B = Math.round(.2 * sr); s + B <= end; s += B) {
       let m = 0, q = 0; for (let i = s; i < s + B; i++) { m += x[i]; q += x[i] * x[i]; }
       const rms = Math.sqrt(q / B); if (rms > 1e-5) dc = Math.max(dc, Math.abs(m / B) / rms);
     }
     let ex = 0, ed = 0; for (let i = Math.round(.3 * sr); i < Math.round(1.3 * sr); i++) { ex += x[i] * x[i]; const d = x[i] - x[i - 1]; ed += d * d; }
-    return { dc, lv, centroid: Math.sqrt(ed / ex) * sr / (2 * Math.PI) };
+    return { dc, lv, bright, centroid: Math.sqrt(ed / ex) * sr / (2 * Math.PI) };
   }
   // Renders notes with one voice tapped onto its own channel; checks how that voice ends.
   async function voiceEnd(id, plan) {
@@ -340,7 +344,7 @@ try {
     assert.deepEqual(bad, []);
   }));
 
-  await test('synthesized voices carry no DC offset; Saw Synth and Poly Synth are clearly different', () => withPage(async page => {
+  await test('synthesized voices carry no DC offset; Saw Synth, Poly Synth and Warm Synth Pad are clearly different', () => withPage(async page => {
     // A DC offset thumps at every note and drifts (it was up to 74% of the level on the FM electric piano).
     const bad = [];
     for (const id of SYNTH) for (const m of [41, 60, 84]) {
@@ -353,12 +357,18 @@ try {
       const rises = lv.slice(4).reduce((n, v, i, a) => n + (i && v > a[i - 1] + .6 ? 1 : 0), 0);
       if (rises > 2) bad.push(`electric_piano_2 midi ${m}: level rises ${rises} times while it should decay`);
     }
-    // Saw Synth: instant and bright. Poly Synth: fades in, darker.
-    const saw = await page.evaluate(() => window.__inst.dcAndShape('lead_2_sawtooth', 60)), poly = await page.evaluate(() => window.__inst.dcAndShape('pad_3_polysynth', 60));
-    const reach = lv => lv.findIndex(v => v > Math.max(...lv) - 3) * 50;
-    if (!(reach(saw.lv) <= 50)) bad.push(`saw synth takes ${reach(saw.lv)} ms to reach its level`);
-    if (!(reach(poly.lv) >= 100)) bad.push(`poly synth reaches its level in ${reach(poly.lv)} ms (should fade in)`);
-    if (!(saw.centroid > poly.centroid * 1.4)) bad.push(`saw (${saw.centroid.toFixed(0)} Hz) is not clearly brighter than poly (${poly.centroid.toFixed(0)} Hz)`);
+    // Saw Synth: instant, steady and brightest. Poly Synth: quick, its filter sweeps open then settles medium-bright.
+    // Warm Synth Pad: slow swell, dark. (Users heard Saw = Poly, then Poly = Warm, when these overlapped.)
+    const shape = id => page.evaluate(id => window.__inst.dcAndShape(id, 60), id);
+    const [saw, poly, warm] = [await shape('lead_2_sawtooth'), await shape('pad_3_polysynth'), await shape('pad_2_warm')];
+    const reach = r => r.lv.findIndex(v => v > Math.max(...r.lv) - 3) * 50, mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+    const settled = r => mean(r.bright.slice(20, 40)), sweepPeak = r => Math.max(...r.bright.slice(2, 10));
+    if (!(reach(saw) <= 50)) bad.push(`saw synth takes ${reach(saw)} ms to reach its level`);
+    if (!(reach(poly) >= 30 && reach(poly) <= 300)) bad.push(`poly synth reaches its level in ${reach(poly)} ms (expected a quick 30-300 ms swell)`);
+    if (!(reach(warm) >= 500)) bad.push(`warm pad reaches its level in ${reach(warm)} ms (expected a slow swell)`);
+    if (!(settled(saw) > settled(poly) * 1.2)) bad.push(`saw (${settled(saw).toFixed(0)} Hz) not clearly brighter than poly (${settled(poly).toFixed(0)} Hz)`);
+    if (!(settled(poly) > settled(warm) * 1.8)) bad.push(`poly (${settled(poly).toFixed(0)} Hz) not clearly brighter than the warm pad (${settled(warm).toFixed(0)} Hz)`);
+    if (!(sweepPeak(poly) > settled(poly) * 1.3)) bad.push(`poly filter does not sweep (peak ${sweepPeak(poly).toFixed(0)} Hz, settled ${settled(poly).toFixed(0)} Hz)`);
     assert.deepEqual(bad, []);
   }));
 
