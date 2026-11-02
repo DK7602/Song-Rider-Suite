@@ -1,4 +1,4 @@
-const CACHE = 'song-rider-suite-v3.4.15';
+const CACHE = 'song-rider-suite-v3.4.16';
 // Recorded instrument audio (assets/instruments/<id>/*.mp3) never changes under the same name, so it lives in
 // its own cache that survives app updates and is served from there first. Bump this to drop the old audio.
 const INSTRUMENT_CACHE = 'srs-instruments-v2';
@@ -14,7 +14,7 @@ const ASSETS = [
   './assets/rider-og-pattern.jpg','./assets/rider-blood-pattern.jpg','./assets/rider-light-og-pattern.jpg','./assets/rider-blood-light-og-pattern.jpg',
   './assets/sapphire-paisley-dark.jpg','./assets/sapphire-paisley-light.jpg','./assets/suite-header-new.webp','./assets/chord-rider-pro-wordmark-hq2.webp',
   './song-rider/index.html','./song-rider/app.js','./song-rider/manifest.webmanifest','./song-rider/song-rider-pro-wordmark-hq.webp',
-  './song-rider/song-rider-pro-wordmark-blood.webp','./song-rider/pdf.mjs','./song-rider/pdf.worker.mjs','./song-rider/lame.min.js',
+  './song-rider/pdf.mjs','./song-rider/pdf.worker.mjs','./song-rider/lame.min.js',
   './assets/brand/app-icon-192.png','./assets/brand/app-icon-512.png','./assets/brand/favicon-32.png','./assets/brand/apple-touch-icon-180.png',
   './assets/brand/song-rider-suite-logo-512.webp','./assets/brand/song-rider-suite-logo-256.png'
 ];

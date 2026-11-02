@@ -69,11 +69,12 @@
     };
     const meta=$('meta[name="theme-color"]'); if(meta) meta.setAttribute('content',map[skin]||map[DEFAULT]);
   }
-  function updateSkinAssets(skin){
-    const blood=skin==='rider-blood'||skin==='rider-blood-light'||skin==='rider-blood-light-og';
+  // Every skin shows the same SONG RIDER PRO wordmark, with a green PRO like CHORD RIDER PRO's. (The blood skins
+  // used to swap in a wordmark with a red PRO.) Restores the original image if an older version swapped it.
+  function updateSkinAssets(){
     document.querySelectorAll('.srp-exact-wordmark').forEach(img=>{
-      if(!img.dataset.srsOriginalSrc)img.dataset.srsOriginalSrc=img.getAttribute('src')||'./song-rider-pro-wordmark-hq.webp?v=3.3.12';
-      img.setAttribute('src',blood?'./song-rider-pro-wordmark-blood.webp?v=3.3.71':img.dataset.srsOriginalSrc);
+      const original=img.dataset.srsOriginalSrc||img.getAttribute('src')||'./song-rider-pro-wordmark-hq.webp?v=3.3.12';
+      if(img.getAttribute('src')!==original)img.setAttribute('src',original);
     });
   }
   function applySkin(skin, persist=true){
