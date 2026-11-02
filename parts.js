@@ -32,7 +32,7 @@
       const durationSteps=Math.max(1,Math.round(Number(raw?.durationSteps)||1));
       const exactStart=Number(raw?.voxStartBeat),exactDur=Number(raw?.voxDurationBeats);
       const key=Number.isFinite(exactStart)&&exactStart>=0?`x:${exactStart.toFixed(3)}:${midi}`:`s:${step}:${midi}`,prev=byKey.get(key);
-      if(!prev||durationSteps>prev.durationSteps)byKey.set(key,{step,midi,durationSteps,...(raw?.voxId?{voxId:String(raw.voxId)}:{}),...(raw?.voxBlank===true?{voxBlank:true}:{}),...(Number.isFinite(exactStart)&&exactStart>=0?{voxStartBeat:exactStart}:{}),...(Number.isFinite(exactDur)&&exactDur>0?{voxDurationBeats:exactDur}:{})});
+      if(!prev||durationSteps>prev.durationSteps)byKey.set(key,{step,midi,durationSteps,...(raw?.voxId?{voxId:String(raw.voxId)}:{}),...(raw?.voxBlank===true?{voxBlank:true}:{}),...(Number.isFinite(exactStart)&&exactStart>=0?{voxStartBeat:exactStart}:{}),...(Number.isFinite(exactDur)&&exactDur>0?{voxDurationBeats:exactDur}:{}),...(raw?.fx&&typeof raw.fx==='object'?{fx:normalizeClipFx(raw.fx)}:{})});
     }
     return [...byKey.values()].sort((a,b)=>a.step-b.step||a.midi-b.midi);
   }
@@ -64,7 +64,22 @@
     }));
   }
   function hasTrackMasterStart(card){const s=card?.voxStartBeat;return s!=null&&Number.isFinite(Number(s))&&Number(s)>=0;}
-  function migrateChordData(data){uniquifyCardIds(data,{dropPhantoms:true});normalizeChordDurations(data);return data;}
+  function migrateChordData(data){uniquifyCardIds(data,{dropPhantoms:true});normalizeChordDurations(data);normalizeCardFx(data);return data;}
+  // ---- Music effects data (music-fx.js) ----
+  // Track FX live on each chord/lead part (p.trackFx), the drums' in the payload (drumsFx), the song's in
+  // the payload (songFx); a clip's own FX (chord card / lead event / drum region .fx) replace its track's
+  // FX for that clip. Older projects have none: everything Off.
+  const MFX=window.CRPMusicFx||null;
+  function normalizeClipFx(fx){return MFX?MFX.normalizeTrackFx(fx,{clip:true}):null;}
+  function normalizePartTrackFx(fx){return MFX?MFX.normalizeTrackFx(fx,{duck:true}):null;}
+  function normalizeDrumsFx(fx){if(!MFX)return null;const f=MFX.normalizeTrackFx(fx,{duck:false});f.duck=false;return f;}
+  function normalizeSongFxSettings(fx){return MFX?MFX.normalizeSongFx(fx):null;}
+  function normalizeCardFx(data){
+    for(const row of data?.rows||[])for(const card of Array.isArray(row)?row:[]){
+      if(!card||typeof card!=='object'||!('fx' in card))continue;
+      if(card.fx&&typeof card.fx==='object'&&MFX)card.fx=normalizeClipFx(card.fx);else delete card.fx;
+    }
+  }
 
 
   // v3.3.59 — repair the dual chord-duration representation used by CRP MIDI
@@ -102,12 +117,15 @@
   let songStartBeat=0, songEndBeat=null, songEndUiTimer=null;
   let drumEvents=[];
   let drumArrangementInitialized=false;
+  let songFxSettings=normalizeSongFxSettings(null),drumsFxSettings=normalizeDrumsFx(null);
   let voxLastHarmonyBeatKey='';
   let liveEditTimer=null,bpmRestartTimer=null,mediaPositionTimer=null,mediaKeepAlive=null,mediaKeepAliveUrl='',mediaPausedBeat=0,mediaActionsInstalled=false;
-  let audioCtx=null, mixInput=null, cycleTimer=null;
+  let audioCtx=null, mixInput=null, songFx=null, auditionFx=null, cycleTimer=null;
   // Per-playback graph (dropped by silenceScheduledAudio): part players/buses,
-  // live voices and clip sources, vocal FX chains and the queued windows.
+  // live voices and clip sources, vocal FX chains, music FX chains (part track FX,
+  // clip FX chains, the drums' chains) and the queued windows.
   let partPlayers=new Map(), playerSound=new WeakMap(), partBuses=new Map(), partHandoffGates=new Map(), partInstrumentFx=new Map(), vocalChains=new Map(), scheduledWindows=[], scheduledVocalPlan='';
+  let partFx=new Map(), clipChains=new Map(), drumChains=new Map();
   const highlightTimers=new Set(), activeVoices=new Set(), activeVocalSources=new Set();
   // Decoded takes, kept across playbacks and cleared on project switch.
   const vocalBufferCache=new Map(), vocalBuffers=new Map();
@@ -133,17 +151,17 @@
 
   function chordPart(name='Chords 1', data=null){
     const d=migrateChordData(data?clone(data):core.snapshot());
-    return {id:uid(),type:'chord',name,enabled:true,muted:false,solo:false,voxSetupEstablished:false,volume:.85,data:d};
+    return {id:uid(),type:'chord',name,enabled:true,muted:false,solo:false,voxSetupEstablished:false,volume:.85,data:d,trackFx:normalizePartTrackFx(null)};
   }
   function leadPart(name='Lead 1'){
-    return {id:uid(),type:'lead',name,enabled:true,muted:false,solo:false,voxSetupEstablished:false,repeat:true,sustain:false,volume:.8,instrument:'piano',sound:'acoustic_grand_piano',octave:0,gridOctave:3,resolution:16,bars:4,barsMode:'fixed',events:[]};
+    return {id:uid(),type:'lead',name,enabled:true,muted:false,solo:false,voxSetupEstablished:false,repeat:true,sustain:false,volume:.8,instrument:'piano',sound:'acoustic_grand_piano',octave:0,gridOctave:3,resolution:16,bars:4,barsMode:'fixed',events:[],trackFx:normalizePartTrackFx(null)};
   }
   function vocalPart(name='Vocals 1'){
     return {id:uid(),type:'vocal',name,enabled:true,muted:false,solo:false,voxTimeline:true,repeat:false,volume:1,transcript:'',recordings:[],activeTakeId:null,voxEvents:[],backingPartIds:parts.filter(x=>x.type==='chord'||x.type==='lead').filter(x=>x.enabled).map(x=>x.id),backingDrums:true,backingVolume:.8,fx:{eq:'clear',comp:'medium',reverb:.12,delay:0,autotune:0}};
   }
   function normalizeVocalFx(fx,fallback=null){
     const f=fx||fallback||{};
-    return {eq:f.eq||'clear',comp:f.comp||'medium',reverb:Number(f.reverb??.12),delay:Number(f.delay||0),autotune:Math.max(0,Math.min(100,Number(f.autotune)||0))};
+    return {eq:f.eq||'clear',comp:f.comp||'medium',reverb:Number(f.reverb??.12),delay:Number(f.delay||0),autotune:Math.max(0,Math.min(100,Number(f.autotune)||0)),duck:f.duck===true};
   }
   function normalizeVoxEvent(e,p=null){
     if(!e)return null;
@@ -161,8 +179,8 @@
   function normalizePart(p,i){
     if(!p||!p.type)return null;
     const base={id:p.id||uid(),name:p.name||`${p.type==='chord'?'Chords':p.type==='lead'?'Lead':'Vocals'} ${i+1}`,enabled:p.enabled!==false,muted:p.muted===true,solo:p.solo===true,voxSetupEstablished:p.voxSetupEstablished===true,volume:Number.isFinite(+p.volume)?Math.max(0,Math.min(1,+p.volume)):.85};
-    if(p.type==='chord')return {...base,type:'chord',data:migrateChordData(clone(p.data||core.snapshot()))};
-    if(p.type==='lead')return {...base,type:'lead',repeat:p.repeat!==false,sustain:p.sustain===true,instrument:['piano','guitar','misc'].includes(p.instrument)?p.instrument:'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(256,+p.bars||4)),barsMode:p.barsMode==='song'?'song':'fixed',events:normalizeLeadEvents(p.events)};
+    if(p.type==='chord')return {...base,type:'chord',data:migrateChordData(clone(p.data||core.snapshot())),trackFx:normalizePartTrackFx(p.trackFx)};
+    if(p.type==='lead')return {...base,type:'lead',trackFx:normalizePartTrackFx(p.trackFx),repeat:p.repeat!==false,sustain:p.sustain===true,instrument:['piano','guitar','misc'].includes(p.instrument)?p.instrument:'piano',sound:p.sound||'acoustic_grand_piano',octave:Number(p.octave)||0,gridOctave:Number(p.gridOctave)||3,resolution:[8,16,32,64].includes(+p.resolution)?+p.resolution:16,bars:Math.max(1,Math.min(256,+p.bars||4)),barsMode:p.barsMode==='song'?'song':'fixed',events:normalizeLeadEvents(p.events)};
     const voxEvents=Array.isArray(p.voxEvents)?p.voxEvents.map(e=>normalizeVoxEvent(e,p)).filter(Boolean):[];
     const recordings=Array.isArray(p.recordings)?p.recordings.map(r=>({...r,blob:null})):[];
     const activeTakeId=p.activeTakeId||null;
@@ -425,6 +443,7 @@
       strip.appendChild(wrap);
     });
     renderActiveVolumeControl();
+    renderPartFxSection();
     renderSongEndEditor();
   }
 
@@ -1157,7 +1176,7 @@
     }catch{return {name:'Recovered take'};}
   }
   function renderVocalEditor(p=active()){
-    if(!p||p.type!=='vocal')return;$('vocalPartTitle').textContent=p.name;if($('vocalTranscript'))$('vocalTranscript').value=p.transcript||'';if($('vocalRepeat'))$('vocalRepeat').checked=p.repeat!==false;$('vocalVolume').value=Math.round(p.volume*100);$('vocalVolumeValue').textContent=`${Math.round(p.volume*100)}%`;renderVocalBacking(p);$('vocalBackingDrums').checked=p.backingDrums!==false;$('vocalBackingVolume').value=Math.round((p.backingVolume??.8)*100);$('vocalBackingVolumeValue').textContent=`${Math.round((p.backingVolume??.8)*100)}%`;$('vocalFxEq').value=p.fx?.eq||'clear';$('vocalFxComp').value=p.fx?.comp||'medium';$('vocalFxReverb').value=String(p.fx?.reverb??.12);$('vocalFxDelay').value=String(p.fx?.delay||0);if($('vocalFxAutotune'))$('vocalFxAutotune').value=String(Math.round(Number(p.fx?.autotune)||0));paintAutotuneSlider();if($('vocalFxAutotuneValue'))$('vocalFxAutotuneValue').textContent=`${Math.round(Number(p.fx?.autotune)||0)}%`;if($('vocalAutotuneKey'))$('vocalAutotuneKey').textContent=vocalAutotuneScale().label;renderVocalTakes(p);updatePartPlaybackButtons();
+    if(!p||p.type!=='vocal')return;$('vocalPartTitle').textContent=p.name;if($('vocalTranscript'))$('vocalTranscript').value=p.transcript||'';if($('vocalRepeat'))$('vocalRepeat').checked=p.repeat!==false;$('vocalVolume').value=Math.round(p.volume*100);$('vocalVolumeValue').textContent=`${Math.round(p.volume*100)}%`;renderVocalBacking(p);$('vocalBackingDrums').checked=p.backingDrums!==false;$('vocalBackingVolume').value=Math.round((p.backingVolume??.8)*100);$('vocalBackingVolumeValue').textContent=`${Math.round((p.backingVolume??.8)*100)}%`;$('vocalFxEq').value=p.fx?.eq||'clear';$('vocalFxComp').value=p.fx?.comp||'medium';$('vocalFxReverb').value=String(p.fx?.reverb??.12);$('vocalFxDelay').value=String(p.fx?.delay||0);if($('vocalFxDuck'))$('vocalFxDuck').checked=vocalDucks(p);if($('vocalFxAutotune'))$('vocalFxAutotune').value=String(Math.round(Number(p.fx?.autotune)||0));paintAutotuneSlider();if($('vocalFxAutotuneValue'))$('vocalFxAutotuneValue').textContent=`${Math.round(Number(p.fx?.autotune)||0)}%`;if($('vocalAutotuneKey'))$('vocalAutotuneKey').textContent=vocalAutotuneScale().label;renderVocalTakes(p);updatePartPlaybackButtons();
   }
   async function ensureMic(){
     if(micStream?.active)return micStream;if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone recording is not available in this browser.');
@@ -1459,7 +1478,7 @@
   }
   function normalizeDrumEvent(raw){
     if(!raw)return null;const start=Math.max(0,Number(raw.startBeat)||0),duration=Math.max(.03,Number(raw.durationBeats)||4),pattern=clone(raw.pattern||blankDrumPattern());
-    return {id:String(raw.id||uid()),startBeat:start,durationBeats:duration,patternOffsetBeats:Number(raw.patternOffsetBeats)||0,pattern};
+    return {id:String(raw.id||uid()),startBeat:start,durationBeats:duration,patternOffsetBeats:Number(raw.patternOffsetBeats)||0,pattern,...(raw.fx&&typeof raw.fx==='object'&&MFX?{fx:normalizeClipFx(raw.fx)}:{})};
   }
   let drumMasterSyncing=false;
   function primaryDrumEvent(){return [...drumEvents].sort((a,b)=>(Number(a.startBeat)||0)-(Number(b.startBeat)||0))[0]||null;}
@@ -1656,7 +1675,7 @@
     for(const entry of vocalChains.values()){
       if(entry.partId!==pid)continue;
       const fx=effectiveVocalFx(p,entry.eventId?eventById(entry.eventId):null);
-      setVocalChainFx(entry.chain,fx,scale);setVocalChainLevel(entry.chain,level);
+      setVocalChainFx(entry.chain,fx,scale);setVocalChainLevel(entry.chain,level);setVocalChainDuck(entry.chain,songFx,vocalDucks(p));
       // Turning Auto-Tune on adds the worklet's latency; re-plan so clips stay in time.
       if(fx.autotune>0&&!entry.chain.tune&&insertChainTune(entry.chain,fx.autotune))replan=true;
     }
@@ -1688,10 +1707,8 @@
       // as chord rows / song markers grow.
       for(const q of parts)if(q?.type==='lead')syncLeadBarsToSong(q);
       pruneRemovedPartAudio();
-      const now=audioCtx?.currentTime||0;
       for(const p of parts){
-        const bus=partBuses.get(p.id);
-        if(bus&&audioCtx){try{if(typeof bus.gain.cancelAndHoldAtTime==='function')bus.gain.cancelAndHoldAtTime(now);else bus.gain.cancelScheduledValues(now);bus.gain.setTargetAtTime(desiredPartGain(p,outputSoundFor(p)),now,.028);}catch{}}
+        if(partBuses.has(p.id)&&audioCtx)setPartGains(p,desiredPartGain(p,outputSoundFor(p)));
         if(p.type==='vocal')applyVocalFxLive(p);
       }
       if(playing||starting){
@@ -1713,10 +1730,11 @@
   }
 
   // ---- Audio output ----
-  // Every Baby DAW source feeds mixInput: a fixed headroom trim, then the suite
-  // master (window.CRPAudio, which limits) when it exists, else our own safety
-  // stage. Drums play in Beat Maker's context and get the same trim through
-  // their gain scale.
+  // Every Baby DAW source reaches the suite master (window.CRPAudio, which
+  // limits; else our own safety stage) through the song effects (songFx, see
+  // music-fx.js). Each source gets a fixed headroom trim first: vocals through
+  // mixInput, instrument parts in their track FX (trim), drums through Beat
+  // Maker's gain scale. The song FX graph lives as long as the context.
   function ensureAudio(){
     if(!audioCtx){
       audioCtx=window.CRPAudio?.context?.()||new (window.AudioContext||window.webkitAudioContext)();
@@ -1730,23 +1748,37 @@
       });
     }
     if(audioCtx.state==='suspended')audioCtx.resume().catch(()=>{});
-    if(!mixInput)mixInput=createMixOutput(audioCtx,window.CRPAudio?.master?.());
+    if(!mixInput){const out=createMixOutput(audioCtx,window.CRPAudio?.master?.());mixInput=out.input;songFx=out.songFx;}
     return audioCtx;
   }
-  function createMixOutput(ctx,sharedMaster=null){
-    const input=ctx.createGain();input.gain.value=MIX_HEADROOM;
-    if(sharedMaster&&sharedMaster.context===ctx){input.connect(sharedMaster);return input;}
-    // Offline export: the suite's loudness master (drive, glue, limiter) so the WAV
-    // sounds as loud as playback.
-    if(typeof window.CRPAudio?.buildMaster==='function'){input.connect(window.CRPAudio.buildMaster(ctx));return input;}
+  // The loudness stage everything ends in: the suite master on the live context,
+  // a fresh copy of it for an offline export (so the WAV sounds as loud as
+  // playback), or a safety stage.
+  function masterStage(ctx,sharedMaster=null){
+    if(sharedMaster&&sharedMaster.context===ctx)return sharedMaster;
+    if(typeof window.CRPAudio?.buildMaster==='function')return window.CRPAudio.buildMaster(ctx);
     // Safety stage: a fast compressor, then a soft clipper that is transparent
     // below 0.8 and never reaches full scale.
     const comp=ctx.createDynamicsCompressor(),pre=ctx.createGain(),clip=ctx.createWaveShaper();
     comp.threshold.value=-6;comp.knee.value=3;comp.ratio.value=12;comp.attack.value=.002;comp.release.value=.15;
     pre.gain.value=1/SOFT_CLIP_RANGE;clip.curve=softClipCurve();clip.oversample='2x';
-    input.connect(comp);comp.connect(pre);pre.connect(clip);clip.connect(ctx.destination);
-    return input;
+    comp.connect(pre);pre.connect(clip);clip.connect(ctx.destination);
+    return comp;
   }
+  // {input: the headroom trim vocals play into, songFx, sum: where track chains
+  // and drums join the song FX}. `tail` (export: the song-end fade) sits between
+  // the song FX and the master.
+  function createMixOutput(ctx,sharedMaster=null,tail=null){
+    const master=masterStage(ctx,sharedMaster);
+    if(tail)tail.connect(master);
+    const input=ctx.createGain();input.gain.value=MIX_HEADROOM;
+    const sfx=MFX?MFX.createSongFx(ctx,tail||master,{level:MFX.LEVELS.song}):null;
+    if(sfx)sfx.set(songFxSettings,{bpm:songBpm(),immediate:true});
+    input.connect(sfx?sfx.input:(tail||master));
+    return {input,songFx:sfx,sum:sfx?sfx.input:input};
+  }
+  // Where track chains and drums join the mix (live).
+  function mixSum(){ensureAudio();return songFx?songFx.input:mixInput;}
   let softClipCurveData=null;
   function softClipCurve(){
     if(softClipCurveData)return softClipCurveData;
@@ -1763,8 +1795,10 @@
       // bus.gain for live volume/mute changes without cancelling the tiny
       // anti-click envelope used when a newly decoded SoundFont becomes ready.
       const gate=audioCtx.createGain();gate.gain.value=1;bus.connect(gate);partHandoffGates.set(p.id,gate);
-      const fx=core.createInstrumentFxChain?.(audioCtx,mixInput);
-      if(fx){gate.connect(fx.input);partInstrumentFx.set(p.id,fx);}else gate.connect(mixInput);
+      // bus → gate → instrument FX (wah/worm) → the part's track FX → song FX.
+      const tfx=createPartTrackFx(audioCtx,p,mixSum(),songFx);if(tfx)partFx.set(p.id,tfx);
+      const dest=tfx?tfx.input:mixInput,fx=core.createInstrumentFxChain?.(audioCtx,dest);
+      if(fx){gate.connect(fx.input);partInstrumentFx.set(p.id,fx);}else gate.connect(dest);
       partBuses.set(p.id,bus);fresh=true;
     }
     return {bus,fresh};
@@ -1772,13 +1806,135 @@
   function busFor(p,soundOverride=null){
     const {bus,fresh}=ensurePartBus(p),sound=soundOverride||requestedPartSound(p);
     partInstrumentFx.get(p.id)?.setSound?.(sound);
-    const target=desiredPartGain(p,sound),now=audioCtx.currentTime;
-    try{
-      if(fresh||!(playing||starting))bus.gain.value=target;
-      else{if(typeof bus.gain.cancelAndHoldAtTime==='function')bus.gain.cancelAndHoldAtTime(now);else bus.gain.cancelScheduledValues(now);bus.gain.setTargetAtTime(target,now,.032);}
-    }catch{bus.gain.value=target;}
+    setPartGains(p,desiredPartGain(p,sound),fresh);
     return bus;
   }
+  // The part's volume bus and its clip-FX chains' buses move together.
+  function setPartGains(p,target,fresh=false){
+    const bus=partBuses.get(p.id),now=audioCtx?.currentTime||0;
+    for(const node of [bus,...partClipChains(p).map(c=>c.bus)]){
+      if(!node)continue;
+      try{
+        if((fresh&&node===bus)||!(playing||starting))node.gain.value=target;
+        else{if(typeof node.gain.cancelAndHoldAtTime==='function')node.gain.cancelAndHoldAtTime(now);else node.gain.cancelScheduledValues(now);node.gain.setTargetAtTime(target,now,.028);}
+      }catch{node.gain.value=target;}
+    }
+  }
+
+  // ---- Music effects (music-fx.js) ----
+  // A chord/lead part's track FX sit after its instrument FX and before the song
+  // FX, with the mix headroom as their output trim. Drive and compression see the
+  // part at its kind's nominal level (CRPMusicFx.LEVELS).
+  function partFxLevel(p){return MFX?(p?.type==='lead'?MFX.LEVELS.lead:MFX.LEVELS.chord):1;}
+  function partTrackFxSettings(p){return normalizePartTrackFx(p?.trackFx);}
+  function createPartTrackFx(ctx,p,dest,sfx,fx=null){
+    if(!MFX)return null;
+    const t=MFX.createTrackFx(ctx,dest,sfx,{level:partFxLevel(p),trim:MIX_HEADROOM});
+    t.set(fx?clipChainSettings(p,fx):partTrackFxSettings(p),{immediate:true});
+    return t;
+  }
+  // A clip's own FX replace its track's (like vocal clip FX); Duck to kick and
+  // Bypass stay the track's.
+  function clipChainSettings(p,fx){const t=partTrackFxSettings(p);return {...normalizeClipFx(fx),duck:!!t?.duck,bypass:!!t?.bypass};}
+  function clipFxKey(fx){return JSON.stringify(normalizeClipFx(fx));}
+  function partClipChains(p){const id=String(p?.id);return [...clipChains.values()].filter(c=>c.partId===id);}
+  // One chain per part and distinct clip-FX setting, shared by every clip with
+  // that setting; those clips' notes play through an extra player on it.
+  function liveClipChain(p,fx){
+    const fxKey=clipFxKey(fx),key=`${p.id}|${fxKey}`;let c=clipChains.get(key);
+    if(!c){
+      ensureAudio();const bus=audioCtx.createGain();bus.gain.value=desiredPartGain(p,outputSoundFor(p));
+      const tfx=createPartTrackFx(audioCtx,p,mixSum(),songFx,fx),dest=tfx?tfx.input:mixInput,ifx=core.createInstrumentFxChain?.(audioCtx,dest);
+      bus.connect(ifx?ifx.input:dest);
+      c={key,fxKey,partId:String(p.id),bus,ifx,tfx,players:new Map()};clipChains.set(key,c);
+    }
+    return c;
+  }
+  function clipPlayerFor(p,fx,sound){
+    if(!MFX)return null;
+    const base=decodedSounds.get(sound)?.base;if(!base)return null;
+    const c=liveClipChain(p,fx);let player=c.players.get(sound);
+    if(!player){player=samplePlayerOn(audioCtx,base,c.bus);c.players.set(sound,player);playerSound.set(player,sound);}
+    c.ifx?.setSound?.(sound);
+    return player;
+  }
+  // After a clip-FX edit during playback: a chain whose setting no clip uses any
+  // more takes over a setting that has no chain yet (and glides to it), so a
+  // slider drag changes the playing chain instead of building new ones.
+  function rekeyChains(chains,used,rekey){
+    const free=chains.filter(c=>!used.has(c.fxKey));
+    for(const fxKey of used.keys()){
+      if(chains.some(c=>c.fxKey===fxKey))continue;
+      const c=free.shift();if(c)rekey(c,fxKey);
+    }
+  }
+  function partClipFxInUse(p){
+    const used=new Map();
+    if(p?.type==='chord')for(const it of chordFlatItems(p))if(it.card?.fx)used.set(clipFxKey(it.card.fx),it.card.fx);
+    if(p?.type==='lead')for(const e of p.events||[])if(e.fx)used.set(clipFxKey(e.fx),e.fx);
+    return used;
+  }
+  function syncClipChains(p){
+    if(!p)return;
+    rekeyChains(partClipChains(p),partClipFxInUse(p),(c,fxKey)=>{clipChains.delete(c.key);c.fxKey=fxKey;c.key=`${p.id}|${fxKey}`;clipChains.set(c.key,c);});
+    for(const c of partClipChains(p))c.tfx?.set(clipChainSettings(p,JSON.parse(c.fxKey)));
+  }
+  function disposeClipChain(c){
+    for(const player of c.players.values())try{player.dispose?.();player.out?.disconnect();}catch{}
+    try{c.bus.disconnect();}catch{}
+    try{c.ifx?.disconnect?.();}catch{}
+    c.tfx?.dispose();
+  }
+  // Applies a part's edited track FX (and its clips' FX) to what is playing.
+  function applyPartFxLive(p){
+    if(!p||!MFX)return;
+    partFx.get(p.id)?.set(partTrackFxSettings(p));
+    syncClipChains(p);
+    if(String(p.id)===String(loadedChordPartId))refreshAuditionFx();
+  }
+  // ---- Drums through their track FX ----
+  // Beat Maker asks where each song drum hit goes (CRPMusicFx.drumDestination):
+  // the Drums track chain, or a region's own chain when the region has clip FX.
+  // The drums arrive at their mix level (Beat Maker's gain scale has the
+  // headroom), so these chains have no trim. The drums never duck.
+  function drumChainSettings(fx=null){const t=drumsFxSettings||normalizeDrumsFx(null);return fx?{...normalizeClipFx(fx),duck:false,bypass:!!t.bypass}:{...t,duck:false};}
+  function drumChain(ctx,map,sfx,fx=null){
+    const fxKey=fx?clipFxKey(fx):'',key=fx?`region|${fxKey}`:'track';let c=map.get(key);
+    if(!c){c=MFX.createTrackFx(ctx,sfx.input,sfx,{level:MFX.LEVELS.drums,trim:1});c.fxKey=fxKey;c.mapKey=key;c.set(drumChainSettings(fx),{immediate:true});map.set(key,c);}
+    return c;
+  }
+  function liveDrumDestination(ctx,regionId){
+    if(!MFX||!audioCtx||ctx!==audioCtx||!(playing||starting)||!songFx)return null;
+    const ev=regionId!=null?drumEvents.find(e=>String(e.id)===String(regionId)):null;
+    return drumChain(audioCtx,drumChains,songFx,ev?.fx||null).input;
+  }
+  function syncDrumChains(){
+    if(!MFX)return;
+    drumChains.get('track')?.set(drumChainSettings());
+    const used=new Map();for(const ev of drumEvents)if(ev.fx)used.set(clipFxKey(ev.fx),ev.fx);
+    rekeyChains([...drumChains.values()].filter(c=>c.mapKey!=='track'),used,(c,fxKey)=>{drumChains.delete(c.mapKey);c.fxKey=fxKey;c.mapKey=`region|${fxKey}`;drumChains.set(c.mapKey,c);});
+    for(const c of drumChains.values())if(c.mapKey!=='track')c.set(drumChainSettings(JSON.parse(c.fxKey)));
+  }
+  function applySongFxLive(){songFx?.set(songFxSettings,{bpm:songBpm()});}
+  // Chord Rider's own taps (app.js) go through the loaded chord part's track FX
+  // and the song FX. This chain lasts as long as the context and never ducks.
+  function auditionDestination(ctx){
+    if(!MFX)return null;
+    ensureAudio();if(ctx&&ctx!==audioCtx)return null;
+    if(!auditionFx){auditionFx=MFX.createTrackFx(audioCtx,mixSum(),songFx,{level:MFX.LEVELS.chord,trim:1});refreshAuditionFx(true);}
+    return auditionFx.input;
+  }
+  function refreshAuditionFx(immediate=false){
+    if(!auditionFx)return;
+    const p=loadedChord();auditionFx.set({...(p?partTrackFxSettings(p):normalizePartTrackFx(null)),duck:false},{immediate});
+  }
+  // Beat Maker's live hooks: where a song drum hit goes, and each song kick
+  // (which pumps the tracks with Duck to kick on).
+  MFX?.setLiveRouter({
+    drumDestination:liveDrumDestination,
+    onKick(ctx,time){if(songFx&&ctx===audioCtx&&(playing||starting))songFx.pump.kick(time);},
+    onKickCancel(ctx,from){if(songFx&&ctx===audioCtx)songFx.pump.cancelFrom(from);},
+  });
 
   // ---- Instruments ----
   // Decoded SoundFont samples (network + mp3 decode) are the expensive part, so
@@ -1904,17 +2060,19 @@
   }
   // Note scheduling for one song window {startTime,fromBeat,toBeat,beatSec},
   // shared by live playback and export. play(player,note,at,opts) starts a note.
-  function scheduleChordNotes(p,player,sound,win,play,onCard){
+  // clipPlayer(fx) gives the player of a clip with its own FX (null: the part's).
+  function scheduleChordNotes(p,player,sound,win,play,onCard,clipPlayer=null){
     const guitar=p.data?.instrument==='guitar';
     chordFlatItems(p).forEach((item,i)=>{
       const b=item.startBeat;if(b<win.fromBeat||b>=win.toBeat)return;
       const at=win.startTime+(b-win.fromBeat)*win.beatSec,base=item.dur*win.beatSec,duration=core.sustain?sustainedPartSeconds(sound,base):Math.max(.18,base*.98);
-      (core.notesFor(item.card,p.data)||[]).forEach((n,j)=>play(player,n,at+(guitar?j*.035:0),{duration,gain:.94}));
+      const pl=(item.card?.fx&&clipPlayer?.(item.card.fx))||player;
+      (core.notesFor(item.card,p.data)||[]).forEach((n,j)=>play(pl,n,at+(guitar?j*.035:0),{duration,gain:.94}));
       onCard?.(at,i);
     });
   }
   function leadPartRepeats(p){return playbackScope?.kind==='vocalMix'?p.repeat:!!core.loop;}
-  function scheduleLeadNotes(p,player,sound,win,repeat,play,onNote){
+  function scheduleLeadNotes(p,player,sound,win,repeat,play,onNote,clipPlayer=null){
     const stepBeats=4/p.resolution,partBeats=Math.max(stepBeats,p.bars*4),bassShift=(core.isBassSound?.(sound)||sound==='electric_bass_finger')?12:0;
     const first=repeat?Math.max(0,Math.floor(win.fromBeat/partBeats)):0,last=repeat?Math.floor((win.toBeat-1e-6)/partBeats):0;
     for(let cyc=first;cyc<=last;cyc++)for(const e of p.events||[]){
@@ -1922,7 +2080,7 @@
       const b=leadEventStartBeat(p,e)+cyc*partBeats;if(b<win.fromBeat||b>=win.toBeat)continue;
       const at=win.startTime+(b-win.fromBeat)*win.beatSec,drawn=leadEventDurationBeats(p,e);
       const duration=p.sustain&&drawn<=stepBeats?sustainedPartSeconds(sound,win.beatSec):Math.max(.05,drawn*win.beatSec*.98);
-      play(player,midiName(e.midi+(Number(p.octave)||0)*12-bassShift),at,{duration,gain:.92});
+      play((e.fx&&clipPlayer?.(e.fx))||player,midiName(e.midi+(Number(p.octave)||0)*12-bassShift),at,{duration,gain:.92});
       onNote?.(at,e.step);
     }
   }
@@ -1933,8 +2091,9 @@
       if(!player)continue;
       const sound=playerSound.get(player)||requestedPartSound(p);
       busFor(p,sound);
-      if(p.type==='chord')scheduleChordNotes(p,player,sound,win,playTracked,(at,i)=>scheduleHighlight((at-audioCtx.currentTime)*1000,p,i));
-      else scheduleLeadNotes(p,player,sound,win,leadPartRepeats(p),playTracked,(at,step)=>scheduleLeadHighlight((at-audioCtx.currentTime)*1000,p,step));
+      const clipPlayer=fx=>clipPlayerFor(p,fx,sound);
+      if(p.type==='chord')scheduleChordNotes(p,player,sound,win,playTracked,(at,i)=>scheduleHighlight((at-audioCtx.currentTime)*1000,p,i),clipPlayer);
+      else scheduleLeadNotes(p,player,sound,win,leadPartRepeats(p),playTracked,(at,step)=>scheduleLeadHighlight((at-audioCtx.currentTime)*1000,p,step),clipPlayer);
     }
   }
 
@@ -2024,14 +2183,15 @@
       comp:ctx.createDynamicsCompressor(),makeup:ctx.createGain(),post:ctx.createGain(),
       revHp:bq('highpass',180,.7),revLp:bq('lowpass',8500,.7),rev:null,revSize:null,wet:ctx.createGain(),
       delay:ctx.createDelay(2),fb:ctx.createGain(),fbHp:bq('highpass',250,.7),fbLp:bq('lowpass',4500,.7),delayGain:ctx.createGain(),
-      out:ctx.createGain(),tune:null,latency:0};
+      out:ctx.createGain(),duck:ctx.createGain(),pump:null,tune:null,latency:0};
     const c=chain;
     c.input.connect(c.hp);c.hp.connect(c.low);c.low.connect(c.pres);c.pres.connect(c.air);c.air.connect(c.comp);c.comp.connect(c.makeup);c.makeup.connect(c.post);
     c.post.connect(c.out);
     c.post.connect(c.revHp);c.revHp.connect(c.revLp);c.wet.connect(c.out);
     c.post.connect(c.delay);c.delay.connect(c.delayGain);c.delayGain.connect(c.out);
     c.delay.connect(c.fb);c.fb.connect(c.fbHp);c.fbHp.connect(c.fbLp);c.fbLp.connect(c.delay);c.fb.gain.value=0;
-    c.out.connect(destination);
+    // duck: the song's Pump (Duck to kick), at unity unless the vocal track ducks.
+    c.out.connect(c.duck);c.duck.connect(destination);
     setVocalChainFx(chain,fx,null,true);
     if(fx.autotune>0)insertChainTune(chain,fx.autotune);
     return chain;
@@ -2075,15 +2235,24 @@
   }
   function disconnectVocalChain(chain){
     if(!chain)return;
-    for(const n of [chain.input,chain.tune,chain.hp,chain.low,chain.pres,chain.air,chain.comp,chain.makeup,chain.post,chain.revHp,chain.revLp,chain.rev,chain.wet,chain.delay,chain.fb,chain.fbHp,chain.fbLp,chain.delayGain,chain.out])try{n?.disconnect();}catch{}
+    chain.pump?.gains.delete(chain.duck);chain.pump=null;
+    for(const n of [chain.input,chain.tune,chain.hp,chain.low,chain.pres,chain.air,chain.comp,chain.makeup,chain.post,chain.revHp,chain.revLp,chain.rev,chain.wet,chain.delay,chain.fb,chain.fbHp,chain.fbLp,chain.delayGain,chain.out,chain.duck])try{n?.disconnect();}catch{}
     chain.tune?.port.postMessage({type:'release'});
+  }
+  // A vocal track's "Duck to kick" (its own track FX, off by default): its
+  // chains (clip chains too) duck with the song's Pump.
+  function vocalDucks(p){return normalizeVocalFx(p?.fx).duck===true;}
+  function setVocalChainDuck(chain,sfx,on){
+    if(!sfx)return;
+    if(on&&!chain.pump){chain.pump=sfx.pump;sfx.pump.attach(chain.duck);}
+    else if(!on&&chain.pump){chain.pump.detach(chain.duck);chain.pump=null;}
   }
   function vocalChainKey(p,e){return e?.fx?`${p.id}:${e.id}`:String(p.id);}
   function liveVocalChain(p,e){
     const key=vocalChainKey(p,e);let entry=vocalChains.get(key);
     if(!entry){
       const chain=buildVocalChain(audioCtx,mixInput,effectiveVocalFx(p,e));
-      setVocalChainLevel(chain,vocalPartLevel(p),true);
+      setVocalChainLevel(chain,vocalPartLevel(p),true);setVocalChainDuck(chain,songFx,vocalDucks(p));
       entry={key,chain,partId:String(p.id),eventId:e?.fx?String(e.id):null};vocalChains.set(key,entry);
     }
     return entry;
@@ -2177,8 +2346,10 @@
     for(const id of [...partBuses.keys()])if(!ids.has(String(id))){
       for(const node of [partBuses.get(id),partHandoffGates.get(id)])try{node?.disconnect();}catch{}
       try{partInstrumentFx.get(id)?.disconnect?.();}catch{}
-      partBuses.delete(id);partHandoffGates.delete(id);partInstrumentFx.delete(id);partPlayers.delete(id);
+      partFx.get(id)?.dispose();
+      partBuses.delete(id);partHandoffGates.delete(id);partInstrumentFx.delete(id);partPlayers.delete(id);partFx.delete(id);
     }
+    for(const [key,c] of clipChains)if(!ids.has(c.partId)){disposeClipChain(c);clipChains.delete(key);}
   }
   function scheduleHighlight(delayMs,p,cardIndex){
     if(p.id!==activePartId||p.type!=='chord')return;
@@ -2239,6 +2410,13 @@
     for(const gate of partHandoffGates.values())try{gate.disconnect();}catch{}
     for(const fx of partInstrumentFx.values())try{fx?.disconnect?.();}catch{}
     partInstrumentFx.clear();partHandoffGates.clear();partBuses.clear();
+    // Music FX chains are per playback too; every duck gain returns to unity and
+    // the song's shared reverb/delay leave the graph once nothing sends to them.
+    for(const t of partFx.values())t.dispose();
+    for(const c of clipChains.values())disposeClipChain(c);
+    for(const t of drumChains.values())t.dispose();
+    partFx.clear();clipChains.clear();drumChains.clear();
+    songFx?.pump.reset();songFx?.flush();
     playerSound=new WeakMap();
   }
   async function startPlayback(options={}){
@@ -2264,7 +2442,7 @@
     const generation=++playbackGeneration;
     starting=true;updatePartPlaybackButtons();
     try{
-      core.status('Loading parts…');ensureAudio();if(audioCtx?.state==='suspended')await audioCtx.resume();if(vs.length)await ensureVocalWorklet(audioCtx);await Promise.all([preload(ps),...vs.map(v=>preloadVocalBuffers(v))]);
+      core.status('Loading parts…');ensureAudio();applySongFxLive();if(audioCtx?.state==='suspended')await audioCtx.resume();if(vs.length)await ensureVocalWorklet(audioCtx);await Promise.all([preload(ps),...vs.map(v=>preloadVocalBuffers(v))]);
       if(generation!==playbackGeneration)return;
       pruneDecodedSounds();
 
@@ -2485,38 +2663,56 @@
     const end=effectiveSongEndBeats(natural),customEnd=Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>start+.03;
     const songSec=Math.max(.05,(end-start)*beatSec),tailSec=customEnd?.08:1.8,sampleRate=AUDIO_EXPORT_SAMPLE_RATE;
     const ctx=new OfflineCtx(2,Math.ceil((songSec+tailSec)*sampleRate),sampleRate);
-    const out=ctx.createGain();out.connect(createMixOutput(ctx));
+    // The same graph as playback, built on the offline context with every
+    // setting in place: track/clip/drum chains → song FX → song-end fade → master.
+    const out=ctx.createGain(),mix=createMixOutput(ctx,null,out),sfx=mix.songFx;
     if(customEnd){out.gain.setValueAtTime(1,Math.max(0,songSec-.045));out.gain.linearRampToValueAtTime(0,songSec);}
     const win={startTime:0,endTime:songSec,fromBeat:start,toBeat:end,endBeat:end,beatSec,includeRunning:true};
     onProgress('Loading sounds…');
     const play=(player,note,at,opts)=>{try{player.play(note,at,opts);}catch{}};
     for(const p of selected.filter(x=>x.type==='chord'||x.type==='lead')){
-      const sound=requestedPartSound(p),bus=ctx.createGain(),base=await decodedSound(sound).promise;
+      const sound=requestedPartSound(p),base=await decodedSound(sound).promise;
       // After the load: the level depends on which engine served the sound.
-      bus.gain.value=soundGain(sound)*p.volume*(p.type==='lead'?LEAD_OUTPUT_BOOST:1);
-      const fx=core.createInstrumentFxChain?.(ctx,out);if(fx){bus.connect(fx.input);fx.setSound(sound);}else bus.connect(out);
-      const player=samplePlayerOn(ctx,base,bus);
-      if(p.type==='chord')scheduleChordNotes(p,player,sound,win,play);
-      else scheduleLeadNotes(p,player,sound,win,!!core.loop,play);
+      const level=soundGain(sound)*p.volume*(p.type==='lead'?LEAD_OUTPUT_BOOST:1);
+      // bus → instrument FX → track FX (or a clip's own FX) → song FX.
+      const chainPlayer=fx=>{
+        const bus=ctx.createGain();bus.gain.value=level;
+        const tfx=sfx?createPartTrackFx(ctx,p,mix.sum,sfx,fx):null,dest=tfx?tfx.input:mix.input;
+        const ifx=core.createInstrumentFxChain?.(ctx,dest);if(ifx){bus.connect(ifx.input);ifx.setSound(sound);}else bus.connect(dest);
+        return samplePlayerOn(ctx,base,bus);
+      };
+      const player=chainPlayer(null),clipPlayers=new Map();
+      const clipPlayer=sfx?fx=>{const k=clipFxKey(fx);if(!clipPlayers.has(k))clipPlayers.set(k,chainPlayer(fx));return clipPlayers.get(k);}:null;
+      if(p.type==='chord')scheduleChordNotes(p,player,sound,win,play,null,clipPlayer);
+      else scheduleLeadNotes(p,player,sound,win,!!core.loop,play,null,clipPlayer);
     }
     const vocals=selected.filter(x=>x.type==='vocal');
     if(vocals.length){
       await ensureVocalWorklet(ctx);await Promise.all(vocals.map(preloadVocalBuffers));
       const chains=new Map(),chainFor=(p,e)=>{
         const key=vocalChainKey(p,e);
-        if(!chains.has(key)){const chain=buildVocalChain(ctx,out,effectiveVocalFx(p,e));setVocalChainLevel(chain,p.volume,true);chains.set(key,{key,chain});}
+        if(!chains.has(key)){const chain=buildVocalChain(ctx,mix.input,effectiveVocalFx(p,e));setVocalChainLevel(chain,p.volume,true);setVocalChainDuck(chain,sfx,vocalDucks(p));chains.set(key,{key,chain});}
         return chains.get(key);
       };
       for(const p of vocals)scheduleVocalClips(ctx,p,win,{chainFor,bufferFor:e=>vocalBuffers.get(String(e.takeId))});
     }
-    if(beat)await scheduleExportDrums(ctx,out,beat,win);
+    // Drums at their live mix level (Beat Maker's gain scale has the headroom),
+    // through the Drums track chain or a region's own; their kicks pump the mix.
+    if(beat){
+      const chains=new Map();
+      await scheduleExportDrums(ctx,sfx?ev=>drumChain(ctx,chains,sfx,ev?.fx||null).input:()=>mix.input,beat,win,{gainScale:sfx?MIX_HEADROOM:1,onKick:sfx?t=>sfx.pump.kick(t):null});
+    }
     onProgress('Rendering WAV…');
     const rendered=await ctx.startRendering();
     return {wav:wavFromStereo(rendered.getChannelData(0),rendered.getChannelData(1),sampleRate),frames:rendered.length,sampleRate};
   }
   // Track Master drum regions (or the single Beat Maker pattern), rendered the
   // way Beat Maker plays them: 16 steps per beat, each region with its pattern.
-  async function scheduleExportDrums(ctx,destination,beat,win){
+  // destFor(region) is where its hits go (region null: the Beat Maker pattern);
+  // onKick(time) hears every step with an audible kick.
+  const KICK_IDS=['kick1','kick2','kick3'];
+  async function scheduleExportDrums(ctx,destFor,beat,win,{gainScale=1,onKick=null}={}){
+    if(typeof destFor!=='function'){const node=destFor;destFor=()=>node;}
     const hasHits=(pattern,id)=>(pattern?.tracks?.[id]||[]).some(a=>Array.isArray(a)&&a.length);
     const buffers=new Map();
     for(const [id,url] of Object.entries(AUDIO_EXPORT_DRUMS)){
@@ -2524,9 +2720,10 @@
       const res=await fetch(url);if(res.ok)buffers.set(id,await ctx.decodeAudioData(await res.arrayBuffer()));
     }
     if(!buffers.size)return;
-    const hit=(pattern,bar,step,at)=>{
-      const gain=Math.max(0,Math.min(1,Number(pattern.gain)||0))*AUDIO_EXPORT_DRUM_SCALE;
-      for(const [id,buffer] of buffers){if(!pattern.tracks?.[id]?.[bar]?.includes(step))continue;const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=buffer;g.gain.value=gain;src.connect(g).connect(destination);src.start(at);}
+    const hit=(pattern,bar,step,at,ev=null)=>{
+      const gain=Math.max(0,Math.min(1,Number(pattern.gain)||0))*AUDIO_EXPORT_DRUM_SCALE*gainScale;let kick=false;
+      for(const [id,buffer] of buffers){if(!pattern.tracks?.[id]?.[bar]?.includes(step))continue;const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=buffer;g.gain.value=gain;src.connect(g).connect(destFor(ev));src.start(at);if(gain>0&&KICK_IDS.includes(id))kick=true;}
+      if(kick)onKick?.(at);
     };
     for(let abs=Math.ceil(win.fromBeat*16-1e-6);abs<win.toBeat*16-1e-6;abs++){
       const songBeat=abs/16,at=win.startTime+(songBeat-win.fromBeat)*win.beatSec;
@@ -2534,7 +2731,7 @@
       for(const ev of drumEvents){
         const evStart=Math.max(0,Number(ev.startBeat)||0),evDur=Math.max(0,Number(ev.durationBeats)||0);if(songBeat<evStart-1e-6||songBeat>=evStart+evDur-1e-6)continue;
         const pat=ev.pattern||beat,patternSteps=Math.max(64,Math.max(1,Number(pat.bars)||1)*64),rawStep=Math.round((songBeat-evStart+(Number(ev.patternOffsetBeats)||0))*16),local=((rawStep%patternSteps)+patternSteps)%patternSteps;
-        hit(pat,Math.floor(local/64),local%64,at);
+        hit(pat,Math.floor(local/64),local%64,at,ev);
       }
     }
   }
@@ -2553,7 +2750,7 @@
 
   function partsPayloadForSave(){
     const safe=parts.map(p=>{const q=clone(p);if(q.type==='vocal')q.recordings=(q.recordings||[]).map(({blob,...r})=>r);return q;});
-    return {version:6,activePartId,loadedChordPartId,songStartBeat:effectiveSongStartBeat(),songEndBeat:Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):null,drumEvents:clone(drumEvents),items:safe};
+    return {version:6,activePartId,loadedChordPartId,songStartBeat:effectiveSongStartBeat(),songEndBeat:Number.isFinite(Number(songEndBeat))&&Number(songEndBeat)>0?Number(songEndBeat):null,drumEvents:clone(drumEvents),items:safe,songFx:clone(songFxSettings),drumsFx:clone(drumsFxSettings)};
   }
   function refreshPartsFingerprintBaseline(){partsFingerprint=JSON.stringify(partsPayloadForSave());}
   function capture(){syncLoadedChord();ensureLegacyDrumEvent();drumArrangementInitialized=true;for(const p of parts)if(p?.type==='lead')syncLeadBarsToSong(p);const payload=partsPayloadForSave(),fingerprint=JSON.stringify(payload);if(fingerprint!==partsFingerprint){partsUpdatedAt=Math.max(Number(partsUpdatedAt)||0,Date.now());partsFingerprint=fingerprint;}return {...payload,updatedAt:partsUpdatedAt};}
@@ -2568,6 +2765,7 @@
     const saved=project?.parts;
     partsUpdatedAt=Number(saved?.updatedAt||project?.updatedAt||0)||0;
     songStartBeat=Math.max(0,Number(saved?.songStartBeat)||0);songEndBeat=Number.isFinite(Number(saved?.songEndBeat))&&Number(saved.songEndBeat)>songStartBeat?Number(saved.songEndBeat):null;drumArrangementInitialized=Array.isArray(saved?.drumEvents);drumEvents=drumArrangementInitialized?saved.drumEvents.map(normalizeDrumEvent).filter(Boolean):[];
+    songFxSettings=normalizeSongFxSettings(saved?.songFx);drumsFxSettings=normalizeDrumsFx(saved?.drumsFx);applySongFxLive();
     if(saved?.items?.length){parts=saved.items.map(normalizePart).filter(Boolean);activePartId=parts.some(p=>p.id===saved.activePartId)?saved.activePartId:(parts.find(p=>p.type==='chord')||parts[0]).id;}
     else {const first=chordPart('Chords 1',core.snapshot());parts=[first];activePartId=first.id;}
     for(const p of allVocalParts())adoptClipTakes(p);
@@ -2589,7 +2787,7 @@
     if(activePartId!==c.id)selectPart(activePartId);else{setEditorMode('chord');renderParts();}
     refreshPartsFingerprintBaseline();renderSongEndEditor();scheduleRecoverCheck({banner:true});
   }
-  function newProject(){resetProjectSession();partsUpdatedAt=0;partsFingerprint='';songStartBeat=0;songEndBeat=null;drumEvents=[];drumArrangementInitialized=true;const p=chordPart('Chords 1',core.snapshot());parts=[p];activePartId=p.id;loadedChordPartId=p.id;setEditorMode('chord');renderParts();renderSongEndEditor();scheduleRecoverCheck({banner:true});}
+  function newProject(){resetProjectSession();partsUpdatedAt=0;partsFingerprint='';songStartBeat=0;songEndBeat=null;drumEvents=[];drumArrangementInitialized=true;songFxSettings=normalizeSongFxSettings(null);drumsFxSettings=normalizeDrumsFx(null);applySongFxLive();const p=chordPart('Chords 1',core.snapshot());parts=[p];activePartId=p.id;loadedChordPartId=p.id;setEditorMode('chord');renderParts();renderSongEndEditor();scheduleRecoverCheck({banner:true});}
 
   function openLyricsOverlay(){
     const overlay=$('srpLyricsOverlay'),frame=$('srpLyricsFrame');if(!overlay||!frame)return;
@@ -2855,7 +3053,7 @@
   function updateVoxEventReadout(el,event){if(!el||!event)return;const b=voxEventBounds(event),time=el.querySelector('.vox-event-time');if(time)time.textContent=`${b.start.toFixed(2)}–${b.end.toFixed(2)}b`;}
 
   function voxSnapshot(){
-    return {parts:clone(parts),beat:window.CRPBeatMaker?.getBeat?.()||null,drumEvents:clone(drumEvents),drumArrangementInitialized,songStartBeat,effectiveSongEndBeat:songEndBeat,activePartId,loadedChordPartId,voxTargetPartId,voxPlayheadBeat,voxInstrumentTrackFocus:voxInstrumentTrackFocus?clone(voxInstrumentTrackFocus):null,voxToolMode,voxRangeMode,voxRangeSelection:voxRangeSelection?clone(voxRangeSelection):null,bpm:songBpm()};
+    return {parts:clone(parts),beat:window.CRPBeatMaker?.getBeat?.()||null,drumEvents:clone(drumEvents),drumArrangementInitialized,songFx:clone(songFxSettings),drumsFx:clone(drumsFxSettings),songStartBeat,effectiveSongEndBeat:songEndBeat,activePartId,loadedChordPartId,voxTargetPartId,voxPlayheadBeat,voxInstrumentTrackFocus:voxInstrumentTrackFocus?clone(voxInstrumentTrackFocus):null,voxToolMode,voxRangeMode,voxRangeSelection:voxRangeSelection?clone(voxRangeSelection):null,bpm:songBpm()};
   }
   function updateVoxHistoryButtons(){if($('voxUndoBtn'))$('voxUndoBtn').disabled=!voxUndoStack.length;if($('voxRedoBtn'))$('voxRedoBtn').disabled=!voxRedoStack.length;}
   // An edit pushes the state from before it; pass a snapshot taken earlier when
@@ -2871,7 +3069,9 @@
     voxTargetPartId=parts.some(p=>p.type==='vocal'&&String(p.id)===String(snap.voxTargetPartId))?snap.voxTargetPartId:(allVocalParts()[0]?.id||null);voxPlayheadBeat=Math.max(0,Number(snap.voxPlayheadBeat)||0);voxSelections=[];voxSelected=null;voxInstrumentSelections=[];voxInstrumentSelection=null;voxInstrumentTrackFocus=snap.voxInstrumentTrackFocus?clone(snap.voxInstrumentTrackFocus):null;voxToolMode=snap.voxToolMode||voxToolMode;voxRangeMode=!!snap.voxRangeMode;voxRangeSelection=snap.voxRangeSelection?clone(snap.voxRangeSelection):null;
     const c=parts.find(p=>p.type==='chord'&&String(p.id)===String(loadedChordPartId));if(c)core.apply(c.data);
     if(Number.isFinite(Number(snap.bpm))&&Math.round(Number(snap.bpm))!==Math.round(songBpm()))setProjectBpm(Number(snap.bpm));
-    renderParts();persistVoxEdits();renderVoxBox();
+    if(snap.songFx)songFxSettings=normalizeSongFxSettings(snap.songFx);if(snap.drumsFx)drumsFxSettings=normalizeDrumsFx(snap.drumsFx);
+    applyAllMusicFxLive();
+    renderParts();persistVoxEdits();renderVoxBox();renderMusicFxPanels();
   }
   function voxUndo(){if(!voxUndoStack.length)return;voxRedoStack.push(voxSnapshot());restoreVoxSnapshot(voxUndoStack.pop());updateVoxHistoryButtons();voxStatus('Undo.');}
   function voxRedo(){if(!voxRedoStack.length)return;voxUndoStack.push(voxSnapshot());restoreVoxSnapshot(voxRedoStack.pop());updateVoxHistoryButtons();voxStatus('Redo.');}
@@ -2988,7 +3188,7 @@
   }
   function renderVoxInspector(){
     const inst=voxInstrumentSelectionList()[0]||null,instList=voxInstrumentSelectionList();
-    const ids=['voxFxVolume','voxFxEq','voxFxComp','voxFxReverb','voxFxDelay','voxFxAutotune','voxFxTarget','voxResetEventFxBtn'];
+    const ids=['voxFxVolume','voxFxEq','voxFxComp','voxFxReverb','voxFxDelay','voxFxAutotune','voxFxDuck','voxFxTarget','voxResetEventFxBtn'];
     const instrumentEditing=!!(inst||voxInstrumentTrackFocus);
     // With no vocal track there is nothing for the effects panel to edit; keep it out
     // of the way (on phones it otherwise covers half the timeline) unless the user chose.
@@ -3001,21 +3201,27 @@
     }
     if(instrumentEditing){
       const focusName=inst?instrumentalSelectionDescription():(voxInstrumentTrackFocus?.name||'Instrument track'),rangeReady=!!voxRangeResolved();
-      if($('voxInspectorTitle'))$('voxInspectorTitle').textContent=inst?'Instrument Event':'Instrument Track';
-      if($('voxInspectorMeta'))$('voxInspectorMeta').textContent=`${focusName} • Vocal Effects collapsed while editing instruments. Select a vocal track or clip to reopen them.`;
       ids.forEach(id=>{if($(id))$(id).disabled=true;});
+      // Music effects for the instrument / Drums track or its selected clips.
+      if(!renderVoxMusicInspector()){
+        if($('voxInspectorTitle'))$('voxInspectorTitle').textContent=inst?'Instrument Event':'Instrument Track';
+        if($('voxInspectorMeta'))$('voxInspectorMeta').textContent=`${focusName} • Select a track or its clips to edit their effects.`;
+      }
       if($('voxCropBtn'))$('voxCropBtn').disabled=false;
       if($('voxSplitBtn'))$('voxSplitBtn').disabled=!instList.some(x=>x.kind==='drum');
       for(const id of ['voxCopyBtn','voxCutBtn','voxDeleteBtn'])if($(id))$(id).disabled=!(inst||rangeReady);
       if($('voxPasteBtn'))$('voxPasteBtn').disabled=!voxClipboard;updateVoxHistoryButtons();return;
     }
-    const part=voxTargetPart(),pairs=voxSelectionPairs(),primary=pairs[0]||{part:null,event:null},event=primary.event,fxTarget=$('voxFxTarget');if(!part)return;
+    const part=voxTargetPart(),pairs=voxSelectionPairs(),primary=pairs[0]||{part:null,event:null},event=primary.event,fxTarget=$('voxFxTarget');
+    if($('voxMusicFx'))$('voxMusicFx').hidden=true;document.querySelector('.vox-inspector .vox-fx-grid')?.removeAttribute('hidden');document.querySelector('.vox-inspector > .vox-inspector-actions')?.removeAttribute('hidden');
+    if(!part)return;
     ids.forEach(id=>{if($(id))$(id).disabled=false;});
     if(fxTarget){const opt=fxTarget.querySelector('option[value="event"]');if(opt){opt.disabled=!pairs.length;opt.textContent=pairs.length>1?`Selected Events (${pairs.length})`:'Selected Event';}if(!pairs.length&&fxTarget.value==='event')fxTarget.value='track';}
     const useEvent=!!(pairs.length&&fxTarget?.value==='event'),fx=useEvent?effectiveVocalFx(primary.part,event):effectiveVocalFx(part),vol=useEvent?Math.max(0,Math.min(1.5,Number(event.volume)||0)):Math.max(0,Math.min(1.5,Number(part.volume)||0));
     if($('voxInspectorTitle'))$('voxInspectorTitle').textContent=useEvent?(pairs.length>1?'Selected Event Effects':'Event Effects'):'Track Effects';
     if($('voxInspectorMeta'))$('voxInspectorMeta').textContent=useEvent?(pairs.length>1?`${pairs.length} vocal events selected • edits apply to all selected clips`:`${primary.part.name} • ${voxEventTake(event)?.name||'Vocal event'}${event.fx?' • override':' • using track FX'}`):`${part.name} • affects all events without an override`;
     if($('voxFxVolume'))$('voxFxVolume').value=String(Math.round(vol*100));if($('voxFxVolumeValue'))$('voxFxVolumeValue').textContent=`${Math.round(vol*100)}%`;
+    if($('voxFxDuck')){$('voxFxDuck').checked=vocalDucks(part);$('voxFxDuck').disabled=useEvent;}
     if($('voxFxEq'))$('voxFxEq').value=fx.eq;if($('voxFxComp'))$('voxFxComp').value=fx.comp;if($('voxFxReverb'))$('voxFxReverb').value=String(fx.reverb);if($('voxFxDelay'))$('voxFxDelay').value=String(fx.delay);if($('voxFxAutotune'))$('voxFxAutotune').value=String(Math.round(Number(fx.autotune)||0));if($('voxFxAutotuneValue'))$('voxFxAutotuneValue').textContent=`${Math.round(Number(fx.autotune)||0)}%`;
     if($('voxResetEventFxBtn'))$('voxResetEventFxBtn').disabled=!(pairs.length&&pairs.some(({event:e})=>e.fx||Number(e.volume)!==1));
     const rangeReady=!!voxRangeResolved();
@@ -3240,10 +3446,10 @@
   function renderVoxDrumMap(tracks,width,ppb,clickBeat){
     if(!voxShowInstrumentals)return;ensureLegacyDrumEvent();const master=window.CRPBeatMaker?.getBeat?.()||blankDrumPattern();
     const row=document.createElement('div');row.className='vox-track-row vox-instrument-track vox-drum-region-row';row.style.width=`${width}px`;row.dataset.voxTrackKey='drum-map';row.dataset.voxKind='drum';row.classList.toggle('is-instrument-focus',voxInstrumentTrackFocus?.key==='drum-map');
-    const label=makeVoxTrackLabel({name:'Drums',meta:`${drumEvents.length} region${drumEvents.length===1?'':'s'}`,checked:master.enabled!==false,onChecked:on=>{if(!window.CRPBeatMaker?.setMix)return;voxCheckpoint();window.CRPBeatMaker.setMix({enabled:on});persistVoxEdits();renderVoxBox();},kind:'drum'});label.title='Double-click (desktop) or double-tap (touch) empty drum-lane space to add a 4-beat region.';label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('drum','Drums','drum-map',{announce:true});};appendVoxTrackVolume(label,{drums:true});appendVoxMuteSolo(label,{drums:true});
+    const label=makeVoxTrackLabel({name:'Drums',meta:`${drumEvents.length} region${drumEvents.length===1?'':'s'}${fxBadge(drumChainSettings())}`,checked:master.enabled!==false,onChecked:on=>{if(!window.CRPBeatMaker?.setMix)return;voxCheckpoint();window.CRPBeatMaker.setMix({enabled:on});persistVoxEdits();renderVoxBox();},kind:'drum'});label.title='Double-click (desktop) or double-tap (touch) empty drum-lane space to add a 4-beat region.';label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('drum','Drums','drum-map',{announce:true});};appendVoxTrackVolume(label,{drums:true});appendVoxMuteSolo(label,{drums:true});
     const drumRange={kind:'drum',trackKey:'drum-map',name:'Drums'};
     const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane vox-drum-region-lane';lane.dataset.voxKind='drum';lane.onpointerdown=e=>{if(voxRangeMode&&e.target===lane)beginVoxRangePointer(e,drumRange,lane);};lane.onclick=e=>{if(e.target!==lane)return;if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}if(recentVoxLaneAdd({id:'drum-map'},e)){e.preventDefault();e.stopPropagation();return;}focusVoxInstrumentTrack('drum','Drums','drum-map',{announce:true});/* Empty drum-lane creation is double-click/double-tap only. The ruler owns seeking. */};wireDrumLaneDoubleAdd(lane,clickBeat);
-    for(const event of drumEvents){const key=`drum:${event.id}`,sel={kind:'drum',key,event,startBeat:event.startBeat,dur:event.durationBeats,name:'Drums'},ev=document.createElement('div');ev.className='vox-instrument-event vox-drum-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.style.left=`${event.startBeat*ppb}px`;ev.style.width=`${Math.max(34,event.durationBeats*ppb)}px`;const hits=drumPatternHitCount(event.pattern),bars=Math.max(1,Number(event.pattern?.bars)||1);ev.innerHTML=`<strong>Drums</strong><span>${event.durationBeats.toFixed(2)}b • ${bars}-bar pattern • ${hits} hits</span>`;ev.title='Drag to move • drag either edge to resize • Split • double-tap to edit pattern';ev.__voxSelection=sel;ev.onclick=e=>{if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}instrumentClickSelection(sel,ev,e);};ev.ondblclick=e=>{if(voxRangeMode)return;e.preventDefault();e.stopPropagation();openDrumEventEditor(sel);};ev.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,drumRange,lane);return;}if(e.target.classList.contains('vox-inst-handle'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}
+    for(const event of drumEvents){const key=`drum:${event.id}`,sel={kind:'drum',key,event,startBeat:event.startBeat,dur:event.durationBeats,name:'Drums'},ev=document.createElement('div');ev.className='vox-instrument-event vox-drum-event'+(voxInstrumentIsSelected(key)?' is-selected':'')+(event.fx?' has-fx':'');ev.dataset.voxKey=key;ev.style.left=`${event.startBeat*ppb}px`;ev.style.width=`${Math.max(34,event.durationBeats*ppb)}px`;const hits=drumPatternHitCount(event.pattern),bars=Math.max(1,Number(event.pattern?.bars)||1);ev.innerHTML=`<strong>Drums</strong><span>${event.durationBeats.toFixed(2)}b • ${bars}-bar pattern • ${hits} hits</span>`;ev.title='Drag to move • drag either edge to resize • Split • double-tap to edit pattern';ev.__voxSelection=sel;ev.onclick=e=>{if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}instrumentClickSelection(sel,ev,e);};ev.ondblclick=e=>{if(voxRangeMode)return;e.preventDefault();e.stopPropagation();openDrumEventEditor(sel);};ev.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,drumRange,lane);return;}if(e.target.classList.contains('vox-inst-handle'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}
     updateVoxRangeOverlay(drumRange,lane);row.append(label,lane);tracks.appendChild(row);
   }
 
@@ -3459,15 +3665,15 @@
     if(!voxShowInstrumentals)return;
     for(const part of parts.filter(p=>p.type==='chord')){
       const items=chordFlatItems(part);const row=document.createElement('div');row.className='vox-track-row vox-instrument-track';row.style.width=`${width}px`;row.dataset.voxKind='chord';row.dataset.voxPartId=part.id;row.dataset.voxTrackKey=voxTrackTokenForPart(part);row.classList.toggle('is-instrument-focus',voxInstrumentTrackFocus?.key===voxTrackTokenForPart(part));
-      const mode=part.data?.mode==='note'?'Note':'Chord';const label=makeVoxTrackLabel({name:part.name,meta:`${mode} • ${items.length} events`,checked:part.enabled,onChecked:on=>{voxCheckpoint();part.enabled=on;persistVoxEdits();renderParts();renderVoxBox();},kind:'chord',part});label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`,{announce:true});};label.querySelector('strong')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`,{announce:true});});label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(part,label,e.clientX,e.clientY);};
+      const mode=part.data?.mode==='note'?'Note':'Chord';const label=makeVoxTrackLabel({name:part.name,meta:`${mode} • ${items.length} events${fxBadge(partTrackFxSettings(part))}`,checked:part.enabled,onChecked:on=>{voxCheckpoint();part.enabled=on;persistVoxEdits();renderParts();renderVoxBox();},kind:'chord',part});label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`,{announce:true});};label.querySelector('strong')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`,{announce:true});});label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(part,label,e.clientX,e.clientY);};
       const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane';lane.dataset.voxKind='chord';lane.dataset.voxPartId=part.id;lane.onpointerdown=e=>{if(voxRangeMode&&e.target===lane)beginVoxRangePointer(e,part,lane);};lane.onclick=e=>{if(e.target!==lane)return;if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}if(recentVoxLaneAdd(part,e)){e.preventDefault();e.stopPropagation();return;}focusVoxInstrumentTrack('chord',part.name,`part:${part.id}`,{announce:true});/* Blank track space selects the paste/drop target; only the ruler seeks. */};wireVoxLaneDoubleAdd(lane,part,clickBeat);
-      for(const item of items){if(!item.card.voxId)item.card.voxId=uid();const key=`chord:${part.id}:${item.card.voxId}`,ev=document.createElement('div');ev.className='vox-instrument-event vox-chord-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.dataset.voxPartId=part.id;ev.style.left=`${item.startBeat*ppb}px`;ev.style.width=`${Math.max(26,item.dur*ppb)}px`;ev.classList.toggle('is-blank',item.card?.voxBlank===true);ev.textContent=item.card?.voxBlank===true?`Type ${mode.toLowerCase()}`:String(item.card?.value||mode);ev.title=`${part.name} • ${item.card?.value||'event'} • beat ${item.startBeat.toFixed(2)}`;const sel={kind:'chord',key,part,card:item.card,startBeat:item.startBeat,dur:item.dur,flatIndex:item.flatIndex};ev.__voxSelection=sel;ev.onclick=e=>{if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}instrumentClickSelection(sel,ev,e);};ev.ondblclick=e=>{if(voxRangeMode)return;e.preventDefault();e.stopPropagation();beginVoxInlineEventEdit(sel,ev);};ev.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}if(e.target.classList.contains('vox-inst-handle')||e.target.classList.contains('vox-inline-event-input'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}updateVoxRangeOverlay(part,lane);row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
+      for(const item of items){if(!item.card.voxId)item.card.voxId=uid();const key=`chord:${part.id}:${item.card.voxId}`,ev=document.createElement('div');ev.className='vox-instrument-event vox-chord-event'+(voxInstrumentIsSelected(key)?' is-selected':'')+(item.card.fx?' has-fx':'');ev.dataset.voxKey=key;ev.dataset.voxPartId=part.id;ev.style.left=`${item.startBeat*ppb}px`;ev.style.width=`${Math.max(26,item.dur*ppb)}px`;ev.classList.toggle('is-blank',item.card?.voxBlank===true);ev.textContent=item.card?.voxBlank===true?`Type ${mode.toLowerCase()}`:String(item.card?.value||mode);ev.title=`${part.name} • ${item.card?.value||'event'} • beat ${item.startBeat.toFixed(2)}`;const sel={kind:'chord',key,part,card:item.card,startBeat:item.startBeat,dur:item.dur,flatIndex:item.flatIndex};ev.__voxSelection=sel;ev.onclick=e=>{if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}instrumentClickSelection(sel,ev,e);};ev.ondblclick=e=>{if(voxRangeMode)return;e.preventDefault();e.stopPropagation();beginVoxInlineEventEdit(sel,ev);};ev.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}if(e.target.classList.contains('vox-inst-handle')||e.target.classList.contains('vox-inline-event-input'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}updateVoxRangeOverlay(part,lane);row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
     }
     for(const part of parts.filter(p=>p.type==='lead')){
       const row=document.createElement('div');row.className='vox-track-row vox-instrument-track';row.style.width=`${width}px`;row.dataset.voxKind='lead';row.dataset.voxPartId=part.id;row.dataset.voxTrackKey=voxTrackTokenForPart(part);row.classList.toggle('is-instrument-focus',voxInstrumentTrackFocus?.key===voxTrackTokenForPart(part));
-      const label=makeVoxTrackLabel({name:part.name,meta:`Lead/Bass • ${part.events?.length||0} notes`,checked:part.enabled,onChecked:on=>{voxCheckpoint();part.enabled=on;persistVoxEdits();renderParts();renderVoxBox();},kind:'lead',part});label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`,{announce:true});};label.querySelector('strong')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`,{announce:true});});label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(part,label,e.clientX,e.clientY);};
+      const label=makeVoxTrackLabel({name:part.name,meta:`Lead/Bass • ${part.events?.length||0} notes${fxBadge(partTrackFxSettings(part))}`,checked:part.enabled,onChecked:on=>{voxCheckpoint();part.enabled=on;persistVoxEdits();renderParts();renderVoxBox();},kind:'lead',part});label.onclick=e=>{if(e.target.closest('input,label,button'))return;focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`,{announce:true});};label.querySelector('strong')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`,{announce:true});});label.oncontextmenu=e=>{e.preventDefault();openVoxTrackContextMenu(part,label,e.clientX,e.clientY);};
       const lane=document.createElement('div');lane.className='vox-track-lane vox-instrument-lane';lane.dataset.voxKind='lead';lane.dataset.voxPartId=part.id;lane.onpointerdown=e=>{if(voxRangeMode&&e.target===lane)beginVoxRangePointer(e,part,lane);};lane.onclick=e=>{if(e.target!==lane)return;if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}if(recentVoxLaneAdd(part,e)){e.preventDefault();e.stopPropagation();return;}focusVoxInstrumentTrack('lead',part.name,`part:${part.id}`,{announce:true});/* Blank track space selects the paste/drop target; only the ruler seeks. */};wireVoxLaneDoubleAdd(lane,part,clickBeat);
-      for(const event of part.events||[]){if(!event.voxId)event.voxId=uid();const startBeat=leadEventStartBeat(part,event),dur=leadEventDurationBeats(part,event),key=`lead:${part.id}:${event.voxId}`,ev=document.createElement('div');ev.className='vox-instrument-event vox-lead-event'+(voxInstrumentIsSelected(key)?' is-selected':'');ev.dataset.voxKey=key;ev.dataset.voxPartId=part.id;ev.style.left=`${startBeat*ppb}px`;ev.style.width=`${Math.max(22,dur*ppb)}px`;ev.classList.toggle('is-blank',event.voxBlank===true);ev.textContent=event.voxBlank===true?'Type note':midiName(event.midi);ev.title=`${part.name} • ${event.voxBlank===true?'blank note':midiName(event.midi)} • beat ${startBeat.toFixed(2)}`;const sel={kind:'lead',key,part,event,startBeat,dur};ev.__voxSelection=sel;ev.onclick=e=>{if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}instrumentClickSelection(sel,ev,e);};ev.ondblclick=e=>{if(voxRangeMode)return;e.preventDefault();e.stopPropagation();beginVoxInlineEventEdit(sel,ev);};ev.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}if(e.target.classList.contains('vox-inst-handle')||e.target.classList.contains('vox-inline-event-input'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}updateVoxRangeOverlay(part,lane);row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
+      for(const event of part.events||[]){if(!event.voxId)event.voxId=uid();const startBeat=leadEventStartBeat(part,event),dur=leadEventDurationBeats(part,event),key=`lead:${part.id}:${event.voxId}`,ev=document.createElement('div');ev.className='vox-instrument-event vox-lead-event'+(voxInstrumentIsSelected(key)?' is-selected':'')+(event.fx?' has-fx':'');ev.dataset.voxKey=key;ev.dataset.voxPartId=part.id;ev.style.left=`${startBeat*ppb}px`;ev.style.width=`${Math.max(22,dur*ppb)}px`;ev.classList.toggle('is-blank',event.voxBlank===true);ev.textContent=event.voxBlank===true?'Type note':midiName(event.midi);ev.title=`${part.name} • ${event.voxBlank===true?'blank note':midiName(event.midi)} • beat ${startBeat.toFixed(2)}`;const sel={kind:'lead',key,part,event,startBeat,dur};ev.__voxSelection=sel;ev.onclick=e=>{if(voxRangeMode){e.preventDefault();e.stopPropagation();return;}instrumentClickSelection(sel,ev,e);};ev.ondblclick=e=>{if(voxRangeMode)return;e.preventDefault();e.stopPropagation();beginVoxInlineEventEdit(sel,ev);};ev.onpointerdown=e=>{if(voxRangeMode){beginVoxRangePointer(e,part,lane);return;}if(e.target.classList.contains('vox-inst-handle')||e.target.classList.contains('vox-inline-event-input'))return;beginVoxInstrumentPointerEdit(e,sel,ev,'move');};appendInstrumentHandles(ev,sel);lane.appendChild(ev);}updateVoxRangeOverlay(part,lane);row.append(label,lane);tracks.appendChild(row);wireVoxTrackLongPress(label,row);
     }
     renderVoxDrumMap(tracks,width,ppb,clickBeat);
   }
@@ -3774,6 +3980,7 @@
   function updateVoxFxFromUi(kind){
     const p=voxTargetPart(),selected=voxSelectionPairs(),eventMode=$('voxFxTarget')?.value==='event'&&selected.length;if(!p)return;const touchedParts=new Set();
     if(eventMode){for(const item of selected){const ev=item.event;let fx=ev.fx||(ev.fx=normalizeVocalFx(item.part.fx));if(kind==='volume')ev.volume=Math.max(0,Math.min(1.5,(Number($('voxFxVolume')?.value)||0)/100));else if(kind==='autotune')fx.autotune=Math.max(0,Math.min(100,Number($('voxFxAutotune')?.value)||0));else if(kind==='eq')fx.eq=$('voxFxEq').value;else if(kind==='comp')fx.comp=$('voxFxComp').value;else if(kind==='reverb')fx.reverb=Number($('voxFxReverb').value)||0;else if(kind==='delay')fx.delay=Number($('voxFxDelay').value)||0;touchedParts.add(item.part);}}
+    else if(kind==='duck'){p.fx={...normalizeVocalFx(p.fx),duck:!!$('voxFxDuck')?.checked};touchedParts.add(p);}
     else{let fx=p.fx;if(kind==='volume'){p.volume=Math.max(0,Math.min(1.5,(Number($('voxFxVolume')?.value)||0)/100));syncPartVolumeControls(p,Math.min(100,Math.round(p.volume*100)));}else if(kind==='autotune')fx.autotune=Math.max(0,Math.min(100,Number($('voxFxAutotune')?.value)||0));else if(kind==='eq')fx.eq=$('voxFxEq').value;else if(kind==='comp')fx.comp=$('voxFxComp').value;else if(kind==='reverb')fx.reverb=Number($('voxFxReverb').value)||0;else if(kind==='delay')fx.delay=Number($('voxFxDelay').value)||0;touchedParts.add(p);}
     if(kind==='volume'&&$('voxFxVolumeValue'))$('voxFxVolumeValue').textContent=`${$('voxFxVolume').value}%`;if(kind==='autotune'&&$('voxFxAutotuneValue'))$('voxFxAutotuneValue').textContent=`${$('voxFxAutotune').value}%`;for(const part of touchedParts)applyVocalFxLive(part);markPartsDirty();core.scheduleAutoSave();renderVoxInspector();
   }
@@ -3816,6 +4023,225 @@
   function wireVoxTransportDrag(){const bar=$('voxFloatingTransport'),handle=$('voxTransportDrag');if(!bar||!handle||handle.dataset.wired)return;handle.dataset.wired='1';handle.addEventListener('pointerdown',e=>{if(e.button!==undefined&&e.button!==0)return;e.preventDefault();const r=bar.getBoundingClientRect(),dx=e.clientX-r.left,dy=e.clientY-r.top;bar.style.left=`${r.left}px`;bar.style.top=`${r.top}px`;bar.style.bottom='auto';bar.style.transform='none';try{handle.setPointerCapture(e.pointerId)}catch{};const move=ev=>{ev.preventDefault();const br=bar.getBoundingClientRect(),x=Math.max(4,Math.min(window.innerWidth-br.width-4,ev.clientX-dx)),y=Math.max(4,Math.min(window.innerHeight-br.height-4,ev.clientY-dy));bar.style.left=`${x}px`;bar.style.top=`${y}px`;};const up=ev=>{try{handle.releasePointerCapture(ev.pointerId)}catch{};handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up);saveVoxTransportPosition();};handle.addEventListener('pointermove',move,{passive:false});handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up);});}
   function wireVoxPlayheadDrag(){const grip=$('voxPlayhead')?.querySelector('span');if(!grip||grip.dataset.wired)return;grip.dataset.wired='1';grip.addEventListener('pointerdown',e=>{if(recording&&!recordingPaused){voxStatus('Pause or stop recording before moving the playhead.');return;}e.preventDefault();e.stopPropagation();disableVoxAutoScroll();const sc=$('voxTimelineScroller'),inner=$('voxTimelineInner');if(!sc||!inner)return;try{grip.setPointerCapture(e.pointerId)}catch{};const move=ev=>{ev.preventDefault();const rect=inner.getBoundingClientRect(),beat=quantizeVoxBeat((ev.clientX-rect.left-voxLabelWidth())/voxPpb());updateVoxPlayhead(beat,false);};const up=ev=>{try{grip.releasePointerCapture(ev.pointerId)}catch{};grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',up);grip.removeEventListener('pointercancel',up);voxSeekTo(voxPlayheadBeat,{manual:true});};grip.addEventListener('pointermove',move,{passive:false});grip.addEventListener('pointerup',up);grip.addEventListener('pointercancel',up);});}
 
+  // ---- Music effects: controls -----------------------------------------------------------------------
+  // One set of controls (presets + an Amount/Speed slider or two) is used everywhere: the Baby DAW part
+  // panel, the Track Master inspector and the Song FX / Drums FX panels. Each control carries
+  // data-mfx="<setting>"; an edit applies live and is one Track Master Undo step (a slider drag is one).
+  const mfxLabels=key=>({eq:MFX?.EQ_LABELS,comp:MFX?.COMP_LABELS,drive:MFX?.DRIVE_LABELS,mod:MFX?.MOD_LABELS,glue:MFX?.GLUE_LABELS,room:MFX?.ROOM_LABELS,delay:MFX?.DELAY_LABELS,pump:MFX?.PUMP_LABELS}[key]||{});
+  function mfxSelect(key,label){return `<label class="mfx-field"><span class="mfx-label">${label}</span><select data-mfx="${key}">${Object.entries(mfxLabels(key)).map(([v,l])=>`<option value="${v}">${escapeHtml(l)}</option>`).join('')}</select></label>`;}
+  function mfxSlider(key,label,min=0,max=100){return `<label class="mfx-field mfx-slider"><span class="mfx-label">${label}<output data-out="${key}"></output></span><input type="range" min="${min}" max="${max}" step="1" data-mfx="${key}" aria-label="${label}"></label>`;}
+  function mfxCheck(key,label,title=''){return `<label class="mfx-check" data-mfx-wrap="${key}"${title?` title="${escapeHtml(title)}"`:''}><input type="checkbox" data-mfx="${key}"><span>${label}</span></label>`;}
+  // Each row pairs a preset with its sliders, so a phone shows them side by side.
+  const mfxRow=(...cells)=>`<div class="mfx-row mfx-row-${cells.length}">${cells.join('')}</div>`;
+  function trackFxControlsHtml(){
+    return `<div class="mfx-grid">${mfxRow(mfxSelect('eq','EQ'),mfxSlider('eqAmount','Amount'))}${mfxRow(mfxSelect('drive','Drive'),mfxSlider('driveAmount','Amount'))}${mfxRow(mfxSelect('mod','Modulation'),mfxSlider('modAmount','Amount'),mfxSlider('modSpeed','Speed'))}${mfxRow(mfxSelect('comp','Compression'),mfxSlider('pan','Pan',-100,100))}${mfxRow(mfxSlider('reverb','Reverb send'),mfxSlider('delay','Delay send'))}</div>`
+      +`<div class="mfx-toggles">${mfxCheck('duck','Duck to kick','With the song’s Pump on, each kick briefly ducks this track')}${mfxCheck('bypass','Bypass','Hear this track without its effects (and its clips’ effects) to compare')}</div>`;
+  }
+  function songFxControlsHtml(){
+    return `<div class="mfx-grid">${mfxRow(mfxSelect('eq','EQ'),mfxSlider('eqAmount','Amount'))}${mfxRow(mfxSelect('glue','Glue'),mfxSelect('pump','Pump'))}${mfxRow(mfxSelect('room','Reverb room'),mfxSlider('reverb','Reverb level'))}${mfxRow(mfxSelect('delay','Delay time'),mfxSlider('feedback','Feedback'))}${mfxRow(mfxSlider('width','Width',-100,100))}</div>`;
+  }
+  const panText=v=>v===0?'C':v<0?`L${-v}`:`R${v}`;
+  function mfxOutputText(key,v){
+    if(key==='pan')return panText(v);
+    if(key==='width')return v===0?'Normal':v<0?`Narrow ${-v}%`:`Wide ${v}%`;
+    if(key==='modSpeed')return `${Math.round(v)}%`;
+    return `${Math.round(v)}%`;
+  }
+  // Shows `fx` in the controls under root. Sliders that only matter with their effect on are disabled
+  // while it is Off. opts: {clip: clip FX (Duck/Bypass are the track's), duck: show Duck to kick, locked}.
+  function paintFxControls(root,fx,{clip=false,duck=true,trackFx=null,disabled=false}={}){
+    if(!root||!fx)return;
+    for(const el of root.querySelectorAll('[data-mfx]')){
+      const key=el.dataset.mfx,src=(clip&&(key==='duck'||key==='bypass'))?(trackFx||{}):fx,v=src[key];
+      if(el.type==='checkbox')el.checked=v===true;else if(document.activeElement!==el||el.tagName==='SELECT')el.value=String(v??'');
+      const off=(key==='eqAmount'&&fx.eq==='off')||(key==='driveAmount'&&fx.drive==='off')||((key==='modAmount'||key==='modSpeed')&&fx.mod==='off');
+      el.disabled=disabled||off||(clip&&(key==='duck'||key==='bypass'));
+      el.closest('.mfx-field')?.classList.toggle('is-off',off);
+      if(el.type==='range')el.style.setProperty('--range-fill',`${(Number(el.value)-Number(el.min))/(Number(el.max)-Number(el.min))*100}%`);
+    }
+    for(const out of root.querySelectorAll('output[data-out]'))out.textContent=mfxOutputText(out.dataset.out,Number(fx[out.dataset.out])||0);
+    const duckWrap=root.querySelector('[data-mfx-wrap="duck"]');if(duckWrap)duckWrap.hidden=!duck;
+  }
+  // Calls apply(key, value) for every edit; one Undo checkpoint per gesture.
+  function wireFxControls(root,apply){
+    if(!root||root.dataset.mfxWired)return;root.dataset.mfxWired='1';
+    let fresh=true;
+    const handle=(e,commit)=>{
+      const el=e.target?.closest?.('[data-mfx]');if(!el||!root.contains(el)||el.disabled)return;
+      const key=el.dataset.mfx,value=el.type==='checkbox'?el.checked:el.type==='range'?Number(el.value):el.value;
+      if(fresh){voxCheckpoint();fresh=false;}
+      apply(key,value,{commit});
+      if(commit)fresh=true;
+    };
+    root.addEventListener('input',e=>{if(e.target?.type==='range')handle(e,false);});
+    root.addEventListener('change',e=>handle(e,true));
+  }
+  // " • FX" on a Track Master track whose effects do something (" • FX off" when bypassed).
+  function fxBadge(fx){return !MFX||!fx||MFX.isDefault(fx)?'':fx.bypass?' • FX off':' • FX';}
+  function fxSummary(fx,song=false){
+    if(!fx)return 'Off';
+    const L=mfxLabels,bits=[];
+    if(fx.eq&&fx.eq!=='off')bits.push(`EQ ${L('eq')[fx.eq]}`);
+    if(song){if(fx.glue!=='off')bits.push(`Glue ${L('glue')[fx.glue]}`);if(fx.pump!=='off')bits.push(`Pump ${L('pump')[fx.pump]}`);if(fx.width)bits.push(mfxOutputText('width',fx.width));return bits.join(' · ')||'Off';}
+    if(fx.comp!=='off')bits.push(`Comp ${L('comp')[fx.comp]}`);if(fx.drive!=='off')bits.push(`Drive ${L('drive')[fx.drive]}`);if(fx.mod!=='off')bits.push(L('mod')[fx.mod]);
+    if(fx.pan)bits.push(`Pan ${panText(fx.pan)}`);if(fx.reverb)bits.push(`Reverb ${fx.reverb}%`);if(fx.delay)bits.push(`Delay ${fx.delay}%`);
+    return (fx.bypass?'Bypassed · ':'')+(bits.join(' · ')||'Off');
+  }
+  // ---- Music effects: editing ----
+  function persistFxEdit({commit=false,loadedChordTouched=false}={}){
+    markPartsDirty();core.scheduleAutoSave();
+    // Track Master edits Chord Rider's own copy of the loaded chord part on commit, so
+    // a later sync from Chord Rider keeps the clip FX.
+    if(commit&&loadedChordTouched){const c=loadedChord();if(c)core.apply(c.data);}
+  }
+  function setTrackFxValue(p,key,value,opts={}){
+    if(!p||!MFX)return;
+    p.trackFx=normalizePartTrackFx({...partTrackFxSettings(p),[key]:value});
+    applyPartFxLive(p);persistFxEdit(opts);
+  }
+  function setDrumsFxValue(key,value,opts={}){
+    if(!MFX)return;
+    drumsFxSettings=normalizeDrumsFx({...drumsFxSettings,[key]:value});
+    syncDrumChains();persistFxEdit(opts);
+  }
+  function setSongFxValue(key,value,opts={}){
+    if(!MFX)return;
+    songFxSettings=normalizeSongFxSettings({...songFxSettings,[key]:value});
+    applySongFxLive();persistFxEdit(opts);
+  }
+  // The FX of a Track Master clip selection: the clip's own, or its track's when it has none.
+  function clipFxHolder(sel){return sel?.kind==='chord'?sel.card:sel?.event||null;}
+  function trackFxForSelection(sel){return sel?.kind==='drum'?drumChainSettings():partTrackFxSettings(sel?.part);}
+  function effectiveClipFx(sel){const h=clipFxHolder(sel);return h?.fx?normalizeClipFx(h.fx):normalizeClipFx(trackFxForSelection(sel));}
+  function setClipFxValue(list,key,value,opts={}){
+    if(!MFX||!list.length)return;
+    let chord=false,loaded=false;const touched=new Set();
+    for(const sel of list){
+      const h=clipFxHolder(sel);if(!h)continue;
+      h.fx=normalizeClipFx({...effectiveClipFx(sel),[key]:value});
+      if(sel.kind==='drum')touched.add('drums');else{touched.add(sel.part);if(sel.kind==='chord'){chord=true;if(String(sel.part.id)===String(loadedChordPartId))loaded=true;}}
+    }
+    for(const t of touched)if(t==='drums')syncDrumChains();else syncClipChains(t);
+    persistFxEdit({...opts,loadedChordTouched:loaded&&chord});
+  }
+  function resetClipFx(list){
+    const own=list.filter(sel=>clipFxHolder(sel)?.fx);if(!own.length)return;
+    voxCheckpoint();const touched=new Set();let loaded=false;
+    for(const sel of own){delete clipFxHolder(sel).fx;if(sel.kind==='drum')touched.add('drums');else{touched.add(sel.part);if(sel.kind==='chord'&&String(sel.part.id)===String(loadedChordPartId))loaded=true;}}
+    for(const t of touched)if(t==='drums')syncDrumChains();else syncClipChains(t);
+    persistFxEdit({commit:true,loadedChordTouched:loaded});
+    voxStatus(`${own.length} clip${own.length===1?'':'s'} now follow${own.length===1?'s':''} the track effects.`);
+  }
+  function applyAllMusicFxLive(){
+    if(!MFX)return;
+    applySongFxLive();for(const p of parts)if(p.type==='chord'||p.type==='lead')applyPartFxLive(p);else if(p.type==='vocal')applyVocalFxLive(p);
+    syncDrumChains();refreshAuditionFx();
+  }
+
+  // ---- Music effects: Baby DAW part panel ----
+  // An Effects section under the selected chord/lead part's volume (folded by default, remembered per
+  // device), plus Song FX and Drums FX buttons for every part.
+  const PART_FX_OPEN_KEY='crp-part-fx-open-v1';
+  function renderPartFxSection(){
+    const mgr=$('partManager');if(!mgr||!MFX)return;
+    let box=$('partFxSection');
+    if(!box){
+      box=document.createElement('div');box.id='partFxSection';box.className='part-fx-section';
+      box.innerHTML=`<details id="partFxPanel" class="mfx-panel"><summary><span class="mfx-panel-title">Effects</span><span id="partFxSummary" class="mfx-summary"></span></summary><div id="partFxBody" class="mfx-body">${trackFxControlsHtml()}</div></details><div class="mfx-buttons"><button id="bdSongFxBtn" type="button" class="mfx-open-btn">Song FX</button><button id="bdDrumsFxBtn" type="button" class="mfx-open-btn">Drums FX</button></div>`;
+      mgr.appendChild(box);
+      const details=$('partFxPanel');try{details.open=localStorage.getItem(PART_FX_OPEN_KEY)==='1';}catch{}
+      details.addEventListener('toggle',()=>{try{localStorage.setItem(PART_FX_OPEN_KEY,details.open?'1':'0');}catch{}});
+      wireFxControls($('partFxBody'),(key,value,opts)=>{const p=active();if(p?.type!=='chord'&&p?.type!=='lead')return;setTrackFxValue(p,key,value,opts);renderPartFxSection();});
+      $('bdSongFxBtn').onclick=openSongFxPanel;$('bdDrumsFxBtn').onclick=openDrumsFxPanel;
+    }else if(box.parentNode!==mgr||box.nextSibling)mgr.appendChild(box);
+    const p=active(),music=p?.type==='chord'||p?.type==='lead';
+    $('partFxPanel').hidden=!music;
+    if(music){const fx=partTrackFxSettings(p);paintFxControls($('partFxBody'),fx,{duck:true});$('partFxSummary').textContent=fxSummary(fx);$('partFxPanel').querySelector('.mfx-panel-title').textContent=`${p.name} effects`;}
+  }
+
+  // ---- Music effects: Song FX and Drums FX panels ----
+  function fxModal(id,title,help,bodyHtml){
+    let modal=$(id);if(modal)return modal;
+    modal=document.createElement('div');modal.id=id;modal.className='mfx-modal';modal.hidden=true;
+    modal.innerHTML=`<div class="mfx-modal-backdrop" data-close></div><div class="mfx-modal-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}"><div class="mfx-modal-head"><h2>${escapeHtml(title)}</h2><button type="button" class="mfx-modal-close" data-close aria-label="Close">✕</button></div><p class="subtle tiny mfx-help">${help}</p><div class="mfx-body" data-mfx-body>${bodyHtml}</div><div class="mfx-modal-actions"><button type="button" class="accent" data-close>Done</button></div></div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click',e=>{if(e.target.closest('[data-close]'))modal.hidden=true;});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.hidden)modal.hidden=true;});
+    return modal;
+  }
+  function openSongFxPanel(){
+    if(!MFX)return;
+    const modal=fxModal('songFxModal','Song FX','Effects on the whole mix. Reverb and Delay here are shared by every track: turn up a track’s Reverb or Delay send to use them. Pump ducks every track with “Duck to kick” on, on each kick.',songFxControlsHtml());
+    const body=modal.querySelector('[data-mfx-body]');
+    wireFxControls(body,(key,value,opts)=>{setSongFxValue(key,value,opts);paintFxControls(body,songFxSettings);if(voxBoxOpen)renderVoxInspector();});
+    paintFxControls(body,songFxSettings);modal.hidden=false;
+  }
+  function openDrumsFxPanel(){
+    if(!MFX)return;
+    const modal=fxModal('drumsFxModal','Drums FX','Effects on the whole Drums track. A drum region can have its own effects instead (select it in Track Master, Apply to: Selected clip(s)).',trackFxControlsHtml());
+    const body=modal.querySelector('[data-mfx-body]');
+    wireFxControls(body,(key,value,opts)=>{setDrumsFxValue(key,value,opts);paintFxControls(body,drumsFxSettings,{duck:false});if(voxBoxOpen)renderVoxInspector();});
+    paintFxControls(body,drumsFxSettings,{duck:false});modal.hidden=false;
+  }
+  function renderMusicFxPanels(){
+    renderPartFxSection();
+    const song=$('songFxModal');if(song&&!song.hidden)paintFxControls(song.querySelector('[data-mfx-body]'),songFxSettings);
+    const drums=$('drumsFxModal');if(drums&&!drums.hidden)paintFxControls(drums.querySelector('[data-mfx-body]'),drumsFxSettings,{duck:false});
+    if(voxBoxOpen)renderVoxInspector();
+  }
+
+  // ---- Music effects: Track Master inspector ----
+  // With an instrument track, the Drums track or their clips selected, the inspector shows the music
+  // effects. Apply to: Track edits the track; Selected clip(s) gives each selected clip its own FX.
+  function ensureVoxMusicFx(){
+    if($('voxMusicFx')||!MFX)return $('voxMusicFx');
+    const grid=document.querySelector('.vox-inspector .vox-fx-grid');if(!grid)return null;
+    const box=document.createElement('div');box.id='voxMusicFx';box.className='vox-music-fx';box.hidden=true;
+    box.innerHTML=`<div id="voxMusicFxBody" class="mfx-body">${trackFxControlsHtml()}</div><div class="vox-inspector-actions"><button id="voxResetClipFxBtn" type="button">Reset Clip FX to Track</button><span id="voxMusicFxHint" class="subtle tiny">Track FX edit the whole track. A clip’s own FX replace them for that clip.</span></div>`;
+    grid.insertAdjacentElement('afterend',box);
+    wireFxControls($('voxMusicFxBody'),(key,value,opts)=>{
+      const t=voxMusicFxTarget();if(!t)return;
+      if(t.mode==='clips')setClipFxValue(t.list,key,value,opts);
+      else if(t.kind==='drum')setDrumsFxValue(key,value,opts);
+      else setTrackFxValue(t.part,key,value,opts);
+      renderVoxInspector();if(opts.commit){renderPartFxSection();renderVoxBox();}
+    });
+    $('voxResetClipFxBtn').onclick=()=>{const t=voxMusicFxTarget();resetClipFx(t?.list||[]);renderVoxBox();};
+    return box;
+  }
+  // {mode: 'track' | 'clips', kind: 'chord' | 'lead' | 'drum', part, list (selected clips), name}
+  function voxMusicFxTarget(){
+    const list=voxInstrumentSelectionList(),primary=list[0]||null,focus=voxInstrumentTrackFocus;
+    const wantClips=$('voxFxTarget')?.value==='event'&&list.length;
+    if(wantClips)return {mode:'clips',kind:primary.kind,part:primary.part||null,list,name:primary.kind==='drum'?'Drums':primary.part?.name};
+    if(primary)return {mode:'track',kind:primary.kind,part:primary.part||null,list,name:primary.kind==='drum'?'Drums':primary.part?.name};
+    if(focus?.kind==='drum')return {mode:'track',kind:'drum',part:null,list,name:'Drums'};
+    const key=String(focus?.key||''),part=key.startsWith('part:')?parts.find(p=>String(p.id)===key.slice(5)&&(p.type==='chord'||p.type==='lead')):null;
+    return part?{mode:'track',kind:part.type,part,list,name:part.name}:null;
+  }
+  function renderVoxMusicInspector(){
+    const box=ensureVoxMusicFx();if(!box)return false;
+    const t=voxMusicFxTarget(),list=voxInstrumentSelectionList(),fxTarget=$('voxFxTarget');
+    box.hidden=!t;document.querySelector('.vox-inspector .vox-fx-grid')?.toggleAttribute('hidden',!!t);document.querySelector('.vox-inspector > .vox-inspector-actions')?.toggleAttribute('hidden',!!t);
+    if(fxTarget){const opt=fxTarget.querySelector('option[value="event"]');if(opt){opt.disabled=!list.length;opt.textContent=list.length>1?`Selected clips (${list.length})`:'Selected clip';}if(!list.length&&fxTarget.value==='event')fxTarget.value='track';fxTarget.disabled=false;}
+    if(!t)return false;
+    const trackFx=t.kind==='drum'?drumChainSettings():partTrackFxSettings(t.part);
+    if(t.mode==='clips'){
+      const own=list.filter(sel=>clipFxHolder(sel)?.fx).length;
+      paintFxControls($('voxMusicFxBody'),effectiveClipFx(list[0]),{clip:true,duck:t.kind!=='drum',trackFx});
+      if($('voxInspectorTitle'))$('voxInspectorTitle').textContent=list.length>1?'Selected Clip Effects':'Clip Effects';
+      if($('voxInspectorMeta'))$('voxInspectorMeta').textContent=list.length>1?`${list.length} clips selected • edits apply to all selected clips`:`${instrumentalSelectionDescription()} • ${own?'own FX':'using track FX'}`;
+      if($('voxMusicFxHint'))$('voxMusicFxHint').textContent='Clip FX replace the track’s FX for these clips. Duck to kick and Bypass follow the track.';
+    }else{
+      paintFxControls($('voxMusicFxBody'),trackFx,{duck:t.kind!=='drum'});
+      if($('voxInspectorTitle'))$('voxInspectorTitle').textContent=t.kind==='drum'?'Drums Track Effects':'Track Effects';
+      if($('voxInspectorMeta'))$('voxInspectorMeta').textContent=`${t.name} • ${fxSummary(trackFx)}`;
+      if($('voxMusicFxHint'))$('voxMusicFxHint').textContent='Track FX edit the whole track. Select clips and choose Apply to: Selected clip(s) to give them their own.';
+    }
+    if($('voxResetClipFxBtn'))$('voxResetClipFxBtn').disabled=!list.some(sel=>clipFxHolder(sel)?.fx);
+    return true;
+  }
+
   function wire(){
     ensureInitial();setEditorMode(active()?.type||'chord');ensureRecordOffsetControl();renderParts();ensureMediaSession();updateMediaMetadata();renderSongEndEditor();scheduleRecoverCheck({banner:true});
     if($('voxBoxBtn'))$('voxBoxBtn').onclick=()=>openVoxBox({fromVocal:true});
@@ -3847,6 +4273,9 @@
     if($('voxFxReverb'))$('voxFxReverb').onchange=()=>{voxCheckpoint();updateVoxFxFromUi('reverb');};
     if($('voxFxDelay'))$('voxFxDelay').onchange=()=>{voxCheckpoint();updateVoxFxFromUi('delay');};
     if($('voxFxAutotune')){$('voxFxAutotune').addEventListener('pointerdown',voxCheckpoint);$('voxFxAutotune').oninput=()=>updateVoxFxFromUi('autotune');}
+    if($('voxFxDuck'))$('voxFxDuck').onchange=()=>{voxCheckpoint();updateVoxFxFromUi('duck');};
+    if($('voxSongFxBtn'))$('voxSongFxBtn').onclick=openSongFxPanel;
+    ensureVoxMusicFx();renderPartFxSection();
     if($('voxInspectorToggleBtn'))$('voxInspectorToggleBtn').onclick=toggleVoxInspector;
     if($('voxResetEventFxBtn'))$('voxResetEventFxBtn').onclick=resetSelectedVoxFx;
     if($('voxToStartBtn'))$('voxToStartBtn').onclick=()=>voxSeekTo(effectiveSongStartBeat());
@@ -3957,7 +4386,8 @@
     $('vocalBackingVolume').oninput=e=>{const p=active();if(p?.type!=='vocal')return;p.backingVolume=+e.target.value/100;$('vocalBackingVolumeValue').textContent=`${e.target.value}%`;core.scheduleAutoSave();};
     if($('vocalTranscribeBtn'))$('vocalTranscribeBtn').onclick=transcribeActiveTake;
     $('vocalTranscript').oninput=e=>{const p=active();if(p?.type!=='vocal')return;p.transcript=e.target.value;const t=p.recordings?.find(r=>r.id===p.activeTakeId);if(t)t.transcript=p.transcript;core.scheduleAutoSave();};
-    for(const id of ['vocalFxEq','vocalFxComp','vocalFxReverb','vocalFxDelay'])$(id).onchange=()=>{const p=active();if(p?.type!=='vocal')return;p.fx={eq:$('vocalFxEq').value,comp:$('vocalFxComp').value,reverb:+$('vocalFxReverb').value,delay:+$('vocalFxDelay').value,autotune:Math.max(0,Math.min(100,Number($('vocalFxAutotune')?.value)||0))};applyVocalFxLive(p);core.scheduleAutoSave();};if($('vocalFxAutotune'))$('vocalFxAutotune').oninput=e=>{const p=active();if(p?.type!=='vocal')return;p.fx={...(p.fx||{}),autotune:Math.max(0,Math.min(100,Number(e.target.value)||0))};paintAutotuneSlider();if($('vocalFxAutotuneValue'))$('vocalFxAutotuneValue').textContent=`${Math.round(p.fx.autotune)}%`;if($('vocalAutotuneKey'))$('vocalAutotuneKey').textContent=vocalAutotuneScale().label;applyVocalFxLive(p);core.scheduleAutoSave();};
+    for(const id of ['vocalFxEq','vocalFxComp','vocalFxReverb','vocalFxDelay'])$(id).onchange=()=>{const p=active();if(p?.type!=='vocal')return;p.fx={...(p.fx||{}),eq:$('vocalFxEq').value,comp:$('vocalFxComp').value,reverb:+$('vocalFxReverb').value,delay:+$('vocalFxDelay').value,autotune:Math.max(0,Math.min(100,Number($('vocalFxAutotune')?.value)||0))};applyVocalFxLive(p);core.scheduleAutoSave();};
+    if($('vocalFxDuck'))$('vocalFxDuck').onchange=e=>{const p=active();if(p?.type!=='vocal')return;voxCheckpoint();p.fx={...normalizeVocalFx(p.fx),duck:!!e.target.checked};applyVocalFxLive(p);markPartsDirty();core.scheduleAutoSave();};if($('vocalFxAutotune'))$('vocalFxAutotune').oninput=e=>{const p=active();if(p?.type!=='vocal')return;p.fx={...(p.fx||{}),autotune:Math.max(0,Math.min(100,Number(e.target.value)||0))};paintAutotuneSlider();if($('vocalFxAutotuneValue'))$('vocalFxAutotuneValue').textContent=`${Math.round(p.fx.autotune)}%`;if($('vocalAutotuneKey'))$('vocalAutotuneKey').textContent=vocalAutotuneScale().label;applyVocalFxLive(p);core.scheduleAutoSave();};
   }
 
   window.CRPParts={handlesPlayback:true,togglePlayback,startPlayback,openTrackMaster,openVoxBox:()=>openVoxBox({fromVocal:true}),liveEditRefresh,seekPlaybackToBeat,seekPlaybackToSeconds,isPlaying:()=>playing||starting,getPlaybackTiming(){
@@ -3981,7 +4411,13 @@
       msUntilNextBeat=beatMs;
     }
     return {playing:true,ready:true,bpm,beatMs,currentBeat,msUntilNextBeat};
-  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncMidiTimelineFromCore,syncCloudAudio,openStudioExport,openAudioExport,refreshBabySetupToggle,syncBeatMakerMaster,syncDrumMix,syncDrumMasterToBeatMaker:()=>syncDrumMasterToBeatMaker(),focusChordPart(){const c=parts.find(p=>p.type==='chord');if(!c){refreshBabySetupToggle();return;}if(activePartId!==c.id)selectPart(c.id);else{setEditorMode('chord');refreshBabySetupToggle();core.refreshSetupVisibility?.();}},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);}};
+  },isRecording:()=>recording,isRecordingPaused:()=>recordingPaused,beginVocalRecording:beginRecording,pauseVocalRecording:toggleRecordingPause,stopVocalRecording:endRecording,openLyricsOverlay,stopPlayback,capture,loadProject,newProject,syncActiveChord,syncCoreLive,syncMidiTimelineFromCore,syncCloudAudio,openStudioExport,openAudioExport,refreshBabySetupToggle,syncBeatMakerMaster,syncDrumMix,syncDrumMasterToBeatMaker:()=>syncDrumMasterToBeatMaker(),focusChordPart(){const c=parts.find(p=>p.type==='chord');if(!c){refreshBabySetupToggle();return;}if(activePartId!==c.id)selectPart(c.id);else{setEditorMode('chord');refreshBabySetupToggle();core.refreshSetupVisibility?.();}},getActiveChordId(){return loadedChordPartId;},getExportData(){syncLoadedChord();return clone(parts);},
+    // Music effects (music-fx.js): the panels, Chord Rider's tap routing, and a read-out of the live graph.
+    openSongFxPanel,openDrumsFxPanel,auditionDestination,
+    getSongFx(){return clone(songFxSettings);},getDrumsFx(){return clone(drumsFxSettings);},
+    setSongFx(fx){voxCheckpoint();songFxSettings=normalizeSongFxSettings({...songFxSettings,...(fx||{})});applySongFxLive();renderMusicFxPanels();persistFxEdit();return clone(songFxSettings);},
+    setDrumsFx(fx){voxCheckpoint();drumsFxSettings=normalizeDrumsFx({...drumsFxSettings,...(fx||{})});syncDrumChains();renderMusicFxPanels();persistFxEdit();return clone(drumsFxSettings);},
+    musicFxState(){return {song:songFx?{active:songFx.active,settings:songFx.settings,pumpGains:[...songFx.pump.gains].map(g=>g.gain.value),pumpPreset:songFx.pump.preset}:null,partChains:partFx.size,clipChains:clipChains.size,clipFxKeys:[...clipChains.values()].map(c=>c.fxKey),drumChains:drumChains.size,audition:auditionFx?auditionFx.settings:null};}};
   // app.js intentionally loads first to expose CRPCore. Tell it that the parts module now
   // exists so the active saved project can be rehydrated with ALL Baby DAW parts before any
   // workspace navigation/save is allowed to capture state.

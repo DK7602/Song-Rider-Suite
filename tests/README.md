@@ -28,6 +28,15 @@ npm test               # API contract tests + browser tests
     on-off, Chord Rider's drum volume, Beat Maker edits and Chord Rider Undo.
   - `srp.test.mjs`: Song Rider Pro conflicts, deletes, Chord Rider link, full storage, XSS,
     typing cost, idle timers, dictation, paste confirmation.
+  - `music-fx.test.mjs`: music effects (`music-fx.js`) on offline renders: all-Off is a null test; EQ
+    presets tilt the spectrum as named and Amount scales them; drive harmonics; compression, drive and
+    glue within ±1.5 dB of Off on recorded piano chords, melody, bass and a drum loop; chorus/phaser/
+    flanger modulation, tremolo and auto-pan at the Speed rate; constant-power pan; tempo delay echoes;
+    reverb tail per room; width; no clicks when switching presets; pump depth and recovery. Through the
+    app: song/track/clip and drum FX in the WAV export, the pump live and in export (vocals not ducked by
+    default, Stop leaves nothing ducked), no graph growth with every effect on, save/undo/redo/reload of
+    FX edits from Track Master and the Song FX panel, the Baby DAW panels and Chord Rider taps.
+    `PRINT_LEVELS=1` prints the level table; `ONLY=<text>` runs the tests whose name contains it.
   - `instruments.test.mjs`: the instrument engine (`instruments.js`) with a small Salamander piano
     fixture (`tests/fixtures/instruments/`) and generated guitar/brass sets: every sound loads and
     renders offline and in realtime, level within 1.5 dB of the piano, master peaks, pitch (incl.

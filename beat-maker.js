@@ -546,15 +546,24 @@
   // Song hits queued ahead but not sounding yet. Stop, Pause, a seek or Preview
   // cancels them, so drums from the old position do not play on for the look-ahead.
   const mainQueued=new Set();
-  function playBuffer(id,time,gain,queue=null){
-    const buf=buffers.get(id); if(!buf||!audioCtx) return;
-    const src=audioCtx.createBufferSource(), g=audioCtx.createGain(); src.buffer=buf; g.gain.value=gain; src.connect(g).connect(drumOutput()); src.start(time);
+  // Song drums (not Preview or the editor's taps) go through the Drums track's
+  // effects, or a region's own, when Baby DAW routes them (window.CRPMusicFx).
+  function songDrumOutput(regionId){ return window.CRPMusicFx?.drumDestination?.(audioCtx,regionId) || drumOutput(); }
+  function playBuffer(id,time,gain,queue=null,regionId=null){
+    const buf=buffers.get(id); if(!buf||!audioCtx) return false;
+    const src=audioCtx.createBufferSource(), g=audioCtx.createGain(); src.buffer=buf; g.gain.value=gain; src.connect(g).connect(queue===mainQueued?songDrumOutput(regionId):drumOutput()); src.start(time);
     if(queue){src.__at=time;queue.add(src);src.onended=()=>queue.delete(src);}
+    return true;
   }
+  // Each audible song kick is reported so the song's Pump can duck the other
+  // tracks at exactly that time (live here, from the region data in export).
+  const KICKS=new Set(['kick1','kick2','kick3']);
+  function reportKick(time,regionId=null){ try{window.CRPMusicFx?.onKick?.(audioCtx,time,regionId);}catch{} }
   function cancelQueuedMainHits(){
     const now=audioCtx?.currentTime||0;
     for(const src of mainQueued)if(src.__at>now){try{src.stop();}catch{}}
     mainQueued.clear();
+    try{window.CRPMusicFx?.onKickCancel?.(audioCtx,now);}catch{}
   }
   async function ensureDrums(){
     if(!audioCtx) audioCtx=window.CRPAudio ? window.CRPAudio.context() : new (window.AudioContext||window.webkitAudioContext)();
@@ -591,8 +600,9 @@
   function hit(id,time,gain=1){ playBuffer(id,time,beat.gain*DRUM_OUTPUT_SCALE*gain); }
   async function audition(id,gain=.78){ try{await ensureDrums();hit(id,audioCtx.currentTime+.01,gain)}catch(e){console.error(e);status(`Drum error: ${e.message||e}`);} }
   function scheduleCanonicalStep(absStep,time,barIndex,gainScale=1,pattern=beat,queue=null){
-    const pat=normalizeBeat(pattern),step=((absStep%64)+64)%64;
-    DRUMS.forEach(([id])=>{ if(pat.tracks[id][barIndex]?.includes(step)) playBuffer(id,time,pat.gain*DRUM_OUTPUT_SCALE*gainScale,queue); });
+    const pat=normalizeBeat(pattern),step=((absStep%64)+64)%64,gain=pat.gain*DRUM_OUTPUT_SCALE*gainScale;let kick=false;
+    DRUMS.forEach(([id])=>{ if(pat.tracks[id][barIndex]?.includes(step)&&playBuffer(id,time,gain,queue)&&KICKS.has(id)&&gain>0) kick=true; });
+    if(kick&&queue===mainQueued) reportKick(time);
   }
   function arrangementHitCount(events){
     let n=0;for(const ev of Array.isArray(events)?events:[]){const pat=normalizeBeat(ev?.pattern);DRUMS.forEach(([id])=>{for(let b=0;b<pat.bars;b++)n+=pat.tracks[id][b].length;});}return n;
@@ -602,7 +612,9 @@
     for(const ev of Array.isArray(mainArrangement)?mainArrangement:[]){
       const start=Math.max(0,Number(ev?.startBeat)||0),dur=Math.max(0,Number(ev?.durationBeats)||0),end=start+dur;if(songBeat<start-1e-6||songBeat>=end-1e-6)continue;
       const pat=normalizeBeat(ev?.pattern),offset=Number(ev?.patternOffsetBeats)||0,patternSteps=Math.max(64,Math.max(1,pat.bars)*64),rawStep=Math.round((songBeat-start+offset)*16),localCanonical=((rawStep%patternSteps)+patternSteps)%patternSteps,bar=Math.floor(localCanonical/64),step=localCanonical%64;
-      DRUMS.forEach(([id])=>{ if(pat.tracks[id][bar]?.includes(step)) playBuffer(id,time,pat.gain*DRUM_OUTPUT_SCALE*gainScale,mainQueued); });
+      const gain=pat.gain*DRUM_OUTPUT_SCALE*gainScale,regionId=ev?.id??null;let kick=false;
+      DRUMS.forEach(([id])=>{ if(pat.tracks[id][bar]?.includes(step)&&playBuffer(id,time,gain,mainQueued,regionId)&&KICKS.has(id)&&gain>0) kick=true; });
+      if(kick) reportKick(time,regionId);
     }
   }
   function stepSeconds(){ return (60/getBpm())/16; } // one 64th = quarter/16

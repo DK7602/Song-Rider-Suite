@@ -396,6 +396,7 @@
         if(Number.isFinite(+prior.voxStartBeat)&&+prior.voxStartBeat>=0)card.voxStartBeat=+prior.voxStartBeat;
         if(Number.isFinite(+prior.voxDurationBeats)&&+prior.voxDurationBeats>0)card.voxDurationBeats=+prior.voxDurationBeats;
         if(prior.voxBlank===true)card.voxBlank=true;
+        if(prior.fx&&typeof prior.fx==='object')card.fx=JSON.parse(JSON.stringify(prior.fx)); // Track Master clip FX
       }
     });
     state.rows[state.selectedRow]=vals;
@@ -562,7 +563,10 @@
   function ensureInstrumentBus(){
     if(state.instrumentBus&&state.instrumentFxChain)return;
     const bus=state.audioCtx.createGain();
-    const fx=createInstrumentFxChain(state.audioCtx,CRPAudio.master());bus.connect(fx.input);
+    // Taps go through the loaded chord part's track effects and the song effects (Baby DAW's
+    // music FX) on their way to the master, so what you tap sounds like what plays.
+    let out=null;try{out=window.CRPParts?.auditionDestination?.(state.audioCtx)||null;}catch{}
+    const fx=createInstrumentFxChain(state.audioCtx,out||CRPAudio.master());bus.connect(fx.input);
     state.instrumentBus=bus;state.instrumentFxChain=fx;
   }
   let lastLoadedPlayer=null;

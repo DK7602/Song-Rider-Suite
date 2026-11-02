@@ -65,6 +65,7 @@
       <li><a href="#bd">Baby DAW</a></li>
       <li><a href="#vocals">Recording vocals</a></li>
       <li><a href="#tm">Track Master</a></li>
+      <li><a href="#fx">Music effects</a></li>
       <li><a href="#export">Exporting</a></li>
       <li><a href="#srp">Song Rider Pro</a></li>
       <li><a href="#sounds">Sounds</a></li>
@@ -227,6 +228,7 @@
       <li><strong>Vocals:</strong> for recording your voice (see <a href="#vocals">Recording vocals</a>).</li>
     </ul>
     <p><span class="ui">Hide Setup</span> (shown for chord parts) folds the instrument and chord controls to give you more room.</p>
+    <p>Under the volume slider, <span class="ui">▸ Effects</span> (chord and lead/bass parts) opens the selected part's effects, and <span class="ui">Song FX</span> / <span class="ui">Drums FX</span> open the effects of the whole song and of the drums. See <a href="#fx">Music effects</a>.</p>
 
     <h3>Writing a lead or bass line</h3>
     <ul>
@@ -282,6 +284,7 @@
       <li><strong>Reverb:</strong> Off, or a Small, Medium or Large room (each a real room sound with its own length).</li>
       <li><strong>Delay:</strong> Off, Slap (one quick echo), or 1/8 and 1/4, which echo in time with the song's BPM and fade away.</li>
       <li><strong>Auto-Tune:</strong> 0–100%. It tunes to the song's Key (or the key of your chords). With no key or chords yet, it tunes to the nearest note. A higher amount corrects further and faster; 100% gives the hard, stepped "Auto-Tune" sound. It's applied in playback and in WAV exports.</li>
+      <li><strong>Duck to kick:</strong> off for vocals. Turn it on if you want the vocal to "breathe" with the song's <a href="#fx-pump">Pump</a> too.</li>
       <li>Effects never change the original recording, so you can change them at any time.</li>
     </ul>
     <p>When you're signed in and the project is saved, takes upload to your account and get a lyrics transcript automatically (<span class="ui">Transcribe active take</span> tries again). <span class="ui">▶ Play Mix</span> plays the vocal part with its backing.</p>
@@ -322,7 +325,62 @@
     </ul>
 
     <h3>Track Effects</h3>
-    <p><span class="ui">Show</span> opens the effects panel for vocal tracks: volume (0–150%), EQ, Compression, Reverb, Delay and Auto-Tune. <em>Apply to</em> chooses the whole track or just the selected clips; <em>Reset Event FX to Track</em> removes a clip's own settings.</p>
+    <p><span class="ui">Show</span> opens the effects panel for the selected track or clips. For a vocal track: volume (0–150%), EQ, Compression, Reverb, Delay, Auto-Tune and Duck to kick. <em>Apply to</em> chooses the whole track or just the selected clips; <em>Reset Event FX to Track</em> removes a clip's own settings.</p>
+    <p>For a chord, lead/bass or Drums track (tap its name, or one of its clips) the panel shows the <a href="#fx">music effects</a>. <span class="ui">Song FX</span> in the toolbar opens the effects of the whole song.</p>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section class="mod" id="fx">
+    <h2><img src="assets/brand/icon-baby-daw-256.webp" alt="">Music effects</h2>
+    <p>Effects for the music (not only the vocals), at three levels: a whole <strong>track</strong> (a chord/note part, a lead/bass part or the Drums), a single <strong>clip</strong> on a track (a chord, a lead note, a drum region), and the whole <strong>song</strong>. Each effect is a short list of presets with one or two sliders. Everything starts Off, so a song sounds exactly as before until you change something.</p>
+
+    <h3 id="fx-where">Where to find them</h3>
+    <ul>
+      <li><strong>Baby DAW:</strong> select a chord or lead/bass part and open <span class="ui">▸ Effects</span> under its volume. <span class="ui">Song FX</span> and <span class="ui">Drums FX</span> are next to it.</li>
+      <li><strong>Track Master:</strong> tap a chord, lead/bass or Drums track's name (or one of its clips), then <span class="ui">Show</span> on the effects panel. <span class="ui">Song FX</span> is the last button of the toolbar.</li>
+    </ul>
+
+    <h3 id="fx-track">Track and clip effects</h3>
+    <div class="wrap"><table>
+      <tr><th>Control</th><th>What it does</th></tr>
+      <tr><td><strong>EQ</strong> + Amount</td><td>Tone. <em>Warm</em> (fuller, softer top), <em>Bright</em> (more sparkle), <em>Scoop</em> (more lows and highs, fewer mids — the "smile"), <em>Mid push</em> (forward, cuts through), <em>Thin</em> (low cut, less boom), <em>Dark</em> (high cut, mellow), <em>Telephone</em> (a narrow, lo-fi band). Amount sets how strong: 0% = no change, 100% = the full preset.</td></tr>
+      <tr><td><strong>Compression</strong></td><td>Evens out loud and soft notes. <em>Light</em>, <em>Medium</em>, <em>Heavy</em>, and <em>Punch</em>, which lets the start of each hit through first (good on drums and plucked sounds). Every preset keeps about the same volume as Off, so you hear the difference in feel, not just "louder".</td></tr>
+      <tr><td><strong>Drive</strong> + Amount</td><td>Saturation and distortion: <em>Warm</em> (gentle, tape-like), <em>Crunch</em> (edgy), <em>Fuzz</em> (thick and buzzy). Amount drives it harder. The volume stays about level as you turn it up.</td></tr>
+      <tr><td><strong>Modulation</strong> + Amount + Speed</td><td><em>Chorus</em> (wide shimmer), <em>Phaser</em> (sweeping swirl), <em>Flanger</em> (jet-plane sweep), <em>Tremolo</em> (volume pulses), <em>Auto-pan</em> (moves between the speakers). Amount is how deep, Speed how fast.</td></tr>
+      <tr><td><strong>Pan</strong></td><td>Places the track (or clip) from left (L) to right (R). The middle (C) is as before; the loudness stays the same anywhere.</td></tr>
+      <tr><td><strong>Reverb send</strong></td><td>How much of the track goes into the song's shared reverb (its room is set in Song FX).</td></tr>
+      <tr><td><strong>Delay send</strong></td><td>How much goes into the song's shared, tempo-synced delay (its timing and repeats are set in Song FX).</td></tr>
+      <tr><td><strong>Duck to kick</strong></td><td>Chord and lead/bass tracks: on by default. With the song's Pump on, each kick briefly ducks this track. (The Drums never duck.)</td></tr>
+      <tr><td><strong>Bypass</strong></td><td>Hear the track without its effects — and without its clips' effects — to compare. Pan and Duck to kick stay. Untick to hear the effects again; your settings are kept.</td></tr>
+    </table></div>
+
+    <h3 id="fx-clip">Clip effects (Apply to)</h3>
+    <ul>
+      <li>In Track Master, select one or more clips (a chord, a lead note or a drum region; <span class="ui">Multi Select</span> picks several) and set <em>Apply to</em> to <strong>Selected clip(s)</strong>. Changes then go to those clips only.</li>
+      <li>A clip with its own effects uses them <em>instead of</em> its track's effects (like vocal clip effects). It starts from a copy of the track's settings, so you only change what should differ. Its Duck to kick and Bypass follow the track. Clips with their own effects show a small <strong>FX</strong> tag.</li>
+      <li><em>Apply to: Track</em> edits the whole track of the selected clip. <span class="ui">Reset Clip FX to Track</span> removes the selected clips' own effects.</li>
+      <li>A track name shows <strong>• FX</strong> when the track has effects (<strong>• FX off</strong> when bypassed).</li>
+    </ul>
+
+    <h3 id="fx-song">Song FX</h3>
+    <div class="wrap"><table>
+      <tr><th>Control</th><th>What it does</th></tr>
+      <tr><td><strong>EQ</strong> + Amount</td><td>The same presets as a track's EQ, on the whole mix.</td></tr>
+      <tr><td><strong>Glue</strong></td><td>Gentle compression on the whole mix (Light, Medium, Heavy) that makes the parts sit together. It keeps the overall volume.</td></tr>
+      <tr><td><strong>Pump</strong></td><td>Off, Subtle, Medium or Heavy. Each kick briefly ducks the other tracks so the mix breathes in time with the beat — the "pumping" sound of house and EDM. Subtle dips about 3 dB, Medium 6 dB, Heavy 11 dB, and the level is back before the next beat (it follows the tempo).</td></tr>
+      <tr><td><strong>Reverb room</strong> + Reverb level</td><td>The shared reverb every track's Reverb send goes to: <em>Room</em> (short), <em>Plate</em> (bright, smooth), <em>Hall</em>, <em>Large Hall</em> (longest). Reverb level is how loud the reverb comes back.</td></tr>
+      <tr><td><strong>Delay time</strong> + Feedback</td><td>The shared echo every track's Delay send goes to, in time with the BPM: 1/8, dotted 1/8, 1/4 or 1/2 note. Feedback sets how many repeats you hear; each repeat is a little darker.</td></tr>
+      <tr><td><strong>Width</strong></td><td>Narrower (towards mono) or wider stereo for the whole mix. The middle is as recorded.</td></tr>
+    </table></div>
+
+    <h3 id="fx-pump">Pump and Duck to kick</h3>
+    <ul>
+      <li>Pump follows the kicks you can hear (Kick 1, 2 and 3 in the drum pattern or regions). With the Drums off, muted, or without kicks, nothing pumps; it also follows Mute and Solo.</li>
+      <li>Every chord and lead/bass track ducks by default; turn a track's <em>Duck to kick</em> off to keep it steady. Vocals don't duck unless you turn their Duck to kick on.</li>
+      <li>Previewing a pattern in Beat Maker never pumps the song.</li>
+    </ul>
+
+    <div class="tip"><strong>Tips:</strong> the effects sound the same in playback and in the WAV export. Chord Rider's own chord taps play through the loaded chord part's effects. Effects that are Off cost nothing, and the shared reverb and delay only run while some track sends to them, so phones stay smooth. Track Master <span class="ui">Undo</span> / <span class="ui">Redo</span> cover every effect change (a slider drag is one step), and effects are saved and synced with the project.</div>
   </section>
 
   <!-- ===================================================================== -->
@@ -333,7 +391,7 @@
       <tr><th>Item</th><th>What you get</th></tr>
       <tr><td><strong>PDF chord sheet</strong></td><td>A printable chord sheet. Choose the parts, drums and project notes to include, then <em>Create PDF</em>.</td></tr>
       <tr><td><strong>PNG image</strong></td><td>The same, as an image to share.</td></tr>
-      <tr><td><strong>Audio mix (WAV)…</strong></td><td>A finished stereo mix of the ticked parts and drums, from START to FINISH, with the same effects and loudness you hear. Rendering is fast and keeps going with the screen locked.</td></tr>
+      <tr><td><strong>Audio mix (WAV)…</strong></td><td>A finished stereo mix of the ticked parts and drums, from START to FINISH, with the same effects (vocal, track, clip and song effects, and the Pump) and loudness you hear. Rendering is fast and keeps going with the screen locked.</td></tr>
       <tr><td><strong>Studio package…</strong></td><td>A ZIP for other music software: a MIDI file per part, the drums as MIDI, your dry vocal recordings and the project data.</td></tr>
     </table></div>
     <div class="note"><strong>Good to know:</strong> the WAV export ignores Mute and Solo; untick parts in the export dialog to leave them out.</div>

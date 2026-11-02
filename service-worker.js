@@ -1,11 +1,11 @@
-const CACHE = 'song-rider-suite-v3.4.22';
+const CACHE = 'song-rider-suite-v3.4.23';
 // Recorded instrument audio (assets/instruments/<id>/*.mp3) never changes under the same name, so it lives in
 // its own cache that survives app updates and is served from there first. Bump this to drop the old audio.
 const INSTRUMENT_CACHE = 'srs-instruments-v2';
 // Precached so the whole suite opens offline. Everything else is cached the first time it loads.
 const ASSETS = [
   './','./index.html','./manifest.webmanifest','./app.js',
-  './parts.js','./beat-maker.js','./scale-rider.js','./skins.js',
+  './music-fx.js','./parts.js','./beat-maker.js','./scale-rider.js','./skins.js',
   './vocal-autotune-worklet.js','./styles.css','./scale-rider.css','./crp-layout-lock.css',
   './suite-shell-lock.css','./branding-shell.css','./suite-header.css','./skins.css',
   './suite-brand.css','./suite-compact.css','./assets/brand/icon-chord-rider-pro-256.webp','./assets/brand/icon-baby-daw-256.webp',

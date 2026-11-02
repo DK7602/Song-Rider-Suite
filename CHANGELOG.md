@@ -53,6 +53,30 @@
 - The sounds are served by the app itself and kept on the device after first use, so they load faster
   and work offline. The old General MIDI sounds remain as an automatic backup.
 
+### Music effects (tracks, clips and the whole song)
+- **Effects for the music, not only the vocals,** in Baby DAW and Track Master, for chord/note parts, lead/bass
+  parts and the drums. Each effect is a few presets plus one or two sliders:
+  - **EQ** (Warm, Bright, Scoop, Mid push, Thin, Dark, Telephone) with Amount; **Compression** (Light, Medium,
+    Heavy, Punch); **Drive** (Warm, Crunch, Fuzz) with Amount; **Modulation** (Chorus, Phaser, Flanger,
+    Tremolo, Auto-pan) with Amount and Speed; **Pan**; **Reverb** and **Delay sends**.
+  - **Track** effects (Baby DAW: ▸ Effects under the part's volume; Track Master: select the track) and
+    **clip** effects (Track Master: select chords, lead notes or drum regions, *Apply to: Selected clip(s)*),
+    which replace the track's effects for those clips, like vocal clip effects. *Reset Clip FX to Track*,
+    a per-track **Bypass** to compare, and FX tags on tracks and clips.
+  - **Song FX** (Track Master toolbar, Baby DAW): EQ, **Glue** compression, the shared **reverb room** (Room,
+    Plate, Hall, Large Hall) and **tempo delay** (1/8, dotted 1/8, 1/4, 1/2, with feedback) every track sends
+    to, stereo **Width**, and **Pump**: each kick briefly ducks the other tracks (Subtle −3, Medium −6,
+    Heavy −11 dB, back before the next beat) so the mix breathes with the beat. Each track has *Duck to kick*
+    (on for chord/lead tracks, off for vocals; the drums never duck).
+- Compression, glue and drive keep the loudness of Off (within 1.5 dB on piano chords, a melody, a bass line
+  and a drum loop), panning keeps a sound's loudness anywhere, switching presets while playing never
+  clicks, and effects that are Off take no processing (the shared reverb and delay only run while
+  something sends to them).
+- **Exports sound like playback:** WAVs have every track, clip and song effect and the same Pump.
+- Chord Rider's own chord taps play through the loaded chord part's effects.
+- Saved and synced with the song; Track Master Undo/Redo covers every effect change. Older songs open with
+  everything Off and sound exactly as before.
+
 ### Fixes
 - **Link SRP works again in every situation.** With a Chord Rider project open it links at once;
   with none open it lists your Chord Rider projects to pick from (or explains how to make one);
