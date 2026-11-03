@@ -1989,7 +1989,7 @@ function adoptServerCopy(remote, rev, local){
       differs = true;
     }
     // Local link bookkeeping belongs to this device's CRP pairing.
-    for(const k of ["linkedCrpProjectId", "linkedOctave", "linkedTranspose", "crpRowsSig"]){
+    for(const k of ["linkedCrpProjectId", "linkedOctave", "linkedTranspose", "crpRowsSig", "crpChordLayout"]){
       if(local[k] !== undefined && remote[k] === undefined) remote[k] = local[k];
     }
   }
@@ -2641,7 +2641,7 @@ Project library (local-first store)
 const LS_SYNC = "songrider_v25_sync";
 const LIBRARY_SAVE_DELAY_MS = 300;
 // Bookkeeping fields: changing them must not move a song's "last changed" time.
-const NON_CONTENT_FIELDS = new Set(["updatedAt", "cloudAudioManifest", "notesImages", "linkedCrpProjectId", "linkedOctave", "linkedTranspose", "crpChordRows", "crpBeatsPerChord", "crpKey", "crpRowsSig"]);
+const NON_CONTENT_FIELDS = new Set(["updatedAt", "cloudAudioManifest", "notesImages", "linkedCrpProjectId", "linkedOctave", "linkedTranspose", "crpChordRows", "crpBeatsPerChord", "crpKey", "crpRowsSig", "crpChordLayout"]);
 
 const library = {
   scope: null,
@@ -16690,7 +16690,7 @@ function applyKeyboardDockLayout(){
 /* CRP / SRP integration bridge.
    Song Rider Pro runs as its own page next to Chord Rider Pro / Baby DAW (same origin). One SRP
    song can be linked to one CRP project; the pair then shares BPM / capo / step / key, and the CRP
-   chord rows are merged into PAGE 1 of the SRP song.
+   chord rows go onto the SRP song's lyric lines in order, through every section.
 
    Shared localStorage keys (root app.js is unchanged and keeps using all of them):
      crp-srp-links-v1                persistent links: CRP id -> {srpProjectId, srpName, linkedAt}
@@ -16907,7 +16907,7 @@ function applyKeyboardDockLayout(){
     node.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();publishSrpTransport();node.blur();}},true);
   });
 
-  // ---------------------------------------------------------------- CRP chord rows -> PAGE 1
+  // ---------------------------------------------------------------- CRP chord rows -> the song's lines
   function crpPayloadFor(preferredCrpId=''){
     const projects=readJson('crp-projects',[])||[];
     const h=handoff(),session=readLinkSession();
@@ -16937,24 +16937,73 @@ function applyKeyboardDockLayout(){
     for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}
     return `${(h>>>0).toString(36)}-${text.length}`;
   }
-  // Put each CRP row's chords on the matching PAGE 1 card, in order. Lyrics, beats and any
-  // extra cards stay. A row with more than 8 chords continues on the next card(s).
-  function mergeCrpRowsIntoPage1(project,rows){
-    const cards=Array.isArray(project.sections?.['PAGE 1'])?project.sections['PAGE 1']:[];
-    let at=0;
-    for(const row of rows){
+  // Chords for the whole song, in order: CRP line 1 goes on the song's first lyric line, line 2 on
+  // the next, and so on through every section in song order (Verse 1, Chorus 1, Verse 2 …). A line
+  // with more than 8 chords continues on the next lyric line, and a blank CRP line leaves its lyric
+  // line without chords. Lines past the song's last lyric go on the cards after it (new cards when
+  // needed; from the top of the first section when nothing has lyrics yet). Lyrics and beats always
+  // stay, and lyric lines past CRP's last line keep the chords they have. Chord-only cards left from
+  // an earlier import (no lyrics, holding an imported chord row) are cleared, and removed when
+  // nothing else is on them.
+  const CRP_CHORD_LAYOUT=2; // 1: every CRP line on PAGE 1 (before v3.4.11); 2: across the song
+  function crpRowChunks(rows){
+    const out=[];
+    for(const row of (Array.isArray(rows)?rows:[])){
       const chords=crpRowChords(row);
       for(let start=0;start===0||start<chords.length;start+=8){
-        const chunk=chords.slice(start,start+8);
-        if(at>=cards.length)cards.push(newLine());
-        const slots=Array(8).fill('');
+        const chunk=chords.slice(start,start+8),slots=Array(8).fill('');
         chunk.forEach((ch,j)=>{slots[Math.floor(j*8/chunk.length)]=ch;});
-        cards[at].notes=slots;
-        at++;
+        out.push(slots);
       }
     }
-    project.sections['PAGE 1']=cards;
-    project.enabledSections=Array.from(new Set(['PAGE 1',...(project.enabledSections||[])]));
+    return out;
+  }
+  function songSectionsInOrder(project){
+    let secs=[];
+    try{if(project===state.project)secs=getVisibleSectionPages().filter(sec=>sec!=='Full');}catch{}
+    if(!secs.length)secs=Object.keys(project.sections||{}).filter(sec=>sec!=='Full');
+    return secs.length?secs:['PAGE 1'];
+  }
+  function mergeCrpRowsIntoSong(project,rows,previousRows=null){
+    if(!project.sections||typeof project.sections!=='object')project.sections={};
+    const chunks=crpRowChunks(rows);
+    const rowKey=notes=>JSON.stringify(Array.from({length:8},(_,i)=>String((notes||[])[i]||'').trim()));
+    const imported=new Set([...chunks,...crpRowChunks(previousRows)].map(rowKey));
+    imported.delete(rowKey([]));
+    const hasLyrics=card=>!!String(card?.lyrics||'').trim();
+    const secs=songSectionsInOrder(project);
+    const targets=[];
+    for(const sec of secs)for(const card of (Array.isArray(project.sections[sec])?project.sections[sec]:[]))if(card&&hasLyrics(card))targets.push({sec,card});
+    const written=new Set();
+    let k=0;
+    for(const t of targets){
+      if(k>=chunks.length)break;
+      t.card.notes=chunks[k++].slice();written.add(t.card);
+    }
+    let overflowSec=null;
+    if(k<chunks.length){
+      const last=targets[targets.length-1]||null;
+      overflowSec=last?last.sec:secs[0];
+      if(!Array.isArray(project.sections[overflowSec]))project.sections[overflowSec]=[];
+      const cards=project.sections[overflowSec];
+      let at=last?cards.indexOf(last.card)+1:0;
+      while(k<chunks.length){
+        if(at>=cards.length)cards.push(newLine());
+        cards[at].notes=chunks[k++].slice();written.add(cards[at]);at++;
+      }
+    }
+    for(const sec of secs){
+      const cards=project.sections[sec];if(!Array.isArray(cards))continue;
+      for(let i=cards.length-1;i>=0;i--){
+        const card=cards[i];
+        if(!card||written.has(card)||hasLyrics(card)||!imported.has(rowKey(card.notes)))continue;
+        card.notes=Array(8).fill('');
+        const beats=Array.isArray(card.beats)&&card.beats.some(b=>String(b||'').trim());
+        if(!beats&&cards.length>MIN_LINES_PER_SECTION)cards.splice(i,1);
+      }
+    }
+    project.enabledSections=Array.from(new Set([...(project.enabledSections||[]),...(overflowSec?[overflowSec]:[])]));
+    if(!project.enabledSections.length)project.enabledSections=['PAGE 1'];
   }
   // Link (forceCreate) or refresh the open song from its CRP partner. The chord merge only runs
   // when CRP's rows actually changed, goes through editProject (so Undo works) and rewrites the
@@ -16981,15 +17030,17 @@ function applyKeyboardDockLayout(){
     }
     const rows=Array.isArray(payload.rows)?payload.rows:[];
     const sig=crpRowsFingerprint(rows);
-    const merge=forceCreate||p.crpRowsSig!==sig;
+    // Songs linked before the chords went across the whole song are laid out again once.
+    const merge=forceCreate||p.crpRowsSig!==sig||Number(p.crpChordLayout)!==CRP_CHORD_LAYOUT;
     if(merge){
       editProject('linkCrpChords',()=>{
-        mergeCrpRowsIntoPage1(p,rows);
+        mergeCrpRowsIntoSong(p,rows,p.crpChordRows);
         syncFullTextFromSections();
       });
     }
     p.linkedCrpProjectId=crpId;
     p.crpRowsSig=sig;
+    p.crpChordLayout=CRP_CHORD_LAYOUT;
     p.crpChordRows=rows;
     p.crpBeatsPerChord=Number(payload.beats)||4;
     if(forceCreate){
@@ -17155,7 +17206,7 @@ function applyKeyboardDockLayout(){
     refreshCrpLinkUi();
     const song=String(state.project?.name||'').trim()||'This song';
     if(!result.ok){showLinkNotice(result.error,{sticky:true});return false;}
-    showLinkNotice(`“${song}” is linked to the Chord Rider / Baby DAW project “${result.name}”. Its chords are on PAGE 1 (Undo removes them) and BPM, capo and key now stay in sync.`+(result.moved?` “${result.moved.name}” is no longer linked to it.`:''));
+    showLinkNotice(`“${song}” is linked to the Chord Rider / Baby DAW project “${result.name}”. Its chords are on your lyric lines in order, through every section (Undo removes them), and BPM, capo and key now stay in sync.`+(result.moved?` “${result.moved.name}” is no longer linked to it.`:''));
     return true;
   }
 
@@ -17215,7 +17266,7 @@ function applyKeyboardDockLayout(){
     const openItem=items.find(it=>it.open);
     const why=openItem?.linkedTo?`“${openItem.name}”, open in Chord Rider, is linked to “${openItem.linkedTo.name}”; picking it moves the link to this song.`:'Chord Rider has no project open right now.';
     intro.textContent=items.length
-      ?`${why} Pick the project to link with “${song}”. Its chords go onto PAGE 1 (your lyrics stay; Undo removes them) and BPM, capo and key stay in sync.`
+      ?`${why} Pick the project to link with “${song}”. Its chords go onto your lyric lines in order, through every section (your lyrics stay; Undo removes them), and BPM, capo and key stay in sync.`
       :`There are no Chord Rider / Baby DAW projects on this device yet. Open Chord Rider, build or open a project and save it, then come back to “${song}” and tap Link SRP.`+(signedIn?' Projects saved in your account download when Chord Rider opens.':'');
     const list=document.createElement('div');
     list.className='archiveList';

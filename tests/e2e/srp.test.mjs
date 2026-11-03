@@ -317,6 +317,91 @@ await test('CRP link merges chords into PAGE 1, keeps every card and lyric, and 
   await ctx.close();
 });
 
+// Every section of the song with its cards that hold something: [title, [[lyrics, chords], …]].
+const songSections = async (page) => {
+  const p = (await stored(page))[0];
+  const order = Object.keys(p.sections || {}).filter((k) => /^PAGE \d+$/.test(k)).sort((a, b) => parseInt(a.slice(5)) - parseInt(b.slice(5)));
+  return order.map((sec) => [p.sectionTitles?.[sec] || sec, p.sections[sec].filter((l) => String(l.lyrics || '').trim() || (l.notes || []).some(Boolean)).map((l) => [l.lyrics, l.notes.filter(Boolean).join(' ')])]).filter(([, cards]) => cards.length);
+};
+const crpSeed = (rows) => {
+  if (localStorage.getItem('crp-projects')) return;
+  localStorage.setItem('crp-projects', JSON.stringify([{ id: 'crp-1', name: 'CRP Song', bpm: 100, beats: 4, key: 'Am', capo: 0, octave: 0, rows, updatedAt: 1000 }]));
+  localStorage.setItem('crp-active-project-id', 'crp-1');
+};
+const setCrpRows = (page, rows) => page.evaluate((rows) => {
+  const all = JSON.parse(localStorage.getItem('crp-projects')); all[0].rows = rows; all[0].updatedAt = Date.now();
+  localStorage.setItem('crp-projects', JSON.stringify(all));
+  window.dispatchEvent(new StorageEvent('storage', { key: 'crp-projects' })); window.dispatchEvent(new Event('focus'));
+}, rows);
+
+await test('Link SRP puts Chord Rider’s lines on the lyric lines of every section in order and keeps them in sync', async () => {
+  const { ctx, page } = await device(browser, null, { init: crpSeed, initArg: crpRows('Am7 Fmaj7', 'Dm7 E7', 'C G', 'F C', 'Am7 Fmaj7', 'Dm7 E7', 'G') });
+  await page.route('**/index.html?playbackBridge=1', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html>' }));
+  await open(page);
+  await typeFull(page, 'v1 a\n\nv1 b\n\n_Chorus 1\nc1 a\n\nc1 b\n\n_Verse 2\nv2 a\n\nv2 b');
+  await sleep(600); await blur(page); await sleep(400);
+  await page.click('#crpSrpLinkBtn'); await sleep(1000);
+  assert.deepEqual(await songSections(page), [
+    ['PAGE 1', [['v1 a', 'Am7 Fmaj7'], ['v1 b', 'Dm7 E7']]],
+    ['Chorus 1', [['c1 a', 'C G'], ['c1 b', 'F C']]],
+    ['Verse 2', [['v2 a', 'Am7 Fmaj7'], ['v2 b', 'Dm7 E7'], ['', 'G']]]
+  ], 'one Chord Rider line per lyric line, through every section; the extra line goes after the last lyric');
+  assert.match(await linkNotice(page), /on your lyric lines in order, through every section/);
+  // Chord Rider changes: a chord in the chorus, and the last two lines removed.
+  await setCrpRows(page, crpRows('Am7 Fmaj7', 'Dm7 E7', 'C Em', 'F C', 'Am7 Fmaj7'));
+  await sleep(1200);
+  assert.deepEqual(await songSections(page), [
+    ['PAGE 1', [['v1 a', 'Am7 Fmaj7'], ['v1 b', 'Dm7 E7']]],
+    ['Chorus 1', [['c1 a', 'C Em'], ['c1 b', 'F C']]],
+    ['Verse 2', [['v2 a', 'Am7 Fmaj7'], ['v2 b', 'Dm7 E7']]]
+  ], 'the change reaches the chorus; the extra card made for the removed line is gone; lyric lines keep their chords');
+  await blur(page);
+  await page.click('#undoBtn'); await sleep(400);
+  assert.deepEqual((await songSections(page))[2], ['Verse 2', [['v2 a', 'Am7 Fmaj7'], ['v2 b', 'Dm7 E7'], ['', 'G']]], 'Undo puts the previous chords back');
+  noErrors(page);
+  await ctx.close();
+});
+
+await test('A song linked with the old first-section layout is laid out across the song once (Undo restores it)', async () => {
+  const rows = crpRows('Am7 Fmaj7', 'Dm7 E7', 'C G', 'F C');
+  const slots = (a, b) => [a, '', '', '', b, '', '', ''];
+  const card = (id, lyrics, notes = Array(8).fill('')) => ({ id, notes, lyrics, beats: ['', '', '', ''] });
+  const song = {
+    id: 'song-1', name: 'Old Link', createdAt: 1, updatedAt: 1, linkedCrpProjectId: 'crp-1', crpRowsSig: 'old', crpChordRows: rows,
+    fullText: '__________\n\n   Am7          Fmaj7\nv1 a\n\n   Dm7          E7\nv1 b\n\nC G\n\nF C\n\n__________Chorus 1\n\nc1 a\n\nc1 b\n',
+    sections: {
+      'PAGE 1': [card('a', 'v1 a', slots('Am7', 'Fmaj7')), card('b', 'v1 b', slots('Dm7', 'E7')), card('c', '', slots('C', 'G')), card('d', '', slots('F', 'C'))],
+      'PAGE 2': [card('e', 'c1 a'), card('f', 'c1 b')]
+    },
+    sectionTitles: { 'PAGE 2': 'Chorus 1' }, enabledSections: ['PAGE 1']
+  };
+  const { ctx, page } = await device(browser, null, {
+    init: ({ song, rows }) => {
+      if (sessionStorage.getItem('seeded')) return; sessionStorage.setItem('seeded', '1');
+      localStorage.setItem('songrider_v25_projects::guest', JSON.stringify([song]));
+      localStorage.setItem('songrider_v25_currentProjectId::guest', 'song-1');
+      localStorage.setItem('crp-projects', JSON.stringify([{ id: 'crp-1', name: 'CRP Song', bpm: 100, beats: 4, key: 'Am', rows, updatedAt: 5 }]));
+      localStorage.setItem('crp-active-project-id', 'crp-1');
+      localStorage.setItem('crp-srp-links-v1', JSON.stringify({ 'crp-1': { srpProjectId: 'song-1', srpName: 'Old Link', linkedAt: 1 } }));
+    }, initArg: { song, rows }
+  });
+  await page.route('**/index.html?playbackBridge=1', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html>' }));
+  await open(page); await sleep(800);
+  assert.deepEqual(await songSections(page), [
+    ['PAGE 1', [['v1 a', 'Am7 Fmaj7'], ['v1 b', 'Dm7 E7']]],
+    ['Chorus 1', [['c1 a', 'C G'], ['c1 b', 'F C']]]
+  ], 'the chords left on the first section move to the chorus');
+  assert.equal((await stored(page))[0].crpChordLayout, 2);
+  await blur(page);
+  await page.click('#undoBtn'); await sleep(400);
+  assert.deepEqual(await songSections(page), [
+    ['PAGE 1', [['v1 a', 'Am7 Fmaj7'], ['v1 b', 'Dm7 E7'], ['', 'C G'], ['', 'F C']]],
+    ['Chorus 1', [['c1 a', ''], ['c1 b', '']]]
+  ], 'Undo gives the old layout back');
+  noErrors(page);
+  await ctx.close();
+});
+
 await test('Link SRP signed in on a phone, coming from an empty Chord Rider: explains, lists the projects, links, follows into CRP, unlinks', async () => {
   const user = await newUser();
   const songId = `song-${uniq()}`;

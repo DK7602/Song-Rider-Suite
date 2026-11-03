@@ -53,6 +53,14 @@
 - The sounds are served by the app itself and kept on the device after first use, so they load faster
   and work offline. The old General MIDI sounds remain as an automatic backup.
 
+### Link SRP fills the whole song
+- **Chord Rider's lines now go onto the lyric lines of every section in order** (Verse 1, Chorus 1, Verse 2 …),
+  not only the first section: line 1 on the first lyric line, line 2 on the next, and so on. Lines past the
+  last lyric go on new cards after it; lyric lines past Chord Rider's last line keep their chords; a blank
+  Chord Rider line leaves its lyric line without chords. Later chord changes in Chord Rider update every
+  section. Songs linked before this are laid out again once (Undo puts the old layout back), and chord-only
+  cards left over from the old first-section import are cleared.
+
 ### Music effects (tracks, clips and the whole song)
 - **Effects for the music, not only the vocals,** in Baby DAW and Track Master, for chord/note parts, lead/bass
   parts and the drums. Each effect is a few presets plus one or two sliders:
