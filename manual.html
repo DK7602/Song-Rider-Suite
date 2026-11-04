@@ -469,10 +469,11 @@ Am | G | F                (a chord-only line)
       <li><span class="ui">⬆️</span> <strong>Upload audio or PDF:</strong>
         <ul>
           <li>A PDF or .txt replaces the song's lyrics (it asks first if there are lyrics, and Undo reverses it). Scanned PDFs without text can't be read.</li>
+          <li>PDF chord charts come in with every chord over the syllable it sits on in the PDF: typeset charts, monospace text charts, Word documents, charts over several pages and two-column charts (read column by column). Copyright, CCLI and page-number lines are left out.</li>
           <li>Audio files (mp3, wav, m4a, aac, ogg) are attached to the song, each with rename, play/pause, stop, download and delete.</li>
         </ul>
       </li>
-      <li><span class="ui">⬇️</span> <strong>Export</strong> downloads a printable, coloured page of the song (chords in red over the lyrics, with BPM, capo and key) to open, print or save as PDF.</li>
+      <li><span class="ui">⬇️</span> <strong>Export</strong> downloads a printable, coloured page of the song (chords in red over the lyrics, with BPM, capo and key) to open, print or save as PDF. Every chord prints over the same letter it sits on in the Full Song View, on a phone, a computer, on paper or opened in Google Docs.</li>
       <li><span class="ui">📁</span> <strong>Completed Projects Archive:</strong> ＋ adds songs from your projects; tap an archived song to open it, or hold it to move it back to Projects.</li>
     </ul>
 
@@ -482,6 +483,14 @@ Am | G | F                (a chord-only line)
       <li>Everything saves automatically as you type; <span class="ui">💾</span> saves straight away.</li>
       <li><span class="ui">↶</span> <span class="ui">↷</span> undo and redo up to 80 song edits (lyrics, chords, titles, parts, imports, linking).</li>
       <li>Pasting text when no box is selected imports it like a .txt file.</li>
+      <li>What an import understands:
+        <ul>
+          <li>Chords over lyrics, as chord sites show them (also with the extra blank lines and spacing web pages add); <span class="ui">[G]</span>inline chords; and ChordPro files (<code>{title:}</code> names a new song, <code>{start_of_chorus}</code>, <code>{c: Bridge}</code> and similar become song parts).</li>
+          <li>Song-part headings such as Verse 1, [Chorus], Chorus x2, Pre-Chorus 2, Bridge 2, Hook, Refrain, Intro, Outro, Instrumental, Tag, Repeat Chorus and [Verse 1: Artist] become song parts.</li>
+          <li>Chord names such as G/B, Cmaj7, Bm7(b5), C(add9), G6/9, E♭ and N.C., and chords typed in lowercase. Lyric lines that start with chord letters ("Amazing grace", "Am I the one") stay lyrics.</li>
+          <li>The Full Song View keeps every chord exactly where it was. Editing a card changes only that card's line; a chord you rename on a card stays on its syllable.</li>
+        </ul>
+      </li>
     </ul>
   </section>
 

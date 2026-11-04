@@ -53,6 +53,28 @@
 - The sounds are served by the app itself and kept on the device after first use, so they load faster
   and work offline. The old General MIDI sounds remain as an automatic backup.
 
+### Song Rider Pro: chord sheet import and export, exact to the syllable
+- **The printable export puts every chord over its syllable at any width.** Chord rows used to be laid out
+  as a share of the page width while lyrics were plain text, so chords drifted (right only near one print
+  width, far off on phones and wide screens). Each chord row now prints with its lyric cut where each chord
+  starts, so every chord sits on its letter on a phone, a computer, on paper and in Google Docs.
+- **PDF import rebuilt** from where each piece of text sits on the page: word spacing is kept (monospace PDFs
+  lost every space), each chord goes over the lyric letter below it in any font (typeset charts, monospace
+  charts, Word documents), two-column charts are read column by column, multi-page charts flow on, and
+  copyright / CCLI / page-number lines are left out.
+- **ChordPro and [G]inline chords** import as chords over lyrics with song parts ({title:} names a new song;
+  {start_of_chorus}, {c: Bridge} … become parts). A chord inside a word ("to[C]night") no longer splits it,
+  and non-chord brackets such as (oh) or [x2] stay in the lyric.
+- **More song-part headings**: Pre-Chorus 2, Bridge 2, Chorus x2, Hook, Refrain, Instrumental, Repeat Chorus,
+  Post-Chorus, Tag, [Verse 1: Artist], Verse One … (everyday words like "Solo" or "Break" only in brackets,
+  with a colon or in capitals).
+- **One chord-name check for the whole app**: G/B, Bm7(b5), C(add9), G6/9, Am(maj7), N.C., ♭/♯ names (E♭ no
+  longer loses its flat) and lowercase chord rows. Lyrics that start with chord letters ("Amazing Grace",
+  "Am I the only one", "Be still") stay lyrics, are not printed in red and are never transposed by capo.
+- **Editing a card no longer moves every chord in the song.** The Full view keeps each line exactly as
+  imported or typed until that card is edited; a chord renamed on a card keeps its column.
+- Card chord boxes follow the chord's place in the lyric (not in the chord row).
+
 ### Link SRP fills the whole song
 - **Chord Rider's lines now go onto the lyric lines of every section in order** (Verse 1, Chorus 1, Verse 2 …),
   not only the first section: line 1 on the first lyric line, line 2 on the next, and so on. Lines past the

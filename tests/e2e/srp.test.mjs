@@ -6,6 +6,7 @@
 // non-zero if any check fails. Workers AI is not available locally, so dictation is stubbed in-page.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = await (async () => {
@@ -400,6 +401,186 @@ await test('A song linked with the old first-section layout is laid out across t
   ], 'Undo gives the old layout back');
   noErrors(page);
   await ctx.close();
+});
+
+// ---- Importing chord sheets (paste, ChordPro, PDF) and printing them ----
+const UG_SHEET = [
+  'Amazing Grace', 'John Newton', '', '[Intro]', 'G  D  G', '', '[Verse 1]',
+  'G                G7         C        G', 'Amazing grace, how sweet the sound',
+  '                     Em      D', 'That saved a wretch like me',
+  'G               G7        C       G', 'I once was lost, but now am found',
+  '        Em        D       G', 'Was blind, but now I see', '', '[Chorus]',
+  'C          G           Em      D', 'Through many dangers, toils and snares',
+  'G      D/F#   Em7       Cmaj7', 'I have already come'
+].join('\n');
+// Paste the way a copy from a website arrives: not into an editor.
+const pasteSong = (page, text) => page.evaluate((text) => {
+  document.activeElement?.blur?.();
+  const dt = new DataTransfer(); dt.setData('text/plain', text);
+  document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+}, text);
+const partTitles = async (page) => {
+  const p = (await stored(page))[0];
+  const order = Object.keys(p.sections).filter((k) => /^PAGE \d+$/.test(k)).sort((a, b) => parseInt(a.slice(5)) - parseInt(b.slice(5)));
+  return order.filter((sec) => p.sections[sec].some((l) => String(l.lyrics || '').trim() || (l.notes || []).some(Boolean)) || p.sectionTitles?.[sec]).map((sec) => p.sectionTitles?.[sec] || '');
+};
+const fullViewText = (page) => page.evaluate(() => Array.from(document.querySelectorAll('textarea.fullSectionText')).map((t) => t.value).join('\n'));
+// The word under each chord of every chord row + lyric pair in plain text: [[lyric, [[chord, word]…]]…].
+const CHORDISH = /^[A-G][#b]?(?:maj|min|m|M|dim|aug|sus|add|\d|#|b|\(|\))*(?:\/[A-G][#b]?)?$/;
+const isChordRowText = (l) => l.trim() && l.trim().split(/\s+/).every((t) => CHORDISH.test(t));
+const wordAt = (ly, i) => { if (i >= ly.length) return '(end)'; let a = i, b = i; while (a > 0 && ly[a - 1] !== ' ') a--; while (b < ly.length && ly[b] !== ' ') b++; return ly.slice(a, b) || '(space)'; };
+function chordWords(text) {
+  const lines = text.replace(/ /g, ' ').split('\n'), out = [];
+  for (let i = 0; i + 1 < lines.length; i++) {
+    let j = i + 1; while (j < lines.length && !lines[j].trim()) j++;
+    if (!isChordRowText(lines[i]) || !lines[j] || !lines[j].trim() || isChordRowText(lines[j]) || /^\s*\[/.test(lines[j])) continue;
+    const ly = lines[j]; const re = /\S+/g; let m; const cw = [];
+    while ((m = re.exec(lines[i]))) cw.push([m[0], wordAt(ly, m.index)]);
+    out.push([ly.replace(/\s+/g, ' ').trim(), cw]); i = j;
+  }
+  return out;
+}
+async function exportPage(page) {
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#exportBtn')]);
+  return readFileSync(await dl.path(), 'utf8');
+}
+// The same, read from where things are drawn in the exported page at a given width.
+async function exportedChordWords(html, width) {
+  const ctx = await browser.newContext({ viewport: { width, height: 900 } });
+  const p = await ctx.newPage();
+  await p.setContent(html);
+  const r = await p.evaluate(() => {
+    const out = [];
+    for (const t of document.querySelectorAll('table')) {
+      const rows = t.querySelectorAll(':scope > tbody > tr');
+      if (rows.length !== 2 || t.querySelector('table')) continue;
+      const nodes = [...rows[1].children].map((td) => [...td.childNodes].find((n) => n.nodeType === 3)).filter(Boolean);
+      const boxes = [], chars = [];
+      for (const tn of nodes) for (let i = 0; i < tn.length; i++) { const rg = document.createRange(); rg.setStart(tn, i); rg.setEnd(tn, i + 1); const b = rg.getBoundingClientRect(); boxes.push([b.left, b.right]); chars.push(tn.data[i] === ' ' ? ' ' : tn.data[i]); }
+      const ly = chars.join('');
+      const cw = [...rows[0].children].filter((td) => td.textContent.trim()).map((td) => {
+        const x = td.getBoundingClientRect().left + 0.5;
+        const i = boxes.findIndex(([a, b]) => x >= a && x < b);
+        let w = '(end)';
+        if (i >= 0 && i < ly.trimEnd().length) { let a = i, b = i; while (a > 0 && ly[a - 1] !== ' ') a--; while (b < ly.length && ly[b] !== ' ') b++; w = ly.slice(a, b) || '(space)'; }
+        return [td.textContent.trim(), w];
+      });
+      out.push([ly.replace(/\s+/g, ' ').trim(), cw]);
+    }
+    return out;
+  });
+  await ctx.close();
+  return r;
+}
+
+await test('A chord sheet copied from a website keeps every chord on its word: Full view, card edits and the printed page at any width', async () => {
+  const { ctx, page } = await device(browser, null);
+  await open(page);
+  // A web copy: no-break spaces in the chord rows and Windows line ends.
+  await pasteSong(page, UG_SHEET.replace(/  /g, '  ').replace(/\n/g, '\r\n'));
+  await sleep(1200);
+  assert.deepEqual(await partTitles(page), ['', 'Intro', 'Verse 1', 'Chorus']);
+  const want = chordWords(UG_SHEET);
+  assert.equal(want.length, 6);
+  assert.deepEqual(chordWords(await fullViewText(page)), want, 'Full view: every chord on its word');
+  let html = await exportPage(page);
+  for (const w of [390, 1280]) assert.deepEqual(await exportedChordWords(html, w), want, `printed page at ${w}px: every chord on its word`);
+  assert.doesNotMatch(html, /c00000[^>]*>Amazing/, 'the title line is not printed as chords');
+  // Change one chord on the Chorus card: only that line changes, and its other chords stay put.
+  for (let i = 0; i < 4; i++) { await blur(page); await page.keyboard.press("ArrowRight"); await sleep(300); }
+  const cell = page.locator('input.noteCell').first();
+  await cell.click(); await cell.fill('Am'); await page.keyboard.press('Tab'); await sleep(700);
+  for (let i = 0; i < 6 && !(await page.locator('.fullSectionCard').count()); i++) { await blur(page); await page.keyboard.press('ArrowLeft'); await sleep(250); }
+  const after = want.map(([ly, cw]) => [ly, ly.startsWith('Through') ? [['Am', 'Through'], ...cw.slice(1)] : cw]);
+  assert.deepEqual(chordWords(await fullViewText(page)), after, 'a card edit moves no other chord');
+  html = await exportPage(page);
+  assert.deepEqual(await exportedChordWords(html, 820), after);
+  noErrors(page);
+  await ctx.close();
+});
+
+await test('ChordPro and [G]inline chord sheets become song parts with each chord over its syllable', async () => {
+  const { ctx, page } = await device(browser, null);
+  await open(page);
+  await pasteSong(page, '{title: River Song}\n{artist: Example Writer}\n{key: G}\n\n{start_of_verse: Verse 1}\n[G]Low in the [C]valley the [G]river runs\n{end_of_verse}\n\n{start_of_chorus}\n[G]Sing it [D]loud, sing it [Em]free to[C]night\n{end_of_chorus}\n\n{comment: Bridge}\n[Am]All the roads lead [C]back to [D]you');
+  await sleep(1200);
+  assert.deepEqual(await partTitles(page), ['Verse 1', 'Chorus', 'Bridge']);
+  const song = (await stored(page))[0];
+  assert.equal(song.name, 'River Song', 'the {title} names a new song');
+  assert.equal(song.sections['PAGE 2'][0].lyrics, 'Sing it loud, sing it free tonight', 'a chord inside a word does not split it');
+  const want = [
+    ['Low in the valley the river runs', [['G', 'Low'], ['C', 'valley'], ['G', 'river']]],
+    ['Sing it loud, sing it free tonight', [['G', 'Sing'], ['D', 'loud,'], ['Em', 'free'], ['C', 'tonight']]],
+    ['All the roads lead back to you', [['Am', 'All'], ['C', 'back'], ['D', 'you']]]
+  ];
+  assert.deepEqual(chordWords(await fullViewText(page)), want);
+  assert.deepEqual(await exportedChordWords(await exportPage(page), 390), want);
+  // [G]inline lines without ChordPro, and a chord row of lowercase chords.
+  await pasteSong(page, '[Verse 1]\n[G]Low in the [C]valley\n\n[Chorus]\ng          d\nSing it loud tonight');
+  await sleep(1200);
+  const cards = (await stored(page))[0].sections;
+  assert.deepEqual([cards['PAGE 1'][0].notes.filter(Boolean), cards['PAGE 2'][0].notes.filter(Boolean)], [['G', 'C'], ['G', 'D']]);
+  noErrors(page);
+  await ctx.close();
+});
+
+await test('Song-part headings from chord and lyric sites, chord names and lyrics that look like chords', async () => {
+  const { ctx, page } = await device(browser, null);
+  await open(page);
+  await pasteSong(page, ['Verse 1:', 'Low in the valley', '', 'Pre-Chorus 2', 'Hold on', '', 'Chorus x2', 'Sing it loud', '', 'Bridge 2', 'All the roads', '', '[Hook]', 'We ride all night', '', '[Verse 2: MC Example]', 'Back on the block', '', 'Refrain', 'Carry me home', '', 'Instrumental', '| G | D | Em | C |', '', 'Repeat Chorus', '', 'Outro', 'Low in the valley'].join('\n'));
+  await sleep(1200);
+  assert.deepEqual(await partTitles(page), ['Verse 1', 'Pre-Chorus 2', 'Chorus x2', 'Bridge 2', 'Hook', 'Verse 2: MC Example', 'Refrain', 'Instrumental', 'Repeat Chorus', 'Outro']);
+  await pasteSong(page, ['[Verse 1]', 'Bm7(b5)        E7#9         Am(maj7)', 'Shadows fall but the air is still', 'G6/9           Csus4(add9)  N.C.', 'Hold the line and wait for me', 'A♭maj7         B♭/D         E♭', 'Every song has a melody', 'G                  D', 'A man who walks alone tonight', 'Em                C', 'Am I the only one awake'].join('\n'));
+  await sleep(1200);
+  const cards = (await stored(page))[0].sections['PAGE 1'].map((l) => [l.lyrics, l.notes.filter(Boolean).join(' ')]);
+  assert.deepEqual(cards, [
+    ['Shadows fall but the air is still', 'Bm7(b5) E7#9 Am(maj7)'],
+    ['Hold the line and wait for me', 'G6/9 Csus4(add9) N.C.'],
+    ['Every song has a melody', 'Abmaj7 Bb/D Eb'],
+    ['A man who walks alone tonight', 'G D'],
+    ['Am I the only one awake', 'Em C']
+  ]);
+  noErrors(page);
+  await ctx.close();
+});
+
+await test('PDF chord charts (typeset two-column with a CCLI footer, and monospace) import with every chord over its syllable', async () => {
+  // Make the PDFs the way chord sites and word processors do: a typeset chart with each chord placed
+  // over its syllable in two columns, and a plain monospace chart.
+  const maker = await browser.newPage();
+  const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const src = UG_SHEET.split('\n'); let typeset = '';
+  for (let i = 0; i < src.length; i++) {
+    const l = src[i], n = src[i + 1] || '';
+    if (isChordRowText(l) && n.trim() && !isChordRowText(n) && !/^\[/.test(n)) {
+      const re = /\S+/g; let m, last = 0, html = '';
+      while ((m = re.exec(l))) { const at = Math.min(m.index, n.length); html += esc(n.slice(last, at)) + `<span class="a" data-c="${m[0]}"></span>`; last = at; }
+      typeset += `<div class="p">${html}${esc(n.slice(last))}</div>`; i++;
+    } else typeset += `<div class="${/^\[/.test(l) ? 'h' : 'l'}">${esc(l.replace(/^\[|\]$/g, '')) || '&nbsp;'}</div>`;
+  }
+  const second = typeset.replace(/Verse 1/, 'Verse 2').replace(/>Intro</, '>Tag<').replace(/<div class="l">Amazing Grace<\/div><div class="l">John Newton<\/div>/, '');
+  await maker.setContent(`<style>body{font:11pt Arial,sans-serif;margin:0}.cols{display:flex;gap:.6in}.cols>div{flex:1}.p{white-space:pre;margin-top:1.25em}.a{position:relative}.a::before{content:attr(data-c);position:absolute;bottom:1.05em;left:0;font-weight:bold}.h{font-weight:bold;margin-top:.8em}.l{white-space:pre}.f{position:fixed;bottom:0;font-size:7pt}</style><div class="cols"><div>${typeset}</div><div>${second}</div></div><div class="f">CCLI Song # 1234567 © 2026 Example Music. For use solely with the SongSelect Terms of Use. All rights reserved.</div>`);
+  const twoCol = await maker.pdf({ format: 'Letter', margin: { top: '0.5in', left: '0.6in', right: '0.6in', bottom: '0.6in' } });
+  await maker.setContent(`<pre style="font:12pt 'Courier New',monospace;margin:0">${esc(UG_SHEET)}</pre>`);
+  const mono = await maker.pdf({ format: 'Letter', margin: { top: '0.6in', left: '0.7in' } });
+  await maker.close();
+  const want = chordWords(UG_SHEET);
+  for (const [name, buffer, parts, pairs] of [['chart.pdf', twoCol, ['', 'Intro', 'Verse 1', 'Chorus', 'Tag', 'Verse 2', 'Chorus'], [...want, ...want]], ['mono.pdf', mono, ['', 'Intro', 'Verse 1', 'Chorus'], want]]) {
+    const { ctx, page } = await device(browser, null);
+    await open(page);
+    const chooser = page.waitForEvent('filechooser');
+    await page.click('#uploadAudioBtn');
+    await (await chooser).setFiles({ name, mimeType: 'application/pdf', buffer });
+    await sleep(2500);
+    assert.deepEqual(await partTitles(page), parts, `${name}: song parts in reading order`);
+    for (let i = 0; i < 6 && !(await page.locator('.fullSectionCard').count()); i++) { await blur(page); await page.keyboard.press('ArrowLeft'); await sleep(250); }
+    const text = await fullViewText(page);
+    assert.doesNotMatch(text, /CCLI|SongSelect/, `${name}: the copyright footer is left out`);
+    assert.deepEqual(chordWords(text), pairs, `${name}: every chord over its syllable`);
+    assert.deepEqual(await exportedChordWords(await exportPage(page), 820), pairs, `${name}: and on the printed page`);
+    noErrors(page);
+    await ctx.close();
+  }
 });
 
 await test('Link SRP signed in on a phone, coming from an empty Chord Rider: explains, lists the projects, links, follows into CRP, unlinks', async () => {

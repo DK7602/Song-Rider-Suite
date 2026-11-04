@@ -994,17 +994,127 @@ return null;
 
 // Common song-sheet headings used by PDF/web copy imports (Ultimate Guitar, chord sheets, etc.).
 // This is intentionally separate from the app's PAGE 1/PAGE 2 navigation labels.
+// ---- Chord names (one check for import, Full view, capo/transpose and export) ----
+// A chord is a capital root A–G with an optional sharp/flat, then the usual chord words and numbers
+// (m, min, maj, M, dim, °, ø, Δ, aug, +, -, sus, add, alt, no, 2–13, b/# alterations, parentheses such
+// as C(add9) or Bm7(b5), 6/9), then an optional /bass note. N.C. (no chord) counts too. Words such as
+// "Amazing", "Grace", "Be", "Am I" or "Add" are lyrics, not chords.
+const SRP_CHORD_RE = /^[A-G](?:#|b)?(?:maj|min|mi|m|M|dim|aug|sus|add|alt|no|omit|°|ø|Δ|\+|-|#|b|\d|\(|\)|\/(?=\d)|,(?=\d))*(?:\/[A-G](?:#|b)?)?$/;
+function srpNormChordToken(tok){
+  let t = String(tok || "").trim().replace(/♯/g, "#").replace(/♭/g, "b").replace(/\u00A0/g, "");
+  if(/^\(?N\.?C\.?\)?$/i.test(t)) return "N.C.";
+  t = t.replace(/[.,;:!?]+$/, "");
+  if(/^[\[(]/.test(t) && /[\])]$/.test(t)) t = t.slice(1, -1).trim();
+  return t;
+}
+function isSrpChordToken(tok){
+  const t = srpNormChordToken(tok);
+  if(!t) return false;
+  if(/^N\.?C\.?$|^N\/C$/i.test(t)) return true;
+  if(!SRP_CHORD_RE.test(t)) return false;
+  // Parentheses must balance: "C(add9)" yes, "C(add9" no.
+  let depth = 0;
+  for(const ch of t){ if(ch === "(") depth++; else if(ch === ")" && --depth < 0) return false; }
+  return depth === 0;
+}
+// Chords typed in lowercase on a phone ("am g f"): the same chord with a capital root and bass note.
+function srpCapChord(tok){ return srpNormChordToken(tok).replace(/^([a-g])/, c => c.toUpperCase()).replace(/\/([a-g])/, (m, c) => "/" + c.toUpperCase()); }
+// Tokens that may sit on a chord row without being chords: bar lines, repeat marks, dashes, "x2".
+function isSrpChordRowFiller(tok){
+  const t = String(tok || "").trim().replace(/\u00A0/g, "");
+  if(!t) return true;
+  if(/^[|:\/\\\-–—.%~*>]+$/.test(t)) return true;
+  if(/^\(?(?:x\s*\d+|\d+\s*x)\)?$/i.test(t)) return true;
+  if(/^\(?(?:repeat|rep|rpt|riff|fine|d\.?s\.?|d\.?c\.?|al coda|to coda)\)?$/i.test(t)) return true;
+  return false;
+}
+// Is this line a chord row? Chords and fillers only, allowing one short label like "Intro:" when it
+// has at least two chords ("Intro: G D Em C").
+function isSrpChordRow(line){
+  const raw = String(line || "").replace(/\u00A0/g, " ").trim();
+  if(!raw) return false;
+  const toks = raw.split(/[\s|,]+/).filter(Boolean);
+  let chords = 0, other = 0, label = 0;
+  toks.forEach((tok, i) => {
+    if(isSrpChordRowFiller(tok)) return;
+    if(isSrpChordToken(tok) || /^[1-8]/.test(tok) && isSrpChordToken(tok.slice(1))) { chords++; return; }
+    if(/:$/.test(tok) && tok.length <= 16 || i === 0 && importHeadingTitleFromLine(tok)) { label++; return; }
+    other++;
+  });
+  if(!chords || label > 1){
+    // All lowercase chords ("am g f c"): a row when every word is a chord and there are at least two.
+    const low = toks.filter(t => !isSrpChordRowFiller(t));
+    return low.length >= 2 && low.every(t => /^[a-g]/.test(t) || isSrpChordToken(t)) && low.every(t => isSrpChordToken(srpCapChord(t)));
+  }
+  if(other === 0) return label === 0 || chords >= 2;
+  if(other === 1 && label === 0 && chords >= 3) return true;
+  const low = toks.filter(t => !isSrpChordRowFiller(t));
+  return low.length >= 2 && low.every(t => isSrpChordToken(srpCapChord(t)));
+}
+// Chord tokens of a chord row with their columns: [{chord, col}].
+function srpChordRowTokens(line){
+  const out = [];
+  const s = String(line || "").replace(/\u00A0/g, " ").replace(/\t/g, "    ");
+  const re = /\S+/g; let m;
+  while((m = re.exec(s))){
+    if(isSrpChordToken(m[0])) out.push({ chord: srpNormChordToken(m[0]), col: m.index });
+    else if(isSrpChordToken(srpCapChord(m[0]))) out.push({ chord: srpCapChord(m[0]), col: m.index });
+  }
+  return out;
+}
+// A line with [G]inline chords → { chordLine, lyricLine } with each chord over the character it was
+// in front of. Non-chord brackets such as [x2] stay in the lyric. Returns null when the line has none.
+function srpInlineToChordOverLyric(line){
+  const src = String(line || "");
+  const re = /\[([^\]\n]{1,24})\]/g;
+  let lyric = "", last = 0, m;
+  const chords = [];
+  while((m = re.exec(src))){
+    lyric += src.slice(last, m.index);
+    last = m.index + m[0].length;
+    if(isSrpChordToken(m[1])) chords.push({ chord: srpNormChordToken(m[1]), at: lyric.length });
+    else lyric += m[0];
+  }
+  if(!chords.length) return null;
+  lyric += src.slice(last);
+  // Lay the chords out; when one would touch the previous chord, open a gap in the lyric if the
+  // chord starts a word (so it still sits on its word), otherwise move it just right.
+  let chordLine = "", shift = 0;
+  for(const c of chords){
+    let at = c.at + shift;
+    const minCol = chordLine.length ? chordLine.length + 1 : 0;
+    if(at < minCol){
+      const need = minCol - at;
+      const startsWord = at >= lyric.length || at === 0 || lyric[at - 1] === " " || lyric[at] === " ";
+      if(startsWord){ lyric = lyric.slice(0, at) + " ".repeat(need) + lyric.slice(at); shift += need; at = minCol; }
+      else at = minCol;
+    }
+    chordLine = chordLine.padEnd(at, " ") + c.chord;
+  }
+  return { chordLine, lyricLine: lyric.replace(/\s+$/, "") };
+}
+
+// Song-part headings in pasted / uploaded sheets: "Verse 1", "[Chorus]", "Chorus:", "Pre-Chorus 2",
+// "Bridge 2", "Hook", "Refrain", "Chorus x2", "Repeat Chorus", "[Verse 1: Artist]", "Verse One" …
+// Everyday words that can also be a lyric line ("Solo", "Break", "Drop", "Rap" …) only count with
+// brackets, a colon or in capitals. Returns the heading as written (without brackets), or null.
+const SRP_STRONG_PARTS = "verse|chorus|pre[- ]?chorus|post[- ]?chorus|bridge|pre[- ]?bridge|hook|pre[- ]?hook|refrain|intro|introduction|outro|interlude|instrumental|tag|coda|prechorus";
+const SRP_WEAK_PARTS = "solo|guitar solo|piano solo|break|breakdown|drop|build|build[- ]?up|rap|spoken|spoken word|ending|end|vamp|turnaround|turn ?around|channel|link|middle ?8|middle eight|ad[- ]?lib|ad[- ]?libs|riff";
 function importHeadingTitleFromLine(line){
-  let raw = String(line || "").trim();
-  if(!raw) return null;
-  raw = raw.replace(/^[\[\(\{]+/,"").replace(/[\]\)\}]+$/,"").trim();
+  let raw = String(line || "").replace(/\u00A0/g, " ").trim();
+  if(!raw || raw.length > 48) return null;
+  const bracketed = /^[\[{(].*[\]})]$/.test(raw);
+  raw = raw.replace(/^[\[\(\{]+\s*/,"").replace(/\s*[\]\)\}]+$/,"").trim();
   raw = raw.replace(/(?:\b[A-Za-z]\s){2,}[A-Za-z]\b/g, (m)=>m.replace(/\s+/g,""));
+  const colon = /:\s*$/.test(raw);
   raw = raw.replace(/\s*:\s*$/,"").replace(/\s+/g," ").trim();
-  const t = raw.toUpperCase();
-  if(/^(VERSE|CHORUS)\s*[0-9]*$/.test(t)) return raw;
-  if(t === "INTRO" || t === "INTRODUCTION") return raw;
-  if(t === "BRIDGE" || t === "OUTRO" || t === "CODA" || t === "INTERLUDE" || t === "TAG") return raw;
-  if(t === "PRECHORUS" || t === "PRE-CHORUS" || t === "PRE CHORUS") return raw;
+  if(!raw) return null;
+  const num = String.raw`(?:\s*(?:\d{1,2}[a-z]?|[ivx]{1,4}|one|two|three|four|five|six|seven|eight|nine|ten|[a-d]))?`;
+  const rep = String.raw`(?:\s*(?:\(?\s*(?:x\s*\d+|\d+\s*x|repeat|rpt)\s*\)?))?`;
+  const who = bracketed ? String.raw`(?:\s*[:\-–]\s*[^\]\[]{1,40})?` : "";
+  const head = (words) => new RegExp(String.raw`^(?:repeat\s+|(?:last|final)\s+)?(?:${words})${num}${rep}${who}$`, "i");
+  if(head(SRP_STRONG_PARTS).test(raw)) return raw;
+  if((bracketed || colon || raw === raw.toUpperCase()) && head(SRP_WEAK_PARTS).test(raw)) return raw;
   return null;
 }
 
@@ -1035,17 +1145,8 @@ function parseFullTextToSectionCards(fullText){
     if(!buckets[sec]) buckets[sec] = [];
   }
 
-  const CHORD_TOKEN_RE = /^([A-G](?:#|b)?)(?:(?:maj|min|m|dim|aug|\+|sus|add)?(?:2|4|5|6|7|9|11|13)?(?:maj7|M7|m7|m9|m11|m13|sus2|sus4|add9|add11|add13|dim7|hdim7|m7b5)?(?:b5|#5|b9|#9|b11|#11|b13|#13)?)?(?:\/[A-G](?:#|b)?)?$|^N\.?C\.?$/i;
-
-  function isChordToken(tok){
-    let t = String(tok || "").trim();
-    if(!t) return false;
-    t = t.replace(/^[\[\(\{]+/,"").replace(/[\]\)\}]+$/,"").trim();
-    t = t.replace(/♯/g,"#").replace(/♭/g,"b");
-    t = t.replace(/[\.,;:]+$/,"").trim();
-    t = t.replace(/\s+/g,"");
-    return CHORD_TOKEN_RE.test(t);
-  }
+  // One chord-name check for the whole app (see isSrpChordToken).
+  function isChordToken(tok){ return isSrpChordToken(tok) || isSrpChordToken(srpCapChord(tok)); }
 
   // ✅ Positional chord tokens:
   // A leading digit 1-8 sets the target chord box, e.g. "1Am 5Dm" -> slot0=Am, slot4=Dm
@@ -1054,11 +1155,7 @@ function parseFullTextToSectionCards(fullText){
     let t = String(tok || "").trim();
     if(!t) return null;
 
-    // strip surrounding bracket wrappers, keep inner
-    t = t.replace(/^[\[\(\{]+/,"").replace(/[\]\)\}]+$/,"").trim();
-    t = t.replace(/♯/g,"#").replace(/♭/g,"b");
-    t = t.replace(/[\.,;:]+$/,"").trim();
-    t = t.replace(/\s+/g,"");
+    t = srpNormChordToken(t).replace(/\s+/g,"");
 
     const m = t.match(/^([1-8])(.+)$/);
     if(!m) return null;
@@ -1074,71 +1171,28 @@ function parseFullTextToSectionCards(fullText){
     return isChordToken(tok) || !!parsePositionalChordToken(tok);
   }
 
+  // [G]inline chords: the chords and where they sit in the cleaned lyric. Non-chord brackets such
+  // as (oh) or [x2] stay in the lyric, and a chord inside a word ("to[C]night") does not split it.
   function extractInlineChords(line){
-    const chords = [];
-    let cleaned = String(line || "");
-    cleaned = cleaned.replace(/[\[\(\{]\s*([^\]\)\}]+?)\s*[\]\)\}]/g, (m, inner) => {
-      const tok = String(inner || "").trim()
-        .replace(/[|]+/g,"")
-        .replace(/[\.,;:]+$/,"")
-        .trim()
-        .replace(/\s+/g,"")
-        .replace(/♯/g,"#").replace(/♭/g,"b");
-      if(isChordToken(tok)) chords.push(tok);
-      return " ";
-    });
-    cleaned = cleaned.replace(/\s+/g, " ").trim();
-    return { cleaned, chords };
-  }
-
-    function lineIsMostlyChords(line){
-    const raw = String(line || "").replace(/\u00A0/g," ").trim();
-    if(!raw) return false;
-
-    // Split on whitespace / bars / commas to catch common chord charts like:
-    // "Am | G | F"  or  "Am, G, F"  or  "Am    G    F"
-    const toks0 = raw.split(/[\s|,]+/).map(s=>s.trim()).filter(Boolean);
-    if(!toks0.length) return false;
-
-    const normTok = (t) => String(t || "")
-      .trim()
-      .replace(/^[\[\(\{]+/,"").replace(/[\]\)\}]+$/,"")
-      .replace(/^[^A-Za-z0-9#b\/\.]+/,"")
-      .replace(/[^A-Za-z0-9#b\/\.]+$/,"")
-      .replace(/[\.,;:]+$/,"")
-      .replace(/♯/g,"#").replace(/♭/g,"b")
-      .trim()
-      .replace(/\s+/g,"");
-
-    let chordCount = 0;
-    let otherCount = 0;
-
-    for(const t0 of toks0){
-      const t = normTok(t0);
-      if(!t) continue;
-
-      // ignore common repeat markers
-      const up = t.toUpperCase();
-      if(up === "REPEAT" || up === "REP" || up === "RPT") continue;
-      if(/^\(?X?\d+\)?$/.test(up)) continue;        // (2)  x2  4  etc
-      if(/^\d+X$/.test(up)) continue;                // 2X, 4X
-
-      if(isChordishToken(t)) chordCount++; else otherCount++;
+    const chords = [], at = [];
+    let cleaned = "", last = 0, m;
+    const src = String(line || "");
+    const re = /[\[\(\{]\s*([^\]\)\}]+?)\s*[\]\)\}]/g;
+    while((m = re.exec(src))){
+      cleaned += src.slice(last, m.index);
+      last = m.index + m[0].length;
+      const tok = srpNormChordToken(String(m[1] || "").replace(/[|]+/g,"")).replace(/\s+/g,"");
+      if(isSrpChordToken(tok)){ chords.push(tok); at.push(cleaned.length); }
+      else cleaned += m[0];
     }
-
-    const total = chordCount + otherCount;
-    if(chordCount === 0) return false;
-    if(total === 1) return chordCount === 1;
-
-    // chord lines should be overwhelmingly chord tokens.
-    // allow 1 small "extra" token like "(x2)" or a stray symbol.
-    if(chordCount >= 2 && otherCount <= 1) return true;
-
-    // be a little forgiving for messy copy/paste (still mostly chords)
-    if(chordCount >= 3 && (chordCount / total) >= 0.65 && otherCount <= 2) return true;
-
-    return false;
+    cleaned += src.slice(last);
+    const lead = cleaned.length - cleaned.replace(/^\s+/,"").length;
+    const len = Math.max(1, cleaned.replace(/\s+/g, " ").trim().length);
+    cleaned = cleaned.replace(/\s+/g, " ").trim();
+    return { cleaned, chords, slots: at.map(x => clamp(Math.round(Math.max(0, x - lead) / Math.max(1, len - 1) * 7), 0, 7)) };
   }
+
+  function lineIsMostlyChords(line){ return isSrpChordRow(line); }
 
     
   function buildSlotsFromAlignedChordLine(chordLineRaw, lyricLineRaw){
@@ -1153,15 +1207,7 @@ function parseFullTextToSectionCards(fullText){
       if(i >= chordLine.length) break;
       const start = i;
       while(i < chordLine.length && chordLine[i] !== " ") i++;
-      let tok = chordLine.slice(start, i).trim();
-      tok = tok
-        .replace(/^[^A-Za-z0-9#b\/\.]+/,"")
-        .replace(/[^A-Za-z0-9#b\/\.]+$/,"")
-        .replace(/[|]+/g,"")
-        .replace(/[\.,;:]+$/,"")
-        .trim()
-        .replace(/\s+/g,"")
-        .replace(/♯/g,"#").replace(/♭/g,"b");
+      let tok = srpNormChordToken(chordLine.slice(start, i).replace(/[|]+/g,"")).replace(/\s+/g,"");
       const pos = parsePositionalChordToken(tok);
       if(pos){
         const s = pos.slot;
@@ -1169,14 +1215,17 @@ function parseFullTextToSectionCards(fullText){
         if(!slots[s]) slots[s] = chord;
         else slots[s] = (slots[s] + " " + chord).trim();
       }else if(isChordToken(tok)){
-        toks.push({ tok, col: start });
+        toks.push({ tok: isSrpChordToken(tok) ? tok : srpCapChord(tok), col: start });
       }
     }
     if(!toks.length) return slots;
 
     let looksCollapsed = !/  +/.test(chordLine) && toks.length >= 2;
 
-    const denom = Math.max(1, chordLine.length - 1);
+    // Chord positions are read against the lyric under them (a chord over the lyric's last word goes in
+    // the last boxes, one past the lyric's end in box 8).
+    const lyricLen = String(lyricLine || "").replace(/\s+$/,"").length;
+    const denom = Math.max(1, (lyricLen || chordLine.length) - 1);
     const n = toks.length;
 
     let wordStarts = [];
@@ -1224,17 +1273,11 @@ function parseFullTextToSectionCards(fullText){
     for(const frag of fragments){
       const parts = String(frag||"").split(/[\s|,]+/).map(x=>x.trim()).filter(Boolean);
       for(let tok of parts){
-        tok = tok
-          .replace(/^[\[\(\{]+/,"").replace(/[\]\)\}]+$/,"")
-          .replace(/^[^A-Za-z0-9#b\/.]+/,"")
-          .replace(/[^A-Za-z0-9#b\/.]+$/,"")
-          .replace(/[\.,;:]+$/,"")
-          .replace(/♯/g,"#").replace(/♭/g,"b")
-          .trim().replace(/\s+/g,"");
+        tok = srpNormChordToken(tok).replace(/\s+/g,"");
         if(!tok) continue;
         const pos = parsePositionalChordToken(tok);
         if(pos){ explicit[pos.slot] = explicit[pos.slot] ? `${explicit[pos.slot]} ${pos.chord}` : pos.chord; continue; }
-        if(isChordToken(tok)) tokens.push(tok);
+        if(isChordToken(tok)) tokens.push(isSrpChordToken(tok) ? tok : srpCapChord(tok));
       }
     }
 
@@ -1252,7 +1295,9 @@ function parseFullTextToSectionCards(fullText){
     return slots;
   }
 
-  function pushCard(sec, lyricsRaw, slots){
+  // src: the exact chord row and lyric line this card came from, so the Full view and the export can
+  // keep every chord on its character until that card's chords or lyric are edited.
+  function pushCard(sec, lyricsRaw, slots, src=null){
     const lyrics = String(lyricsRaw || "").replace(/\s+/g," ").trim();
     if(!lyrics && (!slots || !slots.some(x=>String(x||"").trim()))) return;
 
@@ -1260,8 +1305,11 @@ function parseFullTextToSectionCards(fullText){
     while(chords.length < 8) chords.push("");
 
     ensureBucket(sec);
-    buckets[sec].push({ lyrics, chords });
+    const card = { lyrics, chords };
+    if(src && (src.chord || src.lyric)) card.src = { chord: String(src.chord || "").replace(/\s+$/,""), lyric: String(src.lyric || "").replace(/\s+$/,""), notes: chords.slice() };
+    buckets[sec].push(card);
   }
+  const singleChordRow = (pending) => pending && !String(pending).includes("\n") ? String(pending).replace(/\u00A0/g," ").replace(/\t/g,"    ") : "";
 
   // Recognize common headings in pasted/uploaded text
   function headingTitleFromLine(line){
@@ -1331,7 +1379,7 @@ function parseFullTextToSectionCards(fullText){
       if(_br){
         // flush any dangling chord line
         if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-          pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""));
+          pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""), { chord: singleChordRow(pendingChordLine), lyric: "" });
         }
         pendingChordLine = null;
 
@@ -1369,7 +1417,7 @@ function parseFullTextToSectionCards(fullText){
         }
 
         if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-          pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""));
+          pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""), { chord: singleChordRow(pendingChordLine), lyric: "" });
         }
         pendingChordLine = null;
         continue;
@@ -1386,26 +1434,30 @@ ${line}`;
         continue;
       }
 
-      const { cleaned, chords: inlineChords } = extractInlineChords(line);
+      const { cleaned, chords: inlineChords, slots: inlineSlots } = extractInlineChords(line);
 
       let slots = Array(8).fill("");
+      let src = null;
       if(pendingChordLine){
-        slots = buildSlotsFromPendingChordLines(pendingChordLine, cleaned);
+        slots = buildSlotsFromPendingChordLines(pendingChordLine, line);
+        const row = singleChordRow(pendingChordLine);
+        if(row && !inlineChords.length) src = { chord: row, lyric: line.replace(/\u00A0/g," ").replace(/\t/g,"    ") };
         pendingChordLine = null;
       }else if(inlineChords.length){
-        const n = inlineChords.length;
-        for(let k=0;k<n;k++){
-          const slot = clamp(Math.floor((k / Math.max(1,n-1)) * 7), 0, 7);
-          if(!slots[slot]) slots[slot] = inlineChords[k];
-          else slots[slot] = (slots[slot] + " " + inlineChords[k]).trim();
-        }
+        inlineChords.forEach((ch, k) => {
+          const slot = inlineSlots[k] ?? 0;
+          if(!slots[slot]) slots[slot] = ch;
+          else slots[slot] = (slots[slot] + " " + ch).trim();
+        });
+      }else{
+        src = { chord: "", lyric: line.replace(/\u00A0/g," ").replace(/\t/g,"    ") };
       }
 
-      pushCard(cur, cleaned, slots);
+      pushCard(cur, cleaned, slots, src);
     }
 
     if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-      pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""));
+      pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""), { chord: singleChordRow(pendingChordLine), lyric: "" });
     }
   }else{
     // Heading-driven parsing
@@ -1421,7 +1473,7 @@ ${line}`;
       if(heading){
         // flush any dangling chord line
         if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-          pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""));
+          pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""), { chord: singleChordRow(pendingChordLine), lyric: "" });
         }
         pendingChordLine = null;
 
@@ -1450,7 +1502,7 @@ ${line}`;
         }
 
         if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-          pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""));
+          pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""), { chord: singleChordRow(pendingChordLine), lyric: "" });
         }
         pendingChordLine = null;
         continue;
@@ -1467,26 +1519,30 @@ ${line}`;
         continue;
       }
 
-      const { cleaned, chords: inlineChords } = extractInlineChords(line);
+      const { cleaned, chords: inlineChords, slots: inlineSlots } = extractInlineChords(line);
 
       let slots = Array(8).fill("");
+      let src = null;
       if(pendingChordLine){
-        slots = buildSlotsFromPendingChordLines(pendingChordLine, cleaned);
+        slots = buildSlotsFromPendingChordLines(pendingChordLine, line);
+        const row = singleChordRow(pendingChordLine);
+        if(row && !inlineChords.length) src = { chord: row, lyric: line.replace(/\u00A0/g," ").replace(/\t/g,"    ") };
         pendingChordLine = null;
       }else if(inlineChords.length){
-        const n = inlineChords.length;
-        for(let k=0;k<n;k++){
-          const slot = clamp(Math.floor((k / Math.max(1,n-1)) * 7), 0, 7);
-          if(!slots[slot]) slots[slot] = inlineChords[k];
-          else slots[slot] = (slots[slot] + " " + inlineChords[k]).trim();
-        }
+        inlineChords.forEach((ch, k) => {
+          const slot = inlineSlots[k] ?? 0;
+          if(!slots[slot]) slots[slot] = ch;
+          else slots[slot] = (slots[slot] + " " + ch).trim();
+        });
+      }else{
+        src = { chord: "", lyric: line.replace(/\u00A0/g," ").replace(/\t/g,"    ") };
       }
 
-      pushCard(cur, cleaned, slots);
+      pushCard(cur, cleaned, slots, src);
     }
 
     if(pendingChordLine && lineIsMostlyChords(pendingChordLine)){
-      pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""));
+      pushCard(cur, "", buildSlotsFromPendingChordLines(pendingChordLine, ""), { chord: singleChordRow(pendingChordLine), lyric: "" });
     }
   }
 
@@ -1550,6 +1606,8 @@ function applyFullTextToProjectSections(fullText){
           base.notes[k] = c || "";
         }
       }
+      // The exact lines this card came from (see cardSourceLines).
+      if(w.src) base.src = w.src; else delete base.src;
 
       if(state.autoSplit){
         base.beats = autosplitBeatsFromLyrics(base.lyrics);
@@ -5015,33 +5073,9 @@ function transposeMaybePositionalChordToken(token, semis){
 }
 
 function lineLooksMostlyLikeChordsGlobal(line){
-  const raw = String(line || "").replace(/\u00A0/g, " ").trim();
-  if(!raw) return false;
-
-  const toks = raw.split(/[\s|,]+/).map(s => s.trim()).filter(Boolean);
-  if(!toks.length) return false;
-
-  let chordish = 0;
-  let other = 0;
-
-  for(const tok0 of toks){
-    const tok = String(tok0 || "")
-      .replace(/^[\[\(\{]+/,"")
-      .replace(/[\]\)\}]+$/,"")
-      .replace(/^[^A-Za-z0-9#b\/]+/,"")
-      .replace(/[^A-Za-z0-9#b\/]+$/,"")
-      .trim();
-    if(!tok) continue;
-
-    const posMatch = tok.match(/^([1-8])(.+)$/);
-    const bare = posMatch ? String(posMatch[2] || "") : tok;
-
-    if(parseChordToken(bare)) chordish++;
-    else other++;
-  }
-
-  if(chordish === 0) return false;
-  return (other === 0) || (chordish >= 2 && other <= 1) || (chordish >= 3 && (chordish / Math.max(1, chordish + other)) >= 0.65);
+  // The shared chord-row check: "Amazing Grace" or "Be still" are lyrics, so capo/transpose and the
+  // export leave them alone.
+  return isSrpChordRow(line);
 }
 
 function transposeChordsInDisplayLine(line, semis){
@@ -8879,28 +8913,14 @@ function autosplitBeatsFromLyrics(lyrics){
 //   • Split into 4 beat boxes without splitting words (BSP algorithm)
 // ===============================
 function _fullPerf_isHeadingLine(line){
-  const t = String(line||"").trim();
-  if(!t) return false;
-  const up = t.toUpperCase();
-  return /^(INTRO|VERSE\s*\d+|CHORUS\s*\d+|BRIDGE|PRE\s*-?CHORUS|OUTRO|TAG|HOOK)$/.test(up);
+  return !!importHeadingTitleFromLine(line);
 }
 
 function _fullPerf_isChordLine(line){
   const t = String(line||"").trim();
   if(!t) return true;
   if(/^[-_]{3,}$/.test(t)) return true;
-
-  const cleaned = t.replace(/[\[\]\(\)\{\}]/g, "").trim();
-  const toks = cleaned.split(/\s+/).filter(Boolean);
-  if(!toks.length) return true;
-
-  const chordRe = /^(\d+)?[A-G](?:#|b)?(?:m|maj|min|dim|aug|sus|add)?\d*(?:\/[A-G](?:#|b)?)?$/i;
-  let chordish = 0;
-  for(const tok of toks){
-    if(tok === "|" || tok === "/"){ chordish++; continue; }
-    if(chordRe.test(tok)){ chordish++; continue; }
-  }
-  return chordish === toks.length;
+  return isSrpChordRow(t);
 }
 
 function _fullPerf_pickLyricLineFromBar(barText){
@@ -9109,6 +9129,34 @@ function buildAlignedLine(line, semis=0){
 // Chord line placed over a lyric line: each chord goes to its slot's column, but never on top
 // of (or glued to) the previous chord, even when the lyric is short. Two spaces between chords
 // keep the line readable as an aligned chord row when the Full text is parsed back into cards.
+// The exact chord row + lyric line a card came from, while its chords and lyric are still the same
+// (null once either was edited on the card; then the Full view lays the chords out from the boxes).
+function cardSourceLines(line){
+  const src = line && line.src;
+  if(!src || typeof src !== "object") return null;
+  const norm = (v) => String(v || "").replace(/\s+/g, " ").trim();
+  if(norm(src.lyric) !== norm(line.lyrics)) return null;
+  const now = Array.from({length:8}, (_, i) => String((line.notes || [])[i] || "").trim());
+  const then = Array.from({length:8}, (_, i) => String((src.notes || [])[i] || "").trim());
+  const lyric = String(src.lyric || "");
+  if(now.join("\u0001") === then.join("\u0001") && (norm(src.chord) || !now.some(Boolean))) return { chord: String(src.chord || ""), lyric };
+  // The chords were edited but the lyric was not: each box keeps the column its chord had (a changed
+  // chord name stays on its syllable); a box that had no chord is placed by its position.
+  const toks = srpChordRowTokens(src.chord);
+  const slotCol = Array(8).fill(null);
+  let t = 0;
+  then.forEach((v, i) => { if(!v) return; if(t < toks.length) slotCol[i] = toks[t].col; t += v.split(/\s+/).filter(Boolean).length; });
+  const len = Math.max(1, lyric.replace(/\s+$/, "").length);
+  let row = "";
+  now.forEach((v, i) => {
+    if(!v) return;
+    const want = slotCol[i] != null ? slotCol[i] : Math.round(i * (len - 1) / 7);
+    const col = row.length ? Math.max(want, row.length + 1) : want;
+    row = row.padEnd(col, " ") + v;
+  });
+  return { chord: row, lyric };
+}
+
 function buildChordSheetLines(noteRows, lyric){
   const L = String(lyric || "");
   const slots = Array.isArray(noteRows) ? noteRows.slice(0,8) : [];
@@ -9277,6 +9325,40 @@ function exportLyricLineTable(line){
   `</tr></tbody></table>`;
 }
 
+// Spaces that survive in browsers, print and Google Docs (which drops plain runs of spaces).
+function exportNbsp(text){ return escapeHtml(String(text ?? "")).replace(/ /g, "&nbsp;"); }
+
+// A chord row over its lyric line as one two-row table: the lyric is cut where each chord starts and
+// every piece sits under its own chord, so each chord stays on its syllable at any page width, in print
+// and in Google Docs. A chord past the end of the lyric keeps its distance; chords never touch.
+function exportChordLyricPairTable(chordLine, lyricLine){
+  const chordRow = String(chordLine ?? "").replace(/\t/g, "    ").replace(/\u00A0/g, " ");
+  const lyric = String(lyricLine ?? "").replace(/\t/g, "    ").replace(/\u00A0/g, " ").replace(/\s+$/, "");
+  const chords = [];
+  const re = /\S+/g; let m;
+  while((m = re.exec(chordRow))) chords.push({ text: m[0], col: m.index });
+  const end = Math.max(lyric.length, ...chords.map(c => c.col + 1));
+  const cuts = [...new Set([0, ...chords.map(c => c.col)])].sort((a, b) => a - b);
+  const top = [], bottom = [];
+  cuts.forEach((start, i) => {
+    const stop = i + 1 < cuts.length ? cuts[i + 1] : end;
+    const chord = chords.find(c => c.col === start);
+    const piece = lyric.slice(start, stop).padEnd(Math.max(0, stop - start), " ");
+    top.push(`<td nowrap style="padding:0 ${chord ? "8px" : "0"} 0 0;border:0;vertical-align:bottom;white-space:nowrap;${SRP_EXPORT_MONO}font-weight:900;color:#c00000;">${chord ? escapeHtml(chord.text) : ""}</td>`);
+    bottom.push(`<td nowrap style="padding:0;border:0;vertical-align:top;white-space:nowrap;${SRP_EXPORT_MONO}font-weight:700;color:#111;">${piece ? exportNbsp(piece) : ""}</td>`);
+  });
+  return `<table role="presentation" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border-spacing:0;margin:0;padding:0;"><tbody><tr>${top.join("")}</tr><tr>${bottom.join("")}</tr></tbody></table>`;
+}
+// A chord row with no lyric under it (intro, instrumental): spacing kept as written.
+function exportChordOnlyLine(line){
+  const raw = String(line ?? "").replace(/\t/g, "    ").replace(/\u00A0/g, " ").replace(/\s+$/, "");
+  return `<div style="${SRP_EXPORT_MONO}font-weight:900;color:#c00000;white-space:nowrap;">${exportNbsp(raw) || "&nbsp;"}</div>`;
+}
+function exportLyricOnlyLine(line){
+  const raw = String(line ?? "").replace(/\t/g, "    ").replace(/\u00A0/g, " ").replace(/\s+$/, "");
+  return `<div style="${SRP_EXPORT_MONO}font-weight:700;color:#111;white-space:pre-wrap;">${exportHtmlPreserveSpacing(raw) || "&nbsp;"}</div>`;
+}
+
 function exportTextToHtmlBlocks(fullText){
   const lines = normalizeLineBreaks(fullText || "").split("\n");
   const sections = [];
@@ -9307,12 +9389,32 @@ function exportTextToHtmlBlocks(fullText){
   flushSection();
 
   return sections.map(section => {
-    const bodyLines = section.lines.map(rawLine => {
+    // [G]inline chord lines print like a chord row over its lyric.
+    const src = [];
+    for(const rawLine of section.lines){
       const line = String(rawLine ?? "");
-      if(!line.trim()) return `<div style="height:.72em;line-height:.72em;">&nbsp;</div>`;
-      const isChord = lineLooksMostlyLikeChordsGlobal(line) || _fullPerf_isChordLine(line);
-      return isChord ? exportChordLineTable(line) : exportLyricLineTable(line);
-    }).join("\n");
+      const inline = /\[[^\]]+\]/.test(line) && !importHeadingTitleFromLine(line.trim()) ? srpInlineToChordOverLyric(line) : null;
+      if(inline){ src.push(inline.chordLine); src.push(inline.lyricLine.trim() ? inline.lyricLine : ""); }
+      else src.push(line);
+    }
+    const out = [];
+    for(let i = 0; i < src.length; i++){
+      const line = src[i];
+      if(!line.trim()){ out.push(`<div style="height:.72em;line-height:.72em;">&nbsp;</div>`); continue; }
+      if(isSrpChordRow(line)){
+        // Its lyric is the next line with words (blank lines between them come from web copies).
+        let k = i + 1;
+        while(k < src.length && !src[k].trim()) k++;
+        const next = k < src.length ? src[k] : "";
+        if(next.trim() && !isSrpChordRow(next) && !_parseBreakLine(next) && !importHeadingTitleFromLine(next.trim())){
+          out.push(exportChordLyricPairTable(line, next));
+          i = k;
+        }else out.push(exportChordOnlyLine(line));
+        continue;
+      }
+      out.push(exportLyricOnlyLine(line));
+    }
+    const bodyLines = out.join("\n");
 
     const titleHtml = section.title
       ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:18px;line-height:1.2;font-weight:900;text-decoration:underline;margin:18px 0 8px 0;">${escapeHtml(section.title)}</div>`
@@ -9639,6 +9741,17 @@ function syncFullTextFromSections(){
 
         const notesRaw = Array.isArray(line?.notes) ? line.notes : [];
         const hasNotes = notesRaw.some(n => String(n || "").trim());
+
+        // A card that still has the chords and lyric it was imported / typed with keeps its exact
+        // chord row and lyric line, so editing one card never moves the chords of the others.
+        const exact = cardSourceLines(line);
+        if(exact){
+          wroteAny = true;
+          if(exact.chord.trim()) out.push(exact.chord);
+          if(exact.lyric.trim()) out.push(exact.lyric);
+          out.push("");
+          continue;
+        }
 
         // If the card has chords but no lyrics, still show chords in Full view (copy/paste use case)
         if(!lyr && hasNotes){
@@ -11320,11 +11433,48 @@ function songHasContent(p){
 
 // Replaces the open song's lyrics with imported text (paste outside an editor, PDF, .txt).
 // Asks first when the song already has lyrics; the import is one Undo step.
+// ChordPro ({title: …}, {start_of_chorus}, {c: Bridge}, [G]inline chords) and [G]inline chord lines
+// become plain chords-over-lyrics text with part headings: the form the rest of the import reads, the
+// Full view shows and the export prints with every chord over its syllable.
+const SRP_HEADING_MARK = "\u0002";
+function srpPrepareImportText(text){
+  const lines = normalizeLineBreaks(String(text || "")).split("\n");
+  const chordPro = lines.some(l => /^\s*\{\s*(?:title|t|subtitle|st|artist|key|start_of_\w+|so[cvbt]|eo[cvbt]|end_of_\w+|comment|c|ci|cb|chorus)\s*(?::[^}]*)?\}\s*$/i.test(l));
+  const out = [];
+  let title = "";
+  for(const raw of lines){
+    const t = raw.trim();
+    const d = chordPro ? t.match(/^\{\s*([a-z_]+)\s*(?::\s*(.*?))?\s*\}$/i) : null;
+    if(d){
+      const name = d[1].toLowerCase(), val = String(d[2] || "").trim();
+      if(name === "title" || name === "t"){ if(!title) title = val; continue; }
+      const parts = { sov:"Verse", soc:"Chorus", sob:"Bridge", sot:"Tab" };
+      const part = parts[name] || (name.startsWith("start_of_") ? name.slice(9).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "");
+      if(part){ out.push("", SRP_HEADING_MARK + (val || part)); continue; }
+      if(name === "chorus"){ out.push("", SRP_HEADING_MARK + (val || "Chorus")); continue; }
+      if(/^(?:comment|c|ci|cb|comment_italic|comment_box|highlight)$/.test(name)){
+        if(val) out.push(importHeadingTitleFromLine(val) ? SRP_HEADING_MARK + val : val);
+        continue;
+      }
+      continue; // end_of_…, key, capo, tempo, artist … are not song text
+    }
+    const inline = (/\[[^\]]+\]/.test(raw) && !importHeadingTitleFromLine(t)) ? srpInlineToChordOverLyric(raw) : null;
+    if(inline){
+      out.push(inline.chordLine);
+      if(inline.lyricLine.trim()) out.push(inline.lyricLine);
+      continue;
+    }
+    out.push(raw);
+  }
+  return { text: out.join("\n"), title };
+}
+
 async function importTextToFull(text){
   if(!state.project) return false;
 
   // Normalize and lightly clean import text
-  let cleaned = normalizeLineBreaks(String(text || ""));
+  const prepared = srpPrepareImportText(text);
+  let cleaned = normalizeLineBreaks(prepared.text);
   cleaned = fixPdfLetterSpacing(cleaned);
   cleaned = cleaned.trim();
   if(!cleaned){
@@ -11345,7 +11495,7 @@ async function importTextToFull(text){
     // If it already has break-lines, keep it as-is.
     for(const ln of lines){
       const t = String(ln||"").trim();
-      if(_parseBreakLine(t)) return s;
+      if(_parseBreakLine(t)) return s.split(SRP_HEADING_MARK).join("");
     }
 
     // Try: treat section heading lines as block starts.
@@ -11364,7 +11514,7 @@ async function importTextToFull(text){
     for(const ln of lines){
       const rawLn = String(ln ?? "");
       const t = rawLn.trim();
-      const sec = importHeadingTitleFromLine(t) || isSectionHeadingLine(t);
+      const sec = rawLn.startsWith(SRP_HEADING_MARK) ? (rawLn.slice(1).trim() || "Part") : (importHeadingTitleFromLine(t) || isSectionHeadingLine(t));
       if(sec){
         pushCur();
         // Keep the readable heading text as the Song Part title.
@@ -11398,6 +11548,8 @@ async function importTextToFull(text){
   cleaned = ensureBreakBlocksForFull(cleaned);
 
   editProject("importText", () => {
+    // A ChordPro {title:} names a song that has no name yet.
+    if(prepared.title && (!String(state.project.name || "").trim() || /^new song$/i.test(String(state.project.name || "").trim()))) state.project.name = prepared.title;
     state.project.fullText = cleaned;
     applyFullTextToProjectSections(state.project.fullText || "");
     cleanupDeletedBaseSections();
@@ -11451,7 +11603,7 @@ function fixPdfLetterSpacing(text){
   // preserve their horizontal relationship to the lyric line below them.
   return String(text || "").split("\n").map(line => {
     let s = String(line || "").replace(/\t/g, "    ");
-    s = s.replace(/(?:\b[A-Za-z]\s){2,}[A-Za-z]\b/g, (m)=>m.replace(/\s+/g,""));
+    if(!isSrpChordRow(s)) s = s.replace(/(?:\b[A-Za-z]\s){2,}[A-Za-z]\b/g, (m)=>m.replace(/\s+/g,""));
     return s.replace(/[ \t]+$/g,"");
   }).join("\n");
 }
@@ -11509,92 +11661,186 @@ async function extractTextFromPdfFile(file){
     }
   }
 
+  // Rebuild the song from where each piece of text sits on the page (pdf.js gives text runs with their
+  // x/y, width and font). Lines are grouped by height; spaces come from the gaps between runs. A chord
+  // row is matched to the lyric line under it by position: every chord goes over the lyric letter it
+  // sits above, whatever the font (monospace text charts or proportional, typeset charts). Two-column
+  // charts are read column by column, and copyright / CCLI / page-number lines are left out.
+  const measureCanvas = document.createElement("canvas").getContext("2d");
+  const widthCache = new Map();
+  const charWidths = (str, size, fam) => {
+    const key = `${fam}|${str}`;
+    let w = widthCache.get(key);
+    if(!w){
+      measureCanvas.font = `100px ${/serif|sans|mono|courier|times|arial|helvetica/i.test(fam) ? fam : "sans-serif"}`;
+      w = Array.from(str, ch => measureCanvas.measureText(ch).width / 100);
+      if(widthCache.size > 4000) widthCache.clear();
+      widthCache.set(key, w);
+    }
+    return w.map(x => x * size);
+  };
+  const median = (arr) => {
+    if(!arr.length) return 0;
+    const a = arr.slice().sort((x,y)=>x-y), mid = Math.floor(a.length/2);
+    return (a.length % 2) ? a[mid] : (a[mid-1] + a[mid]) / 2;
+  };
+  const FOOTER_RE = /\bCCLI\b|SongSelect|©|\bcopyright\b|all rights reserved|for use solely|^page\s*\d+(\s*(of|\/)\s*\d+)?$|^\d+\s*(of|\/)\s*\d+$|https?:\/\/|www\./i;
+
+  // One text line → its characters with their x positions.
+  const buildLine = (lineItems) => {
+    const li = lineItems.slice().sort((a,b)=>a.x-b.x);
+    const chars = [], xs = [], ws = [];
+    let prevEnd = null;
+    for(const it of li){
+      const ws0 = charWidths(it.str, it.size, it.fam);
+      const sum = ws0.reduce((t,v)=>t+v, 0) || 1;
+      const scale = it.w > 0 ? it.w / sum : 1;
+      const spaceW = (charWidths(" ", it.size, it.fam)[0] || it.size * 0.28) * (it.w > 0 ? scale : 1);
+      if(prevEnd != null){
+        const gap = it.x - prevEnd;
+        const lastCh = chars[chars.length - 1];
+        if(gap > spaceW * 0.45 && lastCh !== " " && it.str[0] !== " "){
+          const n = Math.max(1, Math.round(gap / Math.max(0.5, spaceW)));
+          for(let k=0;k<n;k++){ chars.push(" "); xs.push(prevEnd + k * gap / n); ws.push(gap / n); }
+        }
+      }
+      let x = it.x;
+      Array.from(it.str).forEach((ch, k) => { chars.push(ch); xs.push(x); ws.push(ws0[k] * scale); x += ws0[k] * scale; });
+      prevEnd = Math.max(prevEnd ?? -Infinity, it.x + (it.w > 0 ? it.w : sum));
+    }
+    return { text: chars.join(""), chars, xs, ws, y: li[0]?.y ?? 0, size: median(li.map(it=>it.size)) || 10, x0: li[0]?.x ?? 0 };
+  };
+  // A lyric line with single spaces, keeping each character's x.
+  const tidyLyric = (L) => {
+    const chars = [], xs = [], ws = [];
+    L.chars.forEach((ch, i) => {
+      if(ch === " " && (!chars.length || chars[chars.length - 1] === " ")) return;
+      chars.push(ch === " " ? " " : ch); xs.push(L.xs[i]); ws.push(L.ws[i]);
+    });
+    while(chars.length && chars[chars.length - 1] === " "){ chars.pop(); xs.pop(); ws.pop(); }
+    return { text: chars.join(""), xs, ws };
+  };
+  const chordRuns = (L) => {
+    const runs = [];
+    let cur = null;
+    L.chars.forEach((ch, i) => {
+      if(ch === " " || ch === " "){ cur = null; return; }
+      if(!cur){ cur = { text: "", x: L.xs[i] }; runs.push(cur); }
+      cur.text += ch;
+    });
+    return runs;
+  };
+  // Chord row + lyric line → [chord row, lyric] with every chord over the letter below it.
+  const pairLines = (C, Ly) => {
+    const lyr = tidyLyric(Ly);
+    const n = lyr.text.length;
+    const left = lyr.xs[0] ?? Ly.x0;
+    const right = n ? lyr.xs[n - 1] + lyr.ws[n - 1] : left;
+    const avgW = n ? Math.max(1, (right - left) / n) : C.size * 0.5;
+    const cols = chordRuns(C).map(r => {
+      const x = r.x + avgW * 0.2;
+      let col;
+      if(x < left) col = -Math.max(1, Math.round((left - x) / avgW));
+      else if(x >= right) col = n + Math.round((x - right) / avgW);
+      else{
+        // A letter runs to where the next one starts (PDFs often give spaces too wide a box).
+        col = lyr.xs.findIndex((cx, i) => x >= cx && x < (i + 1 < n && lyr.xs[i + 1] > cx ? lyr.xs[i + 1] : cx + lyr.ws[i]));
+        if(col < 0) col = Math.round((x - left) / avgW);
+      }
+      return { text: r.text, col };
+    }).sort((a,b) => a.col - b.col);
+    const shift = cols.length ? Math.max(0, -cols[0].col) : 0;
+    let row = "";
+    for(const c of cols){
+      const want = c.col + shift;
+      row = row.padEnd(row.length ? Math.max(want, row.length + 1) : want, " ") + c.text;
+    }
+    return [row, " ".repeat(shift) + lyr.text];
+  };
+  const chordOnly = (C, colLeft) => {
+    const unit = C.size * 0.55;
+    let row = "";
+    for(const r of chordRuns(C)){
+      const want = Math.max(0, Math.round((r.x - colLeft) / unit));
+      row = row.padEnd(row.length ? Math.max(want, row.length + 2) : want, " ") + r.text;
+    }
+    return row;
+  };
+  // A clear gutter down the middle of the page means two columns. A few lines may cross it (the title,
+  // a copyright footer): they are read before (above the columns) or after the two columns.
+  const splitColumns = (items) => {
+    const body = items.filter(it => it.str.trim());
+    if(body.length < 24) return [items];
+    const x0 = Math.min(...body.map(it => it.x)), x1 = Math.max(...body.map(it => it.x + Math.max(it.w, 1)));
+    const W = x1 - x0;
+    if(!(W > 0)) return [items];
+    const B = 240, cover = new Array(B).fill(0);
+    for(const it of body){
+      const a = Math.floor((it.x - x0) / W * B), b = Math.ceil((it.x + Math.max(it.w, 1) - x0) / W * B);
+      for(let k = Math.max(0, a); k < Math.min(B, b); k++) cover[k]++;
+    }
+    const size = median(body.map(it => it.size)) || 10;
+    const minRun = Math.max(2, Math.round(size * 1.2 / W * B));
+    const allowed = Math.max(1, Math.floor(body.length * 0.03));
+    let best = null;
+    for(let k = Math.floor(B * 0.28); k < B * 0.72;){
+      if(cover[k] > allowed){ k++; continue; }
+      let j = k;
+      while(j < B && cover[j] <= allowed) j++;
+      if(j - k >= minRun && (!best || j - k > best[1] - best[0])) best = [k, j];
+      k = j;
+    }
+    if(!best) return [items];
+    const cut = x0 + (best[0] + best[1]) / 2 / B * W;
+    const crosses = it => it.x < cut && it.x + it.w > cut;
+    const L = items.filter(it => !crosses(it) && it.x < cut), R = items.filter(it => !crosses(it) && it.x >= cut);
+    const share = (arr) => arr.filter(it => it.str.trim()).length / body.length;
+    if(share(L) < 0.2 || share(R) < 0.2) return [items];
+    const top = Math.max(...[...L, ...R].map(it => it.y));
+    const across = items.filter(crosses);
+    return [across.filter(it => it.y > top), L, R, across.filter(it => it.y <= top)].filter(a => a.length);
+  };
+
   let out = [];
   for(let p=1; p<=pdf.numPages; p++){
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
-
-    const items = (content.items || []).map(it => ({
-      str: String(it.str || ""),
-      x: (it.transform && it.transform[4]) ? it.transform[4] : 0,
-      y: (it.transform && it.transform[5]) ? it.transform[5] : 0
-    })).filter(it => it.str.trim());
-
-    // ---- Better layout reconstruction (keeps chord-over-lyric alignment much better)
-    // 1) group into lines by Y
-    // 2) within a line, place tokens by X into a fixed-width string
-    items.sort((a,b) => (b.y - a.y) || (a.x - b.x));
-
-    const yTol = 3.5; // PDF units; tweakable
-    const lines = [];
-    let curY = null;
-    let cur = [];
-    const pushCur = () => {
-      if(cur.length) lines.push(cur);
-      cur = [];
-    };
-
-    for(const it of items){
-      if(curY === null){
-        curY = it.y;
-        cur.push(it);
-        continue;
+    const items = (content.items || []).filter(it => typeof it.str === "string" && it.str.length).map(it => {
+      const tr = it.transform || [1,0,0,1,0,0];
+      const size = Math.hypot(tr[2] || 0, tr[3] || 0) || it.height || 10;
+      return { str: it.str.replace(/ /g, " "), x: tr[4] || 0, y: tr[5] || 0, w: Number(it.width) || 0, size, fam: String(content.styles?.[it.fontName]?.fontFamily || "sans-serif") };
+    });
+    for(const colItems of splitColumns(items)){
+      const sorted = colItems.slice().sort((a,b) => (b.y - a.y) || (a.x - b.x));
+      const groups = [];
+      for(const it of sorted){
+        const g = groups[groups.length - 1];
+        if(g && Math.abs(g.y - it.y) <= Math.max(1.2, Math.min(g.size, it.size) * 0.35)) g.items.push(it);
+        else groups.push({ y: it.y, size: it.size, items: [it] });
       }
-      if(Math.abs(it.y - curY) > yTol){
-        pushCur();
-        curY = it.y;
+      const lines = groups.map(g => buildLine(g.items)).filter(L => L.text.trim() && !FOOTER_RE.test(L.text.trim()));
+      if(!lines.length) continue;
+      const colLeft = Math.min(...lines.map(L => L.x0));
+      const step = median(lines.slice(1).map((L, i) => lines[i].y - L.y).filter(d => d > 0)) || lines[0].size * 1.2;
+      let lastY = null;
+      for(let i=0; i<lines.length; i++){
+        const L = lines[i];
+        if(lastY != null && lastY - L.y > step * 1.75 && out.length && out[out.length - 1] !== "") out.push("");
+        const isChord = isSrpChordRow(L.text);
+        const N = lines[i + 1];
+        if(isChord && N && !isSrpChordRow(N.text) && !importHeadingTitleFromLine(N.text.trim()) && (L.y - N.y) < Math.max(L.size, N.size) * 2.6){
+          out.push(...pairLines(L, N));
+          lastY = N.y; i++;
+          continue;
+        }
+        out.push(isChord ? chordOnly(L, colLeft) : tidyLyric(L).text);
+        lastY = L.y;
       }
-      cur.push(it);
+      out.push("");
     }
-    pushCur();
-
-    const median = (arr) => {
-      if(!arr.length) return null;
-      const a = arr.slice().sort((x,y)=>x-y);
-      const mid = Math.floor(a.length/2);
-      return (a.length % 2) ? a[mid] : (a[mid-1] + a[mid]) / 2;
-    };
-
-    const buildAlignedLine = (lineItems) => {
-      const li = lineItems.slice().sort((a,b)=>a.x-b.x);
-      if(!li.length) return "";
-
-      const minX = li[0].x;
-
-      // estimate an average "character width" for this line
-      const samples = [];
-      for(let i=0;i<li.length-1;i++){
-        const dx = li[i+1].x - li[i].x;
-        const len = Math.max(1, String(li[i].str||"").length);
-        if(dx > 1) samples.push(dx / len);
-      }
-      let charW = median(samples);
-      if(!charW || !isFinite(charW)) charW = 4; // fallback
-      charW = Math.max(2, Math.min(12, charW));
-
-      let s = "";
-      let cursor = 0;
-      for(const it of li){
-        const col = Math.max(0, Math.round((it.x - minX) / charW));
-        if(col > cursor) s += " ".repeat(col - cursor);
-        const t = String(it.str || "");
-        s += t;
-        cursor = col + t.length;
-      }
-      return s.replace(/\s+$/,"");
-    };
-
-    for(const lineItems of lines){
-      const s = buildAlignedLine(lineItems).trimEnd();
-      if(s) out.push(s);
-    }
-
-    if(p !== pdf.numPages) out.push("");
   }
 
-  let txt = out.join("\n").trim();
-  txt = fixPdfLetterSpacing(txt);
-  return txt;
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 
