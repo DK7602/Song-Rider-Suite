@@ -996,10 +996,10 @@ return null;
 // This is intentionally separate from the app's PAGE 1/PAGE 2 navigation labels.
 // ---- Chord names (one check for import, Full view, capo/transpose and export) ----
 // A chord is a capital root A–G with an optional sharp/flat, then the usual chord words and numbers
-// (m, min, maj, M, dim, °, ø, Δ, aug, +, -, sus, add, alt, no, 2–13, b/# alterations, parentheses such
+// (m, min, maj, M, dim, °, ø, Δ, aug, +, -, sus, add, alt, no, 2/4/5/6/7/9/11/13, b/# alterations, parentheses such
 // as C(add9) or Bm7(b5), 6/9), then an optional /bass note. N.C. (no chord) counts too. Words such as
 // "Amazing", "Grace", "Be", "Am I" or "Add" are lyrics, not chords.
-const SRP_CHORD_RE = /^[A-G](?:#|b)?(?:maj|min|mi|m|M|dim|aug|sus|add|alt|no|omit|°|ø|Δ|\+|-|#|b|\d|\(|\)|\/(?=\d)|,(?=\d))*(?:\/[A-G](?:#|b)?)?$/;
+const SRP_CHORD_RE = /^[A-G](?:#|b)?(?:maj|min|mi|m|M|dim|aug|sus|add|alt|(?:no|omit)[35]?|°|ø|Δ|\+|-|#|b|13|11|9|7|6|5|4|2|\(|\)|\/(?=9|11|13)|,(?=\d))*(?:\/[A-G](?:#|b)?)?$/;
 function srpNormChordToken(tok){
   let t = String(tok || "").trim().replace(/♯/g, "#").replace(/♭/g, "b").replace(/\u00A0/g, "");
   if(/^\(?N\.?C\.?\)?$/i.test(t)) return "N.C.";
@@ -1044,12 +1044,12 @@ function isSrpChordRow(line){
   if(!chords || label > 1){
     // All lowercase chords ("am g f c"): a row when every word is a chord and there are at least two.
     const low = toks.filter(t => !isSrpChordRowFiller(t));
-    return low.length >= 2 && low.every(t => /^[a-g]/.test(t) || isSrpChordToken(t)) && low.every(t => isSrpChordToken(srpCapChord(t)));
+    return low.length >= 2 && (low.some(t => t.length >= 2) || /\S {2,}\S/.test(raw)) && low.every(t => /^[a-g]/.test(t) || isSrpChordToken(t)) && low.every(t => isSrpChordToken(srpCapChord(t)));
   }
   if(other === 0) return label === 0 || chords >= 2;
   if(other === 1 && label === 0 && chords >= 3) return true;
   const low = toks.filter(t => !isSrpChordRowFiller(t));
-  return low.length >= 2 && low.every(t => isSrpChordToken(srpCapChord(t)));
+  return low.length >= 2 && (low.some(t => t.length >= 2) || /\S {2,}\S/.test(raw)) && low.every(t => isSrpChordToken(srpCapChord(t)));
 }
 // Chord tokens of a chord row with their columns: [{chord, col}].
 function srpChordRowTokens(line){

@@ -516,10 +516,11 @@ await test('ChordPro and [G]inline chord sheets become song parts with each chor
   assert.deepEqual(chordWords(await fullViewText(page)), want);
   assert.deepEqual(await exportedChordWords(await exportPage(page), 390), want);
   // [G]inline lines without ChordPro, and a chord row of lowercase chords.
-  await pasteSong(page, '[Verse 1]\n[G]Low in the [C]valley\n\n[Chorus]\ng          d\nSing it loud tonight');
+  await pasteSong(page, '[Verse 1]\n[G]Low in the [C]valley\n\n[Chorus]\ng          em\nSing it loud tonight\n\n[Bridge]\nc1 a\nlyric words');
   await sleep(1200);
   const cards = (await stored(page))[0].sections;
-  assert.deepEqual([cards['PAGE 1'][0].notes.filter(Boolean), cards['PAGE 2'][0].notes.filter(Boolean)], [['G', 'C'], ['G', 'D']]);
+  assert.deepEqual([cards['PAGE 1'][0].notes.filter(Boolean), cards['PAGE 2'][0].notes.filter(Boolean)], [['G', 'C'], ['G', 'Em']]);
+  assert.deepEqual(cards['PAGE 3'].map((l) => [l.lyrics, l.notes.filter(Boolean).length]), [['c1 a', 0], ['lyric words', 0]], 'words that only look a little like chords stay lyrics');
   noErrors(page);
   await ctx.close();
 });
